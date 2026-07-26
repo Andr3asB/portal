@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% set app_slug = "todo" %}
+{% block title %}Todos{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:22px; font-weight:700; }
+.header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
+.new-todo-card {
+  background:#fff; border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.07);
+}
+.new-todo-row { display:flex; gap:8px; margin-bottom:10px; }
+.new-todo-input {
+  flex:1; border:1.5px solid #d1d1d6; border-radius:10px;
+  padding:10px 12px; font-size:16px; font-family:inherit; outline:none;
+}
+.new-todo-input:focus { border-color:var(--farbe); }
+.new-todo-submit {
+  background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:10px 16px; font-size:20px; cursor:pointer;
+  min-width:48px;
+}
+.todo-options { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.todo-select {
+  border:1.5px solid #d1d1d6; border-radius:8px; padding:7px 10px;
+  font-size:14px; background:#fff; outline:none; flex:1; min-width:120px;
+}
+.privat-row { display:flex; align-items:center; gap:6px; font-size:14px; color:#6e6e73; }
+.privat-row input { width:18px; height:18px; }
+.section-label { font-size:13px; font-weight:600; color:#8e8e93; margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
+.todo-item {
+  background:#fff; border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,.06);
+  display:flex; align-items:flex-start; gap:12px;
+}
+.todo-item.done { opacity:.5; }
+.todo-check-form { flex-shrink:0; margin-top:1px; }
+.todo-check {
+  width:26px; height:26px; border-radius:50%; border:2.5px solid #d1d1d6;
+  background:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:14px; transition:background .15s;
+}
+.todo-item.done .todo-check { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.todo-body { flex:1; min-width:0; }
+.todo-text { font-size:16px; font-weight:500; word-break:break-word; }
+.todo-item.done .todo-text { text-decoration:line-through; }
+.todo-meta { font-size:12px; color:#8e8e93; margin-top:4px; }
+.todo-meta .chip {
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:11px; font-weight:600; color:#fff; margin-right:4px;
+}
+.todo-del {
+  background:none; border:none; color:#c7c7cc; cursor:pointer;
+  font-size:20px; padding:0 4px; flex-shrink:0; align-self:center;
+}
+.todo-del:active { color:#ff3b30; }
+{% endblock %}
+
+{% block body %}
+<header class="page-header" style="background:var(--farbe)">
+  <div>
+    <div class="header-title">✅ Todos</div>
+    <div class="header-sub">{{ todos|selectattr('erledigt','eq',0)|list|length }} offen</div>
+  </div>
+</header>
+
+<main class="main">
+  <!-- Neues Todo -->
+  <div class="new-todo-card">
+    <form method="post" action="/a/todo/{{ token }}/neu">
+      <div class="new-todo-row">
+        <input class="new-todo-input" type="text" name="inhalt"
+               placeholder="Neues Todo…" required autocomplete="off">
+        <button class="new-todo-submit" type="submit">+</button>
+      </div>
+      <div class="todo-options">
+        <select class="todo-select" name="zugewiesen_an">
+          <option value="">Für mich</option>
+          {% for u in users %}
+          <option value="{{ u.id }}"
+            {% if u.id == user.id %}style="font-weight:600"{% endif %}>
+            → {{ u.name }}
+          </option>
+          {% endfor %}
+        </select>
+        <label class="privat-row">
+          <input type="checkbox" name="privat"> 🔒 Privat
+        </label>
+      </div>
+    </form>
+  </div>
+
+  <!-- Offene Todos -->
+  {% set open_todos = todos|selectattr('erledigt','eq',0)|list %}
+  {% set done_todos = todos|selectattr('erledigt','ne',0)|list %}
+
+  {% if open_todos %}
+  <div class="section-label">Offen</div>
+  {% for t in open_todos %}
+  <div class="todo-item">
+    <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
+      <button class="todo-check" type="submit" title="Abhaken">{% if t.erledigt %}✓{% endif %}</button>
+    </form>
+    <div class="todo-body">
+      <div class="todo-text">{{ t.inhalt }}</div>
+      <div class="todo-meta">
+        {% if t.privat %}<span class="chip" style="background:#8e8e93">🔒</span>{% endif %}
+        {% if t.fuer_name and t.zugewiesen_an != user.id %}
+          <span class="chip" style="background:{{ t.fuer_farbe }}">→ {{ t.fuer_name }}</span>
+        {% elif t.zugewiesen_an == user.id and t.von_name %}
+          <span class="chip" style="background:{{ t.von_farbe }}">von {{ t.von_name }}</span>
+        {% endif %}
+        {{ t.erstellt[:10] }}
+      </div>
+    </div>
+    {% if t.erstellt_von == user.id or user.is_admin %}
+    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
+          onsubmit="return confirm('Todo löschen?')">
+      <button class="todo-del" type="submit">×</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Erledigte Todos -->
+  {% if done_todos %}
+  <div class="section-label">Erledigt</div>
+  {% for t in done_todos %}
+  <div class="todo-item done">
+    <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
+      <button class="todo-check" type="submit" title="Wiederherstellen">✓</button>
+    </form>
+    <div class="todo-body">
+      <div class="todo-text">{{ t.inhalt }}</div>
+      <div class="todo-meta">{{ t.erledigt_am[:10] if t.erledigt_am else '' }}</div>
+    </div>
+    {% if t.erstellt_von == user.id or user.is_admin %}
+    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}">
+      <button class="todo-del" type="submit">×</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if not todos %}
+  <div style="text-align:center;padding:48px 16px;color:#8e8e93">
+    <div style="font-size:48px;margin-bottom:12px">🎉</div>
+    Alles erledigt!
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

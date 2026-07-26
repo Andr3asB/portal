@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set app_slug = "geholfen" %}
+{% block title %}Geholfen – Übersicht{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:20px; font-weight:700; }
+.header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
+.stats-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap:10px; margin-bottom:16px;
+}
+.stats-card {
+  background:#fff; border-radius:14px; padding:14px; text-align:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.stats-avatar {
+  width:40px; height:40px; border-radius:50%; margin:0 auto 8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; font-weight:700; color:#fff;
+}
+.stats-name   { font-size:14px; font-weight:600; }
+.stats-points { font-size:28px; font-weight:700; margin:4px 0; }
+.stats-label  { font-size:11px; color:#8e8e93; }
+.detail-table { width:100%; border-collapse:collapse; font-size:13px; }
+.detail-table th {
+  text-align:left; padding:8px 10px; background:#f2f2f7;
+  font-size:12px; color:#6e6e73; border-radius:8px;
+}
+.detail-table td { padding:8px 10px; border-bottom:1px solid #f5f5f7; }
+.detail-table tr:last-child td { border-bottom:none; }
+.count-badge {
+  display:inline-block; background:#e5e5ea; border-radius:10px;
+  padding:2px 8px; font-weight:600; min-width:28px; text-align:center;
+}
+.count-badge.has { background:var(--farbe); color:#fff; }
+.section-label { font-size:13px; font-weight:600; color:#8e8e93;
+  margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
+{% endblock %}
+
+{% block body %}
+<header class="page-header" style="background:var(--farbe)">
+  <div>
+    <div class="header-title">📊 Letzte 7 Tage</div>
+    <div class="header-sub">Geholfen-Übersicht</div>
+  </div>
+</header>
+
+<main class="main">
+  <div class="section-label">Punkte</div>
+  <div class="stats-grid">
+    {% for u in users %}
+    <div class="stats-card">
+      <div class="stats-avatar" style="background:{{ u.farbe }}">{{ u.name[0] }}</div>
+      <div class="stats-name">{{ u.name }}</div>
+      <div class="stats-points" style="color:{{ u.farbe }}">
+        {{ (punkte.get(u.id, 0) * 10 | round | int) / 10 }}
+      </div>
+      <div class="stats-label">Punkte</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="section-label">Details</div>
+  <div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Aufgabe</th>
+          {% for u in users %}<th>{{ u.name }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in aufgaben %}
+        <tr>
+          <td>{{ a.emoji }} {{ a.name }}</td>
+          {% for u in users %}
+          {% set c = counts.get(u.id, {}).get(a.id, 0) %}
+          <td><span class="count-badge {% if c > 0 %}has{% endif %}">{{ c }}</span></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if user.is_admin %}
+  <div style="margin-top:16px">
+    <a class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;padding:12px"
+       href="/a/geholfen/{{ token }}/aufgaben">⚙️ Aufgaben verwalten</a>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

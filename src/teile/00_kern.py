@@ -42,7 +42,49 @@ CREATE TABLE IF NOT EXISTS wuensche (
   erstellt  TEXT    NOT NULL DEFAULT (datetime('now')),
   erledigt  INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS todos (
+  id            INTEGER PRIMARY KEY,
+  inhalt        TEXT    NOT NULL,
+  erstellt_von  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  zugewiesen_an INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  privat        INTEGER NOT NULL DEFAULT 0,
+  erledigt      INTEGER NOT NULL DEFAULT 0,
+  erledigt_am   TEXT,
+  erstellt      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS geholfen_aufgaben (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT    NOT NULL,
+  emoji      TEXT    NOT NULL DEFAULT '👍',
+  gewichtung REAL    NOT NULL DEFAULT 1.0,
+  aktiv      INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS geholfen_eintraege (
+  id          INTEGER PRIMARY KEY,
+  aufgabe_id  INTEGER NOT NULL REFERENCES geholfen_aufgaben(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  zeitstempel TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
+
+_CORE_APPS = [
+    ("home",      "Portal",       "🏠", "Persönliche Startseite"),
+    ("admin",     "Verwaltung",   "⚙️", "Admin-Bereich"),
+    ("todo",      "Todos",        "✅", "Aufgabenliste"),
+    ("werkstatt", "Werkstatt",    "💡", "Verbesserungswünsche"),
+    ("geholfen",  "Geholfen",     "🙋", "Geholfen-Protokoll"),
+]
+
+_DEFAULT_AUFGABEN = [
+    ("Tisch decken",       "🍽️", 1.0),
+    ("Tisch abräumen",     "🥣", 1.0),
+    ("Wäsche falten",      "🧺", 1.5),
+    ("Rasen mähen",        "🌿", 3.0),
+    ("Zimmer aufräumen",   "🧹", 2.0),
+    ("Einkaufen helfen",   "🛒", 1.5),
+    ("Beim Kochen helfen", "🍳", 2.0),
+    ("Spülmaschine ein",   "🍳", 1.0),
+]
 
 
 def get_db():
@@ -96,7 +138,7 @@ def new_token() -> str:
 
 def push_send(user_id: int, title: str, body: str,
               app: str = "", url: str = "", dedup_key: str = ""):
-    """Push-Benachrichtigung – Stub für Meilenstein 2."""
+    """Push-Benachrichtigung – Stub für Meilenstein 3."""
     log.info("push→user %d: %s / %s (app=%s)", user_id, title, body, app)
 
 
@@ -104,6 +146,15 @@ def _init_db(app):
     with app.app_context():
         db = sqlite3.connect(app.config["DB_PATH"])
         db.executescript(SCHEMA)
+        db.executemany(
+            "INSERT OR IGNORE INTO apps(slug,name,emoji,beschreibung) VALUES(?,?,?,?)",
+            _CORE_APPS,
+        )
+        for name, emoji, gew in _DEFAULT_AUFGABEN:
+            db.execute(
+                "INSERT OR IGNORE INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
+                (name, emoji, gew),
+            )
         db.commit()
         db.close()
 

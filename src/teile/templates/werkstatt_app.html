@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% set app_slug = "werkstatt" %}
+{% block title %}Werkstatt{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:22px; font-weight:700; }
+.header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
+.wunsch-card {
+  background:#fff; border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,.06);
+  display:flex; gap:12px; align-items:flex-start;
+}
+.wunsch-card.done { opacity:.45; }
+.wunsch-body { flex:1; min-width:0; }
+.wunsch-text { font-size:15px; font-weight:500; word-break:break-word; }
+.wunsch-card.done .wunsch-text { text-decoration:line-through; }
+.wunsch-meta { font-size:12px; color:#8e8e93; margin-top:4px; display:flex; flex-wrap:wrap; gap:6px; }
+.wunsch-chip {
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:11px; font-weight:600; color:#fff; background:#8e8e93;
+}
+.wunsch-actions { display:flex; flex-direction:column; gap:4px; flex-shrink:0; }
+.btn-done {
+  background:none; border:1.5px solid #34c759; color:#34c759;
+  border-radius:8px; padding:6px 8px; font-size:13px; cursor:pointer;
+  white-space:nowrap;
+}
+.btn-done.active { background:#34c759; color:#fff; }
+.btn-del {
+  background:none; border:none; color:#c7c7cc; cursor:pointer;
+  font-size:18px; text-align:center;
+}
+.empty { text-align:center; padding:48px 16px; color:#8e8e93; font-size:16px; }
+{% endblock %}
+
+{% block body %}
+<header class="page-header" style="background:var(--farbe)">
+  <div>
+    <div class="header-title">💡 Werkstatt</div>
+    <div class="header-sub">{{ wuensche|selectattr('erledigt','eq',0)|list|length }} offene Wünsche</div>
+  </div>
+</header>
+
+<main class="main">
+{% if not wuensche %}
+  <div class="empty">
+    <div style="font-size:48px;margin-bottom:12px">✨</div>
+    Noch keine Wünsche.<br>Nutze das ✨ in jeder App!
+  </div>
+{% else %}
+  {% for w in wuensche %}
+  <div class="wunsch-card {% if w.erledigt %}done{% endif %}">
+    <div class="wunsch-body">
+      <div class="wunsch-text">{{ w.text }}</div>
+      <div class="wunsch-meta">
+        {% if w.app_slug %}<span class="wunsch-chip">{{ w.app_slug }}</span>{% endif %}
+        {% if w.urheber_name %}
+          <span style="color:{{ w.urheber_farbe }}; font-weight:500">{{ w.urheber_name }}</span>
+        {% endif %}
+        <span>{{ w.erstellt[:10] }}</span>
+      </div>
+    </div>
+    {% if user.is_admin %}
+    <div class="wunsch-actions">
+      <form method="post" action="/a/werkstatt/{{ token }}/erledigt/{{ w.id }}">
+        <button type="submit" class="btn-done {% if w.erledigt %}active{% endif %}">
+          {% if w.erledigt %}✓ OK{% else %}✓{% endif %}
+        </button>
+      </form>
+      <form method="post" action="/a/werkstatt/{{ token }}/loeschen/{{ w.id }}"
+            onsubmit="return confirm('Wunsch löschen?')">
+        <button type="submit" class="btn-del">×</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% endif %}
+</main>
+{% endblock %}

@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-26 (Meilenstein 1 abgeschlossen)*
+*Letzte Aktualisierung: 2026-07-26 (Meilenstein 2 abgeschlossen)*
 
 ## Host
 
@@ -69,16 +69,29 @@ GUNICORN_RUN_DIR=/tmp
 
 ```
 app.py               – Flask-App, lädt nummerierte Module aus teile/ automatisch
-manage.py            – CLI: createadmin, adduser, addapp, grant, listusers, listwuensche
+manage.py            – CLI: createadmin, adduser, addapp, grant, listusers,
+                       listwuensche, listtodos, wunsch_erledigt, backlog
 teile/
   __init__.py        – registriert 00_kern als teile.kern
-  00_kern.py         – DB-Verbindung (WAL), grant(), new_token(), push_send()-Stub, /health
-  01_start_token.py  – /p/<token> Startseite, / Landing/denied
-  02_werkstatt.py    – POST /wunsch (✨ Verbesserungswünsche)
+  00_kern.py         – DB-Schema, get_db()/new_db(), grant(), new_token(),
+                       push_send()-Stub, /health, _init_db()
+  01_start_token.py  – / (Landing), /p/<token> (Startseite)
+  02_werkstatt.py    – POST /wunsch (JSON, identifiziert Nutzer über Token)
+  03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer, Grants, QR
+  04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() öffentlich
+  05_werkstatt_app.py – /a/werkstatt/<token>/ Wunschliste (Admin: erledigt/löschen)
+  06_geholfen.py     – /a/geholfen/<token>/ Tipp-Grid + Übersicht + Aufgaben
   templates/
-    base.html        – Grundlayout: safe-area, ⌂ + ✨ Bottom-Bar
-    startseite.html  – Persönliche Startseite mit App-Kacheln
-    denied.html      – Zugang verweigert / Landing ohne Token
+    base.html               – Grundlayout: safe-area, ⌂ + ✨ Bottom-Bar
+    startseite.html         – Persönliche Startseite mit App-Kacheln
+    denied.html             – Zugang verweigert / Landing ohne Token
+    admin.html              – Nutzerverwaltung, Grant-Chips, QR-Modal
+    admin_user_form.html    – Nutzer anlegen/bearbeiten (Farbe, Admin-Flag)
+    todo.html               – Aufgabenliste (neu, zuweisen, erledigen)
+    werkstatt_app.html      – Wunschliste mit Admin-Aktionen
+    geholfen.html           – Tipp-Grid (Fetch-AJAX), Ticker
+    geholfen_uebersicht.html – 7-Tage-Statistik, Punkte pro Nutzer
+    geholfen_aufgaben.html  – Aufgaben verwalten (hinzufügen, deaktivieren)
 static/
   manifest.json      – PWA-Manifest
   icon-192.png       – Generiert im Dockerfile (solid blue #4a90d9)
@@ -94,15 +107,31 @@ static/
 | `grants` | id, user_id, app_id, token (UNIQUE pro user+app) |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, user_id, app_slug, erstellt, erledigt |
+| `todos` | id, inhalt, erstellt_von, zugewiesen_an, privat, erledigt, erledigt_am, erstellt |
+| `geholfen_aufgaben` | id, name, emoji, gewichtung, aktiv |
+| `geholfen_eintraege` | id, aufgabe_id, user_id, zeitstempel |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.
 
-## Nutzer
+## App-Slugs (Core)
+
+| Slug | Name | Emoji | Beschreibung |
+|------|------|-------|--------------|
+| `home` | Portal | 🏠 | Persönliche Startseite |
+| `admin` | Verwaltung | ⚙️ | Nutzerverwaltung, Grants |
+| `todo` | Todos | ✅ | Aufgabenliste |
+| `werkstatt` | Werkstatt | 💡 | Verbesserungswünsche |
+| `geholfen` | Geholfen | 🙋 | Geholfen-Protokoll |
+
+## Nutzer (Stand 2026-07-26)
 
 | ID | Name | Farbe | Admin | Startseiten-URL |
 |----|------|-------|-------|-----------------|
 | 1 | Andi | #3498db | ✅ | `https://portal.16schwaben.de/p/l71US-2m8bVk004JUERd-pVs` |
+| 2 | Simone | (unbekannt) | – | (über Admin-App abrufbar) |
+
+Weitere Familienmitglieder werden über `manage.py adduser` oder den Admin-Bereich (`/a/admin/`) angelegt.
 
 ## util-Aufgaben
 
@@ -123,17 +152,21 @@ Tägliches Backup (rsync auf zweiten Rechner) noch nicht eingerichtet – Meilen
 ## Deployment-Ablauf
 
 ```bash
-# Paket bauen
-tar czf deploy/portal-vN.tar.gz src util docker-compose.yml Caddyfile .env.example
+# Paket bauen (von lokalem Rechner)
+tar czf deploy/portal-vN.tar.gz --exclude='deploy' --exclude='.git' \
+  --exclude='*.db' --exclude='data' --exclude='.env' \
+  --exclude='__pycache__' --exclude='*.pyc' .
 
 # Auf Server laden
-scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/deploy/
+scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
 
-# Auf Server entpacken + neu ausrollen
-ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf deploy/portal-vN.tar.gz && docker compose build && docker compose up -d"
+# Auf Server entpacken + Container neu bauen + starten
+ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf portal-vN.tar.gz"
+ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose build --no-cache portal util"
+ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d"
 
-# Testen
-curl -sI https://portal.16schwaben.de/
+# Testen (von lokalem Rechner, NICHT vom Host)
+curl -s https://portal.16schwaben.de/health
 ```
 
 ## manage.py – Wichtige Befehle
@@ -145,4 +178,7 @@ docker exec portal python manage.py addapp     slug "App-Name" "emoji"
 docker exec portal python manage.py grant      <user_id> <app_slug>
 docker exec portal python manage.py listusers
 docker exec portal python manage.py listwuensche
+docker exec portal python manage.py listtodos
+docker exec portal python manage.py wunsch_erledigt <id>
+docker exec portal python manage.py backlog
 ```

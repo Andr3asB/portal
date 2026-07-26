@@ -182,13 +182,68 @@ def cmd_listwuensche(_):
         print(f"  {status} #{r['id']} {r['erstellt'][:16]}{app} {who}: {r['text']}")
 
 
+def cmd_listtodos(_):
+    db = connect()
+    rows = db.execute("""
+        SELECT t.id, t.inhalt, t.erledigt, t.erstellt, u1.name AS von, u2.name AS fuer
+        FROM   todos t
+        LEFT JOIN users u1 ON u1.id = t.erstellt_von
+        LEFT JOIN users u2 ON u2.id = t.zugewiesen_an
+        ORDER  BY t.erledigt, t.erstellt DESC
+    """).fetchall()
+    db.close()
+    for r in rows:
+        status = "✅" if r["erledigt"] else "⏳"
+        fuer = f" → {r['fuer']}" if r["fuer"] else ""
+        print(f"  {status} #{r['id']} {r['erstellt'][:10]} {r['von']}{fuer}: {r['inhalt']}")
+
+
+def cmd_wunsch_erledigt(args):
+    if not args:
+        sys.exit("Verwendung: wunsch_erledigt <id>")
+    db = connect()
+    db.execute("UPDATE wuensche SET erledigt=1 WHERE id=?", (int(args[0]),))
+    db.commit()
+    db.close()
+    print(f"Wunsch #{args[0]} als erledigt markiert.")
+
+
+def cmd_backlog(_):
+    """Alle offenen Wünsche und Todos – Einblick in den Rückstand."""
+    db = connect()
+    print("=== Offene Wünsche (✨) ===")
+    for r in db.execute("""
+        SELECT w.id, w.text, w.app_slug, w.erstellt, u.name
+        FROM wuensche w LEFT JOIN users u ON u.id = w.user_id
+        WHERE w.erledigt=0 ORDER BY w.erstellt
+    """).fetchall():
+        app = f"[{r['app_slug']}] " if r["app_slug"] else ""
+        who = r["name"] or "anonym"
+        print(f"  #{r['id']} {r['erstellt'][:10]} {app}{who}: {r['text']}")
+    print()
+    print("=== Offene Todos ===")
+    for r in db.execute("""
+        SELECT t.id, t.inhalt, t.erstellt, u1.name AS von, u2.name AS fuer
+        FROM todos t
+        LEFT JOIN users u1 ON u1.id = t.erstellt_von
+        LEFT JOIN users u2 ON u2.id = t.zugewiesen_an
+        WHERE t.erledigt=0 ORDER BY t.erstellt
+    """).fetchall():
+        fuer = f" → {r['fuer']}" if r["fuer"] else ""
+        print(f"  #{r['id']} {r['erstellt'][:10]} {r['von']}{fuer}: {r['inhalt']}")
+    db.close()
+
+
 CMDS = {
-    "createadmin": cmd_createadmin,
-    "adduser":     cmd_adduser,
-    "addapp":      cmd_addapp,
-    "grant":       cmd_grant,
-    "listusers":   cmd_listusers,
-    "listwuensche": cmd_listwuensche,
+    "createadmin":     cmd_createadmin,
+    "adduser":         cmd_adduser,
+    "addapp":          cmd_addapp,
+    "grant":           cmd_grant,
+    "listusers":       cmd_listusers,
+    "listwuensche":    cmd_listwuensche,
+    "listtodos":       cmd_listtodos,
+    "wunsch_erledigt": cmd_wunsch_erledigt,
+    "backlog":         cmd_backlog,
 }
 
 if __name__ == "__main__":

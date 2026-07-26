@@ -59,4 +59,67 @@ Erster Admin-User `Andi` angelegt.
 
 ---
 
-*Nächster Schritt: Meilenstein 2 – Zentrale Dienste (Admin, Todos, Werkstatt, Geholfen)*
+## 2026-07-26 – Meilenstein 2: Zentrale Dienste
+
+### Was gebaut wurde
+
+Vier App-Module + zugehörige Templates auf Basis des M1-Fundaments:
+
+- **Admin** (`03_admin.py`): Nutzerverwaltung, Grant-Chips (toggle aktiv/inaktiv),
+  QR-Code-Generator (via `segno`) für Startseiten-Link, Nutzerprofil-Editor (Farbe, Admin-Flag).
+  Eigene Farbe/Admin-Status kann nicht selbst entzogen werden.
+
+- **Todos** (`04_todo.py`): Aufgabenliste mit Zuweisung an andere Nutzer, privat-Flag
+  (nur Ersteller + Assignee + Admin), erledigen/wiederherstellen, löschen (Owner/Admin).
+  Öffentliche Funktion `todos_neu()` für Cross-App-Erstellung (z.B. Geholfen, zukünftiger Scanner).
+
+- **Werkstatt-App** (`05_werkstatt_app.py`): Wunschliste-Ansicht für den ✨-Button.
+  Admin kann Wünsche als erledigt markieren oder löschen. Für alle sichtbar (gefiltert nach Grants).
+
+- **Geholfen** (`06_geholfen.py`): Tipp-Grid für Haushaltsaufgaben. AJAX via Fetch-API
+  (`X-Requested-With: fetch`), Toast-Benachrichtigung ohne Reload. Übersicht: 7-Tage-Statistik
+  (Punkte gewichtet). Aufgabenverwaltung: Emoji + Name + Gewichtung, aktiv/inaktiv.
+  Seeded mit 8 Standard-Aufgaben.
+
+- **Kern** (`00_kern.py`) erweitert: Tabellen `todos`, `geholfen_aufgaben`, `geholfen_eintraege`
+  ins Schema aufgenommen. Seed für Core-Apps + Default-Aufgaben in `_init_db()`.
+
+- **manage.py** erweitert: `listtodos`, `wunsch_erledigt`, `backlog` (kombinierte Rückstandsansicht).
+
+- **requirements.txt**: `segno>=1.6` ergänzt (QR-Codes, serverseitig als SVG).
+
+### Testergebnisse
+
+- Alle 4 Apps: ✅ HTTP 200
+- Startseite zeigt alle 4 App-Kacheln korrekt: ✅
+- Admin: 2 Nutzerkarten (Andi + Simone): ✅
+- Todo: Form + Sektionen vorhanden: ✅
+- Werkstatt: Wunschliste geladen: ✅
+- Geholfen: 8 Tipp-Buttons vorhanden: ✅
+- POST /wunsch (JSON): `{"ok":true}` ✅
+- POST /a/todo/*/neu → 302 Redirect: ✅
+- POST /a/geholfen/*/tippen/1 → `{"ok":true,"aufgabe":"Tisch decken"}`: ✅
+- Testdaten restlos entfernt: ✅
+
+### Stolpersteine
+
+1. **05_werkstatt_app.py: doppelter DB-Aufruf** – Copy-Paste-Fehler: `get_db().execute()` zweimal
+   innerhalb von `loeschen()` aufgerufen ohne Variable. Zweite Verbindung war ein neues Objekt
+   ohne `.commit()`. Lösung: `db = get_db()` einmalig zuweisen.
+
+2. **manage.py grant druckte falsches Token** – Manage.py erstellte neuen Grant (Token A),
+   Andi togglete danach im Admin-Panel den Grant (revoke → neu-grant = Token B).
+   manage.py-Ausgabe zeigte Token A, DB enthielt Token B. Kein Bug in der Logik –
+   normales Verhalten bei Admin-Toggle-Funktion. Startseite verlinkete korrekt auf Token B.
+
+3. **Segno-Dependency**: `segno>=1.6` musste zu requirements.txt ergänzt werden, da
+   `segno.make()` für SVG-QR-Codes benötigt wird (keine OS-Pakete, pure Python).
+
+### Auslieferungspaket
+
+`deploy/portal-v2.tar.gz` – enthält src/ (alle Module + Templates), util/, docker-compose.yml,
+Caddyfile, .env.example, bauplan.md, CLAUDE.md, server.md, journal.md
+
+---
+
+*Nächster Schritt: Meilenstein 3 – Push-Benachrichtigungen (VAPID), rsync-Backup, Familien-Onboarding*
