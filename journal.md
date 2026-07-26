@@ -165,15 +165,61 @@ Web-Push-Infrastruktur vollständig integriert:
 Keine – `pywebpush>=2.0` akzeptiert base64url-kodierte Roh-Keys direkt.
 Die Schlüssel wurden über `cryptography.hazmat` generiert (direkter als py_vapid).
 
-### Noch offen (M3-Fortsetzung)
-
-- rsync-Backup auf NAS (Andi richtet NAS ein, dann einrichten)
-- Familie onboarden (WireGuard-Profile → Andi, dann QR-Codes ausgeben)
-
 ### Auslieferungspaket
 
 `deploy/portal-v3.tar.gz`
 
 ---
 
-*Nächster Schritt: rsync-Backup auf NAS (wenn NAS bereit), dann Familie onboarden*
+## 2026-07-26 – Meilenstein 3 (Fortsetzung): NAS-Backup
+
+### Was gebaut wurde
+
+Tägliches Backup von `/data` auf Ugreen NAS via tar+ssh-Pipe:
+
+- **`util/backup.py`**: tar lokal erstellen, via SSH als stdin zu `cat > /pfad/datei.tar.gz`
+  auf NAS streichen. Kein rsync-Daemon nötig. 7 Generationen auf NAS, Cleanup via
+  `ls -t | tail -n +8 | xargs -r rm -f` per Remote-SSH.
+
+- **`util/scheduler.py`**: täglich 03:00 Uhr, kein Backup beim Container-Start
+  (vermeidet Flood bei Restart).
+
+- **`util/Dockerfile`**: `useradd -u 1001` hinzugefügt – SSH sucht das Home-Verzeichnis
+  in `/etc/passwd`; ohne Eintrag scheitert der SSH-Login mit "No user exists for uid 1001".
+
+- **`docker-compose.yml`**: `/srv/familienportal/ssh:/ssh:ro` in util eingebunden.
+
+- **NAS-Setup**: SSH-Key `portal-backup@home02` (`id_ed25519`) auf Ugreen NAS in
+  `/home/familienportal/.ssh/authorized_keys` hinterlegt. User `familienportal` (uid=1005).
+  SSH im UGOS-Web-UI für diesen User aktiviert.
+
+### Testergebnisse
+
+- Manueller Backup-Lauf: ✅ `portal-20260726-2104.tar.gz` (19 KB) auf NAS erstellt
+- `ls` auf NAS: ✅ Datei mit korrekter Größe und Timestamp sichtbar
+- SSH ohne Passwort: ✅ BatchMode=yes funktioniert
+
+### Stolpersteine
+
+1. **UGOS rsync braucht setuid-root**: Ugreen UGOS nutzt einen Custom-rsync-Wrapper
+   (`ug_start_server`), der `set euid as root` benötigt – für uid=1005 nicht erlaubt.
+   rsync-Protokoll funktioniert daher nicht für `/volume2/`-Pfade ohne Root-Rechte.
+   Lösung: rsync komplett verworfen, tar+ssh-Pipe verwendet (kein remoter rsync-Daemon).
+
+2. **SSH-Port auf NAS**: Port 2222 (wie home02), nicht 22. Musste in `.env` + `backup.py`
+   Defaults nachgezogen werden.
+
+3. **"This account is currently not available"**: UGOS blockiert SSH per Nutzer.
+   Lösung: Im UGOS-Web-UI SSH für User `familienportal` explizit aktivieren.
+
+4. **"No user exists for uid 1001"**: SSH liest Home-Verzeichnis aus `/etc/passwd`.
+   Im util-Container existierte uid=1001 ohne passwd-Eintrag.
+   Lösung: `useradd -u 1001 -m -s /bin/sh portal` im Dockerfile.
+
+### Auslieferungspaket
+
+Direkt per `scp` auf den Server eingespielt (kein neues `.tar.gz`). Commit: `726ddab`
+
+---
+
+*Nächster Schritt: Familie onboarden (WireGuard-Profile → Andi, dann QR-Codes ausgeben)*

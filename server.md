@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-26 (Meilenstein 3 abgeschlossen)*
+*Letzte Aktualisierung: 2026-07-26 (Meilenstein 3 vollständig abgeschlossen – Push + NAS-Backup)*
 
 ## Host
 
@@ -149,8 +149,9 @@ Weitere Familienmitglieder werden über `manage.py adduser` oder den Admin-Berei
 |---------|----------|---------|
 | SQLite-Snapshot | stündlich | 24 Slots in `/data/snapshots/` |
 | Zertifikats-Watcher | täglich 04:00 + einmalig beim Start | prüft mtime, löst Caddy-Reload aus |
+| NAS-Backup | täglich 03:00 | tar+ssh-Pipe → Ugreen NAS 10.60.0.4:2222, User `familienportal`, Pfad `/volume2/portal.16schwaben.de_Backup/`, 7 Generationen |
 
-Tägliches Backup (rsync auf zweiten Rechner) noch nicht eingerichtet – Meilenstein 3.
+SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
 ## Bekannte Issues
 
