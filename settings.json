@@ -1,0 +1,71 @@
+{
+  "$comment": [
+    "Nach Serveradmin/.claude/settings.json kopieren.",
+    "guardrails.sh gehoert daneben nach Serveradmin/.claude/ und muss ausfuehrbar sein.",
+    "Die deny-Liste faengt lokale Direktaufrufe ab; alles was per ssh auf home02",
+    "laeuft, prueft der PreToolUse-Hook, weil Praefix-Regeln dort nicht greifen."
+  ],
+
+  "permissions": {
+    "deny": [
+      "Bash(sudo:*)",
+      "Bash(su:*)",
+      "Bash(apt:*)",
+      "Bash(apt-get:*)",
+      "Bash(dpkg:*)",
+      "Bash(snap:*)",
+      "Bash(systemctl:*)",
+      "Bash(docker network rm:*)",
+      "Bash(docker network prune:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(docker volume prune:*)",
+      "Bash(docker system prune:*)",
+      "Read(./.env)",
+      "Read(~/.ssh/**)",
+      "Read(**/id_rsa)",
+      "Read(**/id_ed25519)"
+    ],
+
+    "ask": [
+      "Bash(docker compose down:*)",
+      "Bash(docker network create:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker stop:*)",
+      "Bash(git push:*)"
+    ],
+
+    "allow": [
+      "Bash(ssh -p 2222 claude@10.0.0.100:*)",
+      "Bash(scp -P 2222:*)",
+      "Bash(ssh-keygen -lf:*)",
+      "Bash(curl https://portal.16schwaben.de:*)",
+      "Bash(openssl x509:*)",
+      "Bash(openssl s_client:*)",
+      "Bash(python3:*)",
+      "Bash(pytest:*)",
+      "Bash(tar:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/guardrails.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+# Als .gitignore nach C:\Projekte\portal.16schwaben.de\ kopieren
+
+# ── Echte Familiendaten – NIE einchecken ────────────────────────────────
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+backups/
+snapshots/
+
+# ── Geheimnisse ─────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+id_rsa*
+id_ed25519*
+vapid*.json
+secrets/
+
+# ── Auslieferungspakete (Git ist die Versionierung) ─────────────────────
+deploy/*.tar.gz
+deploy/*.tgz
+
+# ── Laufzeit / Werkzeuge ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+test-results/
+playwright-report/
+*.log
+
+# ── Debug-Artefakte, die versehentlich echte Daten enthalten können ─────
+screenshots/
+dumps/
+*.har
