@@ -11,6 +11,14 @@ bp  = Blueprint("todo_app", __name__)
 APP = "todo"
 
 
+def _todo_url(db, user_id: int) -> str:
+    row = db.execute("""
+        SELECT g.token FROM grants g JOIN apps a ON a.id=g.app_id
+        WHERE g.user_id=? AND a.slug='todo'
+    """, (user_id,)).fetchone()
+    return f"https://portal.16schwaben.de/a/todo/{row['token']}/" if row else ""
+
+
 def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,
               privat: bool = False):
     """Programmatische Schnittstelle für andere Apps (z. B. Geholfen, Scanner)."""
@@ -20,8 +28,9 @@ def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,
         (inhalt, erstellt_von, zugewiesen_an, 1 if privat else 0),
     )
     db.commit()
-    if zugewiesen_an:
-        push_send(zugewiesen_an, "Neues Todo", inhalt, "todo")
+    if zugewiesen_an and zugewiesen_an != erstellt_von:
+        push_send(zugewiesen_an, "Neues Todo 📋", inhalt[:80], "todo",
+                  _todo_url(db, zugewiesen_an))
 
 
 def _visible_todos(db, user_id):

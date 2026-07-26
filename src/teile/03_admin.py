@@ -26,6 +26,14 @@ def _grants_by_user(db):
     return result
 
 
+def _push_counts(db):
+    """Gibt {user_id: Anzahl Push-Abos} zurück."""
+    result = {}
+    for row in db.execute("SELECT user_id, COUNT(*) AS n FROM push_abos GROUP BY user_id"):
+        result[row["user_id"]] = row["n"]
+    return result
+
+
 @bp.route("/a/admin/<token>/")
 def index(token):
     user = _admin(token)
@@ -34,10 +42,11 @@ def index(token):
     apps  = db.execute("SELECT * FROM apps WHERE slug != 'home' ORDER BY id").fetchall()
     home_app_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
     grants = _grants_by_user(db)
+    push_counts = _push_counts(db)
     return render_template("admin.html",
         user=user, token=token, farbe=user["farbe"],
         all_users=users, apps=apps, grants=grants,
-        home_app_id=home_app_id,
+        home_app_id=home_app_id, push_counts=push_counts,
     )
 
 

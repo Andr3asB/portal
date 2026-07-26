@@ -29,6 +29,19 @@
   color: #8e8e93; font-size: 16px; line-height: 1.6;
 }
 .empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+.push-banner {
+  background: #fff; border-radius: 14px; padding: 12px 16px;
+  margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  display: flex; align-items: center; gap: 12px;
+}
+.push-banner .push-text { flex: 1; font-size: 14px; color: #3a3a3c; }
+.push-banner .push-text small { display: block; color: #8e8e93; font-size: 12px; margin-top: 2px; }
+.btn-push {
+  background: var(--farbe); color: #fff; border: none;
+  border-radius: 10px; padding: 8px 14px; font-size: 14px;
+  font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.btn-push:disabled { opacity: .5; cursor: default; }
 {% endblock %}
 
 {% block body %}
@@ -38,6 +51,16 @@
 </header>
 
 <main class="main">
+  <!-- Push-Banner: nur sichtbar wenn SW unterstützt wird und Permission noch nicht erteilt/abgelehnt -->
+  <div class="push-banner" id="push-banner" style="display:none">
+    <span style="font-size:28px">🔔</span>
+    <div class="push-text">
+      Benachrichtigungen
+      <small>Werde informiert, wenn jemand dir etwas zuweist.</small>
+    </div>
+    <button class="btn-push" id="push-btn">Aktivieren</button>
+  </div>
+
   {% if apps %}
     <div class="grid">
       {% for app in apps %}
@@ -67,6 +90,63 @@
   document.querySelectorAll('.header-name').forEach(el => {
     el.textContent = el.textContent.replace(/^[^,]+/, g);
   });
+})();
+
+// Push-Opt-in
+(async function(){
+  const TOKEN = '{{ token }}';
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (Notification.permission === 'denied') return;
+
+  const banner = document.getElementById('push-banner');
+  const btn    = document.getElementById('push-btn');
+
+  let swReg;
+  try { swReg = await navigator.serviceWorker.ready; } catch(e) { return; }
+
+  // Schon subscribed?
+  const existing = await swReg.pushManager.getSubscription();
+  if (existing) return;  // Alles gut, nichts anzeigen
+
+  // Noch nicht entschieden → Banner zeigen
+  if (Notification.permission === 'default') banner.style.display = 'flex';
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const resp = await fetch('/push/vapid-public-key');
+      const { key } = await resp.json();
+      if (!key) { btn.disabled = false; return; }
+
+      const appKey = urlB64ToUint8(key);
+      const sub = await swReg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: appKey,
+      });
+
+      await fetch('/push/subscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          token: TOKEN,
+          geraet: navigator.userAgent.substring(0, 80),
+        }),
+      });
+      banner.style.display = 'none';
+    } catch(e) {
+      console.warn('Push subscription failed:', e);
+      btn.disabled = false;
+    }
+  });
+
+  function urlB64ToUint8(b64) {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    return buf;
+  }
 })();
 </script>
 {% endblock %}

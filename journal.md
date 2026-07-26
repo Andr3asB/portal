@@ -122,4 +122,58 @@ Caddyfile, .env.example, bauplan.md, CLAUDE.md, server.md, journal.md
 
 ---
 
-*Nächster Schritt: Meilenstein 3 – Push-Benachrichtigungen (VAPID), rsync-Backup, Familien-Onboarding*
+## 2026-07-26 – Meilenstein 3: Push-Benachrichtigungen (VAPID)
+
+### Was gebaut wurde
+
+Web-Push-Infrastruktur vollständig integriert:
+
+- **Service Worker** (`static/sw.js`): Empfängt `push`-Events, zeigt Systembenachrichtigungen
+  mit Icon und Vibration; `notificationclick` öffnet Deep-Link.
+
+- **Push-Subscription-API** (`07_push.py`):
+  - `GET /push/vapid-public-key` – liefert VAPID-Public-Key für Frontend
+  - `POST /push/subscribe` – speichert Subscription in `push_abos`;
+    `ON CONFLICT(endpoint)` aktualisiert vorhandene Abos
+  - `POST /push/unsubscribe` – entfernt Subscription
+
+- **push_send()** (`00_kern.py`): Echte Implementierung statt Stub.
+  Spawnt Daemon-Thread (nicht-blockierend), sendet via `pywebpush.webpush()` an alle
+  Geräte des Nutzers. Expired Subscriptions (HTTP 404/410) werden automatisch bereinigt.
+  Graceful degradation wenn VAPID_PRIVATE_KEY fehlt.
+
+- **Todo-Zuweisung**: `todos_neu()` sucht den Todo-Token des Zugewiesenen und
+  sendet Push mit Deep-Link-URL.
+
+- **Startseite**: Push-Opt-in-Banner (erscheint nur bei `Notification.permission === 'default'`
+  und noch nicht abonniert).
+
+- **Admin**: Push-Abo-Zähler-Badge (🔔 N) neben Nutzernamen.
+
+- **VAPID-Keys**: In Container mit `cryptography`-Library generiert, in `.env` eingetragen.
+
+### Testergebnisse
+
+- `GET /push/vapid-public-key` → 87-Zeichen-Base64url-Key: ✅
+- `POST /push/subscribe` ohne Daten → 400: ✅
+- `POST /push/subscribe` mit ungültigem Token → 403: ✅
+- `GET /static/sw.js` → 200, push-EventListener vorhanden: ✅
+- Startseite: SW-Registration + Push-Banner vorhanden: ✅
+
+### Stolpersteine
+
+Keine – `pywebpush>=2.0` akzeptiert base64url-kodierte Roh-Keys direkt.
+Die Schlüssel wurden über `cryptography.hazmat` generiert (direkter als py_vapid).
+
+### Noch offen (M3-Fortsetzung)
+
+- rsync-Backup auf NAS (Andi richtet NAS ein, dann einrichten)
+- Familie onboarden (WireGuard-Profile → Andi, dann QR-Codes ausgeben)
+
+### Auslieferungspaket
+
+`deploy/portal-v3.tar.gz`
+
+---
+
+*Nächster Schritt: rsync-Backup auf NAS (wenn NAS bereit), dann Familie onboarden*

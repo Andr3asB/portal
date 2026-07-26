@@ -137,9 +137,59 @@ def new_token() -> str:
 
 
 def push_send(user_id: int, title: str, body: str,
-              app: str = "", url: str = "", dedup_key: str = ""):
-    """Push-Benachrichtigung – Stub für Meilenstein 3."""
-    log.info("push→user %d: %s / %s (app=%s)", user_id, title, body, app)
+              app_slug: str = "", url: str = "", dedup_key: str = ""):
+    """Push-Benachrichtigung an alle Geräte von user_id. Nicht-blockierend (Thread)."""
+    import json, threading, sqlite3
+    from flask import current_app
+
+    private_key = current_app.config.get("VAPID_PRIVATE_KEY", "")
+    subject     = current_app.config.get("VAPID_SUBJECT", "mailto:portal@16schwaben.de")
+    db_path     = current_app.config["DB_PATH"]
+
+    if not private_key:
+        log.info("push stub (kein VAPID): user=%d %s", user_id, title)
+        return
+
+    payload = json.dumps({"title": title, "body": body, "url": url, "app": app_slug})
+
+    def _send():
+        from pywebpush import webpush, WebPushException
+        try:
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            abos = db.execute(
+                "SELECT endpoint, p256dh, auth FROM push_abos WHERE user_id=?",
+                (user_id,),
+            ).fetchall()
+            expired = []
+            for abo in abos:
+                try:
+                    webpush(
+                        subscription_info={
+                            "endpoint": abo["endpoint"],
+                            "keys": {"p256dh": abo["p256dh"], "auth": abo["auth"]},
+                        },
+                        data=payload,
+                        vapid_private_key=private_key,
+                        vapid_claims={"sub": subject},
+                    )
+                except WebPushException as e:
+                    log.warning("push failed user=%d: %s", user_id, e)
+                    if e.response is not None and e.response.status_code in (404, 410):
+                        expired.append(abo["endpoint"])
+            if expired:
+                for ep in expired:
+                    db.execute("DELETE FROM push_abos WHERE endpoint=?", (ep,))
+                db.commit()
+        except Exception as e:
+            log.error("push thread error: %s", e)
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def _init_db(app):

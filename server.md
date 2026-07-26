@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-26 (Meilenstein 2 abgeschlossen)*
+*Letzte Aktualisierung: 2026-07-26 (Meilenstein 3 abgeschlossen)*
 
 ## Host
 
@@ -63,29 +63,38 @@ UID=1001
 GID=1001
 SECRET_KEY=<zufälliger Hex-Key, 32 Bytes>
 GUNICORN_RUN_DIR=/tmp
+VAPID_PRIVATE_KEY=<base64url, einmalig generiert – niemals neu generieren!>
+VAPID_PUBLIC_KEY=<base64url, Gegenstück zum Private Key>
+VAPID_SUBJECT=mailto:andreas.bosch@gmail.com
 ```
+
+**Wichtig:** VAPID_PRIVATE_KEY darf NICHT geändert werden, solange aktive Push-Abos existieren.
+Ein neuer Private Key macht alle bestehenden Subscriptions ungültig (Nutzer müssen neu opt-in).
+Key-Rotation → alle `push_abos` löschen, dann neu generieren.
 
 ## Code-Struktur (src/)
 
 ```
-app.py               – Flask-App, lädt nummerierte Module aus teile/ automatisch
+app.py               – Flask-App, lädt nummerierte Module aus teile/ automatisch;
+                       lädt VAPID_PRIVATE_KEY/PUBLIC_KEY/SUBJECT aus .env
 manage.py            – CLI: createadmin, adduser, addapp, grant, listusers,
                        listwuensche, listtodos, wunsch_erledigt, backlog
 teile/
   __init__.py        – registriert 00_kern als teile.kern
   00_kern.py         – DB-Schema, get_db()/new_db(), grant(), new_token(),
-                       push_send()-Stub, /health, _init_db()
+                       push_send() (VAPID, Thread), /health, _init_db()
   01_start_token.py  – / (Landing), /p/<token> (Startseite)
   02_werkstatt.py    – POST /wunsch (JSON, identifiziert Nutzer über Token)
-  03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer, Grants, QR
-  04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() öffentlich
+  03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer, Grants, QR, Push-Abos
+  04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() mit Push-Deep-Link
   05_werkstatt_app.py – /a/werkstatt/<token>/ Wunschliste (Admin: erledigt/löschen)
   06_geholfen.py     – /a/geholfen/<token>/ Tipp-Grid + Übersicht + Aufgaben
+  07_push.py         – /push/vapid-public-key, /push/subscribe, /push/unsubscribe
   templates/
-    base.html               – Grundlayout: safe-area, ⌂ + ✨ Bottom-Bar
-    startseite.html         – Persönliche Startseite mit App-Kacheln
+    base.html               – Grundlayout: safe-area, ⌂ + ✨ Bottom-Bar, SW-Registration
+    startseite.html         – Persönliche Startseite mit App-Kacheln + Push-Opt-in-Banner
     denied.html             – Zugang verweigert / Landing ohne Token
-    admin.html              – Nutzerverwaltung, Grant-Chips, QR-Modal
+    admin.html              – Nutzerverwaltung, Grant-Chips, QR-Modal, Push-Abo-Badge
     admin_user_form.html    – Nutzer anlegen/bearbeiten (Farbe, Admin-Flag)
     todo.html               – Aufgabenliste (neu, zuweisen, erledigen)
     werkstatt_app.html      – Wunschliste mit Admin-Aktionen
@@ -96,6 +105,7 @@ static/
   manifest.json      – PWA-Manifest
   icon-192.png       – Generiert im Dockerfile (solid blue #4a90d9)
   icon-512.png
+  sw.js              – Service Worker für Push-Benachrichtigungen
 ```
 
 ## Datenbankschema (SQLite, WAL)

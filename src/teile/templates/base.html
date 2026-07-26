@@ -136,5 +136,11 @@
 {% endif %}
 
 {% block extra_scripts %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js')
+    .catch(e => console.warn('SW:', e));
+}
+</script>
 </body>
 </html>
