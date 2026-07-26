@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% set app_slug = "home" %}
+
+{% block title %}Hallo, {{ user.name }}{% endblock %}
+
+{% block extra_styles %}
+.header-name { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.header-sub  { font-size: 15px; opacity: .85; margin-top: 4px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px; margin-top: 8px;
+}
+.tile {
+  background: #fff; border-radius: 18px;
+  padding: 20px 12px 16px;
+  text-align: center; text-decoration: none; color: inherit;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  min-height: 100px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s;
+}
+.tile:active { transform: scale(.96); }
+.tile-emoji { font-size: 40px; line-height: 1; }
+.tile-name  { font-size: 14px; font-weight: 500; color: #3a3a3c; }
+.empty {
+  text-align: center; padding: 48px 16px;
+  color: #8e8e93; font-size: 16px; line-height: 1.6;
+}
+.empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+{% endblock %}
+
+{% block body %}
+<header class="page-header">
+  <div class="header-name">{{ greeting }}, {{ user.name }}! 👋</div>
+  <div class="header-sub">Dein Familienportal</div>
+</header>
+
+<main class="main">
+  {% if apps %}
+    <div class="grid">
+      {% for app in apps %}
+        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/">
+          <span class="tile-emoji">{{ app.emoji }}</span>
+          <span class="tile-name">{{ app.name }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="empty-icon">🚀</span>
+      Hier erscheinen bald deine Apps.<br>
+      Die Familie baut gerade am Portal.
+    </div>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Tageszeit-Gruß
+(function(){
+  const h = new Date().getHours();
+  const map = [[5,'Guten Morgen'],[12,'Hallo'],[17,'Guten Abend'],[22,'Gute Nacht']];
+  const g = map.slice().reverse().find(([h2]) => h >= h2)?.[1] ?? 'Hallo';
+  document.querySelectorAll('.header-name').forEach(el => {
+    el.textContent = el.textContent.replace(/^[^,]+/, g);
+  });
+})();
+</script>
+{% endblock %}

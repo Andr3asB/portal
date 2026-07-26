@@ -1,0 +1,86 @@
+services:
+  portal:
+    build: ./src
+    restart: unless-stopped
+    container_name: portal
+    user: "${UID}:${GID}"
+    networks:
+      - intern
+    volumes:
+      - /srv/familienportal/data:/data
+    environment:
+      DB_PATH: /data/portal.db
+      DATA_DIR: /data
+      GUNICORN_RUN_DIR: /tmp
+    env_file: .env
+    mem_limit: 256m
+    cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    container_name: caddy
+    networks:
+      intern:
+        ipv4_address: 172.30.0.10
+      lan:
+        ipv4_address: 10.0.0.200
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - type: volume
+        source: iobroker-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: portal.16schwaben.de
+      - caddy_data:/data
+    mem_limit: 64m
+    cpus: "0.2"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://172.30.0.10:2019/config/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  util:
+    build: ./util
+    restart: unless-stopped
+    container_name: util
+    user: "${UID}:${GID}"
+    networks:
+      - intern
+    volumes:
+      - /srv/familienportal/data:/data
+      - type: volume
+        source: iobroker-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: portal.16schwaben.de
+    mem_limit: 64m
+    cpus: "0.1"
+
+networks:
+  intern:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/24
+  lan:
+    external: true
+    name: mvl
+
+volumes:
+  iobroker-certs:
+    external: true
+    name: certbot-domainoffensive_iobroker-certs
+  caddy_data:

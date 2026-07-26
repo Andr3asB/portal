@@ -1,0 +1,123 @@
+import sqlite3, secrets, logging
+from contextlib import contextmanager
+from flask import g, current_app, jsonify
+
+log = logging.getLogger("portal.kern")
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+  id       INTEGER PRIMARY KEY,
+  name     TEXT    NOT NULL,
+  farbe    TEXT    NOT NULL DEFAULT '#4a90d9',
+  is_admin INTEGER NOT NULL DEFAULT 0,
+  ki_key   TEXT
+);
+CREATE TABLE IF NOT EXISTS apps (
+  id           INTEGER PRIMARY KEY,
+  slug         TEXT    UNIQUE NOT NULL,
+  name         TEXT    NOT NULL,
+  emoji        TEXT    NOT NULL DEFAULT '📱',
+  beschreibung TEXT
+);
+CREATE TABLE IF NOT EXISTS grants (
+  id      INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+  app_id  INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
+  token   TEXT    UNIQUE NOT NULL,
+  UNIQUE(user_id, app_id)
+);
+CREATE TABLE IF NOT EXISTS push_abos (
+  id       INTEGER PRIMARY KEY,
+  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT    UNIQUE NOT NULL,
+  p256dh   TEXT    NOT NULL,
+  auth     TEXT    NOT NULL,
+  geraet   TEXT
+);
+CREATE TABLE IF NOT EXISTS wuensche (
+  id        INTEGER PRIMARY KEY,
+  text      TEXT    NOT NULL,
+  user_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  app_slug  TEXT,
+  erstellt  TEXT    NOT NULL DEFAULT (datetime('now')),
+  erledigt  INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+
+def get_db():
+    """Request-scoped DB-Verbindung (WAL, foreign keys)."""
+    if "db" not in g:
+        db = sqlite3.connect(
+            current_app.config["DB_PATH"],
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            check_same_thread=False,
+        )
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA foreign_keys=ON")
+        g.db = db
+    return g.db
+
+
+@contextmanager
+def new_db():
+    """Eigene Verbindung für Hintergrund-Threads – nie g.db verwenden!"""
+    db = sqlite3.connect(
+        current_app.config["DB_PATH"],
+        detect_types=sqlite3.PARSE_DECLTYPES,
+        timeout=10,
+    )
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA foreign_keys=ON")
+    try:
+        yield db
+        db.commit()
+    finally:
+        db.close()
+
+
+def grant(token: str, app_slug: str):
+    """Gibt Row(id, name, farbe, is_admin) zurück wenn Token für app_slug gültig, sonst None."""
+    db = get_db()
+    return db.execute("""
+        SELECT u.id, u.name, u.farbe, u.is_admin
+        FROM   grants g
+        JOIN   users u ON u.id = g.user_id
+        JOIN   apps  a ON a.id = g.app_id
+        WHERE  g.token = ? AND a.slug = ?
+    """, (token, app_slug)).fetchone()
+
+
+def new_token() -> str:
+    return secrets.token_urlsafe(18)
+
+
+def push_send(user_id: int, title: str, body: str,
+              app: str = "", url: str = "", dedup_key: str = ""):
+    """Push-Benachrichtigung – Stub für Meilenstein 2."""
+    log.info("push→user %d: %s / %s (app=%s)", user_id, title, body, app)
+
+
+def _init_db(app):
+    with app.app_context():
+        db = sqlite3.connect(app.config["DB_PATH"])
+        db.executescript(SCHEMA)
+        db.commit()
+        db.close()
+
+
+def init_app(app):
+    @app.teardown_appcontext
+    def close_db(exc=None):
+        db = g.pop("db", None)
+        if db:
+            db.close()
+
+    _init_db(app)
+
+    @app.route("/health")
+    def health():
+        get_db().execute("SELECT 1")
+        return jsonify(status="ok")

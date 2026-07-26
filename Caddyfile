@@ -1,0 +1,10 @@
+{
+	auto_https off
+	# Admin-API nur auf dem internen Bridge-Netz – nie auf 10.0.0.200
+	admin 172.30.0.10:2019
+}
+
+portal.16schwaben.de {
+	tls /certs/fullchain.pem /certs/privkey.pem
+	reverse_proxy portal:8000
+}
