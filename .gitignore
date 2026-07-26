@@ -21,6 +21,7 @@ id_rsa*
 id_ed25519*
 vapid*.json
 secrets/
+ssh/
 
 # ── Auslieferungspakete (Git ist die Versionierung) ─────────────────────
 deploy/*.tar.gz

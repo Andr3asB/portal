@@ -59,12 +59,19 @@ services:
       - intern
     volumes:
       - /srv/familienportal/data:/data
+      - /srv/familienportal/ssh:/ssh:ro
       - type: volume
         source: iobroker-certs
         target: /certs
         read_only: true
         volume:
           subpath: portal.16schwaben.de
+    environment:
+      DATA_DIR: /data
+      BACKUP_NAS_HOST: "${BACKUP_NAS_HOST:-10.60.0.4}"
+      BACKUP_NAS_USER: "${BACKUP_NAS_USER:-admin}"
+      BACKUP_NAS_PATH: "${BACKUP_NAS_PATH:-/home/admin/portal-backup}"
+      BACKUP_NAS_PORT: "${BACKUP_NAS_PORT:-22}"
     mem_limit: 64m
     cpus: "0.1"
 

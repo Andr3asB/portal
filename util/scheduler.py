@@ -4,11 +4,13 @@ Prüft jede Minute, ob Aufgaben fällig sind.
 
 Aufgaben:
   - Jede volle Stunde:  SQLite-Snapshot
+  - Täglich 03:00 Uhr:  rsync-Backup auf NAS
   - Täglich 04:00 Uhr:  Zertifikats-Watcher (Caddy-Reload bei Erneuerung)
 """
 import logging, time
 from datetime import datetime
 
+import backup
 import cert_watcher
 import db_snapshot
 
@@ -23,10 +25,11 @@ log = logging.getLogger("util.scheduler")
 def main():
     log.info("util-Scheduler gestartet")
 
-    last_snapshot_hour = -1
+    last_snapshot_hour  = -1
+    last_backup_day     = -1
     last_cert_check_day = -1
 
-    # Beim Start sofort einmal beide Aufgaben ausführen
+    # Beim Start: Snapshot + Cert-Check sofort, Backup nicht (kein Flood beim Neustart)
     db_snapshot.take()
     cert_watcher.check()
     last_snapshot_hour  = datetime.now().hour
@@ -39,6 +42,10 @@ def main():
         if now.hour != last_snapshot_hour:
             db_snapshot.take()
             last_snapshot_hour = now.hour
+
+        if now.hour == 3 and now.day != last_backup_day:
+            backup.run()
+            last_backup_day = now.day
 
         if now.hour == 4 and now.day != last_cert_check_day:
             cert_watcher.check()
