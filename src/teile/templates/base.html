@@ -90,7 +90,8 @@
 
 <div class="bar">
   {% if token is defined and token %}
-    <a class="bar-btn" href="/p/{{ token }}" title="Startseite">⌂</a>
+    {% set _home_tok = user.home_token if (user is defined and user and user.home_token) else token %}
+    <a class="bar-btn" href="/p/{{ _home_tok }}" title="Startseite">⌂</a>
   {% else %}
     <span class="bar-btn"></span>
   {% endif %}

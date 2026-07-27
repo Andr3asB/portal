@@ -121,10 +121,13 @@ def new_db():
 
 
 def grant(token: str, app_slug: str):
-    """Gibt Row(id, name, farbe, is_admin) zurück wenn Token für app_slug gültig, sonst None."""
+    """Gibt Row(id, name, farbe, is_admin, home_token) zurück wenn Token für app_slug gültig, sonst None."""
     db = get_db()
     return db.execute("""
-        SELECT u.id, u.name, u.farbe, u.is_admin
+        SELECT u.id, u.name, u.farbe, u.is_admin,
+               (SELECT g2.token FROM grants g2
+                JOIN apps a2 ON a2.id = g2.app_id
+                WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_token
         FROM   grants g
         JOIN   users u ON u.id = g.user_id
         JOIN   apps  a ON a.id = g.app_id
