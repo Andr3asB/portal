@@ -135,7 +135,7 @@ def qr_svg(token, uid):
         abort(404)
     url = f"https://portal.16schwaben.de/p/{row['token']}"
     qr  = segno.make(url, error="M")
-    buf = io.StringIO()
+    buf = io.BytesIO()
     qr.save(buf, kind="svg", omitsize=True, border=2,
             svgclass=None, lineclass=None, xmldecl=False, nl=False)
     return Response(buf.getvalue(), mimetype="image/svg+xml")
