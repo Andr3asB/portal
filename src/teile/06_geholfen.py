@@ -6,10 +6,14 @@ Design: große Kacheln, auch als Küchen-Tablet-Daueranzeige geeignet.
 """
 from datetime import date, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant
+from teile.kern import get_db, grant as check_grant, to_int
 
 bp  = Blueprint("geholfen_app", __name__)
 APP = "geholfen"
+
+
+def _kann_fuer_andere(user):
+    return user["is_admin"] or user["rolle"] == "eltern"
 
 
 @bp.route("/a/geholfen/<token>/")
@@ -28,9 +32,14 @@ def index(token):
         JOIN   geholfen_aufgaben  a ON a.id = e.aufgabe_id
         ORDER  BY e.zeitstempel DESC LIMIT 10
     """).fetchall()
+    alle_nutzer = None
+    if _kann_fuer_andere(user):
+        alle_nutzer = db.execute(
+            "SELECT id, name, farbe FROM users ORDER BY name"
+        ).fetchall()
     return render_template("geholfen.html",
         user=user, token=token, farbe=user["farbe"],
-        aufgaben=aufgaben, letzte=letzte,
+        aufgaben=aufgaben, letzte=letzte, alle_nutzer=alle_nutzer,
     )
 
 
@@ -45,9 +54,17 @@ def tippen(token, aufgabe_id):
     ).fetchone()
     if not aufg:
         abort(404)
+    ziel_user_id = user["id"]
+    if _kann_fuer_andere(user):
+        data = request.get_json(silent=True) or {}
+        fuer = to_int(data.get("fuer_user_id") or request.form.get("fuer_user_id"))
+        if fuer is not None:
+            exists = db.execute("SELECT id FROM users WHERE id=?", (fuer,)).fetchone()
+            if exists:
+                ziel_user_id = fuer
     db.execute(
         "INSERT INTO geholfen_eintraege(aufgabe_id, user_id) VALUES(?,?)",
-        (aufgabe_id, user["id"]),
+        (aufgabe_id, ziel_user_id),
     )
     db.commit()
     if request.headers.get("X-Requested-With") == "fetch":
@@ -121,7 +138,10 @@ def aufgaben_verwalten(token):
         if action == "neu":
             name = request.form.get("name", "").strip()
             emoji = request.form.get("emoji", "👍").strip()
-            gew = float(request.form.get("gewichtung", 1.0))
+            try:
+                gew = float(request.form.get("gewichtung", 1.0))
+            except (TypeError, ValueError):
+                gew = 1.0
             if name:
                 db.execute(
                     "INSERT INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
@@ -129,7 +149,7 @@ def aufgaben_verwalten(token):
                 )
                 db.commit()
         elif action == "toggle":
-            aid = int(request.form.get("id", 0))
+            aid = to_int(request.form.get("id"), 0)
             row = db.execute("SELECT aktiv FROM geholfen_aufgaben WHERE id=?", (aid,)).fetchone()
             if row:
                 db.execute("UPDATE geholfen_aufgaben SET aktiv=? WHERE id=?",

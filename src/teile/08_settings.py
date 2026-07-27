@@ -1,7 +1,36 @@
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort, make_response
 from teile.kern import get_db
 
 bp = Blueprint("settings", __name__)
+
+
+@bp.route("/manifest/<token>.json")
+def manifest_json(token):
+    db  = get_db()
+    row = db.execute(
+        "SELECT u.farbe FROM users u"
+        " JOIN grants g ON g.user_id=u.id"
+        " JOIN apps   a ON a.id=g.app_id"
+        " WHERE g.token=? AND a.slug='home'",
+        (token,),
+    ).fetchone()
+    if not row:
+        abort(404)
+    data = jsonify({
+        "name":             "Familienportal",
+        "short_name":       "Portal",
+        "start_url":        f"/p/{token}",
+        "scope":            "/",
+        "display":          "standalone",
+        "background_color": "#f5f5f7",
+        "theme_color":      row["farbe"],
+        "icons": [
+            {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    })
+    data.headers["Content-Type"] = "application/manifest+json"
+    return data
 
 
 @bp.route("/settings/darkmode", methods=["POST"])

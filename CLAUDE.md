@@ -65,10 +65,13 @@ scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
 # Zertifikat prüfen
 openssl s_client -connect portal.16schwaben.de:443 -servername portal.16schwaben.de </dev/null 2>/dev/null | openssl x509 -noout -dates
 
-# E2E-Tests
-pytest tests/ -v
-# oder mit Playwright direkt:
+# E2E-Tests (ad hoc mit Playwright, von diesem Rechner aus – tests/ ist aktuell
+# nur ein leeres Verzeichnis, es existiert noch keine feste Suite)
 python -m playwright test tests/
+
+# manage.py im Container – Nutzer/Apps/Grants anlegen, Backlog einsehen
+docker exec portal python manage.py listusers
+docker exec portal python manage.py backlog
 ```
 
 ## Architektur (Überblick)
@@ -88,6 +91,52 @@ Code-Struktur: `app.py` führt nummerierte Module (`teile/00_kern.py`,
 `teile/01_start_token.py`, …) in einem Namensraum aus. Templates als
 einzelne HTML-Dateien mit Inline-CSS/JS; JS-Bibliotheken lokal bündeln,
 nie von fremden CDNs.
+
+## Code-Architektur (`src/`)
+
+`app.py` ist bewusst dünn: es erzeugt die Flask-App und lädt danach jedes
+`teile/NN_name.py`-Modul in aufsteigender Nummernreihenfolge über
+`importlib`, ruft dessen `init_app(app)` auf. Alle Module teilen sich
+einen Namensraum – neue Funktionalität heißt: neue Datei mit nächster
+freier Nummer, kein Umbau von `app.py`. `teile/__init__.py` registriert
+`00_kern.py` zusätzlich als `teile.kern` in `sys.modules`, weil ein
+führendes `0N_` kein gültiger Python-Modulname für ein reguläres
+`from teile.00_kern import …` wäre.
+
+**`teile/00_kern.py` ist die gemeinsame Basis, jedes weitere Modul baut darauf auf:**
+- `SCHEMA` (alle `CREATE TABLE IF NOT EXISTS`) + `_init_db()` (idempotente
+  `ALTER TABLE`-Migrationen per try/except, Seed-Daten). Schemaänderungen
+  gehören hierher, nicht in einzelne App-Module.
+- `get_db()` – request-gebundene Verbindung über Flasks `g`; **nur**
+  innerhalb eines Requests verwenden.
+- `new_db()` – Context-Manager mit eigener Verbindung für Threads/Hintergrundarbeit.
+  Wer `g.db` aus einem Thread heraus anfasst, bekommt „Cannot operate on
+  a closed database" – deshalb hat `push_send()` z. B. eine eigene Verbindung.
+- `grant(token, app_slug)` – der zentrale Zugriffs-Check: löst ein
+  Token+App-Slug-Paar zur Nutzer-Row auf oder gibt `None` zurück. Jede
+  Route in jedem App-Modul beginnt damit.
+- `to_int()`, `push_send()` (Web-Push, VAPID, non-blocking Thread),
+  `_auto_grant_all()` (vergibt eine App automatisch an alle Nutzer, z. B.
+  `hilfe` und `einkauf`).
+
+**Verbindliche Konventionen (siehe auch `server.md` „Sicherheitskonventionen"):**
+- Ganzzahlen aus Nutzereingaben immer über `to_int()`, nie nacktes `int()`.
+- Farbwerte immer über `_clean_farbe()` aus `03_admin.py` validieren
+  (Regex `^#[0-9a-fA-F]{6}$`).
+- Im Frontend-JS `textContent`/`createElement` statt `innerHTML`, wenn
+  Nutzerdaten eingesetzt werden.
+- Jede Route prüft `grant()` zuerst; destruktive Aktionen zusätzlich
+  `is_admin`/Owner-Check.
+
+**Templates:** je App eine eigene `.html`-Datei mit Inline-CSS/JS,
+`base.html` liefert das gemeinsame Grundlayout (⌂-Include, Hamburger-Menü
+mit Dark Mode/Hilfe/✨, Service-Worker-Registrierung). Kein Build-Schritt,
+kein gemeinsames Frontend-Framework – JS-Bibliotheken werden lokal
+gebündelt, nie von einem CDN geladen.
+
+Den aktuellen Stand von DB-Schema, App-Slugs und Modulen (mit Kurzbeschreibung
+je Datei) pflegt `server.md` – dort nachsehen statt hier zu duplizieren,
+da sich das mit jeder Auslieferung ändert.
 
 ## Guardrails und Berechtigungen
 

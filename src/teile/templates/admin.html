@@ -3,7 +3,6 @@
 {% block title %}Verwaltung{% endblock %}
 
 {% block extra_styles %}
-.page-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .header-title { font-size:22px; font-weight:700; }
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
 .btn-add {
@@ -26,6 +25,11 @@
   display:inline-block; font-size:11px; padding:2px 7px;
   border-radius:20px; background:#ff9500; color:#fff; font-weight:600;
   margin-left:6px; vertical-align:middle;
+}
+.badge-rolle {
+  display:inline-block; font-size:11px; padding:2px 7px;
+  border-radius:20px; background:var(--chip-bg); color:var(--chip-text); font-weight:600;
+  margin-left:4px; vertical-align:middle;
 }
 .badge-push {
   display:inline-flex; align-items:center; gap:3px;
@@ -67,15 +71,18 @@
 .qr-url { font-size:11px; color:#8e8e93; margin-top:8px; word-break:break-all; }
 {% endblock %}
 
-{% block body %}
-<header class="page-header" style="background:var(--farbe); padding:calc(20px + var(--st)) 20px 20px;">
-  <div>
-    <div class="header-title">⚙️ Verwaltung</div>
-    <div class="header-sub">{{ all_users|length }} Familienmitglieder</div>
-  </div>
-  <a class="btn-add" href="/a/admin/{{ token }}/user/neu">+ Neu</a>
-</header>
+{% block nav_title %}
+<div class="nav-title">⚙️ Verwaltung</div>
+<div class="nav-sub">{{ all_users|length }} Familienmitglieder</div>
+{% endblock %}
 
+{% block header_extra %}
+<div class="nav-extra">
+  <a class="btn-add" href="/a/admin/{{ token }}/user/neu">+ Neues Mitglied</a>
+</div>
+{% endblock %}
+
+{% block body %}
 <main class="main">
 {% for u in all_users %}
   {% set u_grants = grants.get(u.id, {}) %}
@@ -87,6 +94,7 @@
         <div class="user-name">
           {{ u.name }}
           {% if u.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
+          {% if u.rolle and u.rolle != 'gast' %}<span class="badge-rolle">{{ u.rolle|capitalize }}</span>{% endif %}
           {% if push_counts.get(u.id, 0) > 0 %}
             <span class="badge-push">🔔 {{ push_counts[u.id] }}</span>
           {% endif %}

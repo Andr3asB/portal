@@ -3,13 +3,8 @@
 {% block title %}Geholfen{% endblock %}
 
 {% block extra_styles %}
-.geholfen-header { display:flex; align-items:center; justify-content:space-between; }
 .header-title { font-size:22px; font-weight:700; }
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
-.btn-uebersicht {
-  background:rgba(255,255,255,.2); color:#fff; border:none;
-  border-radius:10px; padding:8px 14px; font-size:14px; text-decoration:none;
-}
 .aufgaben-grid {
   display:grid;
   grid-template-columns:repeat(2, 1fr);
@@ -40,20 +35,53 @@
 /* Tablet-Optimierung: wenn Bildschirm breit genug, mehr Spalten */
 @media(min-width:500px) { .aufgaben-grid { grid-template-columns:repeat(3,1fr); } }
 @media(min-width:700px) { .aufgaben-grid { grid-template-columns:repeat(4,1fr); } }
+/* Nutzer-Picker */
+.nutzer-picker { margin-bottom:12px; }
+.nutzer-picker-label { font-size:12px; color:var(--text-2); font-weight:600;
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.nutzer-pills { display:flex; gap:8px; flex-wrap:wrap; }
+.nutzer-pill {
+  display:flex; align-items:center; gap:6px;
+  border:none; border-radius:20px; padding:7px 14px;
+  font-size:14px; font-weight:600; cursor:pointer;
+  background:var(--chip-bg); color:var(--text-2);
+  transition:background .15s, color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.nutzer-pill.aktiv { color:#fff; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🙋 Geholfen!</div>
+<div class="nav-sub">Hallo, {{ user.name }} 👋</div>
+{% endblock %}
+
+{% block header_extra %}
+{% if user.is_admin %}
+<div class="nav-extra" style="text-align:right">
+  <a class="nav-btn" href="/a/geholfen/{{ token }}/uebersicht" title="Übersicht">📊</a>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block body %}
-<header class="page-header geholfen-header" style="background:var(--farbe)">
-  <div>
-    <div class="header-title">🙋 Geholfen!</div>
-    <div class="header-sub">Hallo, {{ user.name }} 👋</div>
-  </div>
-  {% if user.is_admin %}
-  <a class="btn-uebersicht" href="/a/geholfen/{{ token }}/uebersicht">📊</a>
-  {% endif %}
-</header>
 
 <main class="main">
+  {% if alle_nutzer %}
+  <div class="nutzer-picker">
+    <div class="nutzer-picker-label">Als wer?</div>
+    <div class="nutzer-pills" id="nutzer-pills">
+      {% for n in alle_nutzer %}
+      <button class="nutzer-pill {% if n.id == user.id %}aktiv{% endif %}"
+              data-uid="{{ n.id }}" data-farbe="{{ n.farbe }}"
+              style="{% if n.id == user.id %}background:{{ n.farbe }}{% endif %}"
+              onclick="waehleNutzer({{ n.id }}, '{{ n.farbe }}', this)">
+        {{ n.name }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   <div class="aufgaben-grid" id="aufgaben-grid">
     {% for a in aufgaben %}
     <button class="aufgabe-btn" data-id="{{ a.id }}" data-token="{{ token }}">
@@ -88,7 +116,9 @@
 {% block extra_scripts %}
 <script>
 (function() {
+  let fuerUserId = {{ user.id }};
   let toastTimer;
+
   function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -97,6 +127,18 @@
     toastTimer = setTimeout(() => t.style.display = 'none', 2000);
   }
 
+  window.waehleNutzer = function(uid, farbe, btn) {
+    fuerUserId = uid;
+    document.querySelectorAll('.nutzer-pill').forEach(p => {
+      p.classList.remove('aktiv');
+      p.style.background = '';
+      p.style.color = '';
+    });
+    btn.classList.add('aktiv');
+    btn.style.background = farbe;
+    btn.style.color = '#fff';
+  };
+
   document.querySelectorAll('.aufgabe-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
       const id  = this.dataset.id;
@@ -104,23 +146,32 @@
       this.classList.add('flash');
       setTimeout(() => this.classList.remove('flash'), 600);
       try {
+        const body = JSON.stringify({fuer_user_id: fuerUserId});
         const r = await fetch(`/a/geholfen/${tok}/tippen/${id}`, {
           method: 'POST',
-          headers: {'X-Requested-With': 'fetch'}
+          headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/json'},
+          body,
         });
         const d = await r.json();
         if (d.ok) {
           showToast(d.emoji + ' ' + d.aufgabe + ' ✓');
           if (d.letzte) {
-            const body = document.getElementById('ticker-body');
-            body.innerHTML = d.letzte.map(e =>
-              `<div class="ticker-item">${e.emoji} ${e.name}: ${e.aufgabe}<span class="ticker-time">${e.zeit}</span></div>`
-            ).join('');
+            const tickerBody = document.getElementById('ticker-body');
+            tickerBody.textContent = '';
+            d.letzte.forEach(e => {
+              const item = document.createElement('div');
+              item.className = 'ticker-item';
+              item.textContent = `${e.emoji} ${e.name}: ${e.aufgabe}`;
+              const time = document.createElement('span');
+              time.className = 'ticker-time';
+              time.textContent = e.zeit;
+              item.appendChild(time);
+              tickerBody.appendChild(item);
+            });
             document.getElementById('ticker').style.display = 'block';
           }
         }
       } catch(e) {
-        // Fallback: normaler POST
         const f = document.createElement('form');
         f.method = 'post';
         f.action = `/a/geholfen/${tok}/tippen/${id}`;

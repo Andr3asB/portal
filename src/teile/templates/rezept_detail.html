@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% set app_slug = "rezepte" %}
+{% block title %}{{ rezept.name }}{% endblock %}
+
+{% block extra_styles %}
+.section {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:14px; box-shadow:0 1px 3px var(--shadow);
+}
+.section-title {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;
+}
+.zutat-row {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 0; border-bottom:1px solid var(--surface-2);
+}
+.zutat-row:last-child { border-bottom:none; }
+.zutat-name { flex:1; font-size:15px; color:var(--text); }
+.btn-zutat-kaufen {
+  background:none; border:1.5px solid var(--border); border-radius:20px;
+  padding:6px 12px; font-size:13px; cursor:pointer; color:var(--text-2);
+  white-space:nowrap; flex-shrink:0;
+}
+.btn-zutat-kaufen.added {
+  background:#d4edda; border-color:#c3e6cb; color:#155724; cursor:default;
+}
+body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; color:#8fd19e; }
+.anleitung-text {
+  white-space:pre-wrap; font-size:15px; line-height:1.6; color:var(--text);
+}
+.btn-loeschen-rezept {
+  background:none; border:none; color:#ff3b30; font-size:14px;
+  cursor:pointer; padding:10px 0; width:100%; text-align:center;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/rezepte/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">{{ rezept.name }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if zutaten %}
+  <div class="section">
+    <div class="section-title">🥕 Zutaten</div>
+    {% for z in zutaten %}
+    <div class="zutat-row" id="zutat-{{ z.id }}">
+      <span class="zutat-name">{{ z.name }}</span>
+      <button class="btn-zutat-kaufen" type="button" onclick="zutatEinkaufen({{ z.id }}, this)">🛒 Fehlt</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if rezept.anleitung %}
+  <div class="section">
+    <div class="section-title">👩‍🍳 Zubereitung</div>
+    <div class="anleitung-text">{{ rezept.anleitung }}</div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/a/rezepte/{{ token }}/{{ rezept.id }}/loeschen"
+        onsubmit="return confirm({{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+    <button class="btn-loeschen-rezept" type="submit">🗑️ Rezept löschen</button>
+  </form>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TOKEN = '{{ token }}';
+
+function zutatEinkaufen(id, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  fetch(`/a/rezepte/${TOKEN}/zutat/${id}/einkaufen`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        btn.textContent = '✓ Auf Liste';
+        btn.classList.add('added');
+      } else {
+        btn.disabled = false;
+      }
+    })
+    .catch(() => { btn.disabled = false; });
+}
+</script>
+{% endblock %}

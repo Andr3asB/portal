@@ -40,13 +40,12 @@
 }
 {% endblock %}
 
+{% block nav_title %}
+<div class="nav-title">❓ Hilfe</div>
+<div class="nav-sub">Alles über das Familienportal</div>
+{% endblock %}
+
 {% block body %}
-<header class="page-header" style="background:var(--farbe)">
-  <div>
-    <div class="header-title">❓ Hilfe</div>
-    <div class="header-sub">Alles über das Familienportal</div>
-  </div>
-</header>
 
 <main class="main">
 
@@ -86,15 +85,15 @@
       <li>
         <span class="app-emoji">✅</span>
         <div class="app-desc">
-          <strong>Todos</strong>
-          <span>Aufgaben anlegen, anderen zuweisen und abhaken. Wer eine Aufgabe bekommt, wird per Benachrichtigung informiert.</span>
+          <strong>Aufgaben</strong>
+          <span>Aufgaben anlegen, anderen zuweisen und abhaken. Wer eine Aufgabe bekommt, wird per Benachrichtigung informiert. Löschen ist nur für Eltern möglich.</span>
         </div>
       </li>
       <li>
         <span class="app-emoji">💡</span>
         <div class="app-desc">
           <strong>Werkstatt</strong>
-          <span>Ideen und Wünsche für das Portal sammeln. Nutze den ✨-Knopf unten auf jeder Seite.</span>
+          <span>Ideen und Wünsche für das Portal sammeln. Nutze den ✨-Knopf im Menü (☰ oben rechts).</span>
         </div>
       </li>
       <li>
@@ -102,6 +101,20 @@
         <div class="app-desc">
           <strong>Geholfen</strong>
           <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Andi sieht in der Übersicht, wer sich wie einbringt.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">🛒</span>
+        <div class="app-desc">
+          <strong>Einkaufsliste</strong>
+          <span>Die gemeinsame Einkaufsliste für die ganze Familie. Einträge nach Kategorie sortiert, erledigte Dinge werden automatisch ausgeblendet.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">🍲</span>
+        <div class="app-desc">
+          <strong>Rezepte</strong>
+          <span>Lieblingsrezepte mit Zutaten und Zubereitung speichern. Fehlende Zutaten landen mit einem Klick auf der Einkaufsliste.</span>
         </div>
       </li>
       <li>
@@ -116,7 +129,7 @@
 
   <div class="section">
     <div class="section-title">🔔 Benachrichtigungen</div>
-    <p>Wenn jemand dir ein Todo zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
+    <p>Wenn jemand dir eine Aufgabe zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
     <p>Beim ersten Öffnen des Portals erscheint ein Banner – einfach <strong>„Aktivieren"</strong> tippen. Fertig.</p>
     <div class="tip">Benachrichtigungen funktionieren nur, wenn das Portal als App auf dem Home-Bildschirm gespeichert oder im Browser geöffnet ist.</div>
   </div>
@@ -128,8 +141,59 @@
   </div>
 
   <div class="section">
+    <div class="section-title">🛒 Einkaufsliste</div>
+    <p>Alle Familienmitglieder können gleichzeitig die Liste bearbeiten. Einträge lassen sich einer Kategorie zuordnen (Obst & Gemüse, Kühlregal usw.).</p>
+    <ul class="steps">
+      <li>
+        <span class="step-icon">➕</span>
+        <div><strong>Hinzufügen:</strong> Name eingeben, Kategorie wählen, auf „+ Hinzufügen" tippen. Häufig genutzte Artikel werden als Vorschläge angezeigt.</div>
+      </li>
+      <li>
+        <span class="step-icon">✅</span>
+        <div><strong>Abhaken:</strong> Häkchen beim Artikel antippen. Erledigte Einträge bleiben noch eine Weile sichtbar und verschwinden dann automatisch.</div>
+      </li>
+      <li>
+        <span class="step-icon">%</span>
+        <div><strong>Angebot:</strong> Beim Hinzufügen „% Angebot" ankreuzen und einen Markt auswählen. Der Artikel wird dann mit einem Angebot-Badge markiert.</div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🙋 Geholfen – Für andere eintragen</div>
+    <p>Eltern können in der Geholfen-App Einträge auch für andere Familienmitglieder machen. Dazu erscheint oben auf der Seite ein <strong>„Als wer?"</strong>-Selector.</p>
+    <p>Einfach das richtige Familienmitglied antippen – alle folgenden Kachel-Taps werden dann für diese Person eingetragen.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🗂️ Apps sortieren &amp; gruppieren</div>
+    <p>Auf der Startseite kannst du deine Apps selbst ordnen – und in Gruppen aufteilen.</p>
+    <ul class="steps">
+      <li>
+        <span class="step-icon">✎</span>
+        <div><strong>Anpassen-Modus:</strong> Tippe unten auf „✎ Apps anpassen". Jetzt lassen sich die Kacheln per Drag &amp; Drop verschieben.</div>
+      </li>
+      <li>
+        <span class="step-icon">📁</span>
+        <div><strong>Gruppe anlegen:</strong> Im Anpassen-Modus erscheint „+ Gruppe". Gib einen Namen ein – z. B. „Schule" oder „Wichtig".</div>
+      </li>
+      <li>
+        <span class="step-icon">🔀</span>
+        <div><strong>App in Gruppe ziehen:</strong> Einfach die Kachel auf den Gruppen-Bereich ziehen. „Allgemein" ist immer die letzte Gruppe.</div>
+      </li>
+    </ul>
+    <div class="tip">💡 Die Reihenfolge wird für dich gespeichert und gilt auf allen Geräten.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🍲 Rezepte</div>
+    <p>Jedes Rezept hat einen Namen, eine Zutatenliste und eine Zubereitung. Beim Anlegen einfach jede Zutat in eine eigene Zeile schreiben.</p>
+    <p><strong>🛒 Fehlt:</strong> Bei jeder Zutat im Rezept gibt es einen Knopf dafür – ein Tipp genügt, und die Zutat landet sofort auf der gemeinsamen Einkaufsliste.</p>
+  </div>
+
+  <div class="section">
     <div class="section-title">🌙 Hell / Dunkel</div>
-    <p>Mit dem <strong>🌙-Knopf</strong> in der Leiste unten wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
+    <p>Mit dem <strong>🌙-Knopf</strong> im Menü (☰ oben rechts) wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
   </div>
 
   <div class="section">

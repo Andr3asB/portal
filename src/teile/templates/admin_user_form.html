@@ -9,14 +9,11 @@
 }
 .form-group { margin-bottom:16px; }
 label { display:block; font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
-input[type=text], input[type=color] {
+input[type=text] {
   width:100%; border:1.5px solid var(--border); border-radius:10px;
   padding:10px 12px; font-size:16px; font-family:inherit; outline:none;
 }
 input[type=text]:focus { border-color:var(--farbe); }
-input[type=color] { height:48px; padding:4px 8px; cursor:pointer; }
-.color-row { display:flex; gap:8px; align-items:center; }
-.color-row input[type=text] { flex:1; }
 .checkbox-row { display:flex; align-items:center; gap:10px; }
 .checkbox-row input { width:22px; height:22px; cursor:pointer; }
 .checkbox-row label { margin:0; font-size:16px; font-weight:500; color:var(--text); }
@@ -30,12 +27,15 @@ input[type=color] { height:48px; padding:4px 8px; cursor:pointer; }
 .form-actions .btn { flex:1; padding:14px; font-size:16px; border-radius:12px; }
 {% endblock %}
 
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">{% if edit %}✏️ {{ edit.name }}{% else %}👤 Neues Mitglied{% endif %}</div>
+{% endblock %}
+
 {% block body %}
-<header class="page-header" style="background:var(--farbe)">
-  <div style="font-size:20px; font-weight:700">
-    {% if edit %}✏️ {{ edit.name }} bearbeiten{% else %}👤 Neues Familienmitglied{% endif %}
-  </div>
-</header>
 
 <main class="main">
 <div class="form-card">
@@ -49,18 +49,30 @@ input[type=color] { height:48px; padding:4px 8px; cursor:pointer; }
     <div class="form-group">
       <label>Farbe</label>
       <div class="color-row">
-        <input type="color" name="farbe" id="farbe-picker"
+        <input type="text" id="farbe-hex" name="farbe"
                value="{{ edit.farbe if edit else '#4a90d9' }}"
-               onchange="document.getElementById('farbe-hex').value=this.value">
-        <input type="text" id="farbe-hex" value="{{ edit.farbe if edit else '#4a90d9' }}"
-               pattern="^#[0-9a-fA-F]{6}$"
-               oninput="document.getElementById('farbe-picker').value=this.value">
+               pattern="^#[0-9a-fA-F]{6}$" placeholder="#4a90d9"
+               oninput="syncFarbe(this.value)">
       </div>
       <div class="farben-preset">
         {% for f in ['#3498db','#e74c3c','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#ff5722'] %}
         <button type="button" style="background:{{ f }}"
                 onclick="setFarbe('{{ f }}')"
                 id="preset-{{ loop.index }}"></button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Rolle</label>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        {% for val, label in [('kind','Kind'), ('eltern','Eltern'), ('gast','Gast')] %}
+        <label style="display:flex; gap:6px; align-items:center; cursor:pointer; font-size:15px; font-weight:500; color:var(--text);">
+          <input type="radio" name="rolle" value="{{ val }}"
+                 {% if (edit and edit.rolle == val) or (not edit and val == 'gast') %}checked{% endif %}
+                 style="width:18px;height:18px;cursor:pointer;">
+          {{ label }}
+        </label>
         {% endfor %}
       </div>
     </div>
@@ -86,15 +98,24 @@ input[type=color] { height:48px; padding:4px 8px; cursor:pointer; }
 
 {% block extra_scripts %}
 <script>
+const PRESETS = {{ ['#3498db','#e74c3c','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#ff5722']|tojson }};
+
 function setFarbe(hex) {
-  document.getElementById('farbe-picker').value = hex;
   document.getElementById('farbe-hex').value = hex;
+  highlightPreset(hex);
 }
-// Aktive Farbe hervorheben
-const presets = {{ ['#3498db','#e74c3c','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#ff5722']|tojson }};
-const cur = document.getElementById('farbe-hex').value.toLowerCase();
-presets.forEach((f,i) => {
-  if(f===cur) document.getElementById('preset-'+(i+1)).classList.add('selected');
-});
+
+function syncFarbe(val) {
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) highlightPreset(val);
+}
+
+function highlightPreset(hex) {
+  PRESETS.forEach((f, i) => {
+    document.getElementById('preset-' + (i+1))
+      .classList.toggle('selected', f.toLowerCase() === hex.toLowerCase());
+  });
+}
+
+highlightPreset(document.getElementById('farbe-hex').value);
 </script>
 {% endblock %}

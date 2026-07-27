@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% set app_slug = "rezepte" %}
+{% block title %}Rezepte{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:22px; font-weight:700; }
+.add-card {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:12px 0 6px;
+}
+.field-label:first-child { margin-top:0; }
+.rezept-input, .rezept-textarea {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text); resize:vertical;
+}
+.rezept-input:focus, .rezept-textarea:focus { border-color:var(--farbe); }
+.btn-add {
+  background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
+  width:100%; margin-top:14px;
+}
+.rezept-card {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  display:flex; align-items:center; gap:12px;
+  text-decoration:none; color:inherit;
+}
+.rezept-emoji { font-size:28px; flex-shrink:0; }
+.rezept-name { flex:1; font-size:16px; font-weight:600; }
+.rezept-meta { font-size:13px; color:var(--text-2); margin-top:2px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🍲 Rezepte</div>
+<div class="nav-sub">{{ rezepte|length }} gespeichert</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="add-card">
+    <form method="post" action="/a/rezepte/{{ token }}/neu">
+      <div class="field-label">Name</div>
+      <input class="rezept-input" type="text" name="name"
+             placeholder="z. B. Spaghetti Bolognese" required autocomplete="off">
+
+      <div class="field-label">Zutaten (eine pro Zeile)</div>
+      <textarea class="rezept-textarea" name="zutaten" rows="4"
+                placeholder="500g Hackfleisch
+1 Zwiebel
+1 Dose Tomaten"></textarea>
+
+      <div class="field-label">Zubereitung</div>
+      <textarea class="rezept-textarea" name="anleitung" rows="5"
+                placeholder="Schritt für Schritt, wie es gemacht wird…"></textarea>
+
+      <button class="btn-add" type="submit">+ Rezept speichern</button>
+    </form>
+  </div>
+
+  {% if rezepte %}
+    {% for r in rezepte %}
+    <a class="rezept-card" href="/a/rezepte/{{ token }}/{{ r.id }}">
+      <span class="rezept-emoji">🍲</span>
+      <div>
+        <div class="rezept-name">{{ r.name }}</div>
+        <div class="rezept-meta">{{ r.anzahl_zutaten }} Zutat{{ 'en' if r.anzahl_zutaten != 1 else '' }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Noch keine Rezepte 🍽️<br>
+    <span style="font-size:13px">Trag oben dein erstes Lieblingsrezept ein.</span>
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}

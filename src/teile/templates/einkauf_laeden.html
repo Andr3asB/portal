@@ -1,28 +1,26 @@
 {% extends "base.html" %}
-{% set app_slug = "geholfen" %}
-{% block title %}Aufgaben verwalten{% endblock %}
+{% set app_slug = "einkauf" %}
+{% block title %}Märkte verwalten{% endblock %}
 
 {% block extra_styles %}
 .form-card { background:var(--surface); border-radius:14px; padding:16px; margin-bottom:16px;
   box-shadow:0 1px 3px var(--shadow); }
-.form-row { display:flex; gap:8px; margin-bottom:8px; }
+.form-row { display:flex; gap:8px; }
 .form-input {
   flex:1; border:1.5px solid var(--border); border-radius:10px;
   padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
 }
 .form-input:focus { border-color:var(--farbe); }
 .btn-add { background:var(--farbe); color:#fff; border:none; border-radius:10px;
   padding:9px 16px; font-size:15px; cursor:pointer; }
-.aufg-item {
+.laden-item {
   background:var(--surface); border-radius:12px; padding:12px 16px;
   margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
   display:flex; align-items:center; gap:12px;
 }
-.aufg-item.inaktiv { opacity:.4; }
-.aufg-emoji { font-size:28px; }
-.aufg-info  { flex:1; }
-.aufg-name  { font-size:15px; font-weight:500; }
-.aufg-gew   { font-size:12px; color:var(--text-2); }
+.laden-item.inaktiv { opacity:.4; }
+.laden-name { flex:1; font-size:15px; font-weight:500; }
 .btn-toggle {
   background:none; border:1.5px solid var(--border); border-radius:8px;
   padding:6px 10px; font-size:13px; cursor:pointer; color:var(--text-2);
@@ -30,11 +28,11 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/geholfen/{{ token }}/uebersicht" title="Zurück">←</a>
+<a class="nav-btn" href="/a/einkauf/{{ token }}/" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">⚙️ Aufgaben</div>
+<div class="nav-title">🏪 Märkte</div>
 {% endblock %}
 
 {% block body %}
@@ -43,27 +41,19 @@
     <form method="post">
       <input type="hidden" name="action" value="neu">
       <div class="form-row">
-        <input class="form-input" type="text" name="emoji" placeholder="Emoji" style="max-width:70px">
-        <input class="form-input" type="text" name="name" placeholder="Aufgabenname" required>
-      </div>
-      <div class="form-row">
-        <input class="form-input" type="number" name="gewichtung" placeholder="Punkte" value="1.0" min="0.5" max="10" step="0.5" style="max-width:100px">
+        <input class="form-input" type="text" name="name" placeholder="Marktname" required>
         <button class="btn-add" type="submit">+ Hinzufügen</button>
       </div>
     </form>
   </div>
 
-  {% for a in aufgaben %}
-  <div class="aufg-item {% if not a.aktiv %}inaktiv{% endif %}">
-    <span class="aufg-emoji">{{ a.emoji }}</span>
-    <div class="aufg-info">
-      <div class="aufg-name">{{ a.name }}</div>
-      <div class="aufg-gew">{{ a.gewichtung }} Punkte</div>
-    </div>
+  {% for l in laeden %}
+  <div class="laden-item {% if not l.aktiv %}inaktiv{% endif %}">
+    <span class="laden-name">{{ l.name }}</span>
     <form method="post">
       <input type="hidden" name="action" value="toggle">
-      <input type="hidden" name="id" value="{{ a.id }}">
-      <button class="btn-toggle" type="submit">{% if a.aktiv %}Deaktivieren{% else %}Aktivieren{% endif %}</button>
+      <input type="hidden" name="id" value="{{ l.id }}">
+      <button class="btn-toggle" type="submit">{% if l.aktiv %}Deaktivieren{% else %}Aktivieren{% endif %}</button>
     </form>
   </div>
   {% endfor %}

@@ -3,13 +3,21 @@
 
 {% block title %}Hallo, {{ user.name }}{% endblock %}
 
+{% block nav_title %}
+<div class="nav-title" id="greeting-title">{{ greeting }}, {{ user.name }}! 👋</div>
+<div class="nav-sub">Dein Familienportal</div>
+{% endblock %}
+
 {% block extra_styles %}
-.header-name { font-size: 28px; font-weight: 700; line-height: 1.2; }
-.header-sub  { font-size: 15px; opacity: .85; margin-top: 4px; }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px; margin-top: 8px;
+  gap: 12px;
+}
+/* Leere Gruppen brauchen im Edit-Modus eine Mindesthöhe, sonst kollabiert
+   das Grid auf 0px und elementFromPoint() beim Drag findet die Gruppe nie. */
+.edit-mode .grid {
+  min-height: 100px;
 }
 .tile {
   background: var(--surface); border-radius: 18px;
@@ -20,10 +28,12 @@
   min-height: 100px;
   -webkit-tap-highlight-color: transparent;
   transition: transform .1s;
+  touch-action: none;
+  user-select: none;
 }
-.tile:active { transform: scale(.96); }
-.tile-emoji { font-size: 40px; line-height: 1; }
-.tile-name  { font-size: 14px; font-weight: 500; color: var(--text-3); }
+.tile:not(.edit-mode *):active { transform: scale(.96); }
+.tile-emoji { font-size: 40px; line-height: 1; pointer-events: none; }
+.tile-name  { font-size: 14px; font-weight: 500; color: var(--text-3); pointer-events: none; }
 .empty {
   text-align: center; padding: 48px 16px;
   color: var(--text-2); font-size: 16px; line-height: 1.6;
@@ -42,16 +52,68 @@
   font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .btn-push:disabled { opacity: .5; cursor: default; }
+
+/* Gruppen */
+.gruppe-section { margin-bottom: 20px; }
+.gruppe-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.gruppe-name {
+  font-size: 13px; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .5px;
+  flex: 1;
+}
+.gruppe-edit-btns { display: none; gap: 6px; }
+.edit-mode .gruppe-edit-btns { display: flex; }
+.btn-gruppe-action {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--text-2);
+}
+.btn-gruppe-action:active { background: var(--surface-2); }
+
+/* Edit-Leiste */
+.edit-bar {
+  display: none; gap: 8px; margin-bottom: 16px;
+  align-items: center; flex-wrap: wrap;
+}
+.edit-mode .edit-bar { display: flex; }
+.btn-neue-gruppe {
+  background: var(--farbe); color: #fff; border: none;
+  border-radius: 10px; padding: 8px 14px; font-size: 14px;
+  font-weight: 600; cursor: pointer;
+}
+.btn-neue-gruppe:active { opacity: .8; }
+.edit-info {
+  font-size: 13px; color: var(--text-2); flex: 1;
+}
+
+/* Edit-Toggle */
+.edit-toggle-row {
+  text-align: center; padding: 16px 0 4px;
+}
+.btn-edit-toggle {
+  background: none; border: none; color: var(--text-2);
+  font-size: 14px; cursor: pointer;
+  text-decoration: underline; text-decoration-style: dotted;
+}
+
+/* Drag-Platzhalter */
+.drag-placeholder {
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 2px dashed var(--border);
+  min-height: 100px;
+}
+
+/* Tile im Edit-Modus */
+.edit-mode .tile { cursor: grab; }
+.edit-mode .tile:active { cursor: grabbing; }
 {% endblock %}
 
 {% block body %}
-<header class="page-header">
-  <div class="header-name">{{ greeting }}, {{ user.name }}! 👋</div>
-  <div class="header-sub">Dein Familienportal</div>
-</header>
-
 <main class="main">
-  <!-- Push-Banner: nur sichtbar wenn SW unterstützt wird und Permission noch nicht erteilt/abgelehnt -->
+  <!-- Push-Banner -->
   <div class="push-banner" id="push-banner" style="display:none">
     <span style="font-size:28px">🔔</span>
     <div class="push-text">
@@ -61,14 +123,56 @@
     <button class="btn-push" id="push-btn">Aktivieren</button>
   </div>
 
-  {% if apps %}
-    <div class="grid">
-      {% for app in apps %}
-        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/">
+  {% if gruppen or allgemein %}
+    <!-- Edit-Leiste -->
+    <div class="edit-bar" id="edit-bar">
+      <button class="btn-neue-gruppe" id="add-gruppe-btn">+ Neue Gruppe</button>
+      <span class="edit-info">Kacheln verschieben durch Ziehen</span>
+    </div>
+
+    <!-- Gruppen -->
+    {% for gruppe in gruppen %}
+    <section class="gruppe-section" data-gruppe-id="{{ gruppe.info.id }}">
+      <div class="gruppe-header">
+        <span class="gruppe-name">{{ gruppe.info.name }}</span>
+        <div class="gruppe-edit-btns">
+          <button class="btn-gruppe-action btn-rename-gruppe" data-id="{{ gruppe.info.id }}" title="Umbenennen">✏️</button>
+          <button class="btn-gruppe-action btn-delete-gruppe" data-id="{{ gruppe.info.id }}" title="Löschen">🗑️</button>
+        </div>
+      </div>
+      <div class="grid gruppe-grid">
+        {% for app in gruppe.apps %}
+        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
+           data-grant-id="{{ app.grant_id }}">
           <span class="tile-emoji">{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
         </a>
-      {% endfor %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+    <!-- Allgemein (immer am Ende) -->
+    <section class="gruppe-section allgemein-section" data-gruppe-id="">
+      {% if gruppen %}
+      <div class="gruppe-header">
+        <span class="gruppe-name">Allgemein</span>
+      </div>
+      {% endif %}
+      <div class="grid gruppe-grid">
+        {% for app in allgemein %}
+        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
+           data-grant-id="{{ app.grant_id }}">
+          <span class="tile-emoji">{{ app.emoji }}</span>
+          <span class="tile-name">{{ app.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Edit-Toggle -->
+    <div class="edit-toggle-row">
+      <button class="btn-edit-toggle" id="edit-toggle">✎ Apps anpassen</button>
     </div>
   {% else %}
     <div class="empty">
@@ -84,12 +188,11 @@
 <script>
 // Tageszeit-Gruß
 (function(){
-  const h = new Date().getHours();
+  const h   = new Date().getHours();
   const map = [[5,'Guten Morgen'],[12,'Hallo'],[17,'Guten Abend'],[22,'Gute Nacht']];
-  const g = map.slice().reverse().find(([h2]) => h >= h2)?.[1] ?? 'Hallo';
-  document.querySelectorAll('.header-name').forEach(el => {
-    el.textContent = el.textContent.replace(/^[^,]+/, g);
-  });
+  const g   = map.slice().reverse().find(([h2]) => h >= h2)?.[1] ?? 'Hallo';
+  const el  = document.getElementById('greeting-title');
+  if (el) el.textContent = el.textContent.replace(/^[^,]+/, g);
 })();
 
 // Push-Opt-in
@@ -104,40 +207,26 @@
   let swReg;
   try { swReg = await navigator.serviceWorker.ready; } catch(e) { return; }
 
-  // Schon subscribed?
   const existing = await swReg.pushManager.getSubscription();
-  if (existing) return;  // Alles gut, nichts anzeigen
+  if (existing) return;
 
-  // Noch nicht entschieden → Banner zeigen
   if (Notification.permission === 'default') banner.style.display = 'flex';
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     try {
-      const resp = await fetch('/push/vapid-public-key');
+      const resp   = await fetch('/push/vapid-public-key');
       const { key } = await resp.json();
       if (!key) { btn.disabled = false; return; }
-
       const appKey = urlB64ToUint8(key);
-      const sub = await swReg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: appKey,
-      });
-
+      const sub    = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
       await fetch('/push/subscribe', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          subscription: sub.toJSON(),
-          token: TOKEN,
-          geraet: navigator.userAgent.substring(0, 80),
-        }),
+        body: JSON.stringify({ subscription: sub.toJSON(), token: TOKEN, geraet: navigator.userAgent.substring(0, 80) }),
       });
       banner.style.display = 'none';
-    } catch(e) {
-      console.warn('Push subscription failed:', e);
-      btn.disabled = false;
-    }
+    } catch(e) { console.warn('Push subscription failed:', e); btn.disabled = false; }
   });
 
   function urlB64ToUint8(b64) {
@@ -147,6 +236,242 @@
     for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
     return buf;
   }
+})();
+
+// Apps anpassen – Edit-Modus + Drag & Drop
+(function(){
+  const TOKEN    = '{{ token }}';
+  let editMode   = false;
+  let dragState  = null;
+
+  const editBtn = document.getElementById('edit-toggle');
+  if (!editBtn) return;
+
+  // Edit-Modus umschalten
+  editBtn.addEventListener('click', () => {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    editBtn.textContent = editMode ? '✓ Fertig' : '✎ Apps anpassen';
+    if (!editMode && dragState) cancelDrag();
+  });
+
+  // Drag & Drop mit Pointer Events
+  function initDrag(tile) {
+    tile.addEventListener('pointerdown', onDown);
+  }
+
+  document.querySelectorAll('.tile[data-grant-id]').forEach(initDrag);
+
+  function onDown(e) {
+    if (!editMode) return;
+    if (e.button && e.button !== 0) return;
+    e.preventDefault();
+    const tile = e.currentTarget;
+    tile.setPointerCapture(e.pointerId);
+    const rect = tile.getBoundingClientRect();
+    dragState = {
+      tile, pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      started: false, ghost: null, placeholder: null,
+    };
+    tile.addEventListener('pointermove', onMove);
+    tile.addEventListener('pointerup',   onUp);
+    tile.addEventListener('pointercancel', onCancel);
+  }
+
+  function onMove(e) {
+    if (!dragState || dragState.tile !== e.currentTarget) return;
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    if (!dragState.started && Math.hypot(dx, dy) > 8) {
+      dragState.started = true;
+      beginDrag(e);
+    }
+    if (dragState.started) continueDrag(e);
+  }
+
+  function onUp(e) {
+    if (!dragState || dragState.tile !== e.currentTarget) return;
+    removeListeners(dragState.tile);
+    if (dragState.started) finishDrag();
+    dragState = null;
+  }
+
+  function onCancel(e) {
+    if (!dragState || dragState.tile !== e.currentTarget) return;
+    removeListeners(dragState.tile);
+    if (dragState.started) cancelDrag();
+    dragState = null;
+  }
+
+  function removeListeners(tile) {
+    tile.removeEventListener('pointermove', onMove);
+    tile.removeEventListener('pointerup',   onUp);
+    tile.removeEventListener('pointercancel', onCancel);
+  }
+
+  function beginDrag(e) {
+    const { tile, offsetX, offsetY } = dragState;
+    const rect = tile.getBoundingClientRect();
+
+    const ghost = tile.cloneNode(true);
+    ghost.removeAttribute('data-grant-id');
+    ghost.style.cssText = [
+      'position:fixed', 'z-index:1000', 'pointer-events:none',
+      `width:${rect.width}px`, `height:${rect.height}px`,
+      `left:${e.clientX - offsetX}px`, `top:${e.clientY - offsetY}px`,
+      'opacity:.85', 'transform:scale(1.05)',
+      'box-shadow:0 12px 30px rgba(0,0,0,.22)', 'border-radius:18px',
+    ].join(';');
+    document.body.appendChild(ghost);
+
+    const ph = document.createElement('div');
+    ph.className = 'drag-placeholder';
+    ph.style.cssText = `width:${rect.width}px; height:${rect.height}px;`;
+    tile.parentNode.insertBefore(ph, tile.nextSibling);
+    tile.style.opacity = '.15';
+
+    dragState.ghost       = ghost;
+    dragState.placeholder = ph;
+  }
+
+  function continueDrag(e) {
+    const { ghost, placeholder, offsetX, offsetY, tile } = dragState;
+    ghost.style.left = `${e.clientX - offsetX}px`;
+    ghost.style.top  = `${e.clientY - offsetY}px`;
+
+    ghost.style.visibility = 'hidden';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    ghost.style.visibility = '';
+    if (!under) return;
+
+    const targetTile = under.closest('.tile[data-grant-id]');
+    const targetGrid = under.closest('.gruppe-grid');
+
+    if (targetTile && targetTile !== tile) {
+      const r   = targetTile.getBoundingClientRect();
+      const mid = r.left + r.width / 2;
+      targetTile.parentNode.insertBefore(placeholder, e.clientX < mid ? targetTile : targetTile.nextSibling);
+    } else if (targetGrid && targetGrid !== placeholder.parentNode) {
+      const hasTiles = targetGrid.querySelector('.tile[data-grant-id]');
+      if (!hasTiles) targetGrid.appendChild(placeholder);
+    }
+  }
+
+  function finishDrag() {
+    const { tile, ghost, placeholder } = dragState;
+    placeholder.parentNode.insertBefore(tile, placeholder);
+    placeholder.remove();
+    ghost.remove();
+    tile.style.opacity = '';
+    saveLayout();
+  }
+
+  function cancelDrag() {
+    if (!dragState?.started) return;
+    const { tile, ghost, placeholder } = dragState;
+    if (placeholder?.parentNode) placeholder.parentNode.insertBefore(tile, placeholder);
+    placeholder?.remove();
+    ghost?.remove();
+    tile.style.opacity = '';
+  }
+
+  async function saveLayout() {
+    const order = [];
+    document.querySelectorAll('.gruppe-section').forEach(section => {
+      const gid      = section.dataset.gruppeId;
+      const gruppeId = gid ? parseInt(gid) : null;
+      section.querySelectorAll('.gruppe-grid .tile[data-grant-id]').forEach((tile, pos) => {
+        order.push({ grant_id: parseInt(tile.dataset.grantId), gruppe_id: gruppeId, position: pos });
+      });
+    });
+    try {
+      await fetch(`/p/${TOKEN}/reorder`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order}),
+      });
+    } catch(err) { console.warn('reorder failed', err); }
+  }
+
+  // Gruppe anlegen
+  document.getElementById('add-gruppe-btn')?.addEventListener('click', async () => {
+    const name = prompt('Name der neuen Gruppe:');
+    if (!name?.trim()) return;
+    try {
+      const resp = await fetch(`/p/${TOKEN}/gruppe/neu`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name.trim()}),
+      });
+      const d = await resp.json();
+      if (!d.ok) return;
+      const allgemein = document.querySelector('.allgemein-section');
+      const section   = buildGruppeSection(d.id, d.name);
+      allgemein.parentNode.insertBefore(section, allgemein);
+    } catch(e) { console.warn('gruppe neu failed', e); }
+  });
+
+  function buildGruppeSection(id, name) {
+    const sec = document.createElement('section');
+    sec.className    = 'gruppe-section';
+    sec.dataset.gruppeId = id;
+    sec.innerHTML = `
+      <div class="gruppe-header">
+        <span class="gruppe-name">${esc(name)}</span>
+        <div class="gruppe-edit-btns" style="display:flex">
+          <button class="btn-gruppe-action btn-rename-gruppe" data-id="${id}" title="Umbenennen">✏️</button>
+          <button class="btn-gruppe-action btn-delete-gruppe" data-id="${id}" title="Löschen">🗑️</button>
+        </div>
+      </div>
+      <div class="grid gruppe-grid"></div>
+    `;
+    registerGruppeButtons(sec);
+    return sec;
+  }
+
+  function esc(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function registerGruppeButtons(container) {
+    container.querySelectorAll('.btn-rename-gruppe').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id  = btn.dataset.id;
+        const cur = btn.closest('.gruppe-header').querySelector('.gruppe-name').textContent;
+        const name = prompt('Neuer Name:', cur);
+        if (!name?.trim() || name.trim() === cur) return;
+        const resp = await fetch(`/p/${TOKEN}/gruppe/${id}/umbenennen`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name: name.trim()}),
+        });
+        const d = await resp.json();
+        if (d.ok) btn.closest('.gruppe-header').querySelector('.gruppe-name').textContent = name.trim();
+      });
+    });
+
+    container.querySelectorAll('.btn-delete-gruppe').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id   = btn.dataset.id;
+        const name = btn.closest('.gruppe-header').querySelector('.gruppe-name').textContent;
+        if (!confirm(`„${name}“ löschen?\nApps werden nach Allgemein verschoben.`)) return;
+        const resp = await fetch(`/p/${TOKEN}/gruppe/${id}/loeschen`, {method:'POST'});
+        const d    = await resp.json();
+        if (!d.ok) return;
+        const sec     = btn.closest('.gruppe-section');
+        const algGrid = document.querySelector('.allgemein-section .gruppe-grid');
+        sec.querySelectorAll('.tile[data-grant-id]').forEach(t => algGrid.appendChild(t));
+        sec.remove();
+        saveLayout();
+      });
+    });
+  }
+
+  // Gruppen-Buttons für bestehende Sektionen registrieren
+  document.querySelectorAll('.gruppe-section').forEach(registerGruppeButtons);
+
 })();
 </script>
 {% endblock %}

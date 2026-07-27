@@ -52,14 +52,16 @@
 .cal-dot { display:inline-block; width:16px; height:16px; border-radius:50%; }
 {% endblock %}
 
-{% block body %}
-<header class="page-header" style="background:var(--farbe)">
-  <div>
-    <div class="header-title">📊 Letzte 7 Tage</div>
-    <div class="header-sub">Geholfen-Übersicht</div>
-  </div>
-</header>
+{% block nav_left %}
+<a class="nav-btn" href="/a/geholfen/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
 
+{% block nav_title %}
+<div class="nav-title">📊 Übersicht</div>
+<div class="nav-sub">Letzte 7 Tage · Kalender</div>
+{% endblock %}
+
+{% block body %}
 <main class="main">
   <div class="section-label">Punkte</div>
   <div class="stats-grid">

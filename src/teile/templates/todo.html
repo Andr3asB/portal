@@ -55,23 +55,28 @@
   font-size:20px; padding:0 4px; flex-shrink:0; align-self:center;
 }
 .todo-del:active { color:#ff3b30; }
+.todo-check-ghost {
+  width:26px; height:26px; border-radius:50%; border:2.5px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; color:var(--text-2); flex-shrink:0; margin-top:1px;
+  opacity:.4;
+}
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">✅ Aufgaben</div>
+<div class="nav-sub">{{ todos|selectattr('erledigt','eq',0)|list|length }} offen</div>
 {% endblock %}
 
 {% block body %}
-<header class="page-header" style="background:var(--farbe)">
-  <div>
-    <div class="header-title">✅ Todos</div>
-    <div class="header-sub">{{ todos|selectattr('erledigt','eq',0)|list|length }} offen</div>
-  </div>
-</header>
 
 <main class="main">
-  <!-- Neues Todo -->
+  <!-- Neue Aufgabe -->
   <div class="new-todo-card">
     <form method="post" action="/a/todo/{{ token }}/neu">
       <div class="new-todo-row">
         <input class="new-todo-input" type="text" name="inhalt"
-               placeholder="Neues Todo…" required autocomplete="off">
+               placeholder="Neue Aufgabe…" required autocomplete="off">
         <button class="new-todo-submit" type="submit">+</button>
       </div>
       <div class="todo-options">
@@ -98,10 +103,15 @@
   {% if open_todos %}
   <div class="section-label">Offen</div>
   {% for t in open_todos %}
+  {% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id %}
   <div class="todo-item">
+    {% if ich_darf_erledigen %}
     <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
-      <button class="todo-check" type="submit" title="Abhaken">{% if t.erledigt %}✓{% endif %}</button>
+      <button class="todo-check" type="submit" title="Abhaken"></button>
     </form>
+    {% else %}
+    <span class="todo-check-ghost"></span>
+    {% endif %}
     <div class="todo-body">
       <div class="todo-text">{{ t.inhalt }}</div>
       <div class="todo-meta">
@@ -114,9 +124,9 @@
         {{ t.erstellt[:10] }}
       </div>
     </div>
-    {% if t.erstellt_von == user.id or user.is_admin %}
+    {% if darf_loeschen %}
     <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
-          onsubmit="return confirm('Todo löschen?')">
+          onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button class="todo-del" type="submit">×</button>
     </form>
     {% endif %}
@@ -128,16 +138,22 @@
   {% if done_todos %}
   <div class="section-label">Erledigt</div>
   {% for t in done_todos %}
+  {% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id %}
   <div class="todo-item done">
+    {% if ich_darf_erledigen %}
     <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
       <button class="todo-check" type="submit" title="Wiederherstellen">✓</button>
     </form>
+    {% else %}
+    <span class="todo-check-ghost">✓</span>
+    {% endif %}
     <div class="todo-body">
       <div class="todo-text">{{ t.inhalt }}</div>
       <div class="todo-meta">{{ t.erledigt_am[:10] if t.erledigt_am else '' }}</div>
     </div>
-    {% if t.erstellt_von == user.id or user.is_admin %}
-    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}">
+    {% if darf_loeschen %}
+    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
+          onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button class="todo-del" type="submit">×</button>
     </form>
     {% endif %}
