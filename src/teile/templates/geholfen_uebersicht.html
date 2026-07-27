@@ -36,6 +36,20 @@
 .count-badge.has { background:var(--farbe); color:#fff; }
 .section-label { font-size:13px; font-weight:600; color:var(--text-2);
   margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
+.section-label-row { display:flex; align-items:center; justify-content:space-between; }
+.cal-toggle-group { display:flex; gap:4px; }
+.cal-toggle {
+  font-size:12px; font-weight:600; padding:4px 10px; border-radius:8px;
+  border:1.5px solid var(--border); background:none; color:var(--text-2); cursor:pointer;
+}
+.cal-toggle.active { background:var(--farbe); color:#fff; border-color:var(--farbe); }
+.cal-table { width:100%; border-collapse:collapse; font-size:13px; }
+.cal-table th { padding:8px 10px; background:var(--surface-2); color:var(--text-2); font-size:12px; text-align:center; }
+.cal-table th:first-child { text-align:left; }
+.cal-table td { padding:6px 10px; border-bottom:1px solid var(--surface-2); text-align:center; }
+.cal-table td:first-child { text-align:left; font-size:12px; color:var(--text-2); white-space:nowrap; }
+.cal-table tr:last-child td { border-bottom:none; }
+.cal-dot { display:inline-block; width:16px; height:16px; border-radius:50%; }
 {% endblock %}
 
 {% block body %}
@@ -84,6 +98,38 @@
     </table>
   </div>
 
+  <div class="section-label-row">
+    <span class="section-label" style="margin:16px 0 8px">Kalender</span>
+    <div class="cal-toggle-group">
+      <button class="cal-toggle active" id="btn-10" onclick="showDays(10)">10 Tage</button>
+      <button class="cal-toggle" id="btn-30" onclick="showDays(30)">30 Tage</button>
+    </div>
+  </div>
+  <div style="background:var(--surface);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px var(--shadow);overflow-x:auto">
+    <table class="cal-table">
+      <thead>
+        <tr>
+          <th>Tag</th>
+          {% for u in users %}<th title="{{ u.name }}">{{ u.name[0] }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for tag in tage|reverse %}
+        <tr class="cal-row">
+          <td>{{ tag[5:] }}</td>
+          {% for u in users %}
+          <td>
+            {% if u.id in kalender.get(tag, []) %}
+              <span class="cal-dot" style="background:{{ u.farbe }}"></span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   {% if user.is_admin %}
   <div style="margin-top:16px">
     <a class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;padding:12px"
@@ -91,4 +137,17 @@
   </div>
   {% endif %}
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showDays(n) {
+  document.querySelectorAll('.cal-row').forEach(function(row, i) {
+    row.style.display = i < n ? '' : 'none';
+  });
+  document.getElementById('btn-10').classList.toggle('active', n === 10);
+  document.getElementById('btn-30').classList.toggle('active', n === 30);
+}
+showDays(10);
+</script>
 {% endblock %}

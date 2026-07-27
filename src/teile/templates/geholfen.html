@@ -63,17 +63,17 @@
     {% endfor %}
   </div>
 
-  {% if letzte %}
-  <div class="ticker">
+  <div class="ticker" id="ticker" {% if not letzte %}style="display:none"{% endif %}>
     <div class="ticker-title">📜 Zuletzt</div>
+    <div id="ticker-body">
     {% for e in letzte %}
     <div class="ticker-item">
       {{ e.emoji }} {{ e.name }}: {{ e.aufgabe }}
       <span class="ticker-time">{{ e.zeitstempel[11:16] }}</span>
     </div>
     {% endfor %}
+    </div>
   </div>
-  {% endif %}
 </main>
 
 <!-- Erfolgs-Toast -->
@@ -109,7 +109,16 @@
           headers: {'X-Requested-With': 'fetch'}
         });
         const d = await r.json();
-        if (d.ok) showToast(d.emoji + ' ' + d.aufgabe + ' ✓');
+        if (d.ok) {
+          showToast(d.emoji + ' ' + d.aufgabe + ' ✓');
+          if (d.letzte) {
+            const body = document.getElementById('ticker-body');
+            body.innerHTML = d.letzte.map(e =>
+              `<div class="ticker-item">${e.emoji} ${e.name}: ${e.aufgabe}<span class="ticker-time">${e.zeit}</span></div>`
+            ).join('');
+            document.getElementById('ticker').style.display = 'block';
+          }
+        }
       } catch(e) {
         // Fallback: normaler POST
         const f = document.createElement('form');

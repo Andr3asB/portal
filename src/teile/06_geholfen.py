@@ -4,6 +4,7 @@ URL-Präfix: /a/geholfen/<token>/
 
 Design: große Kacheln, auch als Küchen-Tablet-Daueranzeige geeignet.
 """
+from datetime import date, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant
 
@@ -50,7 +51,19 @@ def tippen(token, aufgabe_id):
     )
     db.commit()
     if request.headers.get("X-Requested-With") == "fetch":
-        return jsonify(ok=True, aufgabe=aufg["name"], emoji=aufg["emoji"])
+        letzte = db.execute("""
+            SELECT e.zeitstempel, u.name, a.emoji, a.name AS aufgabe
+            FROM   geholfen_eintraege e
+            JOIN   users             u ON u.id = e.user_id
+            JOIN   geholfen_aufgaben a ON a.id = e.aufgabe_id
+            ORDER  BY e.zeitstempel DESC LIMIT 10
+        """).fetchall()
+        return jsonify(
+            ok=True, aufgabe=aufg["name"], emoji=aufg["emoji"],
+            letzte=[{"name": r["name"], "aufgabe": r["aufgabe"],
+                     "emoji": r["emoji"], "zeit": r["zeitstempel"][11:16]}
+                    for r in letzte],
+        )
     return redirect(url_for("geholfen_app.index", token=token))
 
 
@@ -64,26 +77,36 @@ def uebersicht(token):
     aufgaben = db.execute(
         "SELECT * FROM geholfen_aufgaben WHERE aktiv=1 ORDER BY id"
     ).fetchall()
-    # Einträge der letzten 7 Tage
+    # Punkte/Counts letzte 7 Tage
     eintraege = db.execute("""
         SELECT e.user_id, e.aufgabe_id, a.gewichtung
         FROM   geholfen_eintraege e
         JOIN   geholfen_aufgaben  a ON a.id = e.aufgabe_id
         WHERE  e.zeitstempel >= datetime('now', '-7 days')
     """).fetchall()
-    # Aggregieren: {user_id: {aufgabe_id: count}}, Punkte je User
     counts = {}
     punkte = {}
     for e in eintraege:
-        uid = e["user_id"]
-        aid = e["aufgabe_id"]
+        uid, aid = e["user_id"], e["aufgabe_id"]
         counts.setdefault(uid, {}).setdefault(aid, 0)
         counts[uid][aid] += 1
         punkte[uid] = punkte.get(uid, 0.0) + e["gewichtung"]
+    # Kalender: letzte 30 Tage – welcher Nutzer hat an welchem Tag geholfen
+    tage = [(date.today() - timedelta(days=i)).isoformat() for i in range(29, -1, -1)]
+    kal_rows = db.execute("""
+        SELECT date(zeitstempel) AS tag, user_id
+        FROM   geholfen_eintraege
+        WHERE  zeitstempel >= datetime('now', '-30 days')
+        GROUP  BY date(zeitstempel), user_id
+    """).fetchall()
+    kalender = {}
+    for r in kal_rows:
+        kalender.setdefault(r["tag"], set()).add(r["user_id"])
     return render_template("geholfen_uebersicht.html",
         user=user, token=token, farbe=user["farbe"],
         users=users, aufgaben=aufgaben,
         counts=counts, punkte=punkte,
+        tage=tage, kalender=kalender,
     )
 
 
