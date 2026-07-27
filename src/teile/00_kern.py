@@ -74,6 +74,7 @@ _CORE_APPS = [
     ("todo",      "Todos",        "✅", "Aufgabenliste"),
     ("werkstatt", "Werkstatt",    "💡", "Verbesserungswünsche"),
     ("geholfen",  "Geholfen",     "🙋", "Geholfen-Protokoll"),
+    ("hilfe",     "Hilfe",        "❓", "Erklärungen und Tipps"),
 ]
 
 _DEFAULT_AUFGABEN = [
@@ -215,6 +216,19 @@ def _init_db(app):
                 db.execute(
                     "INSERT INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
                     (name, emoji, gew),
+                )
+        # Auto-Grant: Hilfe-App für alle Nutzer ohne Eintrag freischalten
+        hilfe = db.execute("SELECT id FROM apps WHERE slug='hilfe'").fetchone()
+        if hilfe:
+            missing = db.execute(
+                "SELECT id FROM users WHERE id NOT IN "
+                "(SELECT user_id FROM grants WHERE app_id=?)",
+                (hilfe[0],),
+            ).fetchall()
+            for row in missing:
+                db.execute(
+                    "INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
+                    (row[0], hilfe[0], secrets.token_urlsafe(18)),
                 )
         db.commit()
         db.close()

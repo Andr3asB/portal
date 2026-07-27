@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% set app_slug = "hilfe" %}
+{% block title %}Hilfe{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:22px; font-weight:700; }
+.header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
+.section {
+  background:var(--surface); border-radius:16px; padding:18px 16px;
+  margin-bottom:12px; box-shadow:0 1px 3px var(--shadow);
+}
+.section-title {
+  font-size:17px; font-weight:700; margin-bottom:10px;
+  display:flex; align-items:center; gap:8px;
+}
+.section p { font-size:15px; line-height:1.6; color:var(--text); margin-bottom:8px; }
+.section p:last-child { margin-bottom:0; }
+.steps { list-style:none; padding:0; margin:0; }
+.steps li {
+  font-size:15px; line-height:1.5; padding:6px 0;
+  border-bottom:1px solid var(--surface-2);
+  display:flex; gap:10px; align-items:baseline;
+}
+.steps li:last-child { border-bottom:none; }
+.step-icon { font-size:20px; flex-shrink:0; width:28px; text-align:center; }
+.app-list { list-style:none; padding:0; margin:0; }
+.app-list li {
+  font-size:15px; padding:10px 0;
+  border-bottom:1px solid var(--surface-2);
+  display:flex; gap:12px; align-items:flex-start;
+}
+.app-list li:last-child { border-bottom:none; }
+.app-emoji { font-size:24px; flex-shrink:0; width:32px; text-align:center; margin-top:1px; }
+.app-desc strong { display:block; font-weight:600; margin-bottom:2px; }
+.app-desc span { font-size:13px; color:var(--text-2); line-height:1.4; }
+.tip {
+  background:var(--surface-2); border-radius:10px;
+  padding:10px 12px; font-size:14px; color:var(--text-2);
+  margin-top:8px; line-height:1.5;
+}
+{% endblock %}
+
+{% block body %}
+<header class="page-header" style="background:var(--farbe)">
+  <div>
+    <div class="header-title">❓ Hilfe</div>
+    <div class="header-sub">Alles über das Familienportal</div>
+  </div>
+</header>
+
+<main class="main">
+
+  <div class="section">
+    <div class="section-title">🏠 Was ist das Portal?</div>
+    <p>Das ist unser privates Familienportal – nur für uns. Wer einen persönlichen Link hat, kommt herein. Den Link bekommt jedes Familienmitglied von Andi.</p>
+    <p>Jeder hat seine eigene Seite mit seiner Lieblingsfarbe und den Apps, die für ihn freigeschaltet sind.</p>
+    <div class="tip">⚠️ Teile deinen Link nicht mit anderen – er gehört nur dir.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📱 Als App auf dem Handy speichern</div>
+    <p>Das Portal lässt sich wie eine echte App auf dem Home-Bildschirm speichern – kein App Store nötig.</p>
+    <ul class="steps">
+      <li>
+        <span class="step-icon">🍎</span>
+        <div><strong>iPhone / iPad (Safari):</strong> Teilen-Symbol unten → „Zum Home-Bildschirm"</div>
+      </li>
+      <li>
+        <span class="step-icon">🤖</span>
+        <div><strong>Android (Chrome):</strong> Menü oben rechts (⋮) → „App installieren" oder „Zum Startbildschirm hinzufügen"</div>
+      </li>
+    </ul>
+    <div class="tip">💡 Danach öffnet sich das Portal direkt ohne Browser-Leiste – wie eine richtige App.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🗂️ Die Apps</div>
+    <ul class="app-list">
+      <li>
+        <span class="app-emoji">🏠</span>
+        <div class="app-desc">
+          <strong>Startseite</strong>
+          <span>Dein persönlicher Einstieg. Von hier aus öffnest du alle Apps.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">✅</span>
+        <div class="app-desc">
+          <strong>Todos</strong>
+          <span>Aufgaben anlegen, anderen zuweisen und abhaken. Wer eine Aufgabe bekommt, wird per Benachrichtigung informiert.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">💡</span>
+        <div class="app-desc">
+          <strong>Werkstatt</strong>
+          <span>Ideen und Wünsche für das Portal sammeln. Nutze den ✨-Knopf unten auf jeder Seite.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">🙋</span>
+        <div class="app-desc">
+          <strong>Geholfen</strong>
+          <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Andi sieht in der Übersicht, wer sich wie einbringt.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">⚙️</span>
+        <div class="app-desc">
+          <strong>Verwaltung</strong>
+          <span>Nur für Admins. Hier werden Nutzer und App-Zugänge verwaltet.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔔 Benachrichtigungen</div>
+    <p>Wenn jemand dir ein Todo zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
+    <p>Beim ersten Öffnen des Portals erscheint ein Banner – einfach <strong>„Aktivieren"</strong> tippen. Fertig.</p>
+    <div class="tip">Benachrichtigungen funktionieren nur, wenn das Portal als App auf dem Home-Bildschirm gespeichert oder im Browser geöffnet ist.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🌙 Hell / Dunkel</div>
+    <p>Mit dem <strong>🌙-Knopf</strong> in der Leiste unten wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔗 Link verloren oder ungültig?</div>
+    <p>Kein Problem! Melde dich einfach bei Andi – er erstellt dir einen neuen Link und schickt ihn dir.</p>
+  </div>
+
+</main>
+{% endblock %}
