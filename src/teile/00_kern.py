@@ -203,11 +203,12 @@ def _init_db(app):
             "INSERT OR IGNORE INTO apps(slug,name,emoji,beschreibung) VALUES(?,?,?,?)",
             _CORE_APPS,
         )
-        for name, emoji, gew in _DEFAULT_AUFGABEN:
-            db.execute(
-                "INSERT OR IGNORE INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
-                (name, emoji, gew),
-            )
+        if db.execute("SELECT COUNT(*) FROM geholfen_aufgaben").fetchone()[0] == 0:
+            for name, emoji, gew in _DEFAULT_AUFGABEN:
+                db.execute(
+                    "INSERT INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
+                    (name, emoji, gew),
+                )
         db.commit()
         db.close()
 
