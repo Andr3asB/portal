@@ -12,8 +12,8 @@
   text-decoration:none; white-space:nowrap; cursor:pointer;
 }
 .user-card {
-  background:#fff; border-radius:16px; padding:16px;
-  margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.07);
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:12px; box-shadow:0 1px 3px var(--shadow);
 }
 .user-header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
 .avatar {
@@ -33,17 +33,17 @@
   border-radius:20px; background:#e5f6ec; color:#34c759; font-weight:600;
   margin-left:4px; vertical-align:middle;
 }
-.user-url { font-size:12px; color:#8e8e93; word-break:break-all; margin-bottom:10px; }
+.user-url { font-size:12px; color:var(--text-2); word-break:break-all; margin-bottom:10px; }
 .user-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
 .btn-edit {
   font-size:13px; padding:6px 12px; border-radius:8px;
-  background:#f2f2f7; color:#1d1d1f; border:none; cursor:pointer; text-decoration:none;
+  background:var(--surface-2); color:var(--text); border:none; cursor:pointer; text-decoration:none;
 }
 .btn-qr {
   font-size:13px; padding:6px 12px; border-radius:8px;
-  background:#f2f2f7; color:#1d1d1f; border:none; cursor:pointer;
+  background:var(--surface-2); color:var(--text); border:none; cursor:pointer;
 }
-.grants-label { font-size:12px; color:#8e8e93; margin-bottom:6px; font-weight:500; }
+.grants-label { font-size:12px; color:var(--text-2); margin-bottom:6px; font-weight:500; }
 .grants-row   { display:flex; flex-wrap:wrap; gap:6px; }
 .grant-chip {
   display:inline-flex; align-items:center; gap:4px;
@@ -51,15 +51,15 @@
   border:none; cursor:pointer;
 }
 .grant-chip.active   { background:#34c759; color:#fff; }
-.grant-chip.inactive { background:#e5e5ea; color:#8e8e93; }
-.grant-chip.inactive:hover { background:#d1d1d6; }
+.grant-chip.inactive { background:var(--chip-bg); color:var(--chip-text); }
+.grant-chip.inactive:hover { background:var(--surface-2); }
 .qr-modal {
   display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
   align-items:center; justify-content:center; z-index:200;
 }
 .qr-modal.open { display:flex; }
 .qr-box {
-  background:#fff; border-radius:20px; padding:24px; max-width:300px; width:90%;
+  background:var(--surface); border-radius:20px; padding:24px; max-width:300px; width:90%;
   text-align:center;
 }
 .qr-box h3 { margin-bottom:12px; font-size:17px; }

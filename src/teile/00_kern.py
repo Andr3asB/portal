@@ -6,11 +6,12 @@ log = logging.getLogger("portal.kern")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-  id       INTEGER PRIMARY KEY,
-  name     TEXT    NOT NULL,
-  farbe    TEXT    NOT NULL DEFAULT '#4a90d9',
-  is_admin INTEGER NOT NULL DEFAULT 0,
-  ki_key   TEXT
+  id        INTEGER PRIMARY KEY,
+  name      TEXT    NOT NULL,
+  farbe     TEXT    NOT NULL DEFAULT '#4a90d9',
+  is_admin  INTEGER NOT NULL DEFAULT 0,
+  ki_key    TEXT,
+  dark_mode INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS apps (
   id           INTEGER PRIMARY KEY,
@@ -124,7 +125,7 @@ def grant(token: str, app_slug: str):
     """Gibt Row(id, name, farbe, is_admin, home_token) zurück wenn Token für app_slug gültig, sonst None."""
     db = get_db()
     return db.execute("""
-        SELECT u.id, u.name, u.farbe, u.is_admin,
+        SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode,
                (SELECT g2.token FROM grants g2
                 JOIN apps a2 ON a2.id = g2.app_id
                 WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_token
@@ -199,6 +200,12 @@ def _init_db(app):
     with app.app_context():
         db = sqlite3.connect(app.config["DB_PATH"])
         db.executescript(SCHEMA)
+        # Migration: dark_mode column
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN dark_mode INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
         db.executemany(
             "INSERT OR IGNORE INTO apps(slug,name,emoji,beschreibung) VALUES(?,?,?,?)",
             _CORE_APPS,

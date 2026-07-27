@@ -16,7 +16,7 @@ def startseite(token):
 
     # Token muss für die 'home'-App ausgestellt sein
     row = db.execute("""
-        SELECT u.id, u.name, u.farbe, u.is_admin
+        SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode
         FROM   grants g
         JOIN   users u ON u.id = g.user_id
         JOIN   apps  a ON a.id = g.app_id

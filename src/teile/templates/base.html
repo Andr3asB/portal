@@ -12,18 +12,44 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --farbe: {{ farbe | default('#4a90d9') }};
+      --farbe:         {{ farbe | default('#4a90d9') }};
       --st: env(safe-area-inset-top,    0px);
       --sb: env(safe-area-inset-bottom, 0px);
       --sl: env(safe-area-inset-left,   0px);
       --sr: env(safe-area-inset-right,  0px);
+      --bg:            #f5f5f7;
+      --surface:       #ffffff;
+      --surface-2:     #f2f2f7;
+      --text:          #1d1d1f;
+      --text-2:        #8e8e93;
+      --text-3:        #3a3a3c;
+      --border:        #d1d1d6;
+      --border-subtle: rgba(0,0,0,.08);
+      --shadow:        rgba(0,0,0,.07);
+      --bar-bg:        rgba(255,255,255,.92);
+      --chip-bg:       #e5e5ea;
+      --chip-text:     #8e8e93;
+    }
+    body.dark {
+      --bg:            #1c1c1e;
+      --surface:       #2c2c2e;
+      --surface-2:     #3a3a3c;
+      --text:          #f2f2f7;
+      --text-2:        #98989d;
+      --text-3:        #e5e5e5;
+      --border:        #48484a;
+      --border-subtle: rgba(255,255,255,.08);
+      --shadow:        rgba(0,0,0,.35);
+      --bar-bg:        rgba(28,28,30,.92);
+      --chip-bg:       #3a3a3c;
+      --chip-text:     #98989d;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f5f5f7;
+      background: var(--bg);
       min-height: 100dvh;
       padding-bottom: calc(70px + var(--sb));
-      color: #1d1d1f;
+      color: var(--text);
     }
     .page-header {
       background: var(--farbe);
@@ -32,13 +58,13 @@
     }
     .main { padding: 16px; }
 
-    /* Bottom-Leiste mit ⌂ und ✨ */
+    /* Bottom-Leiste */
     .bar {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: rgba(255,255,255,.92);
+      background: var(--bar-bg);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-top: 1px solid rgba(0,0,0,.08);
+      border-top: 1px solid var(--border-subtle);
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px calc(24px + var(--sr)) calc(8px + var(--sb)) calc(24px + var(--sl));
       z-index: 50;
@@ -51,7 +77,7 @@
       border-radius: 12px;
       -webkit-tap-highlight-color: transparent;
     }
-    .bar-btn:active { background: rgba(0,0,0,.06); }
+    .bar-btn:active { background: var(--border-subtle); }
 
     /* ✨ Overlay */
     #wunsch-overlay {
@@ -62,16 +88,17 @@
     }
     #wunsch-overlay.open { display: flex; }
     .wunsch-card {
-      background: #fff; border-radius: 20px 20px 0 0;
+      background: var(--surface); border-radius: 20px 20px 0 0;
       padding: 20px 20px calc(20px + var(--sb));
       width: 100%; max-width: 500px;
     }
     .wunsch-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
     .wunsch-card textarea {
-      width: 100%; border: 1.5px solid #d1d1d6;
+      width: 100%; border: 1.5px solid var(--border);
       border-radius: 10px; padding: 10px 12px;
       font-size: 16px; font-family: inherit;
       resize: none; outline: none;
+      background: var(--surface); color: var(--text);
     }
     .wunsch-card textarea:focus { border-color: var(--farbe); }
     .wunsch-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
@@ -79,12 +106,21 @@
       padding: 10px 20px; border-radius: 10px;
       font-size: 15px; font-weight: 500; border: none; cursor: pointer;
     }
-    .btn-secondary { background: #f2f2f7; color: #1d1d1f; }
+    .btn-secondary { background: var(--surface-2); color: var(--text); }
     .btn-primary   { background: var(--farbe); color: #fff; }
+
+    /* Globale Input-Basisstile für Dark Mode */
+    body.dark input:not([type=checkbox]):not([type=radio]):not([type=color]),
+    body.dark textarea,
+    body.dark select {
+      background: var(--surface);
+      color: var(--text);
+      color-scheme: dark;
+    }
     {% block extra_styles %}{% endblock %}
   </style>
 </head>
-<body>
+<body class="{{ 'dark' if user is defined and user and user.dark_mode else '' }}">
 
 {% block body %}{% endblock %}
 
@@ -92,6 +128,11 @@
   {% if token is defined and token %}
     {% set _home_tok = user.home_token if (user is defined and user and user.home_token) else token %}
     <a class="bar-btn" href="/p/{{ _home_tok }}" title="Startseite">⌂</a>
+  {% else %}
+    <span class="bar-btn"></span>
+  {% endif %}
+  {% if token is defined and token %}
+    <button class="bar-btn" id="dm-btn" title="Darkmode umschalten">{{ '☀️' if user is defined and user and user.dark_mode else '🌙' }}</button>
   {% else %}
     <span class="bar-btn"></span>
   {% endif %}
@@ -131,6 +172,22 @@
     } catch(e) {}
     overlay.classList.remove('open');
     document.getElementById('wunsch-text').value = '';
+  });
+
+  const dmBtn = document.getElementById('dm-btn');
+  dmBtn.addEventListener('click', async () => {
+    try {
+      const resp = await fetch('/settings/darkmode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: '{{ token }}'})
+      });
+      const d = await resp.json();
+      if (d.ok) {
+        document.body.classList.toggle('dark', d.dark);
+        dmBtn.textContent = d.dark ? '☀️' : '🌙';
+      }
+    } catch(e) { console.warn('darkmode toggle failed', e); }
   });
 })();
 </script>
