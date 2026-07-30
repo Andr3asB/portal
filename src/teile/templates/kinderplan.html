@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% set app_slug = "kinderplan" %}
+{% block title %}Aufgabenplan{% endblock %}
+
+{% block extra_styles %}
+.nutzer-picker { margin-bottom:12px; }
+.nutzer-picker-label {
+  font-size:12px; color:var(--text-2); font-weight:600;
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;
+}
+.nutzer-pills { display:flex; gap:8px; flex-wrap:wrap; }
+.nutzer-pill {
+  display:inline-flex; align-items:center; gap:6px;
+  border:none; border-radius:20px; padding:7px 14px;
+  font-size:14px; font-weight:600; cursor:pointer;
+  background:var(--chip-bg); color:var(--text-2);
+  text-decoration:none; -webkit-tap-highlight-color:transparent;
+}
+.nutzer-pill.aktiv { color:#fff; }
+
+.tag-card {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.tag-card.heute { box-shadow:0 0 0 2px var(--farbe), 0 1px 3px var(--shadow); }
+.tag-card.gesperrt { opacity:.7; }
+.tag-header { display:flex; align-items:center; gap:8px; }
+.tag-name { font-size:15px; font-weight:700; flex:1; }
+.lock-badge { font-size:11px; color:var(--text-2); white-space:nowrap; }
+.tag-edit-toggle {
+  background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2);
+}
+.tag-leer { color:var(--text-2); font-size:14px; font-style:italic; margin-top:4px; }
+
+.aufgabe-row { display:flex; align-items:center; gap:10px; padding:5px 0; font-size:15px; }
+.aufgabe-check {
+  width:24px; height:24px; border-radius:50%; border:2px solid var(--border);
+  background:none; cursor:pointer; flex-shrink:0; display:flex;
+  align-items:center; justify-content:center; font-size:13px; color:#fff;
+  transition:background .15s;
+}
+.aufgabe-row.done .aufgabe-check { background:var(--farbe); border-color:var(--farbe); }
+.aufgabe-check-ghost {
+  width:24px; height:24px; border-radius:50%; border:2px solid var(--border);
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  font-size:13px; color:var(--text-2); opacity:.4;
+}
+.aufgabe-check:disabled { cursor:default; }
+
+.tag-edit-panel {
+  display:none; flex-direction:column; gap:8px; margin-top:10px;
+  padding-top:10px; border-top:1px solid var(--border);
+}
+.angebot-form-label {
+  font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:8px 12px; font-size:13px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🗓️ Aufgabenplan</div>
+<div class="nav-sub">{{ ziel.name if ziel else 'Noch keine Kinder' }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if kinder|length > 1 %}
+  <div class="nutzer-picker">
+    <div class="nutzer-picker-label">Wessen Plan?</div>
+    <div class="nutzer-pills">
+      {% for k in kinder %}
+      <a class="nutzer-pill{% if ziel and k.id == ziel.id %} aktiv{% endif %}"
+         style="{% if ziel and k.id == ziel.id %}background:{{ k.farbe }}{% endif %}"
+         href="?fuer={{ k.id }}">{{ k.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not ziel %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Noch keine Kinder angelegt.
+  </div>
+  {% else %}
+    {% for tag in plan %}
+    <div class="tag-card{% if tag.ist_heute %} heute{% endif %}{% if tag.gesperrt %} gesperrt{% endif %}">
+      <div class="tag-header">
+        <span class="tag-name">{{ tag.name }}</span>
+        {% if tag.gesperrt %}<span class="lock-badge">🔒 nur Eltern</span>{% endif %}
+        {% if darf_editieren and not tag.gesperrt %}
+        <button class="tag-edit-toggle" type="button" onclick="togglePlan({{ tag.wochentag }})" title="Bearbeiten">✏️</button>
+        {% endif %}
+      </div>
+
+      {% if tag.eintraege %}
+        {% for e in tag.eintraege %}
+        <div class="aufgabe-row{% if e.erledigt_heute %} done{% endif %}">
+          {% if tag.ist_heute %}
+            {% if darf_editieren %}
+            <button class="aufgabe-check" type="button"
+                    onclick="abhaken({{ ziel.id }}, {{ e.aufgabe_id }}, this)"
+                    {% if e.erledigt_heute %}disabled{% endif %}>{{ '✓' if e.erledigt_heute else '' }}</button>
+            {% else %}
+            <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt_heute else '' }}</span>
+            {% endif %}
+          {% endif %}
+          <span>{{ e.emoji }} {{ e.name }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="tag-leer">Nichts geplant</div>
+      {% endif %}
+
+      {% if darf_editieren and not tag.gesperrt %}
+      <div class="tag-edit-panel" id="plan-edit-{{ tag.wochentag }}">
+        <div class="angebot-form-label">Aufgaben für {{ tag.name }}</div>
+        <div class="btn-row">
+          {% for a in aufgaben %}
+          {% set zugewiesen = tag.eintraege|selectattr('aufgabe_id','eq',a.id)|list|length > 0 %}
+          <form method="post" action="/a/kinderplan/{{ token }}/zuweisen" style="display:contents">
+            <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
+            <input type="hidden" name="aufgabe_id" value="{{ a.id }}">
+            <input type="hidden" name="wochentag" value="{{ tag.wochentag }}">
+            <button type="submit" class="chip-btn{% if zugewiesen %} active{% endif %}">{{ a.emoji }} {{ a.name }}</button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TOKEN = '{{ token }}';
+
+function togglePlan(wd) {
+  const p = document.getElementById('plan-edit-' + wd);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function abhaken(zielId, aufgabeId, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  fetch(`/a/kinderplan/${TOKEN}/abhaken`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ziel_id: zielId, aufgabe_id: aufgabeId}),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      btn.textContent = '✓';
+      btn.closest('.aufgabe-row').classList.add('done');
+    } else {
+      btn.disabled = false;
+    }
+  }).catch(() => { btn.disabled = false; });
+}
+</script>
+{% endblock %}

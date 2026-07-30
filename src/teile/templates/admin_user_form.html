@@ -87,6 +87,13 @@ input[type=text]:focus { border-color:var(--farbe); }
     </div>
     {% endif %}
 
+    <div class="form-group">
+      <label>KI-Token-Limit pro Monat</label>
+      <input type="text" inputmode="numeric" name="ki_token_limit"
+             value="{{ edit.ki_token_limit if edit else 100000 }}"
+             pattern="^[0-9]+$" placeholder="100000">
+    </div>
+
     <div class="form-actions">
       <a class="btn btn-secondary" href="/a/admin/{{ token }}/">Abbrechen</a>
       <button type="submit" class="btn btn-primary">Speichern</button>

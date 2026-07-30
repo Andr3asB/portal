@@ -44,6 +44,11 @@ UniFi-Gateway zu den Containern (10.0.0.192/26).
 Nach jeder Auslieferung die Checkliste aus `bauplan.md` Abschnitt 9
 abarbeiten.
 
+„Implementiere alle Wünsche" heißt: **alle außer den mit Priorität
+`zurueckgestellt` markierten** (siehe Docstring in `05_werkstatt_app.py`).
+Deren Priorität ändert ausschließlich ein Admin manuell – nie automatisiert,
+auch nicht im Rahmen eines Sammel-Auftrags.
+
 ## Wichtige Kommandos
 
 ```bash
@@ -127,6 +132,19 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
   Nutzerdaten eingesetzt werden.
 - Jede Route prüft `grant()` zuerst; destruktive Aktionen zusätzlich
   `is_admin`/Owner-Check.
+- Jedes echte (nicht reversible) Löschen fragt vorher per `confirm()` nach
+  (`|tojson|forceescape` im `onsubmit`-Attribut, siehe `server.md`
+  „Sicherheitskonventionen"); reversible Toggles (aktiv/inaktiv, Grant-Entzug)
+  brauchen keine Abfrage.
+
+**UI-Konventionen (verbindlich, aus Nutzer-Feedback, nicht in `bauplan.md`):**
+- Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
+  immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
+  Sackgassen.
+- Jede neue Funktion gehört in die Hilfe-App (`09_hilfe.py`/`hilfe.html`),
+  bei Bedarf als eigenes Kapitel mit Sprunglink im Inhaltsverzeichnis.
+  Gehört zum „dokumentieren"-Schritt der Arbeitsweise oben, genauso
+  verbindlich wie `journal.md`/`server.md`.
 
 **Templates:** je App eine eigene `.html`-Datei mit Inline-CSS/JS,
 `base.html` liefert das gemeinsame Grundlayout (⌂-Include, Hamburger-Menü
@@ -160,6 +178,5 @@ Konfigurationsvorlagen für `.claude/` auf diesem Rechner.
 
 ## Gitignore
 
-Die Datei `gitignore` im Repo-Root muss als `.gitignore` im
-Arbeitsverzeichnis aktiv sein. Falls noch nicht geschehen:
-`cp gitignore .gitignore` (oder entsprechend unter Windows).
+`.gitignore` ist bereits aktiv (aus `gitignore` im Repo-Root übernommen).
+Bei Änderungen an den Ausschlussregeln beide Dateien synchron halten.

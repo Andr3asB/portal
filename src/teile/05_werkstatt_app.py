@@ -3,6 +3,13 @@ Werkstatt-App – Übersicht und Verwaltung aller Verbesserungswünsche.
 URL-Präfix: /a/werkstatt/<token>/
 
 Die Erfassung selbst läuft über 02_werkstatt.py (POST /wunsch).
+
+WICHTIGE REGEL (Wunsch #61): Wünsche mit prioritaet='zurueckgestellt'
+dürfen NIEMALS automatisiert umgesetzt werden – auch nicht, wenn die
+Anweisung lautet "implementiere alle Wünsche" oder ähnlich pauschal
+formuliert ist. Diese Regel gilt uneingeschränkt für jede KI, die an
+diesem Projekt arbeitet. Ein Admin muss die Priorität eines
+zurückgestellten Wunsches erst ändern, bevor er umgesetzt werden darf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import get_db, grant as check_grant
@@ -10,20 +17,21 @@ from teile.kern import get_db, grant as check_grant
 bp  = Blueprint("werkstatt_app", __name__)
 APP = "werkstatt"
 
-_PRIORITAETEN = ("niedrig", "mittel", "hoch", "sehr_hoch")
+_PRIORITAETEN = ("niedrig", "mittel", "hoch", "sehr_hoch", "zurueckgestellt")
 
 _PRIO_ORDER = """
     CASE w.prioritaet
-        WHEN 'sehr_hoch' THEN 1
-        WHEN 'hoch'      THEN 2
-        WHEN 'mittel'    THEN 3
-        WHEN 'niedrig'   THEN 4
+        WHEN 'sehr_hoch'       THEN 1
+        WHEN 'hoch'            THEN 2
+        WHEN 'mittel'          THEN 3
+        WHEN 'niedrig'         THEN 4
+        WHEN 'zurueckgestellt' THEN 6
         ELSE 5
     END ASC, w.erstellt DESC
 """
 
 _SELECT = """
-    SELECT w.id, w.text, w.titel, w.prioritaet, w.app_slug,
+    SELECT w.id, w.text, w.titel, w.prioritaet, w.app_slug, w.ansicht,
            w.erstellt, w.erledigt, w.erledigt_am,
            u.name AS urheber_name, u.farbe AS urheber_farbe
     FROM   wuensche w

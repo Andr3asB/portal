@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Vokabeln lernen{% endblock %}
+
+{% block extra_styles %}
+.form-label {
+  font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin:16px 0 6px;
+}
+.form-label:first-child { margin-top:0; }
+.chip-row { display:flex; gap:8px; flex-wrap:wrap; }
+.sprache-chip {
+  border:1.5px solid var(--border); border-radius:20px; padding:8px 16px;
+  font-size:14px; background:var(--surface-2); color:var(--text); cursor:pointer;
+}
+.sprache-chip.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.kapitel-chip {
+  display:inline-flex; align-items:center; gap:5px; background:var(--surface-2);
+  border:1.5px solid var(--border); border-radius:16px; padding:7px 14px; font-size:14px; cursor:pointer;
+}
+.kapitel-chip input { margin:0; }
+.btn-start {
+  margin-top:24px; width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:12px; padding:13px 0; font-size:16px; font-weight:600; cursor:pointer;
+}
+.empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📖 Vokabeln lernen</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  {% if not sprachen %}
+  <div class="empty">Aktiviere zuerst mindestens eine Sprache im Menü unter „Sprachen".</div>
+  {% else %}
+  <form method="post" action="/a/vokabeln/{{ token }}/lernen/start">
+    <div class="form-label">Sprache</div>
+    <div class="chip-row" id="sprache-chips">
+      {% for s in sprachen %}
+      <button type="button" class="sprache-chip{% if loop.first %} aktiv{% endif %}"
+              data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this)">{{ s.name }}</button>
+      {% endfor %}
+    </div>
+    <input type="hidden" name="sprache_id" id="sprache-id" value="{{ sprachen[0].id }}" required>
+
+    <div class="form-label">Kapitel</div>
+    <div class="chip-row">
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="alle" checked onchange="alleUmschalten(this)"> Alle</label>
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="ohne" class="kapitel-einzel" disabled> Ohne Kapitel</label>
+      {% for k in kapitel %}
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}" class="kapitel-einzel" disabled> {{ k.name }}</label>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn-start">Los geht's</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function spracheWaehlen(btn) {
+  document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
+  btn.classList.add('aktiv');
+  document.getElementById('sprache-id').value = btn.dataset.spracheId;
+}
+
+function alleUmschalten(alleCheckbox) {
+  document.querySelectorAll('.kapitel-einzel').forEach(cb => {
+    cb.disabled = alleCheckbox.checked;
+    if (alleCheckbox.checked) cb.checked = false;
+  });
+}
+</script>
+{% endblock %}

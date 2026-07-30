@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% set app_slug = "geholfen" %}
+{% block title %}Zuletzt geholfen{% endblock %}
+
+{% block extra_styles %}
+.verlauf-item {
+  background:var(--surface); border-radius:12px; padding:12px 14px;
+  margin-bottom:6px; box-shadow:0 1px 3px var(--shadow);
+}
+.verlauf-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-size:15px; }
+.verlauf-emoji { font-size:22px; flex-shrink:0; }
+.verlauf-text { flex:1; min-width:0; }
+.verlauf-time { font-size:12px; color:var(--text-2); flex-shrink:0; white-space:nowrap; }
+.verlauf-edit-btn {
+  background:none; border:none; font-size:15px; cursor:pointer;
+  color:var(--text-2); padding:2px 4px; flex-shrink:0;
+}
+.verlauf-edit-panel {
+  display:none; flex-direction:column; gap:8px;
+  flex:1 0 100%; margin-top:8px; padding-top:10px;
+  border-top:1px solid var(--border);
+}
+.verlauf-edit-label {
+  font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.verlauf-edit-input, .verlauf-edit-select {
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:14px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text); width:100%;
+}
+.verlauf-edit-input:focus, .verlauf-edit-select:focus { border-color:var(--farbe); }
+.verlauf-edit-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:13px; cursor:pointer; align-self:flex-start;
+}
+.verlauf-loeschen-btn {
+  background:none; border:none; color:#ff3b30; font-size:13px;
+  cursor:pointer; padding:4px 0; align-self:flex-start;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/geholfen/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📜 Zuletzt geholfen</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  {% if letzte %}
+    {% for e in letzte %}
+    <div class="verlauf-item" id="verlauf-{{ e.id }}">
+      <div class="verlauf-row">
+        <span class="verlauf-emoji">{{ e.emoji }}</span>
+        <span class="verlauf-text"><strong style="color:{{ e.farbe }}">{{ e.name }}</strong>: {{ e.aufgabe }}</span>
+        <span class="verlauf-time">{{ e.zeitstempel[:16] }}</span>
+        {% if darf_bearbeiten %}
+        <button class="verlauf-edit-btn" type="button"
+                onclick="toggleVerlaufEdit({{ e.id }})" title="Bearbeiten">✏️</button>
+        {% endif %}
+      </div>
+
+      {% if darf_bearbeiten %}
+      <div class="verlauf-edit-panel" id="verlauf-edit-{{ e.id }}">
+        <form method="post" action="/a/geholfen/{{ token }}/eintrag/{{ e.id }}/bearbeiten">
+          <div class="verlauf-edit-label">Datum &amp; Uhrzeit</div>
+          <input class="verlauf-edit-input" type="datetime-local" name="zeitstempel"
+                 value="{{ e.zeitstempel[:16].replace(' ', 'T') }}" required>
+
+          <div class="verlauf-edit-label">Wer</div>
+          <select class="verlauf-edit-select" name="user_id">
+            {% for n in alle_nutzer %}
+            <option value="{{ n.id }}" {% if n.id == e.user_id %}selected{% endif %}>{{ n.name }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="verlauf-edit-label">Hilfsleistung</div>
+          <select class="verlauf-edit-select" name="aufgabe_id">
+            {% for a in alle_aufgaben %}
+            <option value="{{ a.id }}" {% if a.id == e.aufgabe_id %}selected{% endif %}>{{ a.emoji }} {{ a.name }}</option>
+            {% endfor %}
+          </select>
+
+          <button type="submit" class="verlauf-edit-save">Speichern</button>
+        </form>
+
+        <form method="post" action="/a/geholfen/{{ token }}/eintrag/{{ e.id }}/loeschen"
+              onsubmit="return confirm({{ ('„' ~ e.name ~ ': ' ~ e.aufgabe ~ '“ löschen?')|tojson|forceescape }})">
+          <button type="submit" class="verlauf-loeschen-btn">🗑️ Eintrag löschen</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Noch keine Einträge.
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleVerlaufEdit(id) {
+  const p = document.getElementById('verlauf-edit-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+</script>
+{% endblock %}

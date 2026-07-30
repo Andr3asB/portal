@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set app_slug = "sportschau" %}
+{% block title %}Sportschau{% endblock %}
+
+{% block extra_styles %}
+.heatmap-section {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-top:4px;
+}
+.heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
+.heatmap-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.heatmap-name {
+  font-size:13px; font-weight:600; width:120px; flex-shrink:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.heatmap-cells { display:flex; gap:4px; flex:1; }
+.heatmap-cell {
+  flex:1; aspect-ratio:1; border-radius:4px; background:var(--surface-2);
+  max-width:22px; transition:background .2s;
+}
+.heatmap-cell.gruen { background:#34c759; }
+.empty { text-align:center; padding:48px 16px; color:var(--text-2); font-size:16px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🏃 Sportschau</div>
+<div class="nav-sub">Letzte 10 Tage</div>
+{% endblock %}
+
+{% block body %}
+
+<main class="main">
+
+{% if fehler %}
+  <div class="empty">
+    <div style="font-size:48px;margin-bottom:12px">📡</div>
+    Trainingsdaten gerade nicht abrufbar.<br>Versuch's später nochmal.
+  </div>
+{% elif not trainingsarten %}
+  <div class="empty">
+    <div style="font-size:48px;margin-bottom:12px">🏃</div>
+    Keine Trainings in den letzten 10 Tagen.
+  </div>
+{% else %}
+  <div class="heatmap-section">
+    <div class="heatmap-title">📊 Letzte 10 Tage</div>
+    {% for art in trainingsarten %}
+    <div class="heatmap-row">
+      <span class="heatmap-name">{{ art }}</span>
+      <div class="heatmap-cells">
+        {% for tag in tage %}
+        <span class="heatmap-cell{% if tag in trainings_tage.get(art, []) %} gruen{% endif %}"
+              title="{{ tag }}"></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+</main>
+{% endblock %}

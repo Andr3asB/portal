@@ -14,3 +14,23 @@ portal.16schwaben.de {
 	}
 	reverse_proxy portal:8000
 }
+
+# Interner Relay für Sportschau-App (Wunsch #62): portal hängt nur im Bridge-
+# Netz und kann den hae-Server (10.0.0.199, macvlan-IP auf demselben Host)
+# nicht direkt erreichen. caddy schon (eigene macvlan-IP, gleiches L2-Segment)
+# und reicht die Anfrage 1:1 weiter (Header inkl. api-key bleiben erhalten).
+# Per IP statt Hostname, weil health-api.16schwaben.de nur über Pi-hole
+# (10.0.0.194) auflösbar ist, home02 aber einen anderen DNS-Server nutzt -
+# kein Host-Eingriff nötig, da alles innerhalb unseres eigenen Caddyfiles
+# gelöst wird. Nur auf dem internen Bridge-Netz erreichbar, nie auf
+# 10.0.0.200 oder nach außen.
+:2021 {
+	bind 172.30.0.10
+	reverse_proxy 10.0.0.199:443 {
+		header_up Host health-api.16schwaben.de
+		transport http {
+			tls
+			tls_server_name health-api.16schwaben.de
+		}
+	}
+}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Vokabeln lernen{% endblock %}
+
+{% block extra_styles %}
+.fortschritt { font-size:13px; color:var(--text-2); text-align:center; margin-bottom:16px; }
+.frage-card {
+  background:var(--surface); border-radius:16px; padding:28px 20px;
+  text-align:center; box-shadow:0 1px 3px var(--shadow); margin-bottom:16px;
+}
+.frage-richtung { font-size:12px; color:var(--text-2); margin-bottom:8px; }
+.frage-wort { font-size:26px; font-weight:700; margin-bottom:20px; }
+.frage-input {
+  width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:10px;
+  padding:12px 14px; font-size:18px; text-align:center; font-family:inherit;
+  outline:none; background:var(--surface); color:var(--text);
+}
+.frage-input:focus { border-color:var(--farbe); }
+.frage-input.richtig { border-color:#34c759; }
+.frage-input.falsch { border-color:#ff3b30; }
+.feedback { margin-top:14px; font-size:15px; font-weight:600; min-height:22px; }
+.feedback.richtig { color:#34c759; }
+.feedback.falsch { color:#ff3b30; }
+.btn-antworten {
+  margin-top:16px; width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:12px 0; font-size:16px; font-weight:600; cursor:pointer;
+}
+.btn-beenden {
+  width:100%; background:none; border:1.5px solid var(--border); color:var(--text-2);
+  border-radius:10px; padding:11px 0; font-size:14px; cursor:pointer;
+}
+.ende-card { text-align:center; padding:40px 20px; }
+.ende-emoji { font-size:48px; margin-bottom:12px; }
+.btn-zurueck {
+  display:inline-block; margin-top:16px; background:var(--farbe); color:#fff;
+  border-radius:10px; padding:11px 22px; font-size:15px; font-weight:600; text-decoration:none;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück" onclick="return beendenUndZurueck()">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📖 Training</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  {% if vokabeln %}
+  <div class="fortschritt" id="fortschritt"></div>
+  <div class="frage-card">
+    <div class="frage-richtung" id="frage-richtung"></div>
+    <div class="frage-wort" id="frage-wort"></div>
+    <input class="frage-input" id="frage-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="feedback" id="feedback"></div>
+    <button class="btn-antworten" id="antworten-btn">Antworten</button>
+  </div>
+  <button class="btn-beenden" id="beenden-btn">Training beenden</button>
+  {% else %}
+  <div class="ende-card">
+    <div class="ende-emoji">🤷</div>
+    Keine Vokabeln für diese Auswahl gefunden.
+    <div><a class="btn-zurueck" href="/a/vokabeln/{{ token }}/">Zurück</a></div>
+  </div>
+  {% endif %}
+
+  <div class="ende-card" id="ende-card" style="display:none">
+    <div class="ende-emoji">🎉</div>
+    <span id="ende-text">Geschafft!</span>
+    <div><a class="btn-zurueck" href="/a/vokabeln/{{ token }}/">Zurück zur Übersicht</a></div>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TOKEN = '{{ token }}';
+const SESSION_ID = {{ session_id }};
+let queue = {{ vokabeln|tojson }};
+const gesamt = queue.length;
+let erledigt = new Set();
+let aktuelle = null;
+let beendet = false;
+
+function normalisieren(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function naechsteFrage() {
+  if (queue.length === 0) {
+    zeigeEnde();
+    return;
+  }
+  aktuelle = queue.shift();
+  aktuelle.richtung = Math.random() < 0.5 ? 'fremd_zu_deutsch' : 'deutsch_zu_fremd';
+  const gezeigt = aktuelle.richtung === 'fremd_zu_deutsch' ? aktuelle.fremd : aktuelle.deutsch;
+  document.getElementById('frage-richtung').textContent =
+    aktuelle.richtung === 'fremd_zu_deutsch' ? 'Was heißt das auf Deutsch?' : 'Wie heißt das in der Fremdsprache?';
+  document.getElementById('frage-wort').textContent = gezeigt;
+  const input = document.getElementById('frage-input');
+  input.value = '';
+  input.className = 'frage-input';
+  input.disabled = false;
+  input.focus();
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('antworten-btn').textContent = 'Antworten';
+  document.getElementById('antworten-btn').onclick = pruefen;
+  aktualisiereFortschritt();
+}
+
+function aktualisiereFortschritt() {
+  document.getElementById('fortschritt').textContent =
+    `${erledigt.size} von ${gesamt} gelernt`;
+}
+
+function pruefen() {
+  const input = document.getElementById('frage-input');
+  const erwartetRoh = aktuelle.richtung === 'fremd_zu_deutsch' ? aktuelle.deutsch : aktuelle.fremd;
+  const richtig = normalisieren(input.value) === normalisieren(erwartetRoh) && input.value.trim() !== '';
+
+  input.disabled = true;
+  input.className = 'frage-input ' + (richtig ? 'richtig' : 'falsch');
+  const feedback = document.getElementById('feedback');
+  if (richtig) {
+    feedback.textContent = '✅ Richtig!';
+    feedback.className = 'feedback richtig';
+    erledigt.add(aktuelle.id);
+  } else {
+    feedback.textContent = `❌ Richtig wäre: ${erwartetRoh}`;
+    feedback.className = 'feedback falsch';
+    queue.push(aktuelle);
+  }
+
+  fetch(`/a/vokabeln/${TOKEN}/versuch`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({session_id: SESSION_ID, vokabel_id: aktuelle.id, richtig}),
+  }).catch(() => {});
+
+  const btn = document.getElementById('antworten-btn');
+  btn.textContent = 'Weiter';
+  btn.onclick = naechsteFrage;
+  aktualisiereFortschritt();
+}
+
+document.getElementById('frage-input')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('antworten-btn').click();
+});
+
+function zeigeEnde() {
+  document.querySelector('.frage-card').style.display = 'none';
+  document.getElementById('beenden-btn').style.display = 'none';
+  document.getElementById('ende-card').style.display = 'block';
+  document.getElementById('ende-text').textContent = `Geschafft! ${gesamt} Vokabel${gesamt !== 1 ? 'n' : ''} gelernt.`;
+  sitzungBeenden();
+}
+
+function sitzungBeenden() {
+  if (beendet) return;
+  beendet = true;
+  const url = `/a/vokabeln/${TOKEN}/session/${SESSION_ID}/beenden`;
+  if (navigator.sendBeacon) navigator.sendBeacon(url);
+  else fetch(url, {method: 'POST'}).catch(() => {});
+}
+
+function beendenUndZurueck() {
+  sitzungBeenden();
+  return true;
+}
+
+document.getElementById('beenden-btn')?.addEventListener('click', () => {
+  sitzungBeenden();
+  location.href = `/a/vokabeln/${TOKEN}/`;
+});
+
+// Nur "pagehide" (Navigation weg/Tab schliessen), NICHT "visibilitychange" -
+// sonst wuerde kurzes Sperren des Handys/Wechseln der App die Session
+// serverseitig beenden, obwohl im Browser noch alles weiterlaeuft, und
+// /versuch wuerde danach nur noch stillschweigend 400 zurueckgeben.
+document.addEventListener('pagehide', sitzungBeenden);
+
+if (queue.length) naechsteFrage();
+</script>
+{% endblock %}

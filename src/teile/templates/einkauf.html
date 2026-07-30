@@ -68,12 +68,6 @@
   white-space:nowrap;
 }
 body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
-.btn-del {
-  background:none; border:none; color:var(--text-2); font-size:18px;
-  cursor:pointer; padding:4px; line-height:1; flex-shrink:0;
-  border-radius:6px;
-}
-.btn-del:active { background:var(--surface-2); }
 /* Angebot-Toggle-Formular */
 .angebot-toggle-btn {
   background:none; border:none; font-size:13px; cursor:pointer;
@@ -81,9 +75,9 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
   white-space:nowrap;
 }
 .angebot-toggle-btn:hover { background:var(--surface-2); }
-/* Eigene volle Zeile unter dem Artikel, statt in dieselbe Reihe gequetscht */
-.angebot-form {
-  display:none; flex-direction:column; align-items:stretch; gap:8px;
+/* Edit-Panel: eigene volle Zeile unter dem Artikel, statt in dieselbe Reihe gequetscht */
+.edit-panel {
+  display:none; flex-direction:column; align-items:stretch; gap:10px;
   flex:1 0 100%; margin-top:8px; padding-top:10px;
   border-top:1px solid var(--border);
 }
@@ -97,6 +91,10 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
   align-self:flex-start;
 }
 .btn-angebot-submit:disabled { opacity:.4; cursor:default; }
+.btn-loeschen-inline {
+  background:none; border:none; color:#ff3b30; font-size:13px;
+  cursor:pointer; padding:4px 0; align-self:flex-start;
+}
 .erledigt-section { margin-top:20px; }
 .erledigt-label { font-size:12px; color:var(--text-2); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:.6px; }
 {% endblock %}
@@ -106,16 +104,9 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
 <div class="nav-sub">Für alle</div>
 {% endblock %}
 
-{% block header_extra %}
-{% if user.is_admin %}
-<div class="nav-extra" style="text-align:right">
-  <a class="nav-btn" href="/a/einkauf/{{ token }}/laeden" title="Märkte verwalten">🏪</a>
-</div>
-{% endif %}
-{% endblock %}
-
-{% macro item_card(item, token, laeden) %}
-<div class="item-card{% if item.erledigt %} erledigt{% endif %}" id="item-{{ item.id }}">
+{% macro item_card(item, token, laeden, kategorien) %}
+<div class="item-card{% if item.erledigt %} erledigt{% endif %}" id="item-{{ item.id }}"
+     data-kategorie="{{ item.kategorie_id }}">
   <input class="item-check" type="checkbox"
          onchange="toggleErledigt({{ item.id }}, this)"
          {% if item.erledigt %}checked{% endif %}>
@@ -125,31 +116,41 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
     <span class="badge-angebot">% {{ item.laden_name or '' }}</span>
   {% endif %}
 
-  <!-- Angebot-Toggle -->
+  <!-- Bearbeiten-Toggle: Name, Angebot und Löschen stecken alle im Panel -->
   <button class="angebot-toggle-btn" type="button"
-          onclick="toggleAngebotForm({{ item.id }})"
-          title="Angebot markieren">%</button>
-  <form class="angebot-form" id="angebot-form-{{ item.id }}"
-        method="post" action="/a/einkauf/{{ token }}/angebot/{{ item.id }}">
-    <input type="hidden" name="angebot" value="{% if not item.angebot %}1{% else %}0{% endif %}">
-    {% if not item.angebot %}
-    <div class="angebot-form-label">Markt wählen</div>
-    <div class="btn-row laden-btn-row">
-      {% for l in laeden %}
-      <button type="button" class="chip-btn chip-btn-sm" data-value="{{ l.id }}">{{ l.name }}</button>
-      {% endfor %}
-    </div>
-    <input type="hidden" name="laden_id" class="laden-hidden-input">
-    {% endif %}
-    <button type="submit" class="btn-angebot-submit" {% if not item.angebot %}disabled{% endif %}>
-      {{ 'Entfernen' if item.angebot else 'Angebot' }}
-    </button>
-  </form>
+          onclick="toggleEditPanel({{ item.id }})"
+          title="Bearbeiten">✏️</button>
 
-  <form method="post" action="/a/einkauf/{{ token }}/loeschen/{{ item.id }}" style="margin:0"
-        onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
-    <button class="btn-del" type="submit" title="Löschen">×</button>
-  </form>
+  <div class="edit-panel" id="edit-panel-{{ item.id }}">
+    <form method="post" action="/a/einkauf/{{ token }}/bearbeiten/{{ item.id }}" class="edit-form">
+      <div class="angebot-form-label">Name</div>
+      <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
+
+      <div class="angebot-form-label">Kategorie</div>
+      <div class="btn-row kat-row">
+        {% for k in kategorien %}
+        <button type="button" class="chip-btn{% if k.id == item.kategorie_id %} active{% endif %}" data-value="{{ k.id }}">{{ k.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="kategorie_id" value="{{ item.kategorie_id }}" class="kat-hidden">
+
+      <button type="button" class="chip-btn angebot-toggle-chip{% if item.angebot %} active{% endif %}">% Angebot</button>
+      <div class="btn-row laden-row" style="display:{% if item.angebot %}flex{% else %}none{% endif %}">
+        {% for l in laeden %}
+        <button type="button" class="chip-btn chip-btn-sm{% if item.laden_id == l.id %} active{% endif %}" data-value="{{ l.id }}">{{ l.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="angebot" value="{% if item.angebot %}1{% else %}0{% endif %}" class="angebot-hidden">
+      <input type="hidden" name="laden_id" value="{{ item.laden_id or '' }}" class="laden-hidden">
+
+      <button type="submit" class="btn-angebot-submit form-submit-btn">Speichern</button>
+    </form>
+
+    <form method="post" action="/a/einkauf/{{ token }}/loeschen/{{ item.id }}"
+          onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+      <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
+    </form>
+  </div>
 </div>
 {% endmacro %}
 
@@ -169,36 +170,42 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
       </div>
 
       <div class="field-label">Kategorie wählen</div>
-      <div class="btn-row" id="kategorie-row">
+      <div class="btn-row kat-row">
         {% for k in kategorien %}
-        <button type="button" class="chip-btn" data-value="{{ k }}">{{ k }}</button>
+        <button type="button" class="chip-btn" data-value="{{ k.id }}">{{ k.name }}</button>
         {% endfor %}
       </div>
-      <input type="hidden" name="kategorie" id="add-kategorie">
+      <input type="hidden" name="kategorie_id" class="kat-hidden">
 
       <div class="angebot-row">
-        <button type="button" class="chip-btn" id="add-angebot-btn">% Angebot</button>
+        <button type="button" class="chip-btn angebot-toggle-chip">% Angebot</button>
       </div>
-      <div class="btn-row" id="add-laden-row" style="display:none">
+      <div class="btn-row laden-row" style="display:none">
         {% for l in laeden %}
         <button type="button" class="chip-btn" data-value="{{ l.id }}">{{ l.name }}</button>
         {% endfor %}
       </div>
-      <input type="hidden" name="angebot" id="add-angebot-hidden" value="0">
-      <input type="hidden" name="laden_id" id="add-laden-hidden">
+      <input type="hidden" name="angebot" class="angebot-hidden" value="0">
+      <input type="hidden" name="laden_id" class="laden-hidden">
 
-      <button class="btn-add" type="submit" id="add-submit-btn" disabled>+ Hinzufügen</button>
+      <button class="btn-add form-submit-btn" type="submit" disabled>+ Hinzufügen</button>
     </form>
   </div>
 
   {% set has_items = namespace(v=false) %}
   {% for kat in kategorien %}
-    {% if gruppen[kat] %}
+    {% if gruppen[kat.id] %}
       {% set has_items.v = true %}
-      <div class="kat-label">{{ kat }}</div>
-      {% for item in gruppen[kat] %}{{ item_card(item, token, laeden) }}{% endfor %}
+      <div class="kat-label" data-kategorie-label="{{ kat.id }}">{{ kat.name }}</div>
+      {% for item in gruppen[kat.id] %}{{ item_card(item, token, laeden, kategorien) }}{% endfor %}
     {% endif %}
   {% endfor %}
+
+  {% if unsortiert %}
+    {% set has_items.v = true %}
+    <div class="kat-label" data-kategorie-label="">Ohne Kategorie</div>
+    {% for item in unsortiert %}{{ item_card(item, token, laeden, kategorien) }}{% endfor %}
+  {% endif %}
 
   {% if not has_items.v %}
   <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
@@ -210,7 +217,7 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
   {% if erledigt %}
   <div class="erledigt-section">
     <div class="erledigt-label">✓ Erledigt</div>
-    {% for item in erledigt %}{{ item_card(item, token, laeden) }}{% endfor %}
+    {% for item in erledigt %}{{ item_card(item, token, laeden, kategorien) }}{% endfor %}
   </div>
   {% endif %}
 
@@ -221,6 +228,11 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
 <script>
 const TOKEN = '{{ token }}';
 
+// Wartet 5s nach dem Abhaken, bevor die Karte physisch zu "Erledigt" wandert
+// (Wunsch #13) - so kann ein versehentliches Antippen noch zurückgenommen
+// werden, ohne dass die Karte schon irgendwo hin gesprungen ist.
+const PENDING_MOVE = new Map();
+
 function toggleErledigt(id, cb) {
   fetch(`/a/einkauf/${TOKEN}/erledigt/${id}`, {
     method: 'POST',
@@ -228,87 +240,164 @@ function toggleErledigt(id, cb) {
   }).then(r => r.json()).then(d => {
     if (!d.ok) { cb.checked = !cb.checked; return; }
     const card = document.getElementById('item-' + id);
-    if (card) {
-      if (d.erledigt) {
-        card.classList.add('erledigt');
-        cb.checked = true;
-      } else {
-        card.classList.remove('erledigt');
-        cb.checked = false;
+    if (!card) return;
+
+    if (d.erledigt) {
+      cb.checked = true;
+      card.classList.add('erledigt');
+      const timeoutId = setTimeout(() => {
+        PENDING_MOVE.delete(id);
+        moveToErledigtTop(card);
+      }, 5000);
+      PENDING_MOVE.set(id, timeoutId);
+    } else {
+      cb.checked = false;
+      card.classList.remove('erledigt');
+      if (PENDING_MOVE.has(id)) {
+        // Wurde innerhalb der 5s wieder abgewählt - Karte stand noch nie
+        // physisch bei Erledigt, also einfach den Umzug abbrechen.
+        clearTimeout(PENDING_MOVE.get(id));
+        PENDING_MOVE.delete(id);
+      } else if (card.closest('.erledigt-section')) {
+        // Karte war schon bei Erledigt einsortiert - für eine korrekte
+        // Kategorie-/Alphabet-Einordnung einfach neu laden.
+        location.reload();
       }
     }
   }).catch(() => { cb.checked = !cb.checked; });
 }
 
-function toggleAngebotForm(id) {
-  const f = document.getElementById('angebot-form-' + id);
-  if (f) f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+function moveToErledigtTop(card) {
+  const kategorie = card.dataset.kategorie;
+  let section = document.querySelector('.erledigt-section');
+  if (!section) {
+    section = document.createElement('div');
+    section.className = 'erledigt-section';
+    const label = document.createElement('div');
+    label.className = 'erledigt-label';
+    label.textContent = '✓ Erledigt';
+    section.appendChild(label);
+    document.querySelector('main.main').appendChild(section);
+  }
+  section.querySelector('.erledigt-label').insertAdjacentElement('afterend', card);
+
+  // Wenn das die letzte offene Karte dieser Kategorie war, bleibt sonst ein
+  // Kategorie-Titel ohne Inhalt stehen - den dann mit entfernen.
+  const nochOffen = [...document.querySelectorAll('.item-card[data-kategorie]')]
+    .some(el => el.dataset.kategorie === kategorie && !el.closest('.erledigt-section'));
+  if (!nochOffen) {
+    document.querySelector(`.kat-label[data-kategorie-label="${CSS.escape(kategorie)}"]`)?.remove();
+  }
 }
 
-// Button-Reihe zum Markt auswählen in den bestehenden Angebot-Formularen
-// (nur relevant beim Markieren als Angebot, nicht beim Entfernen)
-document.querySelectorAll('.angebot-form').forEach(form => {
-  const row    = form.querySelector('.laden-btn-row');
-  const hidden = form.querySelector('.laden-hidden-input');
-  const submit = form.querySelector('.btn-angebot-submit');
-  if (!row) return;
-  row.querySelectorAll('.chip-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      row.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      hidden.value = btn.dataset.value;
-      submit.disabled = false;
-    });
-  });
-});
+function toggleEditPanel(id) {
+  const p = document.getElementById('edit-panel-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
 
-// Neues Item hinzufügen: Kategorie-Buttons, Angebot-Toggle, Markt-Buttons
-(function(){
-  const katRow        = document.getElementById('kategorie-row');
-  const katHidden      = document.getElementById('add-kategorie');
-  const angebotBtn     = document.getElementById('add-angebot-btn');
-  const angebotHidden  = document.getElementById('add-angebot-hidden');
-  const ladenRow       = document.getElementById('add-laden-row');
-  const ladenHidden    = document.getElementById('add-laden-hidden');
-  const submitBtn      = document.getElementById('add-submit-btn');
-  if (!katRow) return;
+// Gemeinsame Logik für Kategorie-Buttons + Angebot-Toggle/Markt-Buttons,
+// verwendet sowohl vom Neu-Formular als auch von jedem Edit-Panel (Wunsch
+// #23-#25: identisches Verhalten und identische Beschriftung an beiden
+// Stellen, ein einziges "Speichern" statt separater Teil-Formulare).
+function wireKategorieAngebotForm(root, { requireKategorie }) {
+  if (!root) return;
+  const katRow       = root.querySelector('.kat-row');
+  const katHidden     = root.querySelector('.kat-hidden');
+  const angebotBtn    = root.querySelector('.angebot-toggle-chip');
+  const angebotHidden = root.querySelector('.angebot-hidden');
+  const ladenRow      = root.querySelector('.laden-row');
+  const ladenHidden   = root.querySelector('.laden-hidden');
+  const submitBtn     = root.querySelector('.form-submit-btn');
 
   function updateSubmit() {
-    const katOk    = !!katHidden.value;
+    if (!submitBtn) return;
+    const katOk     = !requireKategorie || !!katHidden.value;
     const angebotOn = angebotHidden.value === '1';
     const ladenOk   = !angebotOn || !!ladenHidden.value;
     submitBtn.disabled = !(katOk && ladenOk);
   }
 
-  katRow.querySelectorAll('.chip-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      katRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      katHidden.value = btn.dataset.value;
+  if (katRow) {
+    katRow.querySelectorAll('.chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        katRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        katHidden.value = btn.dataset.value;
+        updateSubmit();
+      });
+    });
+  }
+
+  if (angebotBtn) {
+    angebotBtn.addEventListener('click', () => {
+      const on = angebotBtn.classList.toggle('active');
+      angebotHidden.value = on ? '1' : '0';
+      ladenRow.style.display = on ? 'flex' : 'none';
+      if (!on) {
+        ladenHidden.value = '';
+        ladenRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+      }
       updateSubmit();
     });
-  });
+  }
 
-  angebotBtn.addEventListener('click', () => {
-    const on = angebotBtn.classList.toggle('active');
-    angebotHidden.value = on ? '1' : '0';
-    ladenRow.style.display = on ? 'flex' : 'none';
-    if (!on) {
-      ladenHidden.value = '';
-      ladenRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+  if (ladenRow) {
+    ladenRow.querySelectorAll('.chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ladenRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ladenHidden.value = btn.dataset.value;
+        updateSubmit();
+      });
+    });
+  }
+
+  updateSubmit();
+}
+
+wireKategorieAngebotForm(document.getElementById('add-form'), { requireKategorie: true });
+document.querySelectorAll('.edit-panel .edit-form').forEach(form => {
+  wireKategorieAngebotForm(form, { requireKategorie: false });
+});
+
+// Wunsch #58: Kategorie/Angebot/Markt merken sich die letzte Auswahl über
+// mehrere hintereinander hinzugefügte Einträge hinweg. sessionStorage statt
+// eines Server-Felds, weil es genau das gewünschte Verhalten von selbst
+// mitbringt: übersteht den Seiten-Reload nach dem Hinzufügen (neue Anfrage,
+// gleicher Tab), wird aber beim echten Schließen des Tabs/Browsers verworfen
+// - dann startet die App wieder mit "nichts markiert".
+const EINKAUF_STORAGE_KEY = 'einkauf_letzte_auswahl';
+
+function speichereLetzteAuswahl() {
+  const form = document.getElementById('add-form');
+  if (!form) return;
+  const daten = {
+    kategorie_id: form.querySelector('.kat-hidden').value,
+    angebot: form.querySelector('.angebot-hidden').value,
+    laden_id: form.querySelector('.laden-hidden').value,
+  };
+  try { sessionStorage.setItem(EINKAUF_STORAGE_KEY, JSON.stringify(daten)); } catch (e) {}
+}
+
+function wendeLetzteAuswahlAn() {
+  const form = document.getElementById('add-form');
+  if (!form) return;
+  let daten;
+  try { daten = JSON.parse(sessionStorage.getItem(EINKAUF_STORAGE_KEY) || 'null'); } catch (e) { daten = null; }
+  if (!daten) return;
+  if (daten.kategorie_id) {
+    form.querySelector(`.kat-row .chip-btn[data-value="${CSS.escape(daten.kategorie_id)}"]`)?.click();
+  }
+  if (daten.angebot === '1') {
+    form.querySelector('.angebot-toggle-chip')?.click();
+    if (daten.laden_id) {
+      form.querySelector(`.laden-row .chip-btn[data-value="${CSS.escape(daten.laden_id)}"]`)?.click();
     }
-    updateSubmit();
-  });
+  }
+}
 
-  ladenRow.querySelectorAll('.chip-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      ladenRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      ladenHidden.value = btn.dataset.value;
-      updateSubmit();
-    });
-  });
-})();
+document.getElementById('add-form')?.addEventListener('submit', speichereLetzteAuswahl);
+wendeLetzteAuswahlAn();
 
 // Vorschlag per Enter/Tab bestätigen und Fokus halten
 const addName = document.getElementById('add-name');
@@ -318,7 +407,7 @@ if (addName) {
       e.preventDefault();
       // .click() statt .submit(), damit ein deaktivierter Button
       // (fehlende Kategorie/Markt) das Absenden weiterhin verhindert
-      document.getElementById('add-submit-btn')?.click();
+      document.querySelector('#add-form .form-submit-btn')?.click();
     }
   });
 }

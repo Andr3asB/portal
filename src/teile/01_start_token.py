@@ -45,7 +45,7 @@ def startseite(token):
         FROM   grants g
         JOIN   apps   a  ON a.id  = g.app_id
         LEFT JOIN home_gruppen hg ON hg.id = g.gruppe_id
-        WHERE  g.user_id = ? AND a.slug != 'home'
+        WHERE  g.user_id = ? AND a.slug NOT IN ('home', 'hilfe')
         ORDER  BY (g.gruppe_id IS NULL), gruppe_pos, g.gruppe_id, g.position, a.id
     """, (row["id"],)).fetchall()
 
@@ -102,6 +102,29 @@ def reorder(token):
                 "UPDATE grants SET position=?, gruppe_id=? WHERE id=?",
                 (position, gruppe_id, grant_id)
             )
+    db.commit()
+    return jsonify(ok=True)
+
+
+@bp.route("/p/<token>/gruppe/reorder", methods=["POST"])
+def gruppe_reorder(token):
+    """Wunsch #21: die Gruppen selbst umsortieren (nicht nur Apps innerhalb)."""
+    row = _home_user(token)
+    if not row:
+        abort(403)
+    data  = request.get_json(silent=True) or {}
+    order = data.get("order", [])
+    if not isinstance(order, list):
+        abort(400)
+    db = get_db()
+    for position, gid in enumerate(order):
+        gid = to_int(gid)
+        if gid is None:
+            continue
+        db.execute(
+            "UPDATE home_gruppen SET position=? WHERE id=? AND user_id=?",
+            (position, gid, row["id"])
+        )
     db.commit()
     return jsonify(ok=True)
 

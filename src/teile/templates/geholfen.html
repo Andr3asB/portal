@@ -7,34 +7,44 @@
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
 .aufgaben-grid {
   display:grid;
-  grid-template-columns:repeat(2, 1fr);
-  gap:12px; margin-bottom:16px;
+  grid-template-columns:repeat(3, 1fr);
+  gap:8px; margin-bottom:16px;
 }
 .aufgabe-btn {
-  background:var(--surface); border:none; border-radius:18px; padding:20px 12px;
-  display:flex; flex-direction:column; align-items:center; gap:8px;
+  background:var(--surface); border:none; border-radius:14px; padding:10px 6px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
   box-shadow:0 2px 8px var(--shadow);
-  cursor:pointer; min-height:100px;
+  cursor:pointer; min-height:64px;
   -webkit-tap-highlight-color: transparent;
   transition:transform .12s, box-shadow .12s;
 }
 .aufgabe-btn:active { transform:scale(.94); box-shadow:0 1px 3px var(--shadow); }
 .aufgabe-btn.flash  { background:var(--farbe); }
-.aufgabe-emoji { font-size:40px; line-height:1; pointer-events:none; }
-.aufgabe-name  { font-size:14px; font-weight:600; color:var(--text-3); pointer-events:none; }
+.aufgabe-emoji { font-size:26px; line-height:1; pointer-events:none; }
+.aufgabe-name  { font-size:11px; font-weight:600; color:var(--text-3); pointer-events:none; text-align:center; }
 .aufgabe-btn.flash .aufgabe-name { color:#fff; }
-.ticker {
-  background:var(--surface); border-radius:14px; padding:14px 16px;
-  box-shadow:0 1px 3px var(--shadow);
-}
-.ticker-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
-.ticker-item  { font-size:14px; padding:4px 0; border-bottom:1px solid var(--surface-2); color:var(--text-3); }
-.ticker-item:last-child { border-bottom:none; }
-.ticker-time  { font-size:11px; color:var(--text-2); float:right; }
 
 /* Tablet-Optimierung: wenn Bildschirm breit genug, mehr Spalten */
-@media(min-width:500px) { .aufgaben-grid { grid-template-columns:repeat(3,1fr); } }
-@media(min-width:700px) { .aufgaben-grid { grid-template-columns:repeat(4,1fr); } }
+@media(min-width:500px) { .aufgaben-grid { grid-template-columns:repeat(4,1fr); } }
+@media(min-width:700px) { .aufgaben-grid { grid-template-columns:repeat(5,1fr); } }
+
+/* Heatmap (Wunsch #29) */
+.heatmap-section {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-top:4px;
+}
+.heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
+.heatmap-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.heatmap-name {
+  font-size:13px; font-weight:600; width:72px; flex-shrink:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.heatmap-cells { display:flex; gap:4px; flex:1; }
+.heatmap-cell {
+  flex:1; aspect-ratio:1; border-radius:4px; background:var(--surface-2);
+  max-width:22px; transition:background .2s;
+}
+.heatmap-cell.gruen { background:#34c759; }
 /* Nutzer-Picker */
 .nutzer-picker { margin-bottom:12px; }
 .nutzer-picker-label { font-size:12px; color:var(--text-2); font-weight:600;
@@ -54,14 +64,6 @@
 {% block nav_title %}
 <div class="nav-title">🙋 Geholfen!</div>
 <div class="nav-sub">Hallo, {{ user.name }} 👋</div>
-{% endblock %}
-
-{% block header_extra %}
-{% if user.is_admin %}
-<div class="nav-extra" style="text-align:right">
-  <a class="nav-btn" href="/a/geholfen/{{ token }}/uebersicht" title="Übersicht">📊</a>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block body %}
@@ -91,17 +93,22 @@
     {% endfor %}
   </div>
 
-  <div class="ticker" id="ticker" {% if not letzte %}style="display:none"{% endif %}>
-    <div class="ticker-title">📜 Zuletzt</div>
-    <div id="ticker-body">
-    {% for e in letzte %}
-    <div class="ticker-item">
-      {{ e.emoji }} {{ e.name }}: {{ e.aufgabe }}
-      <span class="ticker-time">{{ e.zeitstempel[11:16] }}</span>
+  {% if heatmap_nutzer %}
+  <div class="heatmap-section">
+    <div class="heatmap-title">📊 Letzte 10 Tage</div>
+    {% for n in heatmap_nutzer %}
+    <div class="heatmap-row">
+      <span class="heatmap-name" style="color:{{ n.farbe }}">{{ n.name }}</span>
+      <div class="heatmap-cells">
+        {% for tag in tage %}
+        <span class="heatmap-cell{% if tag in geholfen_tage.get(n.id, []) %} gruen{% endif %}"
+              id="heat-{{ n.id }}-{{ tag }}" title="{{ tag }}"></span>
+        {% endfor %}
+      </div>
     </div>
     {% endfor %}
-    </div>
   </div>
+  {% endif %}
 </main>
 
 <!-- Erfolgs-Toast -->
@@ -155,21 +162,8 @@
         const d = await r.json();
         if (d.ok) {
           showToast(d.emoji + ' ' + d.aufgabe + ' ✓');
-          if (d.letzte) {
-            const tickerBody = document.getElementById('ticker-body');
-            tickerBody.textContent = '';
-            d.letzte.forEach(e => {
-              const item = document.createElement('div');
-              item.className = 'ticker-item';
-              item.textContent = `${e.emoji} ${e.name}: ${e.aufgabe}`;
-              const time = document.createElement('span');
-              time.className = 'ticker-time';
-              time.textContent = e.zeit;
-              item.appendChild(time);
-              tickerBody.appendChild(item);
-            });
-            document.getElementById('ticker').style.display = 'block';
-          }
+          const cell = document.getElementById(`heat-${d.fuer_user_id}-${d.tag}`);
+          if (cell) cell.classList.add('gruen');
         }
       } catch(e) {
         const f = document.createElement('form');

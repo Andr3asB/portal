@@ -26,6 +26,13 @@
   border:1.5px solid var(--border); border-radius:8px; padding:7px 10px;
   font-size:14px; background:var(--surface); color:var(--text); outline:none; flex:1; min-width:120px;
 }
+.ziel-typ-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+.ziel-typ-radio { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--text-2); }
+.ziel-typ-radio input { width:16px; height:16px; }
+.ziel-detail { flex:1; min-width:120px; }
+.rollen-row { display:flex; gap:10px; flex-wrap:wrap; }
+.rolle-chip { display:flex; align-items:center; gap:5px; font-size:14px; color:var(--text-2); }
+.rolle-chip input { width:16px; height:16px; }
 .privat-row { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text-2); }
 .privat-row input { width:18px; height:18px; }
 .section-label { font-size:13px; font-weight:600; color:var(--text-2); margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
@@ -35,13 +42,6 @@
   display:flex; align-items:flex-start; gap:12px;
 }
 .todo-item.done { opacity:.5; }
-.todo-check-form { flex-shrink:0; margin-top:1px; }
-.todo-check {
-  width:26px; height:26px; border-radius:50%; border:2.5px solid var(--border);
-  background:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  font-size:14px; transition:background .15s;
-}
-.todo-item.done .todo-check { background:var(--farbe); border-color:var(--farbe); color:#fff; }
 .todo-body { flex:1; min-width:0; }
 .todo-text { font-size:16px; font-weight:500; word-break:break-word; }
 .todo-item.done .todo-text { text-decoration:line-through; }
@@ -55,18 +55,147 @@
   font-size:20px; padding:0 4px; flex-shrink:0; align-self:center;
 }
 .todo-del:active { color:#ff3b30; }
-.todo-check-ghost {
-  width:26px; height:26px; border-radius:50%; border:2.5px solid var(--border);
-  display:flex; align-items:center; justify-content:center;
-  font-size:14px; color:var(--text-2); flex-shrink:0; margin-top:1px;
-  opacity:.4;
+.status-picker { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.status-chip {
+  border:1.5px solid var(--border); border-radius:14px; background:var(--surface);
+  color:var(--text-2); font-size:11px; font-weight:600; padding:5px 10px; cursor:pointer;
 }
+.status-chip.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.status-chip:disabled { opacity:.5; cursor:default; }
+.todo-edit-toggle {
+  background:none; border:none; font-size:16px; cursor:pointer;
+  color:var(--text-2); padding:0 4px; flex-shrink:0; align-self:center;
+}
+.todo-edit-panel {
+  display:none; flex-direction:column; gap:8px; margin-top:10px;
+  padding-top:10px; border-top:1px solid var(--border);
+}
+.todo-edit-form { display:flex; gap:8px; }
+.todo-edit-input {
+  flex:1; border:1.5px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:14px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.todo-edit-input:focus { border-color:var(--farbe); }
+.todo-edit-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
+}
+.todo-verlauf-toggle {
+  background:none; border:none; font-size:12px; color:var(--text-2);
+  cursor:pointer; padding:2px 0; text-align:left; align-self:flex-start;
+  text-decoration:underline; text-decoration-style:dotted;
+}
+.todo-verlauf { display:none; flex-direction:column; gap:6px; margin-top:4px; }
+.todo-verlauf-eintrag {
+  font-size:12px; color:var(--text-2); background:var(--surface-2);
+  border-radius:8px; padding:6px 10px;
+}
+.todo-verlauf-text { display:block; color:var(--text); font-size:13px; }
+.todo-verlauf-meta { display:block; margin-top:2px; opacity:.8; }
 {% endblock %}
 
 {% block nav_title %}
 <div class="nav-title">✅ Aufgaben</div>
-<div class="nav-sub">{{ todos|selectattr('erledigt','eq',0)|list|length }} offen</div>
+<div class="nav-sub">{{ todos|selectattr('status','eq','offen')|list|length }} offen</div>
 {% endblock %}
+
+{% macro ziel_auswahl(users, rollen, rollen_labels, aktueller_user_id, vorbelegt_zugewiesen_an=None, vorbelegte_rollen=None, vorbelegt_privat=False) %}
+{% set ziel_typ_aktuell = 'alle' if vorbelegte_rollen == 'alle' else ('rollen' if vorbelegte_rollen else 'person') %}
+{% set gewaehlte_rollen = vorbelegte_rollen.split(',') if vorbelegte_rollen and vorbelegte_rollen != 'alle' else [] %}
+<div class="ziel-wrap">
+  <div class="ziel-typ-row">
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="person" {% if ziel_typ_aktuell == 'person' %}checked{% endif %} onchange="updateZielTyp(this)"> Person</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="rollen" {% if ziel_typ_aktuell == 'rollen' %}checked{% endif %} onchange="updateZielTyp(this)"> Rolle(n)</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="alle" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %} onchange="updateZielTyp(this)"> Alle</label>
+  </div>
+  <div class="todo-options">
+    <div class="ziel-person ziel-detail" {% if ziel_typ_aktuell != 'person' %}style="display:none"{% endif %}>
+      <select class="todo-select" name="zugewiesen_an">
+        <option value="" {% if not vorbelegt_zugewiesen_an %}selected{% endif %}>Für mich</option>
+        {% for u in users %}
+        <option value="{{ u.id }}"
+          {% if u.id == vorbelegt_zugewiesen_an %}selected{% endif %}
+          {% if u.id == aktueller_user_id %}style="font-weight:600"{% endif %}>
+          → {{ u.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ziel-rollen ziel-detail rollen-row" {% if ziel_typ_aktuell != 'rollen' %}style="display:none"{% endif %}>
+      {% for r in rollen %}
+      <label class="rolle-chip"><input type="checkbox" name="rollen" value="{{ r }}" {% if r in gewaehlte_rollen %}checked{% endif %}> {{ rollen_labels[r] }}</label>
+      {% endfor %}
+    </div>
+    <label class="privat-row">
+      <input type="checkbox" name="privat" {% if vorbelegt_privat %}checked{% endif %}> 🔒 Privat
+    </label>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro todo_item(t, token, user, darf_loeschen, historie, status_order, status_labels, rollen_labels, users, rollen) %}
+{% set rolle_passt = t.zugewiesen_rollen and (t.zugewiesen_rollen == 'alle' or user.rolle in t.zugewiesen_rollen.split(',')) %}
+{% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id or (not t.zugewiesen_an and rolle_passt) %}
+<div class="todo-item{% if t.erledigt %} done{% endif %}" id="todo-{{ t.id }}">
+  <div class="todo-body">
+    <div class="todo-text">{{ t.inhalt }}</div>
+    <div class="todo-meta">
+      {% if t.privat %}<span class="chip" style="background:#8e8e93">🔒</span>{% endif %}
+      {% if t.zugewiesen_rollen %}
+        <span class="chip" style="background:#8e8e93">→ {% if t.zugewiesen_rollen == 'alle' %}Alle{% else %}{% for r in t.zugewiesen_rollen.split(',') %}{{ rollen_labels.get(r, r) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</span>
+      {% elif t.fuer_name and t.zugewiesen_an != user.id %}
+        <span class="chip" style="background:{{ t.fuer_farbe }}">→ {{ t.fuer_name }}</span>
+      {% elif t.zugewiesen_an == user.id and t.von_name %}
+        <span class="chip" style="background:{{ t.von_farbe }}">von {{ t.von_name }}</span>
+      {% endif %}
+      Erstellt: {{ t.erstellt[:10] }}{% if t.erledigt and t.erledigt_am %} · Erledigt: {{ t.erledigt_am[:10] }}{% endif %}
+    </div>
+
+    <form method="post" action="/a/todo/{{ token }}/status/{{ t.id }}" class="status-picker">
+      {% for s in status_order %}
+      <button type="submit" name="status" value="{{ s }}"
+              class="status-chip{% if s == t.status %} active{% endif %}"
+              {% if not ich_darf_erledigen %}disabled{% endif %}>{{ status_labels[s] }}</button>
+      {% endfor %}
+    </form>
+
+    {% if ich_darf_erledigen %}
+    <div class="todo-edit-panel" id="todo-edit-{{ t.id }}">
+      <form method="post" action="/a/todo/{{ token }}/bearbeiten/{{ t.id }}">
+        <div class="todo-edit-form">
+          <input class="todo-edit-input" type="text" name="inhalt" value="{{ t.inhalt }}" required>
+          <button type="submit" class="todo-edit-save">Speichern</button>
+        </div>
+        {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}
+      </form>
+      {% if historie.get(t.id) %}
+      <button type="button" class="todo-verlauf-toggle" onclick="toggleVerlauf({{ t.id }})">🕘 Verlauf ({{ historie[t.id]|length }})</button>
+      <div class="todo-verlauf" id="todo-verlauf-{{ t.id }}">
+        {% for h in historie[t.id] %}
+        <div class="todo-verlauf-eintrag">
+          <span class="todo-verlauf-text">„{{ h.alter_inhalt }}“</span>
+          <span class="todo-verlauf-meta">{{ h.geaendert_von_name or 'unbekannt' }} · {{ h.geaendert_am[:16] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if ich_darf_erledigen %}
+  <button class="todo-edit-toggle" type="button" onclick="toggleTodoEdit({{ t.id }})" title="Bearbeiten">✏️</button>
+  {% endif %}
+
+  {% if darf_loeschen %}
+  <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
+        onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+    <button class="todo-del" type="submit">×</button>
+  </form>
+  {% endif %}
+</div>
+{% endmacro %}
 
 {% block body %}
 
@@ -79,87 +208,18 @@
                placeholder="Neue Aufgabe…" required autocomplete="off">
         <button class="new-todo-submit" type="submit">+</button>
       </div>
-      <div class="todo-options">
-        <select class="todo-select" name="zugewiesen_an">
-          <option value="">Für mich</option>
-          {% for u in users %}
-          <option value="{{ u.id }}"
-            {% if u.id == user.id %}style="font-weight:600"{% endif %}>
-            → {{ u.name }}
-          </option>
-          {% endfor %}
-        </select>
-        <label class="privat-row">
-          <input type="checkbox" name="privat"> 🔒 Privat
-        </label>
-      </div>
+      {{ ziel_auswahl(users, rollen, rollen_labels, user.id) }}
     </form>
   </div>
 
-  <!-- Offene Todos -->
-  {% set open_todos = todos|selectattr('erledigt','eq',0)|list %}
-  {% set done_todos = todos|selectattr('erledigt','ne',0)|list %}
-
-  {% if open_todos %}
-  <div class="section-label">Offen</div>
-  {% for t in open_todos %}
-  {% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id %}
-  <div class="todo-item">
-    {% if ich_darf_erledigen %}
-    <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
-      <button class="todo-check" type="submit" title="Abhaken"></button>
-    </form>
-    {% else %}
-    <span class="todo-check-ghost"></span>
+  <!-- 4 Status-Stufen (Wunsch #20) -->
+  {% for status in status_order %}
+    {% set gruppe = todos|selectattr('status','eq',status)|list %}
+    {% if gruppe %}
+    <div class="section-label">{{ status_labels[status] }}</div>
+    {% for t in gruppe %}{{ todo_item(t, token, user, darf_loeschen, historie, status_order, status_labels, rollen_labels, users, rollen) }}{% endfor %}
     {% endif %}
-    <div class="todo-body">
-      <div class="todo-text">{{ t.inhalt }}</div>
-      <div class="todo-meta">
-        {% if t.privat %}<span class="chip" style="background:#8e8e93">🔒</span>{% endif %}
-        {% if t.fuer_name and t.zugewiesen_an != user.id %}
-          <span class="chip" style="background:{{ t.fuer_farbe }}">→ {{ t.fuer_name }}</span>
-        {% elif t.zugewiesen_an == user.id and t.von_name %}
-          <span class="chip" style="background:{{ t.von_farbe }}">von {{ t.von_name }}</span>
-        {% endif %}
-        {{ t.erstellt[:10] }}
-      </div>
-    </div>
-    {% if darf_loeschen %}
-    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
-          onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
-      <button class="todo-del" type="submit">×</button>
-    </form>
-    {% endif %}
-  </div>
   {% endfor %}
-  {% endif %}
-
-  <!-- Erledigte Todos -->
-  {% if done_todos %}
-  <div class="section-label">Erledigt</div>
-  {% for t in done_todos %}
-  {% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id %}
-  <div class="todo-item done">
-    {% if ich_darf_erledigen %}
-    <form class="todo-check-form" method="post" action="/a/todo/{{ token }}/check/{{ t.id }}">
-      <button class="todo-check" type="submit" title="Wiederherstellen">✓</button>
-    </form>
-    {% else %}
-    <span class="todo-check-ghost">✓</span>
-    {% endif %}
-    <div class="todo-body">
-      <div class="todo-text">{{ t.inhalt }}</div>
-      <div class="todo-meta">{{ t.erledigt_am[:10] if t.erledigt_am else '' }}</div>
-    </div>
-    {% if darf_loeschen %}
-    <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
-          onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
-      <button class="todo-del" type="submit">×</button>
-    </form>
-    {% endif %}
-  </div>
-  {% endfor %}
-  {% endif %}
 
   {% if not todos %}
   <div style="text-align:center;padding:48px 16px;color:var(--text-2)">
@@ -168,4 +228,27 @@
   </div>
   {% endif %}
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleTodoEdit(id) {
+  const p = document.getElementById('todo-edit-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+function toggleVerlauf(id) {
+  const v = document.getElementById('todo-verlauf-' + id);
+  if (v) v.style.display = v.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// Wunsch #39: Ziel Person/Rolle(n)/Alle umschalten. Über closest('.ziel-wrap')
+// statt IDs skopiert, damit dieselbe Markup-Struktur im Neu-Formular UND in
+// jedem Bearbeiten-Panel unabhängig voneinander funktioniert (Wunsch #43).
+function updateZielTyp(radio) {
+  const wrap = radio.closest('.ziel-wrap');
+  const typ  = wrap.querySelector('input[name="ziel_typ"]:checked').value;
+  wrap.querySelector('.ziel-person').style.display = typ === 'person' ? '' : 'none';
+  wrap.querySelector('.ziel-rollen').style.display  = typ === 'rollen' ? 'flex' : 'none';
+}
+</script>
 {% endblock %}

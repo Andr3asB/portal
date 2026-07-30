@@ -26,13 +26,38 @@
   background:#d4edda; border-color:#c3e6cb; color:#155724; cursor:default;
 }
 body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; color:#8fd19e; }
-.anleitung-text {
-  white-space:pre-wrap; font-size:15px; line-height:1.6; color:var(--text);
+.schritte-liste { margin:0; padding-left:22px; }
+.schritte-liste li { font-size:15px; line-height:1.6; color:var(--text); margin-bottom:10px; }
+.schritte-liste li:last-child { margin-bottom:0; }
+.rezept-aktionen { display:flex; gap:10px; margin-top:4px; }
+.btn-bearbeiten-rezept {
+  flex:1; background:none; border:1.5px solid var(--border); border-radius:10px;
+  color:var(--text-2); font-size:14px; cursor:pointer; padding:10px 0;
+  text-align:center; text-decoration:none;
 }
 .btn-loeschen-rezept {
-  background:none; border:none; color:#ff3b30; font-size:14px;
-  cursor:pointer; padding:10px 0; width:100%; text-align:center;
+  flex:1; background:none; border:1.5px solid var(--border); border-radius:10px;
+  color:#ff3b30; font-size:14px; cursor:pointer; padding:10px 0; text-align:center;
 }
+.rezept-info-row {
+  display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px;
+}
+.rezept-info-item { font-size:15px; color:var(--text); font-weight:600; }
+.rezept-info-item .info-label {
+  display:block; font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px;
+}
+.btn-wunsch {
+  background:var(--surface-2); border:1.5px solid var(--border); border-radius:20px;
+  cursor:pointer; padding:5px 14px; font-size:13px; font-weight:600; color:var(--text-2);
+}
+.btn-wunsch.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.sterne-picker { display:flex; gap:4px; }
+.stern-btn {
+  background:none; border:none; font-size:26px; line-height:1; cursor:pointer;
+  padding:2px; color:var(--border);
+}
+.stern-btn.aktiv { color:#ff9500; }
 {% endblock %}
 
 {% block nav_left %}
@@ -46,6 +71,34 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 {% block body %}
 <main class="main">
 
+  <div class="section">
+    <div class="rezept-info-row">
+      {% if rezept.portionen %}
+      <div class="rezept-info-item"><span class="info-label">Portionen</span>🍽️ {{ rezept.portionen }}</div>
+      {% endif %}
+      {% if rezept.kategorie and rezept.kategorie in kategorien %}
+      <div class="rezept-info-item"><span class="info-label">Kategorie</span>{{ kategorien[rezept.kategorie] }}</div>
+      {% endif %}
+      <div class="rezept-info-item" id="durchschnitt-anzeige">
+        <span class="info-label">Bewertung</span>{% if anzahl_bewertungen %}⭐ {{ '%.1f'|format(durchschnitt) }} ({{ anzahl_bewertungen }}){% else %}⭐ Noch keine Bewertung{% endif %}
+      </div>
+      <div class="rezept-info-item">
+        <span class="info-label">Auf die Wunschliste?</span>
+        <button type="button" id="wunsch-btn" class="btn-wunsch{% if eigener_wunsch %} aktiv{% endif %}"
+                onclick="wunschToggle({{ rezept.id }})">
+          <span id="wunsch-label">{{ '✓ Ja' if eigener_wunsch else 'Nein' }}</span><span id="wunsch-anzahl-text">{{ ' (' ~ wunsch_anzahl ~ ')' if wunsch_anzahl else '' }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="section-title">Deine Bewertung</div>
+    <div class="sterne-picker" id="sterne-picker">
+      {% for i in range(1, 6) %}
+      <button type="button" class="stern-btn{% if eigene_bewertung and i <= eigene_bewertung %} aktiv{% endif %}"
+              data-wert="{{ i }}" onclick="bewerten({{ rezept.id }}, {{ i }})">★</button>
+      {% endfor %}
+    </div>
+  </div>
+
   {% if zutaten %}
   <div class="section">
     <div class="section-title">🥕 Zutaten</div>
@@ -58,17 +111,32 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
   </div>
   {% endif %}
 
-  {% if rezept.anleitung %}
+  {% if schritte %}
   <div class="section">
     <div class="section-title">👩‍🍳 Zubereitung</div>
-    <div class="anleitung-text">{{ rezept.anleitung }}</div>
+    <ol class="schritte-liste">
+      {% for s in schritte %}
+      <li>{{ s.text }}</li>
+      {% endfor %}
+    </ol>
   </div>
   {% endif %}
 
-  <form method="post" action="/a/rezepte/{{ token }}/{{ rezept.id }}/loeschen"
-        onsubmit="return confirm({{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
-    <button class="btn-loeschen-rezept" type="submit">🗑️ Rezept löschen</button>
-  </form>
+  {% if rezept.quelle_url %}
+  <div class="section" style="padding:12px 16px">
+    <a href="{{ rezept.quelle_url }}" target="_blank" rel="noopener noreferrer" style="font-size:14px;color:var(--text-2)">
+      🔗 Zum Originalrezept
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="rezept-aktionen">
+    <a class="btn-bearbeiten-rezept" href="/a/rezepte/{{ token }}/{{ rezept.id }}/bearbeiten">✏️ Bearbeiten</a>
+    <form method="post" action="/a/rezepte/{{ token }}/{{ rezept.id }}/loeschen" style="flex:1"
+          onsubmit="return confirm({{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+      <button class="btn-loeschen-rezept" type="submit" style="width:100%">🗑️ Löschen</button>
+    </form>
+  </div>
 
 </main>
 {% endblock %}
@@ -91,6 +159,45 @@ function zutatEinkaufen(id, btn) {
       }
     })
     .catch(() => { btn.disabled = false; });
+}
+
+// Wunsch #52: Sterne-Bewertung, sofort per Fetch statt vollem Reload.
+function bewerten(rid, sterne) {
+  fetch(`/a/rezepte/${TOKEN}/${rid}/bewerten`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sterne}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      document.querySelectorAll('#sterne-picker .stern-btn').forEach(btn => {
+        btn.classList.toggle('aktiv', parseInt(btn.dataset.wert) <= sterne);
+      });
+      const anzeige = document.getElementById('durchschnitt-anzeige');
+      anzeige.innerHTML = '<span class="info-label">Bewertung</span>⭐ '
+        + d.durchschnitt.toFixed(1) + ' (' + d.anzahl + ')';
+    });
+}
+
+// Wunsch #65: Rezept als "wünsch ich mir" markieren/entmarkieren.
+let wunschLaeuft = false;
+function wunschToggle(rid) {
+  if (wunschLaeuft) return;
+  wunschLaeuft = true;
+  fetch(`/a/rezepte/${TOKEN}/${rid}/wunsch/toggle`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      wunschLaeuft = false;
+      if (!d.ok) {
+        if (d.grund === 'limit') alert('Du kannst höchstens 5 Rezepte gleichzeitig wünschen.');
+        return;
+      }
+      document.getElementById('wunsch-btn').classList.toggle('aktiv', d.markiert);
+      document.getElementById('wunsch-label').textContent = d.markiert ? '✓ Ja' : 'Nein';
+      document.getElementById('wunsch-anzahl-text').textContent = d.anzahl > 0 ? ` (${d.anzahl})` : '';
+    })
+    .catch(() => { wunschLaeuft = false; });
 }
 </script>
 {% endblock %}

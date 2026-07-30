@@ -1,0 +1,761 @@
+{% extends "base.html" %}
+{% set app_slug = "tierbaukasten" %}
+{% block title %}Tierbaukasten{% endblock %}
+
+{% macro boden_schatten() %}
+  <ellipse cx="100" cy="213" rx="52" ry="9" fill="#000" opacity=".14"/>
+{% endmacro %}
+
+{% macro kopf_und_augen() %}
+  <ellipse cx="100" cy="78" rx="34" ry="32" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="87" cy="61" rx="11" ry="7" fill="#fff" opacity=".2" transform="rotate(-20 87 61)"/>
+  <circle cx="88" cy="72" r="4.5" fill="#2b2b2b"/>
+  <circle cx="112" cy="72" r="4.5" fill="#2b2b2b"/>
+  <circle cx="89.5" cy="70.5" r="1.3" fill="#fff"/>
+  <circle cx="113.5" cy="70.5" r="1.3" fill="#fff"/>
+{% endmacro %}
+
+{% macro kopf_hinten() %}
+  <ellipse cx="100" cy="78" rx="34" ry="32" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="87" cy="61" rx="11" ry="7" fill="#fff" opacity=".2" transform="rotate(-20 87 61)"/>
+  <path d="M 82,68 Q 100,58 118,68" stroke="#00000025" stroke-width="2" fill="none"/>
+{% endmacro %}
+
+{% macro gesicht_teile(typ) %}
+  {% if typ in ('katze', 'hund', 'hase') %}
+  <circle cx="100" cy="92" r="3.5" fill="#2b2b2b"/>
+  {% elif typ == 'baer' %}
+  <circle cx="100" cy="94" r="4.5" fill="#2b2b2b"/>
+  {% elif typ == 'vogel' %}
+  <path d="M 88,90 L 112,90 L 100,104 Z" fill="#f5a623"/>
+  {% endif %}
+{% endmacro %}
+
+{% macro koerper_vorne(typ) %}
+  {% if typ == 'katze' %}
+  <path d="M 68,55 L 58,18 L 88,48 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 132,55 L 142,18 L 112,48 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 70,44 L 65,29 L 80,46 Z" fill="#ffc9d9" opacity=".85"/>
+  <path d="M 130,44 L 135,29 L 120,46 Z" fill="#ffc9d9" opacity=".85"/>
+  <ellipse cx="100" cy="155" rx="42" ry="50" id="body-vorne-katze" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="83" cy="122" rx="15" ry="10" fill="#fff" opacity=".14" transform="rotate(-15 83 122)"/>
+  <path d="M 138,175 C 175,165 185,120 165,95" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="14" stroke-linecap="round"/>
+  <ellipse cx="80" cy="201" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="120" cy="201" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
+  <g stroke="#00000030" stroke-width="1.3" fill="none">
+    <path d="M 74,118 Q 80,124 75,131"/>
+    <path d="M 126,138 Q 120,144 125,151"/>
+    <path d="M 88,172 Q 94,178 88,185"/>
+  </g>
+  <g stroke="#2b2b2b" stroke-width="1.2">
+    <line x1="72" y1="82" x2="40" y2="76"/><line x1="72" y1="88" x2="40" y2="88"/>
+    <line x1="128" y1="82" x2="160" y2="76"/><line x1="128" y1="88" x2="160" y2="88"/>
+  </g>
+  {% elif typ == 'hund' %}
+  <ellipse cx="62" cy="85" rx="16" ry="32" transform="rotate(-15 62 85)" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="138" cy="85" rx="16" ry="32" transform="rotate(15 138 85)" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="155" rx="45" ry="48" id="body-vorne-hund" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="82" cy="122" rx="16" ry="10" fill="#fff" opacity=".14" transform="rotate(-15 82 122)"/>
+  <path d="M 140,170 C 165,175 170,155 158,140" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="13" stroke-linecap="round"/>
+  <ellipse cx="78" cy="199" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="122" cy="199" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
+  <g stroke="#00000028" stroke-width="1.3" fill="none">
+    <path d="M 72,115 Q 78,121 73,128"/>
+    <path d="M 128,135 Q 122,141 127,148"/>
+  </g>
+  {% elif typ == 'hase' %}
+  <ellipse cx="82" cy="28" rx="11" ry="38" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="118" cy="28" rx="11" ry="38" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="82" cy="30" rx="5" ry="28" fill="#ffc9d9"/>
+  <ellipse cx="118" cy="30" rx="5" ry="28" fill="#ffc9d9"/>
+  <ellipse cx="100" cy="155" rx="40" ry="48" id="body-vorne-hase" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="83" cy="122" rx="14" ry="9" fill="#fff" opacity=".14" transform="rotate(-15 83 122)"/>
+  <circle cx="145" cy="175" r="12" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="82" cy="199" rx="14" ry="8" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="118" cy="199" rx="14" ry="8" style="fill:var(--koerper-farbe)"/>
+  {% elif typ == 'baer' %}
+  <circle cx="70" cy="48" r="16" style="fill:var(--koerper-farbe)"/>
+  <circle cx="130" cy="48" r="16" style="fill:var(--koerper-farbe)"/>
+  <circle cx="70" cy="49" r="8" fill="#00000018"/>
+  <circle cx="130" cy="49" r="8" fill="#00000018"/>
+  <ellipse cx="100" cy="158" rx="50" ry="52" id="body-vorne-baer" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="80" cy="125" rx="17" ry="11" fill="#fff" opacity=".14" transform="rotate(-15 80 125)"/>
+  <ellipse cx="75" cy="205" rx="16" ry="10" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="125" cy="205" rx="16" ry="10" style="fill:var(--koerper-farbe)"/>
+  <g stroke="#00000025" stroke-width="1.4" fill="none">
+    <path d="M 72,130 Q 80,136 74,144"/>
+    <path d="M 128,150 Q 120,156 126,164"/>
+  </g>
+  {% elif typ == 'vogel' %}
+  <ellipse cx="100" cy="145" rx="34" ry="46" id="body-vorne-vogel" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="128" cy="150" rx="18" ry="28" transform="rotate(25 128 150)" style="fill:var(--koerper-farbe);opacity:.7"/>
+  <g stroke="#00000030" stroke-width="1.2" fill="none">
+    <path d="M 120,135 Q 130,150 120,165"/>
+    <path d="M 126,140 Q 134,150 126,160"/>
+  </g>
+  <ellipse cx="88" cy="118" rx="10" ry="7" fill="#fff" opacity=".16" transform="rotate(-15 88 118)"/>
+  <line x1="90" y1="195" x2="90" y2="212" stroke="#f5a623" stroke-width="4"/>
+  <line x1="110" y1="195" x2="110" y2="212" stroke="#f5a623" stroke-width="4"/>
+  {% elif typ == 'fisch' %}
+  <ellipse cx="100" cy="130" rx="40" ry="55" id="body-vorne-fisch" style="fill:var(--koerper-farbe)"/>
+  <path d="M 80,180 L 100,222 L 65,203 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 120,180 L 100,222 L 135,203 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 85,42 L 100,14 L 115,42 Z" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="42" cy="150" rx="16" ry="22" transform="rotate(-25 42 150)" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="158" cy="150" rx="16" ry="22" transform="rotate(25 158 150)" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="85" cy="105" rx="12" ry="8" fill="#fff" opacity=".16" transform="rotate(-15 85 105)"/>
+  <g stroke="#00000025" stroke-width="1.3" fill="none">
+    <path d="M 78,120 Q 72,135 78,150"/>
+    <path d="M 88,155 Q 82,168 88,180"/>
+    <path d="M 112,155 Q 118,168 112,180"/>
+  </g>
+  {% endif %}
+{% endmacro %}
+
+{% macro koerper_seite(typ, suffix='') %}
+  {% if typ == 'fisch' %}
+  <ellipse cx="100" cy="130" rx="58" ry="34" id="body-seite-fisch{{ suffix }}" style="fill:var(--koerper-farbe)"/>
+  <path d="M 42,110 L 20,90 L 45,140 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 95,98 L 108,68 L 118,98 Z" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="90" cy="115" rx="12" ry="7" fill="#fff" opacity=".16"/>
+  <circle cx="142" cy="122" r="4" fill="#2b2b2b"/>
+  <path d="M 60,150 Q 70,165 85,168" stroke="#00000025" stroke-width="1.4" fill="none"/>
+  {% else %}
+  <ellipse cx="90" cy="155" rx="55" ry="42" id="body-seite-{{ typ }}{{ suffix }}" style="fill:var(--koerper-farbe)"/>
+  {% if typ == 'katze' %}
+  <circle cx="152" cy="105" r="27" style="fill:var(--koerper-farbe)"/>
+  <path d="M 145,82 L 138,62 L 158,84 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 172,90 L 182,72 L 178,96 Z" style="fill:var(--koerper-farbe)"/>
+  <path d="M 45,145 C 15,140 10,105 30,85" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="13" stroke-linecap="round"/>
+  {% elif typ == 'hund' %}
+  <circle cx="152" cy="105" r="28" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="175" cy="118" rx="11" ry="22" transform="rotate(20 175 118)" style="fill:var(--koerper-farbe)"/>
+  <path d="M 40,150 C 15,152 12,130 22,118" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="12" stroke-linecap="round"/>
+  {% elif typ == 'hase' %}
+  <circle cx="150" cy="108" r="25" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="168" cy="70" rx="9" ry="34" transform="rotate(18 168 70)" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="168" cy="72" rx="4" ry="24" transform="rotate(18 168 72)" fill="#ffc9d9"/>
+  <circle cx="42" cy="160" r="10" style="fill:var(--koerper-farbe)"/>
+  {% elif typ == 'baer' %}
+  <circle cx="150" cy="105" r="30" style="fill:var(--koerper-farbe)"/>
+  <circle cx="172" cy="80" r="12" style="fill:var(--koerper-farbe)"/>
+  {% elif typ == 'vogel' %}
+  <circle cx="148" cy="100" r="24" style="fill:var(--koerper-farbe)"/>
+  <path d="M 168,100 L 190,95 L 168,110 Z" fill="#f5a623"/>
+  <ellipse cx="80" cy="130" rx="22" ry="14" transform="rotate(-10 80 130)" style="fill:var(--koerper-farbe);opacity:.75"/>
+  {% endif %}
+  <ellipse cx="75" cy="195" rx="12" ry="8" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="115" cy="195" rx="12" ry="8" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="80" cy="140" rx="14" ry="9" fill="#fff" opacity=".13"/>
+  {% if typ != 'vogel' %}<circle cx="163" cy="100" r="3.5" fill="#2b2b2b"/>{% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro muster_streifen() %}
+  <g style="fill:var(--muster-farbe)">
+    <rect x="40" y="85" width="14" height="140" transform="rotate(25 100 155)"/>
+    <rect x="70" y="85" width="14" height="140" transform="rotate(25 100 155)"/>
+    <rect x="100" y="85" width="14" height="140" transform="rotate(25 100 155)"/>
+    <rect x="130" y="85" width="14" height="140" transform="rotate(25 100 155)"/>
+    <rect x="160" y="85" width="14" height="140" transform="rotate(25 100 155)"/>
+  </g>
+{% endmacro %}
+{% macro muster_punkte() %}
+  <g style="fill:var(--muster-farbe)">
+    {% for cx, cy in [(65,110),(100,105),(135,110),(60,145),(100,145),(140,145),
+                       (65,180),(100,185),(135,180),(80,210),(120,210)] %}
+    <circle cx="{{ cx }}" cy="{{ cy }}" r="7"/>
+    {% endfor %}
+  </g>
+{% endmacro %}
+{% macro muster_flecken() %}
+  <g style="fill:var(--muster-farbe)">
+    <ellipse cx="70" cy="115" rx="14" ry="10" transform="rotate(-15 70 115)"/>
+    <ellipse cx="130" cy="130" rx="16" ry="11" transform="rotate(20 130 130)"/>
+    <ellipse cx="90" cy="175" rx="12" ry="16" transform="rotate(10 90 175)"/>
+    <ellipse cx="125" cy="190" rx="13" ry="9" transform="rotate(-10 125 190)"/>
+    <ellipse cx="65" cy="185" rx="10" ry="8" transform="rotate(5 65 185)"/>
+  </g>
+{% endmacro %}
+
+{% macro accessoire_hut() %}
+  <path d="M 72,50 L 128,50 L 100,8 Z" fill="#e74c3c"/>
+  <circle cx="100" cy="8" r="6" fill="#f5d76e"/>
+  <rect x="70" y="46" width="60" height="8" rx="4" fill="#c0392b"/>
+{% endmacro %}
+{% macro accessoire_schleife() %}
+  <path d="M 100,108 L 80,96 L 80,120 Z" fill="#ff2d78"/>
+  <path d="M 100,108 L 120,96 L 120,120 Z" fill="#ff2d78"/>
+  <circle cx="100" cy="108" r="6" fill="#d6115e"/>
+{% endmacro %}
+{% macro accessoire_brille() %}
+  <circle cx="88" cy="72" r="13" fill="none" stroke="#2b2b2b" stroke-width="3"/>
+  <circle cx="112" cy="72" r="13" fill="none" stroke="#2b2b2b" stroke-width="3"/>
+  <line x1="101" y1="72" x2="99" y2="72" stroke="#2b2b2b" stroke-width="3"/>
+  <line x1="75" y1="72" x2="65" y2="66" stroke="#2b2b2b" stroke-width="3"/>
+  <line x1="125" y1="72" x2="135" y2="66" stroke="#2b2b2b" stroke-width="3"/>
+{% endmacro %}
+
+{% macro figur_vorschau(einzel_typ, suffix, muster_wert, koerperbau) %}
+  {# Rendert EINE Figur als statisches SVG (Galerie) - keine Ansichten-Rotation. #}
+  <defs>
+    <clipPath id="clip-{{ einzel_typ }}{{ suffix }}"><use href="#body-vorne-{{ einzel_typ }}{{ suffix }}"/></clipPath>
+  </defs>
+  {{ boden_schatten() }}
+  <g style="transform-box:view-box; transform-origin:100px 140px; transform:scaleX({{ '%.3f'|format(0.82 + ((koerperbau or 50) / 100) * 0.36) }})">
+    {{ koerper_vorne(einzel_typ) }}
+    {% if muster_wert %}
+    <g clip-path="url(#clip-{{ einzel_typ }}{{ suffix }})">
+      {% if muster_wert == 'streifen' %}{{ muster_streifen() }}{% elif muster_wert == 'punkte' %}{{ muster_punkte() }}{% elif muster_wert == 'flecken' %}{{ muster_flecken() }}{% endif %}
+    </g>
+    {% endif %}
+    {{ kopf_und_augen() }}
+    {{ gesicht_teile(einzel_typ) }}
+  </g>
+{% endmacro %}
+
+{% block extra_styles %}
+.section {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:14px; box-shadow:0 1px 3px var(--shadow);
+}
+.section-title {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;
+}
+.schritt-titel { font-size:17px; font-weight:700; margin-bottom:14px; text-align:center; }
+.pfeil-nav { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+.btn-pfeil {
+  background:var(--surface-2); border:none; border-radius:50%; width:48px; height:48px;
+  font-size:20px; cursor:pointer; color:var(--text); display:flex; align-items:center; justify-content:center;
+}
+.btn-pfeil.weiter { background:var(--farbe); color:#fff; }
+.btn-pfeil:disabled { opacity:.35; cursor:default; }
+.btn-pfeil.unsichtbar { visibility:hidden; }
+.kategorie-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0; }
+.kategorie-karte {
+  background:var(--surface-2); border:2.5px solid transparent; border-radius:16px;
+  padding:24px 10px; text-align:center; cursor:pointer; font-size:15px; font-weight:600;
+}
+.kategorie-karte .emoji-gross { font-size:40px; display:block; margin-bottom:8px; }
+.kategorie-karte.active { border-color:var(--farbe); background:var(--surface); }
+.vorschau-box { display:flex; justify-content:center; align-items:center; gap:6px; padding:8px 0 16px; }
+.vorschau-box svg { width:170px; height:187px; }
+.btn-drehen {
+  background:var(--surface-2); border:none; border-radius:50%; width:36px; height:36px;
+  font-size:16px; cursor:pointer; color:var(--text-2); flex-shrink:0;
+}
+.ansicht-label { text-align:center; font-size:12px; color:var(--text-2); margin-bottom:10px; }
+.chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.chip-btn {
+  background:var(--chip-bg); border:none; border-radius:20px; padding:8px 14px;
+  font-size:14px; font-weight:600; color:var(--text-2); cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.chip-btn.active { background:var(--farbe); color:#fff; }
+.field-label { font-size:13px; font-weight:600; color:var(--text-2); margin:10px 0 6px; }
+.farbe-row { display:flex; align-items:center; gap:10px; }
+input[type="color"] { width:44px; height:36px; border:none; border-radius:8px; padding:0; background:none; }
+input[type="range"] { width:100%; }
+.regler-labels { display:flex; justify-content:space-between; font-size:12px; color:var(--text-2); }
+.farbschwatch-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.farbschwatch {
+  width:32px; height:32px; border-radius:50%; border:2.5px solid var(--border);
+  cursor:pointer; padding:0; -webkit-tap-highlight-color:transparent; box-sizing:border-box;
+}
+.farbschwatch.active { border-color:var(--farbe); border-width:3px; }
+.mensch-select {
+  width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:10px;
+  padding:10px 12px; font-size:15px; background:var(--surface-2); color:var(--text);
+  font-family:inherit; margin-bottom:4px;
+}
+#mensch-vorschau-svg { width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
+#mensch-vorschau-svg svg { width:100%; height:100%; }
+.mensch-lade-hinweis { color:var(--text-2); font-size:13px; }
+input[type="text"].rezept-input {
+  width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:10px;
+  padding:10px 12px; font-size:15px; background:var(--surface-2); color:var(--text);
+}
+.btn-add {
+  width:100%; background:var(--farbe); color:#fff; border:none; border-radius:12px;
+  padding:14px; font-size:16px; font-weight:700; cursor:pointer; margin-top:14px;
+}
+.galerie-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+.galerie-item {
+  background:var(--surface); border-radius:14px; padding:8px;
+  box-shadow:0 1px 3px var(--shadow); text-align:center; position:relative;
+}
+.galerie-item svg { width:100%; max-width:120px; height:auto; }
+.mensch-galerie-svg { display:flex; justify-content:center; }
+.mensch-galerie-svg svg { width:100%; max-width:120px; height:auto; }
+.galerie-name { font-size:13px; font-weight:600; color:var(--text); margin-top:2px; }
+.btn-loeschen-tier {
+  position:absolute; top:4px; right:4px; background:var(--surface-2); border:none;
+  border-radius:50%; width:26px; height:26px; color:#ff3b30; font-size:15px; cursor:pointer;
+}
+.empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🐾 Tierbaukasten</div>
+<div class="nav-sub">Bau deine eigene Figur</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="section">
+    <form method="post" action="/a/tierbaukasten/{{ token }}/speichern" id="baukasten-form">
+
+      <!-- Schritt 1: Kategorie -->
+      <div class="schritt" id="schritt-1" data-schritt="1">
+        <div class="schritt-titel">Was möchtest du bauen?</div>
+        <div class="kategorie-grid">
+          {% for k, label in kategorien.items() %}
+          <div class="kategorie-karte kategorie-karte-wahl" data-kat="{{ k }}">
+            <span class="emoji-gross">{{ label.split(' ')[0] }}</span>{{ label.split(' ', 1)[1] }}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="pfeil-nav">
+          <button type="button" class="btn-pfeil unsichtbar" disabled>←</button>
+          <button type="button" class="btn-pfeil weiter" id="pfeil-1-weiter" disabled>→</button>
+        </div>
+      </div>
+
+      <!-- Schritt 2: Tierart (nur bei Kategorie "tier") -->
+      <div class="schritt" id="schritt-2" data-schritt="2" style="display:none">
+        <div class="schritt-titel">Welches Tier?</div>
+        <div class="chip-row" id="tier-chips">
+          {% for k, label in tiere.items() %}
+          <button type="button" class="chip-btn tier-chip" data-value="{{ k }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+        <div class="pfeil-nav">
+          <button type="button" class="btn-pfeil" id="pfeil-2-zurueck">←</button>
+          <button type="button" class="btn-pfeil weiter" id="pfeil-2-weiter" disabled>→</button>
+        </div>
+      </div>
+
+      <!-- Schritt 3: Anpassen -->
+      <div class="schritt" id="schritt-3" data-schritt="3" style="display:none">
+        <div class="schritt-titel">Anpassen</div>
+
+        <div id="tier-vorschau-bereich">
+        <div class="vorschau-box">
+          <button type="button" class="btn-drehen" id="dreh-links">◀</button>
+          <svg id="tier-svg" viewBox="0 0 200 220" style="--koerper-farbe:#e8b04b; --muster-farbe:#ffffff; --koerperbau-scale:1;">
+            <defs>
+              {% for k in tiere %}
+              <clipPath id="clip-{{ k }}"><use href="#body-vorne-{{ k }}"/></clipPath>
+              <clipPath id="clip-seite-{{ k }}"><use href="#body-seite-{{ k }}"/></clipPath>
+              {% endfor %}
+            </defs>
+            <g id="figur-skalierung" style="transform-box:view-box; transform-origin:100px 140px; transform:scaleX(var(--koerperbau-scale));">
+              {{ boden_schatten() }}
+
+              {% for k in tiere %}
+              <g id="vorne-{{ k }}" class="ansicht-gruppe" data-ansicht="vorne" data-typ="{{ k }}" style="display:none">{{ koerper_vorne(k) }}</g>
+              {% endfor %}
+
+              <g id="muster-container-vorne" class="muster-container" data-ansicht="vorne" style="display:none">
+                <g class="muster-gruppe" data-ansicht="vorne" data-muster="streifen" style="display:none">{{ muster_streifen() }}</g>
+                <g class="muster-gruppe" data-ansicht="vorne" data-muster="punkte" style="display:none">{{ muster_punkte() }}</g>
+                <g class="muster-gruppe" data-ansicht="vorne" data-muster="flecken" style="display:none">{{ muster_flecken() }}</g>
+              </g>
+
+              <g id="kopf-vorne" class="ansicht-gruppe" data-ansicht="vorne" style="display:none">{{ kopf_und_augen() }}</g>
+              {% for k in tiere %}
+              <g id="gesicht-vorne-{{ k }}" class="ansicht-gruppe" data-ansicht="vorne" data-typ="{{ k }}" style="display:none">{{ gesicht_teile(k) }}</g>
+              {% endfor %}
+
+              <g id="acc-hut" class="accessoire-gruppe" style="display:none">{{ accessoire_hut() }}</g>
+              <g id="acc-schleife" class="accessoire-gruppe" style="display:none">{{ accessoire_schleife() }}</g>
+              <g id="acc-brille" class="accessoire-gruppe" style="display:none">{{ accessoire_brille() }}</g>
+
+              {% for k in tiere %}
+              <g id="hinten-{{ k }}" class="ansicht-gruppe" data-ansicht="hinten" data-typ="{{ k }}" style="display:none">{{ koerper_vorne(k) }}</g>
+              {% endfor %}
+
+              <g id="muster-container-hinten" class="muster-container" data-ansicht="hinten" style="display:none">
+                <g class="muster-gruppe" data-ansicht="hinten" data-muster="streifen" style="display:none">{{ muster_streifen() }}</g>
+                <g class="muster-gruppe" data-ansicht="hinten" data-muster="punkte" style="display:none">{{ muster_punkte() }}</g>
+                <g class="muster-gruppe" data-ansicht="hinten" data-muster="flecken" style="display:none">{{ muster_flecken() }}</g>
+              </g>
+
+              <g id="kopf-hinten" class="ansicht-gruppe" data-ansicht="hinten" style="display:none">{{ kopf_hinten() }}</g>
+
+              {% for k in tiere %}
+              <g id="seite-{{ k }}" class="ansicht-gruppe" data-ansicht="seite" data-typ="{{ k }}" style="display:none">{{ koerper_seite(k) }}</g>
+              {% endfor %}
+
+              <g id="muster-container-seite" class="muster-container" data-ansicht="seite" style="display:none">
+                <g class="muster-gruppe" data-ansicht="seite" data-muster="streifen" style="display:none">{{ muster_streifen() }}</g>
+                <g class="muster-gruppe" data-ansicht="seite" data-muster="punkte" style="display:none">{{ muster_punkte() }}</g>
+                <g class="muster-gruppe" data-ansicht="seite" data-muster="flecken" style="display:none">{{ muster_flecken() }}</g>
+              </g>
+            </g>
+          </svg>
+          <button type="button" class="btn-drehen" id="dreh-rechts">▶</button>
+        </div>
+        <div class="ansicht-label" id="ansicht-label">Von vorne</div>
+        </div>
+
+        <div id="mensch-vorschau-bereich" style="display:none">
+          <div class="vorschau-box">
+            <div id="mensch-vorschau-svg"><div class="mensch-lade-hinweis">Lädt …</div></div>
+          </div>
+        </div>
+
+        <input type="hidden" name="tier_typ" id="tier_typ-hidden" value="katze">
+
+        <div id="tier-anpassung">
+        <div class="field-label">Farbe</div>
+        <div class="farbe-row">
+          <input type="color" name="koerper_farbe" id="koerper_farbe" value="#e8b04b">
+        </div>
+
+        <div class="field-label">Muster</div>
+        <div class="chip-row" id="muster-chips">
+          {% for k, label in muster.items() %}
+          <button type="button" class="chip-btn muster-chip{% if k == 'keins' %} active{% endif %}" data-value="{{ k }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="muster" id="muster-hidden" value="keins">
+        <div class="field-label">Musterfarbe</div>
+        <div class="farbe-row" id="musterfarbe-row">
+          <input type="color" name="muster_farbe" id="muster_farbe" value="#ffffff">
+        </div>
+
+        <div class="field-label">Körperbau</div>
+        <input type="range" name="koerperbau" id="koerperbau" min="0" max="100" value="50">
+        <div class="regler-labels"><span>schlank</span><span>kräftig</span></div>
+
+        <div class="field-label">Accessoires (mehrere möglich)</div>
+        <div class="chip-row" id="accessoire-chips">
+          {% for k, label in accessoires.items() %}
+          <button type="button" class="chip-btn accessoire-chip" data-value="{{ k }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="accessoire" id="accessoire-hidden" value="">
+        </div>
+
+        <div id="mensch-anpassung" style="display:none">
+          <div class="field-label">Hautfarbe</div>
+          <div class="farbschwatch-row" data-feld="haut">
+            {% for hex in mensch_haut %}
+            <button type="button" class="farbschwatch mensch-swatch{% if loop.first %} active{% endif %}" data-feld="haut" data-value="{{ hex }}" style="background:{{ hex }}"></button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_haut" value="{{ mensch_haut[0] }}">
+
+          <div class="field-label">Frisur</div>
+          <select name="mensch_frisur" class="mensch-select">
+            {% for wert, label in mensch_frisur.items() %}
+            <option value="{{ wert }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="field-label">Haarfarbe</div>
+          <div class="farbschwatch-row" data-feld="haarfarbe">
+            {% for hex in mensch_haarfarben %}
+            <button type="button" class="farbschwatch mensch-swatch{% if loop.first %} active{% endif %}" data-feld="haarfarbe" data-value="{{ hex }}" style="background:{{ hex }}"></button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_haarfarbe" value="{{ mensch_haarfarben[0] }}">
+
+          <div class="field-label">Augen</div>
+          <select name="mensch_augen" class="mensch-select">
+            {% for wert, label in mensch_augen.items() %}
+            <option value="{{ wert }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="field-label">Augenbrauen</div>
+          <select name="mensch_augenbrauen" class="mensch-select">
+            {% for wert, label in mensch_augenbrauen.items() %}
+            <option value="{{ wert }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="field-label">Mund</div>
+          <select name="mensch_mund" class="mensch-select">
+            {% for wert, label in mensch_mund.items() %}
+            <option value="{{ wert }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="field-label">Bart</div>
+          <div class="chip-row" data-feld="bart">
+            <button type="button" class="chip-btn mensch-chip active" data-feld="bart" data-value="keins">Keins</button>
+            {% for wert, label in mensch_bart.items() %}
+            <button type="button" class="chip-btn mensch-chip" data-feld="bart" data-value="{{ wert }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_bart" value="keins">
+
+          <div class="field-label">Kleidung</div>
+          <div class="chip-row" data-feld="kleidung">
+            {% for wert, label in mensch_kleidung.items() %}
+            <button type="button" class="chip-btn mensch-chip{% if loop.first %} active{% endif %}" data-feld="kleidung" data-value="{{ wert }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_kleidung" value="{{ (mensch_kleidung.keys()|list)[0] }}">
+
+          <div class="field-label">Kleidungsfarbe</div>
+          <div class="farbschwatch-row" data-feld="kleidungsfarbe">
+            {% for hex in mensch_kleidungsfarben %}
+            <button type="button" class="farbschwatch mensch-swatch{% if loop.first %} active{% endif %}" data-feld="kleidungsfarbe" data-value="{{ hex }}" style="background:{{ hex }}"></button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_kleidungsfarbe" value="{{ mensch_kleidungsfarben[0] }}">
+
+          <div class="field-label">Accessoire</div>
+          <div class="chip-row" data-feld="accessoire">
+            <button type="button" class="chip-btn mensch-chip active" data-feld="accessoire" data-value="keins">Keins</button>
+            {% for wert, label in mensch_accessoire.items() %}
+            <button type="button" class="chip-btn mensch-chip" data-feld="accessoire" data-value="{{ wert }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_accessoire" value="keins">
+
+          <div class="field-label">Accessoire-Farbe</div>
+          <div class="farbschwatch-row" data-feld="accessoirefarbe">
+            {% for hex in mensch_accessoirefarben %}
+            <button type="button" class="farbschwatch mensch-swatch{% if loop.first %} active{% endif %}" data-feld="accessoirefarbe" data-value="{{ hex }}" style="background:{{ hex }}"></button>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="mensch_accessoirefarbe" value="{{ mensch_accessoirefarben[0] }}">
+        </div>
+
+        <div class="field-label">Name (optional)</div>
+        <input type="text" class="rezept-input" name="name" maxlength="40" placeholder="z. B. Bommel" autocomplete="off">
+
+        <div class="pfeil-nav">
+          <button type="button" class="btn-pfeil" id="pfeil-3-zurueck">←</button>
+          <span></span>
+        </div>
+        <button class="btn-add" type="submit">🐾 Speichern</button>
+      </div>
+
+    </form>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🖼️ Meine Figuren</div>
+    {% if eigene %}
+    <div class="galerie-grid">
+      {% for k in eigene %}
+      <div class="galerie-item">
+        {% if k.tier_typ == 'mensch' %}
+        <div class="mensch-galerie-svg">{{ mensch_svgs.get(k.id, '') | safe }}</div>
+        {% else %}
+        <svg viewBox="0 0 200 220" style="--koerper-farbe:{{ k.koerper_farbe }}; --muster-farbe:{{ k.muster_farbe or '#ffffff' }};">
+          {{ figur_vorschau(k.tier_typ, '-' ~ k.id, k.muster, k.koerperbau) }}
+          {% for acc in (k.accessoire or '').split(',') if acc %}
+            {% if acc == 'hut' %}{{ accessoire_hut() }}{% elif acc == 'schleife' %}{{ accessoire_schleife() }}{% elif acc == 'brille' %}{{ accessoire_brille() }}{% endif %}
+          {% endfor %}
+        </svg>
+        {% endif %}
+        {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
+        <form method="post" action="/a/tierbaukasten/{{ token }}/loeschen/{{ k.id }}"
+              onsubmit="return confirm({{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?')|tojson|forceescape }})">
+          <button type="submit" class="btn-loeschen-tier">×</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">Noch keine eigenen Figuren gespeichert.</div>
+    {% endif %}
+  </div>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  const TOKEN = '{{ token }}';
+  const svgRoot = document.getElementById('tier-svg');
+  const form = document.getElementById('baukasten-form');
+
+  let kategorie = '';
+  let tierTyp = '';
+  let ansicht = 'vorne';
+  let musterWert = 'keins';
+  const ANSICHTEN = ['vorne', 'seite', 'hinten'];
+  const ANSICHT_LABELS = {vorne: 'Von vorne', seite: 'Von der Seite', hinten: 'Von hinten'};
+
+  function zeigeSchritt(nr) {
+    document.querySelectorAll('.schritt').forEach(s => {
+      s.style.display = (parseInt(s.dataset.schritt) === nr) ? 'block' : 'none';
+    });
+  }
+
+  // Schritt 1: Kategorie waehlen
+  document.querySelectorAll('.kategorie-karte-wahl').forEach(karte => {
+    karte.addEventListener('click', () => {
+      document.querySelectorAll('.kategorie-karte-wahl').forEach(k => k.classList.remove('active'));
+      karte.classList.add('active');
+      kategorie = karte.dataset.kat;
+      document.getElementById('pfeil-1-weiter').disabled = false;
+    });
+  });
+  document.getElementById('pfeil-1-weiter').addEventListener('click', () => {
+    if (!kategorie) return;
+    if (kategorie === 'tier') {
+      zeigeSchritt(2);
+    } else {
+      tierTyp = 'mensch';
+      document.getElementById('tier_typ-hidden').value = 'mensch';
+      zeigeSchritt3FuerKategorie();
+      zeigeSchritt(3);
+    }
+  });
+
+  // Schritt 2: Tierart waehlen (nur Kategorie "tier")
+  document.querySelectorAll('.tier-chip').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tier-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tierTyp = btn.dataset.value;
+    document.getElementById('tier_typ-hidden').value = tierTyp;
+    document.getElementById('pfeil-2-weiter').disabled = false;
+  }));
+  document.getElementById('pfeil-2-zurueck').addEventListener('click', () => zeigeSchritt(1));
+  document.getElementById('pfeil-2-weiter').addEventListener('click', () => {
+    if (!tierTyp) return;
+    zeigeSchritt3FuerKategorie();
+    zeigeSchritt(3);
+  });
+  document.getElementById('pfeil-3-zurueck').addEventListener('click', () => {
+    zeigeSchritt(kategorie === 'tier' ? 2 : 1);
+  });
+
+  // Schritt 3: passende Vorschau/Anpassung je nach Kategorie ein-/ausblenden
+  function zeigeSchritt3FuerKategorie() {
+    const istMensch = kategorie === 'mensch';
+    document.getElementById('tier-vorschau-bereich').style.display = istMensch ? 'none' : 'block';
+    document.getElementById('mensch-vorschau-bereich').style.display = istMensch ? 'block' : 'none';
+    document.getElementById('tier-anpassung').style.display = istMensch ? 'none' : 'block';
+    document.getElementById('mensch-anpassung').style.display = istMensch ? 'block' : 'none';
+    if (istMensch) {
+      menschVorschauAktualisieren();
+    } else {
+      aktualisiereVorschau();
+    }
+  }
+
+  // Schritt 3: Ansicht drehen (nur Tier)
+  function aktualisiereVorschau() {
+    document.querySelectorAll('.ansicht-gruppe').forEach(g => {
+      const typOk = !g.dataset.typ || g.dataset.typ === tierTyp;
+      const ansichtOk = g.dataset.ansicht === ansicht;
+      g.style.display = (typOk && ansichtOk) ? 'block' : 'none';
+    });
+    const musterAktiv = musterWert !== 'keins';
+    const clipId = (ansicht === 'seite') ? ('clip-seite-' + tierTyp) : ('clip-' + tierTyp);
+    document.querySelectorAll('.muster-container').forEach(c => {
+      const zeigen = musterAktiv && c.dataset.ansicht === ansicht;
+      c.style.display = zeigen ? 'block' : 'none';
+      if (zeigen) c.setAttribute('clip-path', 'url(#' + clipId + ')');
+    });
+    document.querySelectorAll('.muster-gruppe').forEach(g => {
+      g.style.display = (g.dataset.ansicht === ansicht && g.dataset.muster === musterWert) ? 'block' : 'none';
+    });
+    document.querySelectorAll('.accessoire-gruppe').forEach(g => g.style.display = 'none');
+    if (ansicht === 'vorne') {
+      const gewaehlt = document.getElementById('accessoire-hidden').value.split(',').filter(Boolean);
+      gewaehlt.forEach(wert => {
+        const accGruppe = document.getElementById('acc-' + wert);
+        if (accGruppe) accGruppe.style.display = 'block';
+      });
+    }
+    document.getElementById('ansicht-label').textContent = ANSICHT_LABELS[ansicht];
+  }
+  document.getElementById('dreh-links').addEventListener('click', () => {
+    ansicht = ANSICHTEN[(ANSICHTEN.indexOf(ansicht) + ANSICHTEN.length - 1) % ANSICHTEN.length];
+    aktualisiereVorschau();
+  });
+  document.getElementById('dreh-rechts').addEventListener('click', () => {
+    ansicht = ANSICHTEN[(ANSICHTEN.indexOf(ansicht) + 1) % ANSICHTEN.length];
+    aktualisiereVorschau();
+  });
+
+  document.getElementById('koerper_farbe').addEventListener('input', e => {
+    svgRoot.style.setProperty('--koerper-farbe', e.target.value);
+  });
+  document.getElementById('muster_farbe').addEventListener('input', e => {
+    svgRoot.style.setProperty('--muster-farbe', e.target.value);
+  });
+  document.getElementById('koerperbau').addEventListener('input', e => {
+    const wert = parseInt(e.target.value);
+    const skala = 0.82 + (wert / 100) * 0.36;
+    svgRoot.style.setProperty('--koerperbau-scale', skala.toFixed(3));
+  });
+
+  document.querySelectorAll('.muster-chip').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.muster-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    musterWert = btn.dataset.value;
+    document.getElementById('muster-hidden').value = musterWert;
+    aktualisiereVorschau();
+  }));
+
+  // Wunsch #69: mehrere Accessoires gleichzeitig - jeder Chip schaltet
+  // unabhaengig um statt sich gegenseitig auszuschliessen.
+  document.querySelectorAll('.accessoire-chip').forEach(btn => btn.addEventListener('click', () => {
+    btn.classList.toggle('active');
+    const hidden = document.getElementById('accessoire-hidden');
+    const gewaehlt = new Set(hidden.value.split(',').filter(Boolean));
+    if (btn.classList.contains('active')) {
+      gewaehlt.add(btn.dataset.value);
+    } else {
+      gewaehlt.delete(btn.dataset.value);
+    }
+    hidden.value = [...gewaehlt].join(',');
+    aktualisiereVorschau();
+  }));
+
+  // Mensch-Anpassung: Farbschwatches (ein aktiver Wert je Feld)
+  document.querySelectorAll('.mensch-swatch').forEach(btn => btn.addEventListener('click', () => {
+    const feld = btn.dataset.feld;
+    document.querySelectorAll(`.mensch-swatch[data-feld="${feld}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`[name="mensch_${feld}"]`).value = btn.dataset.value;
+    menschVorschauAktualisieren();
+  }));
+
+  // Mensch-Anpassung: Chips (Bart/Kleidung/Accessoire, je ein aktiver Wert)
+  document.querySelectorAll('.mensch-chip').forEach(btn => btn.addEventListener('click', () => {
+    const feld = btn.dataset.feld;
+    document.querySelectorAll(`.mensch-chip[data-feld="${feld}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`[name="mensch_${feld}"]`).value = btn.dataset.value;
+    menschVorschauAktualisieren();
+  }));
+
+  // Mensch-Anpassung: Auswahllisten (Frisur/Augen/Augenbrauen/Mund)
+  document.querySelectorAll('.mensch-select').forEach(sel => sel.addEventListener('change', menschVorschauAktualisieren));
+
+  const MENSCH_FELDER = ['haut', 'frisur', 'haarfarbe', 'augen', 'augenbrauen', 'mund',
+                          'bart', 'kleidung', 'kleidungsfarbe', 'accessoire', 'accessoirefarbe'];
+
+  function menschVorschauAktualisieren() {
+    const daten = new FormData();
+    MENSCH_FELDER.forEach(feld => {
+      const el = document.querySelector(`[name="mensch_${feld}"]`);
+      if (el) daten.append('mensch_' + feld, el.value);
+    });
+    fetch(`/a/tierbaukasten/${TOKEN}/vorschau-mensch`, { method: 'POST', body: daten })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) document.getElementById('mensch-vorschau-svg').innerHTML = d.svg;
+      })
+      .catch(() => {});
+  }
+
+  zeigeSchritt(1);
+})();
+</script>
+{% endblock %}

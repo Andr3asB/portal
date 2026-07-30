@@ -2,8 +2,8 @@
 {% set app_slug = "werkstatt" %}
 {% block title %}Werkstatt{% endblock %}
 
-{% set PRIO_LABELS = {'niedrig': 'Niedrig', 'mittel': 'Mittel', 'hoch': 'Hoch', 'sehr_hoch': 'Sehr hoch'} %}
-{% set PRIO_COLORS = {'niedrig': '#34c759', 'mittel': '#bf9000', 'hoch': '#ff9500', 'sehr_hoch': '#ff3b30'} %}
+{% set PRIO_LABELS = {'niedrig': 'Niedrig', 'mittel': 'Mittel', 'hoch': 'Hoch', 'sehr_hoch': 'Sehr hoch', 'zurueckgestellt': 'Zurückgestellt'} %}
+{% set PRIO_COLORS = {'niedrig': '#34c759', 'mittel': '#bf9000', 'hoch': '#ff9500', 'sehr_hoch': '#ff3b30', 'zurueckgestellt': '#8e8e93'} %}
 
 {% block extra_styles %}
 .wunsch-card {
@@ -104,7 +104,7 @@
       <div class="wunsch-text">{{ w.text }}</div>
     {% endif %}
     <div class="wunsch-meta">
-      {% if w.app_slug %}<span class="wunsch-chip">{{ w.app_slug }}</span>{% endif %}
+      {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}
         <span style="color:{{ w.urheber_farbe }};font-weight:500">{{ w.urheber_name }}</span>
       {% endif %}
@@ -120,6 +120,7 @@
         <option value="mittel"   {% if w.prioritaet == 'mittel'   %}selected{% endif %}>Mittel</option>
         <option value="hoch"     {% if w.prioritaet == 'hoch'     %}selected{% endif %}>Hoch</option>
         <option value="sehr_hoch"{% if w.prioritaet == 'sehr_hoch'%}selected{% endif %}>Sehr hoch</option>
+        <option value="zurueckgestellt"{% if w.prioritaet == 'zurueckgestellt'%}selected{% endif %}>Zurückgestellt</option>
       </select>
     </form>
     <form method="post" action="/a/werkstatt/{{ token }}/erledigt/{{ w.id }}">
@@ -150,7 +151,7 @@
       <div class="wunsch-text">{{ w.text }}</div>
     {% endif %}
     <div class="wunsch-meta">
-      {% if w.app_slug %}<span class="wunsch-chip">{{ w.app_slug }}</span>{% endif %}
+      {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}
         <span style="color:{{ w.urheber_farbe }};font-weight:500">{{ w.urheber_name }}</span>
       {% endif %}

@@ -13,6 +13,8 @@
   <link rel="manifest" href="/static/manifest.json">
   {% endif %}
   <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -61,6 +63,7 @@
       background: var(--farbe);
       color: #fff;
       padding-top: calc(var(--st) + 6px);
+      padding-bottom: 6px;
     }
     .nav-bar {
       display: flex;
@@ -88,7 +91,7 @@
     }
     .nav-sub { font-size: 13px; opacity: .85; margin-top: 1px; }
     .nav-extra {
-      padding: 6px calc(16px + var(--sr)) 14px calc(16px + var(--sl));
+      padding: 14px calc(16px + var(--sr)) 14px calc(16px + var(--sl));
     }
 
     .main { padding: 16px; }
@@ -122,8 +125,21 @@
       cursor: pointer; text-decoration: none; width: 100%;
       -webkit-tap-highlight-color: transparent;
     }
+    .menu-divider {
+      height: 1px; background: var(--border); margin: 8px 4px;
+      flex-shrink: 0;
+    }
     .menu-item:active { background: var(--border); }
     .menu-emoji { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+    .menu-icon-row { display: flex; gap: 8px; }
+    .menu-icon-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 14px; border-radius: 14px; border: none;
+      background: var(--surface-2); color: var(--text);
+      font-size: 22px; cursor: pointer; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .menu-icon-btn:active { background: var(--border); }
 
     /* Wunsch-Overlay */
     #wunsch-overlay {
@@ -202,24 +218,62 @@
       <button class="menu-close-btn" id="menu-close">✕ Schließen</button>
     </div>
 
+    <!-- 1. Startseite: immer ganz oben (Wunsch #32) -->
     <a class="menu-item" href="/p/{{ user.home_token if user is defined and user else '#' }}">
       <span class="menu-emoji">🏠</span>Startseite
     </a>
 
-    <button class="menu-item" id="dm-menu-btn">
-      <span class="menu-emoji" id="dm-emoji">{{ '☀️' if user is defined and user and user.dark_mode else '🌙' }}</span>
-      <span id="dm-label">{{ 'Light Mode' if user is defined and user and user.dark_mode else 'Dark Mode' }}</span>
-    </button>
+    <!-- 2. Eintraege der gerade geoeffneten App -->
+    {% set zeigt_geholfen_items = app_slug is defined and app_slug == 'geholfen' and token is defined and token %}
+    {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin and token is defined and token %}
+    {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
+    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items %}
+    <div class="menu-divider"></div>
 
-    {% if user is defined and user and user.hilfe_token %}
-    <a class="menu-item" href="/a/hilfe/{{ user.hilfe_token }}/">
-      <span class="menu-emoji">❓</span>Hilfe
+    {% if zeigt_geholfen_items %}
+    <a class="menu-item" href="/a/geholfen/{{ token }}/verlauf">
+      <span class="menu-emoji">📜</span>Zuletzt geholfen
+    </a>
+    {% if user.is_admin %}
+    <a class="menu-item" href="/a/geholfen/{{ token }}/uebersicht">
+      <span class="menu-emoji">📊</span>Statistik
+    </a>
+    {% endif %}
+    {% endif %}
+
+    {% if zeigt_einkauf_items %}
+    <a class="menu-item" href="/a/einkauf/{{ token }}/laeden">
+      <span class="menu-emoji">🏪</span>Märkte verwalten
+    </a>
+    <a class="menu-item" href="/a/einkauf/{{ token }}/kategorien">
+      <span class="menu-emoji">🗂️</span>Kategorien verwalten
     </a>
     {% endif %}
 
-    <button class="menu-item" id="wunsch-menu-btn">
-      <span class="menu-emoji">✨</span>Verbesserungsvorschlag
-    </button>
+    {% if zeigt_vokabeln_items %}
+    <a class="menu-item" href="/a/vokabeln/{{ token }}/sprachen">
+      <span class="menu-emoji">🌐</span>Sprachen
+    </a>
+    <a class="menu-item" href="/a/vokabeln/{{ token }}/kapitel">
+      <span class="menu-emoji">🗂️</span>Kapitel verwalten
+    </a>
+    {% endif %}
+
+    <div class="menu-divider"></div>
+    {% endif %}
+
+    <!-- 3. Allgemeine Eintraege, gelten ueberall - nur Icons, eine Zeile (Wunsch #33) -->
+    <div class="menu-icon-row">
+      <button class="menu-icon-btn" id="dm-menu-btn" title="Dark Mode">
+        <span id="dm-emoji">{{ '☀️' if user is defined and user and user.dark_mode else '🌙' }}</span>
+      </button>
+
+      {% if user is defined and user and user.hilfe_token %}
+      <a class="menu-icon-btn" href="/a/hilfe/{{ user.hilfe_token }}/" title="Hilfe">❓</a>
+      {% endif %}
+
+      <button class="menu-icon-btn" id="wunsch-menu-btn" title="Verbesserungsvorschlag">✨</button>
+    </div>
   </div>
 </div>
 
@@ -263,7 +317,6 @@
       if (d.ok) {
         document.body.classList.toggle('dark', d.dark);
         document.getElementById('dm-emoji').textContent  = d.dark ? '☀️' : '🌙';
-        document.getElementById('dm-label').textContent  = d.dark ? 'Light Mode' : 'Dark Mode';
         menuOverlay.classList.remove('open');
       }
     } catch(e) { console.warn('darkmode toggle failed', e); }
@@ -285,15 +338,26 @@
   document.getElementById('wunsch-send').addEventListener('click', async () => {
     const text = document.getElementById('wunsch-text').value.trim();
     if (!text) return;
+    let erfolgreich = false;
     try {
-      await fetch('/wunsch', {
+      const resp = await fetch('/wunsch', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text, app: '{{ app_slug | default("") }}', token: TOKEN }),
+        body: JSON.stringify({
+          text, app: '{{ app_slug | default("") }}', token: TOKEN,
+          pfad: window.location.pathname,
+        }),
       });
+      const d = await resp.json();
+      erfolgreich = !!d.ok;
     } catch(e) {}
     wunschOverlay.classList.remove('open');
     document.getElementById('wunsch-text').value = '';
+    // Wunsch #60: Werkstatt-Seite neu laden, wenn dort gerade ein neuer Wunsch
+    // eingetragen wurde, damit er sofort in der Liste erscheint.
+    if (erfolgreich && '{{ app_slug | default("") }}' === 'werkstatt') {
+      location.reload();
+    }
   });
 })();
 </script>

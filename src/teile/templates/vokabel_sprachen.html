@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Sprachen{% endblock %}
+
+{% block extra_styles %}
+.sprache-item {
+  background:var(--surface); border-radius:12px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.sprache-name { font-size:15px; font-weight:600; }
+.switch { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+.switch input { opacity:0; width:0; height:0; }
+.switch-slider {
+  position:absolute; inset:0; background:var(--border); border-radius:26px; cursor:pointer; transition:.15s;
+}
+.switch-slider::before {
+  content:""; position:absolute; height:20px; width:20px; left:3px; bottom:3px;
+  background:#fff; border-radius:50%; transition:.15s;
+}
+.switch input:checked + .switch-slider { background:var(--farbe); }
+.switch input:checked + .switch-slider::before { transform:translateX(20px); }
+.hinweis { text-align:center; color:var(--text-2); font-size:13px; padding:12px 20px 20px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🌐 Sprachen</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  <form method="post" id="sprachen-form">
+    {% for s in sprachen %}
+    <div class="sprache-item">
+      <span class="sprache-name">{{ s.name }}</span>
+      <label class="switch">
+        <input type="checkbox" name="sprache_ids" value="{{ s.id }}"
+               {% if s.id in aktive_ids %}checked{% endif %} onchange="this.form.requestSubmit()">
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    {% endfor %}
+  </form>
+  <div class="hinweis">Neue Sprachen kommen bei Bedarf per ✨-Wunsch dazu.</div>
+</main>
+{% endblock %}

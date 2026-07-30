@@ -1,0 +1,156 @@
+"""
+Essensplan – aktuelle und folgende Woche, zwei Mahlzeiten pro Tag.
+URL-Präfix: /a/essensplan/<token>/
+
+Jeder Tag hat einen Mittag- und einen Abend-Slot: entweder ein Verweis auf
+ein bestehendes Rezept (teile.11_rezepte) oder freier Text. Einträge lassen
+sich per Drag & Drop auf einen beliebigen anderen Slot verschieben – anderer
+Tag, andere Mahlzeit oder beides (Wunsch #35, überarbeitet). Aktuelle und
+nächste Woche haben eigene Überschriften (Wunsch #40/#41), vergangene Tage
+sind zu einem Block einklappbar (Wunsch #42).
+"""
+from datetime import date, timedelta
+from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
+from teile.kern import get_db, grant as check_grant, to_int
+
+bp  = Blueprint("essensplan_app", __name__)
+APP = "essensplan"
+
+WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+MAHLZEITEN = ["mittag", "abend"]
+MAHLZEIT_LABELS = {"mittag": "Mittag", "abend": "Abend"}
+
+
+def _user(token):
+    u = check_grant(token, APP)
+    if not u:
+        abort(403)
+    return u
+
+
+@bp.route("/a/essensplan/<token>/")
+def index(token):
+    user  = _user(token)
+    heute = date.today()
+    montag = heute - timedelta(days=heute.weekday())
+    tage_daten = [montag + timedelta(days=i) for i in range(14)]  # aktuelle + folgende Woche
+
+    db   = get_db()
+    rows = db.execute("""
+        SELECT e.tag, e.mahlzeit, e.text, r.id AS rezept_id, r.name AS rezept_name
+        FROM   essensplan_eintraege e
+        LEFT JOIN rezepte r ON r.id = e.rezept_id
+        WHERE  e.tag BETWEEN ? AND ?
+    """, (tage_daten[0].isoformat(), tage_daten[-1].isoformat())).fetchall()
+    eintraege_map = {}
+    for r in rows:
+        eintraege_map.setdefault(r["tag"], {})[r["mahlzeit"]] = r
+
+    rezepte = db.execute(
+        "SELECT id, name FROM rezepte ORDER BY name COLLATE NOCASE"
+    ).fetchall()
+
+    tage = []
+    for d in tage_daten:
+        iso = d.isoformat()
+        if d < heute:
+            status = "vergangen"
+        elif d == heute:
+            status = "heute"
+        else:
+            status = "zukunft"
+        tage.append({
+            "iso": iso, "datum": d, "wochentag_name": WOCHENTAGE[d.weekday()],
+            "status": status, "eintraege": eintraege_map.get(iso, {}),
+        })
+
+    # Wunsch #40/#41: eigene Überschriften je Woche. Wunsch #42: vergangene
+    # Tage (immer ein zusammenhängender Block am Anfang der aktuellen Woche)
+    # einklappbar statt einzeln in der Liste.
+    aktuelle_woche  = tage[:7]
+    naechste_woche  = tage[7:]
+    vergangene_tage = [t for t in aktuelle_woche if t["status"] == "vergangen"]
+    aktuelle_rest   = [t for t in aktuelle_woche if t["status"] != "vergangen"]
+
+    return render_template("essensplan.html",
+        user=user, token=token, farbe=user["farbe"],
+        tage=tage, vergangene_tage=vergangene_tage, aktuelle_rest=aktuelle_rest,
+        naechste_woche=naechste_woche,
+        rezepte=rezepte, mahlzeiten=MAHLZEITEN, mahlzeit_labels=MAHLZEIT_LABELS,
+    )
+
+
+@bp.route("/a/essensplan/<token>/eintrag", methods=["POST"])
+def eintrag_speichern(token):
+    user     = _user(token)
+    tag      = request.form.get("tag", "").strip()
+    mahlzeit = request.form.get("mahlzeit", "").strip()
+    if not tag or mahlzeit not in MAHLZEITEN:
+        return redirect(url_for("essensplan_app.index", token=token))
+
+    db        = get_db()
+    rezept_id = to_int(request.form.get("rezept_id"))
+    if rezept_id is not None and not db.execute(
+        "SELECT 1 FROM rezepte WHERE id=?", (rezept_id,)
+    ).fetchone():
+        rezept_id = None
+    text = "" if rezept_id else request.form.get("text", "").strip()
+
+    if not rezept_id and not text:
+        db.execute("DELETE FROM essensplan_eintraege WHERE tag=? AND mahlzeit=?", (tag, mahlzeit))
+    else:
+        db.execute("""
+            INSERT INTO essensplan_eintraege(tag, mahlzeit, rezept_id, text, erstellt_von)
+            VALUES(?,?,?,?,?)
+            ON CONFLICT(tag, mahlzeit) DO UPDATE SET
+                rezept_id=excluded.rezept_id,
+                text=excluded.text,
+                erstellt_von=excluded.erstellt_von
+        """, (tag, mahlzeit, rezept_id, text, user["id"]))
+    db.commit()
+    return redirect(url_for("essensplan_app.index", token=token))
+
+
+@bp.route("/a/essensplan/<token>/verschieben", methods=["POST"])
+def verschieben(token):
+    """Drag & Drop: Eintrag auf einen beliebigen anderen Mahlzeit-Slot ziehen
+    (anderer Tag und/oder andere Mahlzeit). Ist der Ziel-Slot schon belegt,
+    werden beide getauscht."""
+    _user(token)
+    data          = request.get_json(silent=True) or {}
+    von_tag       = (data.get("von_tag") or "").strip()
+    von_mahlzeit  = (data.get("von_mahlzeit") or "").strip()
+    nach_tag      = (data.get("nach_tag") or "").strip()
+    nach_mahlzeit = (data.get("nach_mahlzeit") or "").strip()
+    if (not von_tag or not nach_tag or von_mahlzeit not in MAHLZEITEN
+            or nach_mahlzeit not in MAHLZEITEN
+            or (von_tag == nach_tag and von_mahlzeit == nach_mahlzeit)):
+        return jsonify(ok=False), 400
+
+    db = get_db()
+    quelle = db.execute(
+        "SELECT id FROM essensplan_eintraege WHERE tag=? AND mahlzeit=?", (von_tag, von_mahlzeit)
+    ).fetchone()
+    if not quelle:
+        return jsonify(ok=False), 404
+    ziel = db.execute(
+        "SELECT id FROM essensplan_eintraege WHERE tag=? AND mahlzeit=?", (nach_tag, nach_mahlzeit)
+    ).fetchone()
+
+    if ziel:
+        # Platzhalter-Tag, damit die UNIQUE(tag,mahlzeit)-Regel beim Tausch
+        # nicht kurzzeitig zwei Zeilen mit demselben (tag,mahlzeit) verlangt.
+        db.execute("UPDATE essensplan_eintraege SET tag='__tausch__' WHERE id=?", (quelle["id"],))
+        db.execute("UPDATE essensplan_eintraege SET tag=?, mahlzeit=? WHERE id=?",
+                   (von_tag, von_mahlzeit, ziel["id"]))
+        db.execute("UPDATE essensplan_eintraege SET tag=?, mahlzeit=? WHERE id=?",
+                   (nach_tag, nach_mahlzeit, quelle["id"]))
+    else:
+        db.execute("UPDATE essensplan_eintraege SET tag=?, mahlzeit=? WHERE id=?",
+                   (nach_tag, nach_mahlzeit, quelle["id"]))
+    db.commit()
+    return jsonify(ok=True)
+
+
+def init_app(app):
+    app.register_blueprint(bp)

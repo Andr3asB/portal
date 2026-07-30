@@ -71,6 +71,14 @@
   padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--text-2);
 }
 .btn-gruppe-action:active { background: var(--surface-2); }
+.btn-gruppe-drag { cursor: grab; touch-action: none; }
+.btn-gruppe-drag:active { cursor: grabbing; }
+.gruppe-drag-placeholder {
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 2px dashed var(--border);
+  margin-bottom: 20px;
+}
 
 /* Edit-Leiste */
 .edit-bar {
@@ -127,7 +135,7 @@
     <!-- Edit-Leiste -->
     <div class="edit-bar" id="edit-bar">
       <button class="btn-neue-gruppe" id="add-gruppe-btn">+ Neue Gruppe</button>
-      <span class="edit-info">Kacheln verschieben durch Ziehen</span>
+      <span class="edit-info">Kacheln verschieben durch Ziehen, Gruppen am ⠿ ziehen</span>
     </div>
 
     <!-- Gruppen -->
@@ -136,6 +144,7 @@
       <div class="gruppe-header">
         <span class="gruppe-name">{{ gruppe.info.name }}</span>
         <div class="gruppe-edit-btns">
+          <button class="btn-gruppe-action btn-gruppe-drag" title="Verschieben">⠿</button>
           <button class="btn-gruppe-action btn-rename-gruppe" data-id="{{ gruppe.info.id }}" title="Umbenennen">✏️</button>
           <button class="btn-gruppe-action btn-delete-gruppe" data-id="{{ gruppe.info.id }}" title="Löschen">🗑️</button>
         </div>
@@ -243,6 +252,7 @@
   const TOKEN    = '{{ token }}';
   let editMode   = false;
   let dragState  = null;
+  let gruppeDragState = null;
 
   const editBtn = document.getElementById('edit-toggle');
   if (!editBtn) return;
@@ -253,6 +263,7 @@
     document.body.classList.toggle('edit-mode', editMode);
     editBtn.textContent = editMode ? '✓ Fertig' : '✎ Apps anpassen';
     if (!editMode && dragState) cancelDrag();
+    if (!editMode && gruppeDragState) cancelGruppeDrag();
   });
 
   // Drag & Drop mit Pointer Events
@@ -396,6 +407,137 @@
     } catch(err) { console.warn('reorder failed', err); }
   }
 
+  // Gruppen selbst verschieben (Wunsch #21) – eigener Pointer-Drag, ausgelöst
+  // vom ⠿-Handle statt vom ganzen Abschnitt (sonst kollidiert es mit dem
+  // Ziehen der Kacheln darin). Allgemein bleibt immer die letzte Sektion.
+  function initGruppeDrag(handle) {
+    handle.addEventListener('pointerdown', onGruppeDown);
+  }
+
+  function onGruppeDown(e) {
+    if (!editMode) return;
+    if (e.button && e.button !== 0) return;
+    e.preventDefault();
+    const handle  = e.currentTarget;
+    const section = handle.closest('.gruppe-section');
+    if (!section) return;
+    handle.setPointerCapture(e.pointerId);
+    gruppeDragState = {
+      section, handle, pointerId: e.pointerId,
+      startY: e.clientY, started: false, ghost: null, placeholder: null,
+    };
+    handle.addEventListener('pointermove', onGruppeMove);
+    handle.addEventListener('pointerup',   onGruppeUp);
+    handle.addEventListener('pointercancel', onGruppeCancel);
+  }
+
+  function onGruppeMove(e) {
+    if (!gruppeDragState || gruppeDragState.handle !== e.currentTarget) return;
+    const dy = e.clientY - gruppeDragState.startY;
+    if (!gruppeDragState.started && Math.abs(dy) > 8) {
+      gruppeDragState.started = true;
+      beginGruppeDrag(e);
+    }
+    if (gruppeDragState.started) continueGruppeDrag(e);
+  }
+
+  function onGruppeUp(e) {
+    if (!gruppeDragState || gruppeDragState.handle !== e.currentTarget) return;
+    removeGruppeListeners(gruppeDragState.handle);
+    if (gruppeDragState.started) finishGruppeDrag();
+    gruppeDragState = null;
+  }
+
+  function onGruppeCancel(e) {
+    if (!gruppeDragState || gruppeDragState.handle !== e.currentTarget) return;
+    removeGruppeListeners(gruppeDragState.handle);
+    if (gruppeDragState.started) cancelGruppeDrag();
+    gruppeDragState = null;
+  }
+
+  function removeGruppeListeners(handle) {
+    handle.removeEventListener('pointermove', onGruppeMove);
+    handle.removeEventListener('pointerup',   onGruppeUp);
+    handle.removeEventListener('pointercancel', onGruppeCancel);
+  }
+
+  function beginGruppeDrag(e) {
+    const { section } = gruppeDragState;
+    const rect = section.getBoundingClientRect();
+
+    const ghost = section.cloneNode(true);
+    ghost.style.cssText = [
+      'position:fixed', 'z-index:1000', 'pointer-events:none',
+      `width:${rect.width}px`, `left:${rect.left}px`, `top:${rect.top}px`,
+      'opacity:.9', 'box-shadow:0 12px 30px rgba(0,0,0,.22)',
+      'background:var(--bg)', 'border-radius:14px', 'padding:4px',
+    ].join(';');
+    document.body.appendChild(ghost);
+
+    const ph = document.createElement('div');
+    ph.className = 'gruppe-drag-placeholder';
+    ph.style.height = `${rect.height}px`;
+    section.parentNode.insertBefore(ph, section.nextSibling);
+    section.style.display = 'none';
+
+    gruppeDragState.ghost       = ghost;
+    gruppeDragState.placeholder = ph;
+    gruppeDragState.offsetY     = e.clientY - rect.top;
+  }
+
+  function continueGruppeDrag(e) {
+    const { section, ghost, placeholder, offsetY } = gruppeDragState;
+    ghost.style.top = `${e.clientY - offsetY}px`;
+
+    const sections = [...document.querySelectorAll('.gruppe-section:not(.allgemein-section)')]
+      .filter(s => s !== placeholder && s !== section);
+    const allgemein = document.querySelector('.allgemein-section');
+
+    let inserted = false;
+    for (const s of sections) {
+      const r   = s.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (e.clientY < mid) {
+        s.parentNode.insertBefore(placeholder, s);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      allgemein.parentNode.insertBefore(placeholder, allgemein);
+    }
+  }
+
+  function finishGruppeDrag() {
+    const { section, ghost, placeholder } = gruppeDragState;
+    placeholder.parentNode.insertBefore(section, placeholder);
+    placeholder.remove();
+    ghost.remove();
+    section.style.display = '';
+    saveGruppenOrder();
+  }
+
+  function cancelGruppeDrag() {
+    if (!gruppeDragState?.started) return;
+    const { section, ghost, placeholder } = gruppeDragState;
+    if (placeholder?.parentNode) placeholder.parentNode.insertBefore(section, placeholder);
+    placeholder?.remove();
+    ghost?.remove();
+    section.style.display = '';
+  }
+
+  async function saveGruppenOrder() {
+    const order = [...document.querySelectorAll('.gruppe-section:not(.allgemein-section)')]
+      .map(s => parseInt(s.dataset.gruppeId));
+    try {
+      await fetch(`/p/${TOKEN}/gruppe/reorder`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order}),
+      });
+    } catch(err) { console.warn('gruppe reorder failed', err); }
+  }
+
   // Gruppe anlegen
   document.getElementById('add-gruppe-btn')?.addEventListener('click', async () => {
     const name = prompt('Name der neuen Gruppe:');
@@ -422,6 +564,7 @@
       <div class="gruppe-header">
         <span class="gruppe-name">${esc(name)}</span>
         <div class="gruppe-edit-btns" style="display:flex">
+          <button class="btn-gruppe-action btn-gruppe-drag" title="Verschieben">⠿</button>
           <button class="btn-gruppe-action btn-rename-gruppe" data-id="${id}" title="Umbenennen">✏️</button>
           <button class="btn-gruppe-action btn-delete-gruppe" data-id="${id}" title="Löschen">🗑️</button>
         </div>
@@ -437,6 +580,8 @@
   }
 
   function registerGruppeButtons(container) {
+    container.querySelectorAll('.btn-gruppe-drag').forEach(initGruppeDrag);
+
     container.querySelectorAll('.btn-rename-gruppe').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id  = btn.dataset.id;

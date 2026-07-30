@@ -38,6 +38,19 @@
   padding:10px 12px; font-size:14px; color:var(--text-2);
   margin-top:8px; line-height:1.5;
 }
+.toc-list { list-style:none; padding:0; margin:0; }
+.toc-list li { border-bottom:1px solid var(--surface-2); }
+.toc-list li:last-child { border-bottom:none; }
+.toc-list a {
+  display:block; padding:9px 2px; font-size:15px; color:var(--text);
+  text-decoration:none;
+}
+.nach-oben-btn {
+  position:fixed; bottom:24px; right:20px; z-index:50;
+  width:48px; height:48px; border-radius:50%;
+  background:var(--farbe); color:#fff; border:none;
+  font-size:20px; line-height:1; box-shadow:0 2px 8px rgba(0,0,0,.25); cursor:pointer;
+}
 {% endblock %}
 
 {% block nav_title %}
@@ -49,14 +62,41 @@
 
 <main class="main">
 
-  <div class="section">
+  {% set kapitel = [
+    ('kapitel-1', '🏠 Was ist das Portal?'),
+    ('kapitel-2', '📱 Als App auf dem Handy speichern'),
+    ('kapitel-3', '🗂️ Die Apps'),
+    ('kapitel-4', '🔔 Benachrichtigungen'),
+    ('kapitel-5', '🙋 Geholfen – Heatmap, Verlauf & Statistik'),
+    ('kapitel-6', '🛒 Einkaufsliste'),
+    ('kapitel-7', '🙋 Geholfen – Für andere eintragen'),
+    ('kapitel-8', '🗂️ Apps sortieren & gruppieren'),
+    ('kapitel-9', '🍲 Rezepte'),
+    ('kapitel-10', '🍽️ Essensplan'),
+    ('kapitel-11', '🗓️ Aufgabenplan'),
+    ('kapitel-12', '🌙 Hell / Dunkel'),
+    ('kapitel-13', '🏃 Sportschau'),
+    ('kapitel-14', '🐾 Tierbaukasten'),
+    ('kapitel-15', '📚 Vokabeln'),
+    ('kapitel-16', '🔗 Link verloren oder ungültig?'),
+  ] %}
+  <div class="section toc">
+    <div class="section-title">📑 Inhalt</div>
+    <ul class="toc-list">
+      {% for anchor, label in kapitel %}
+      <li><a href="#{{ anchor }}">{{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="section" id="kapitel-1">
     <div class="section-title">🏠 Was ist das Portal?</div>
     <p>Das ist unser privates Familienportal – nur für uns. Wer einen persönlichen Link hat, kommt herein. Den Link bekommt jedes Familienmitglied von Andi.</p>
     <p>Jeder hat seine eigene Seite mit seiner Lieblingsfarbe und den Apps, die für ihn freigeschaltet sind.</p>
     <div class="tip">⚠️ Teile deinen Link nicht mit anderen – er gehört nur dir.</div>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-2">
     <div class="section-title">📱 Als App auf dem Handy speichern</div>
     <p>Das Portal lässt sich wie eine echte App auf dem Home-Bildschirm speichern – kein App Store nötig.</p>
     <ul class="steps">
@@ -72,7 +112,7 @@
     <div class="tip">💡 Danach öffnet sich das Portal direkt ohne Browser-Leiste – wie eine richtige App.</div>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-3">
     <div class="section-title">🗂️ Die Apps</div>
     <ul class="app-list">
       <li>
@@ -86,21 +126,21 @@
         <span class="app-emoji">✅</span>
         <div class="app-desc">
           <strong>Aufgaben</strong>
-          <span>Aufgaben anlegen, anderen zuweisen und abhaken. Wer eine Aufgabe bekommt, wird per Benachrichtigung informiert. Löschen ist nur für Eltern möglich.</span>
+          <span>Aufgaben anlegen und durch die vier Stufen Backlog/Offen/In Arbeit/Erledigt schieben. Ziel wählen: eine bestimmte Person (→ Benachrichtigung), eine oder mehrere Rollen (Eltern/Kind/Gast) oder Alle – Aufgaben ohne konkrete Person landen direkt im Backlog statt in Offen. Löschen ist nur für Eltern möglich. Mit ✏️ lässt sich alles bearbeiten (Text, Ziel, Privat-Flag) – mit derselben Auswahl wie beim Anlegen; Eltern bei jeder Aufgabe, Kinder nur bei eigenen oder passend zugewiesenen. Frühere Textfassungen bleiben im Verlauf einsehbar.</span>
         </div>
       </li>
       <li>
         <span class="app-emoji">💡</span>
         <div class="app-desc">
           <strong>Werkstatt</strong>
-          <span>Ideen und Wünsche für das Portal sammeln. Nutze den ✨-Knopf im Menü (☰ oben rechts).</span>
+          <span>Ideen und Wünsche für das Portal sammeln. Nutze den ✨-Knopf im Menü (☰ oben rechts) – der Wunsch merkt sich automatisch, auf welcher Seite du gerade warst.</span>
         </div>
       </li>
       <li>
         <span class="app-emoji">🙋</span>
         <div class="app-desc">
           <strong>Geholfen</strong>
-          <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Andi sieht in der Übersicht, wer sich wie einbringt.</span>
+          <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Unter den Kacheln zeigt eine kleine Heatmap, wer sich in den letzten 10 Tagen wie eingebracht hat.</span>
         </div>
       </li>
       <li>
@@ -118,6 +158,20 @@
         </div>
       </li>
       <li>
+        <span class="app-emoji">🍽️</span>
+        <div class="app-desc">
+          <strong>Essensplan</strong>
+          <span>Zeigt die aktuelle und die folgende Woche mit Mittag- und Abendessen pro Tag. Vergangene Tage sind grau, heute ist farblich umrandet.</span>
+        </div>
+      </li>
+      <li>
+        <span class="app-emoji">🗓️</span>
+        <div class="app-desc">
+          <strong>Aufgabenplan</strong>
+          <span>Kinder ordnen wiederkehrende Aufgaben Wochentagen zu und haken sie ab – das zählt direkt in der Geholfen-App. Jedes Kind sieht auch die Pläne der Geschwister, editieren kann es nur den eigenen. Ab 20 Uhr ist der Plan für den nächsten Tag nur noch für Eltern änderbar.</span>
+        </div>
+      </li>
+      <li>
         <span class="app-emoji">⚙️</span>
         <div class="app-desc">
           <strong>Verwaltung</strong>
@@ -127,45 +181,51 @@
     </ul>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-4">
     <div class="section-title">🔔 Benachrichtigungen</div>
     <p>Wenn jemand dir eine Aufgabe zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
     <p>Beim ersten Öffnen des Portals erscheint ein Banner – einfach <strong>„Aktivieren"</strong> tippen. Fertig.</p>
     <div class="tip">Benachrichtigungen funktionieren nur, wenn das Portal als App auf dem Home-Bildschirm gespeichert oder im Browser geöffnet ist.</div>
   </div>
 
-  <div class="section">
-    <div class="section-title">🙋 Geholfen – Ticker & Kalender</div>
-    <p>Nach jedem Antippen einer Kachel aktualisiert sich die <strong>„Zuletzt"-Liste</strong> am unteren Rand sofort – ohne Neuladen der Seite.</p>
-    <p>In der <strong>Übersicht</strong> (📊, nur für Admins) gibt es einen Kalender, der zeigt, wer in den letzten 10 oder 30 Tagen an welchem Tag geholfen hat. Mit den Buttons oben rechts kannst du zwischen den Zeiträumen wechseln.</p>
+  <div class="section" id="kapitel-5">
+    <div class="section-title">🙋 Geholfen – Heatmap, Verlauf & Statistik</div>
+    <p>Unter den Kacheln zeigt eine <strong>Heatmap</strong> für jedes Familienmitglied die letzten 10 Tage: grün, wenn an dem Tag geholfen wurde, sonst grau. Nach dem Antippen einer Kachel färbt sich das heutige Feld sofort ein – ohne Neuladen der Seite.</p>
+    <p>Die Liste der letzten Eintragungen findest du unter <strong>„📜 Zuletzt geholfen"</strong> im Menü (☰ oben rechts). Eltern können dort mit ✏️ Datum, Person und Hilfsleistung eines Eintrags nachträglich korrigieren oder den Eintrag löschen.</p>
+    <p>In der <strong>Statistik</strong> (📊, im Menü, nur für Admins) gibt es einen Kalender, der zeigt, wer in den letzten 10 oder 30 Tagen an welchem Tag geholfen hat. Mit den Buttons oben rechts kannst du zwischen den Zeiträumen wechseln.</p>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-6">
     <div class="section-title">🛒 Einkaufsliste</div>
     <p>Alle Familienmitglieder können gleichzeitig die Liste bearbeiten. Einträge lassen sich einer Kategorie zuordnen (Obst & Gemüse, Kühlregal usw.).</p>
     <ul class="steps">
       <li>
         <span class="step-icon">➕</span>
-        <div><strong>Hinzufügen:</strong> Name eingeben, Kategorie wählen, auf „+ Hinzufügen" tippen. Häufig genutzte Artikel werden als Vorschläge angezeigt.</div>
+        <div><strong>Hinzufügen:</strong> Name eingeben, Kategorie wählen, auf „+ Hinzufügen" tippen. Häufig genutzte Artikel werden als Vorschläge angezeigt. Kategorie, Angebot und Markt bleiben für den nächsten Eintrag markiert – praktisch, wenn mehrere ähnliche Dinge hintereinander eingetragen werden. Beim nächsten Öffnen der App ist wieder nichts markiert.</div>
       </li>
       <li>
         <span class="step-icon">✅</span>
-        <div><strong>Abhaken:</strong> Häkchen beim Artikel antippen. Erledigte Einträge bleiben noch eine Weile sichtbar und verschwinden dann automatisch.</div>
+        <div><strong>Abhaken:</strong> Häkchen beim Artikel antippen. Nach 5 Sekunden wandert der Eintrag zu „Erledigt" (ganz oben, neueste zuerst) – innerhalb dieser 5 Sekunden lässt sich das Abhaken noch zurücknehmen.</div>
+      </li>
+      <li>
+        <span class="step-icon">✏️</span>
+        <div><strong>Bearbeiten:</strong> Öffnet Name, Kategorie und Angebot zum Ändern in einem Panel – ein „Speichern" übernimmt alles auf einmal. Löschen ist ebenfalls dort zu finden.</div>
       </li>
       <li>
         <span class="step-icon">%</span>
         <div><strong>Angebot:</strong> Beim Hinzufügen „% Angebot" ankreuzen und einen Markt auswählen. Der Artikel wird dann mit einem Angebot-Badge markiert.</div>
       </li>
     </ul>
+    <div class="tip">🗂️ Admins finden „Kategorien verwalten" im Menü (☰) – dort lassen sich Kategorien anlegen, umbenennen und deaktivieren.</div>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-7">
     <div class="section-title">🙋 Geholfen – Für andere eintragen</div>
     <p>Eltern können in der Geholfen-App Einträge auch für andere Familienmitglieder machen. Dazu erscheint oben auf der Seite ein <strong>„Als wer?"</strong>-Selector.</p>
     <p>Einfach das richtige Familienmitglied antippen – alle folgenden Kachel-Taps werden dann für diese Person eingetragen.</p>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-8">
     <div class="section-title">🗂️ Apps sortieren &amp; gruppieren</div>
     <p>Auf der Startseite kannst du deine Apps selbst ordnen – und in Gruppen aufteilen.</p>
     <ul class="steps">
@@ -181,25 +241,76 @@
         <span class="step-icon">🔀</span>
         <div><strong>App in Gruppe ziehen:</strong> Einfach die Kachel auf den Gruppen-Bereich ziehen. „Allgemein" ist immer die letzte Gruppe.</div>
       </li>
+      <li>
+        <span class="step-icon">⠿</span>
+        <div><strong>Gruppen selbst umsortieren:</strong> Im Anpassen-Modus am ⠿-Symbol im Gruppen-Titel ziehen, um ganze Gruppen untereinander zu verschieben.</div>
+      </li>
     </ul>
     <div class="tip">💡 Die Reihenfolge wird für dich gespeichert und gilt auf allen Geräten.</div>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-9">
     <div class="section-title">🍲 Rezepte</div>
-    <p>Jedes Rezept hat einen Namen, eine Zutatenliste und eine Zubereitung. Beim Anlegen einfach jede Zutat in eine eigene Zeile schreiben.</p>
+    <p>Jedes Rezept hat einen Namen, optional die Portionenzahl, eine Zutatenliste und die Zubereitung als einzelne Schritte. Über „+ Neues Rezept" öffnet sich die Eingabemaske auf einer eigenen Seite – beim Anlegen einfach jede Zutat bzw. jeden Zubereitungsschritt in eine eigene Zeile schreiben.</p>
+    <p>🔍 Ab 3 Buchstaben im Suchfeld wird die Liste sofort gefiltert – gesucht wird sowohl im Rezeptnamen als auch in den Zutaten. Über die Chips "Kochen"/"Backen" lässt sich die Liste zusätzlich nach Kategorie filtern (im Formular beim Anlegen/Bearbeiten wählbar).</p>
+    <p><strong>🔗 Aus URL importieren:</strong> Link einer Rezeptseite einfügen – das Rezept wird automatisch erkannt (bei vielen Seiten direkt, sonst per KI) und landet vorausgefüllt im Formular zur Kontrolle, bevor es gespeichert wird. Jeder Nutzer hat dafür ein eigenes monatliches KI-Kontingent (im Admin-Bereich einstellbar) – ist es aufgebraucht, geht das manuelle Eintragen natürlich weiterhin. Der Link zur Originalseite bleibt gespeichert und erscheint unten auf der Rezeptseite als "Zum Originalrezept" – praktisch, wenn dort z. B. auch Nährwerte oder Fotos zu finden sind, die das Portal selbst nicht speichert.</p>
     <p><strong>🛒 Fehlt:</strong> Bei jeder Zutat im Rezept gibt es einen Knopf dafür – ein Tipp genügt, und die Zutat landet sofort auf der gemeinsamen Einkaufsliste.</p>
+    <p><strong>✏️ Bearbeiten:</strong> Auf der Rezept-Seite lässt sich jedes Rezept nachträglich anpassen – Name, Portionen, Zutaten und Zubereitung, im selben Formular wie beim Anlegen.</p>
+    <p><strong>⭐ Bewerten:</strong> Jeder kann jedes Rezept mit 1-5 Sternen bewerten (antippen genügt) und die eigene Bewertung jederzeit ändern. Portionen und Durchschnittsbewertung stehen gut sichtbar direkt über der Zutatenliste, die Durchschnittsbewertung außerdem schon in der Übersicht.</p>
+    <p><strong>Auf die Wunschliste:</strong> Bis zu 5 Rezepte gleichzeitig mit "Wünschen?" markieren, die bald mal wieder auf den Essensplan sollen – der Knopf zeigt "✓ Gewünscht", wenn du es markiert hast, und in Klammern, wie viele Personen sich das Rezept insgesamt wünschen. Über den Chip "📌 Gewünscht" in der Übersicht lässt sich die Liste auf die eigenen Wünsche eingrenzen. Sobald das Rezept auf dem Essensplan stand und der Tag vorbei ist, verschwindet die Markierung automatisch wieder.</p>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-10">
+    <div class="section-title">🍽️ Essensplan</div>
+    <p>Zeigt immer die aktuelle und die folgende Woche (mit eigenen Überschriften "Aktuelle Woche"/"Nächste Woche"), mit einem Mittag- und einem Abend-Feld pro Tag.</p>
+    <p>✏️ öffnet ein bestehendes Rezept zum Auswählen oder ein freies Textfeld – nur eins von beiden pro Feld. Beide leer lassen und speichern entfernt die Planung wieder.</p>
+    <p><strong>⠿ Verschieben:</strong> Ein Eintrag lässt sich per Ziehen auf ein beliebiges anderes Feld legen – anderer Tag, andere Mahlzeit (Mittag ↔ Abend) oder beides. Ist dort schon etwas geplant, werden beide Einträge einfach getauscht.</p>
+    <div class="tip">💡 Vergangene Tage werden zu einem Block zusammengefasst ("N vergangene Tage") – antippen klappt sie auf, die Tage selbst sind wie gewohnt grau dargestellt. Der heutige Tag ist mit deiner Profilfarbe umrandet.</div>
+  </div>
+
+  <div class="section" id="kapitel-11">
+    <div class="section-title">🗓️ Aufgabenplan</div>
+    <p>Oben lässt sich auswählen, wessen Plan gerade angezeigt wird – den eigenen oder den eines Geschwisters. Bearbeiten (✏️) geht nur beim eigenen Plan.</p>
+    <p>Im Bearbeiten-Modus einfach auf eine Aufgabe tippen, um sie diesem Wochentag zuzuweisen – nochmal tippen entfernt sie wieder.</p>
+    <p>Am heutigen Tag lässt sich jede zugewiesene Aufgabe direkt abhaken – das zählt automatisch als Eintrag in der Geholfen-App mit.</p>
+    <div class="tip">🔒 Ab 20 Uhr abends ist der Plan für den nächsten Tag gesperrt und kann nur noch von Eltern geändert werden.</div>
+  </div>
+
+  <div class="section" id="kapitel-12">
     <div class="section-title">🌙 Hell / Dunkel</div>
     <p>Mit dem <strong>🌙-Knopf</strong> im Menü (☰ oben rechts) wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
   </div>
 
-  <div class="section">
+  <div class="section" id="kapitel-13">
+    <div class="section-title">🏃 Sportschau</div>
+    <p>Zeigt Andis Trainings der letzten 10 Tage als Heatmap – eine Zeile pro Trainingsart (z. B. "Outdoor Ausführen", "Outdoor Spaziergang"), grün markiert der Tag, an dem trainiert wurde.</p>
+    <p>Die Daten kommen live von Andis hae-Server, es wird nichts im Portal gespeichert – ist der Server gerade nicht erreichbar, erscheint stattdessen ein Hinweis.</p>
+  </div>
+
+  <div class="section" id="kapitel-14">
+    <div class="section-title">🐾 Tierbaukasten</div>
+    <p>Ein eigener Assistent in drei Schritten: 1) Mensch oder Tier auswählen, 2) bei Tier zusätzlich die Tierart (Katze, Hund, Hase, Bär, Vogel oder Fisch), 3) anpassen. Der Pfeil unten rechts blättert weiter, der Pfeil links zurück.</p>
+    <p><strong>🐾 Tier:</strong> Farbe, ein Muster mit eigener Farbe (Streifen, Punkte oder Flecken, in allen Ansichten sichtbar), Körperbau (schlank bis kräftig) und beliebig viele Accessoires gleichzeitig (Hut, Schleife und/oder Brille kombinierbar). Mit ◀ ▶ lässt sich die Vorschau von vorne, von der Seite und von hinten ansehen.</p>
+    <p><strong>🧍 Mensch:</strong> Hautfarbe, Frisur, Haarfarbe, Augen, Augenbrauen, Mund, Bart, Kleidung samt Farbe und Accessoire (Brille) – deutlich detaillierter als bei den Tieren, da hier eine bewährte, extra dafür gemachte Zeichnungsbibliothek verwendet wird. Nur eine Ansicht (von vorne) verfügbar.</p>
+    <p>"Speichern" legt die Figur in der eigenen Galerie "Meine Figuren" ab – die sieht nur der jeweilige Nutzer selbst, keine gemeinsame Pinnwand. Mit ✕ lässt sich eine gespeicherte Figur wieder löschen.</p>
+  </div>
+
+  <div class="section" id="kapitel-15">
+    <div class="section-title">📚 Vokabeln</div>
+    <p>Jede Vokabel besteht aus dem fremdsprachigen Wort, der deutschen Übersetzung, einer Sprache und optional einem oder mehreren Kapiteln. Über "+ Vokabel eintragen" auf der Hauptseite öffnet sich das Formular – die zuletzt gewählte Sprache bleibt für die nächste Eingabe auf diesem Gerät automatisch ausgewählt, praktisch beim Eintragen mehrerer Vokabeln hintereinander.</p>
+    <p><strong>🌐 Sprachen:</strong> Im Menü einstellbar, welche Sprachen du nutzen möchtest (Standard: Englisch und Latein). Neue Sprachen kommen bei Bedarf per ✨-Wunsch dazu.</p>
+    <p><strong>🗂️ Kapitel:</strong> Ebenfalls im Menü – eigene Kapitel anlegen, umbenennen und deaktivieren, um Vokabeln zu gruppieren (z. B. nach Lektion). Eine Vokabel kann mehreren Kapiteln zugeordnet sein oder auch keinem.</p>
+    <p>✏️ öffnet ein Bearbeiten-Panel direkt in der Liste (Wort, Übersetzung, Sprache, Kapitel), dort auch "🗑️ Vokabel löschen". Die Suche über der Liste filtert sofort über fremdsprachiges Wort und Übersetzung.</p>
+    <p><strong>📖 Lernen:</strong> Erst Sprache und Kapitel (eins, mehrere oder "Alle") wählen, dann startet der Trainer: Er zeigt zufällig entweder das deutsche oder das fremdsprachige Wort, du tippst das Gegenstück ein. Richtig beantwortete Vokabeln kommen in dieser Runde nicht noch mal dran, falsch beantwortete etwas später erneut – bis alle einmal richtig saßen.</p>
+    <div class="tip">💡 Jeder Lerndurchgang wird als eigene Sitzung mit Start- und Endzeitpunkt gespeichert, ebenso jeder einzelne Versuch. "Training beenden" schließt die Sitzung sauber ab, genauso wie das Verlassen der Seite.</div>
+  </div>
+
+  <div class="section" id="kapitel-16">
     <div class="section-title">🔗 Link verloren oder ungültig?</div>
     <p>Kein Problem! Melde dich einfach bei Andi – er erstellt dir einen neuen Link und schickt ihn dir.</p>
   </div>
 
 </main>
+
+<button class="nach-oben-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Nach oben">↑</button>
 {% endblock %}

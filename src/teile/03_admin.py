@@ -6,7 +6,7 @@ import io
 import re
 import segno
 from flask import Blueprint, render_template, request, redirect, url_for, abort, Response
-from teile.kern import get_db, grant as check_grant, new_token
+from teile.kern import get_db, grant as check_grant, new_token, to_int
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -14,6 +14,11 @@ _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 def _clean_farbe(value, fallback="#4a90d9"):
     value = (value or "").strip()
     return value if _HEX_RE.match(value) else fallback
+
+
+def _clean_ki_limit(value, fallback=100000):
+    parsed = to_int(value)
+    return parsed if parsed is not None and parsed >= 0 else fallback
 
 bp = Blueprint("admin_app", __name__)
 APP = "admin"
@@ -68,12 +73,13 @@ def user_neu(token):
         rolle    = request.form.get("rolle", "gast")
         if rolle not in ("eltern", "kind", "gast"):
             rolle = "gast"
+        ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"))
         if not name:
             return redirect(url_for("admin_app.user_neu", token=token))
         db = get_db()
         uid = db.execute(
-            "INSERT INTO users(name,farbe,is_admin,rolle) VALUES(?,?,?,?) RETURNING id",
-            (name, farbe, is_admin, rolle),
+            "INSERT INTO users(name,farbe,is_admin,rolle,ki_token_limit) VALUES(?,?,?,?,?) RETURNING id",
+            (name, farbe, is_admin, rolle, ki_token_limit),
         ).fetchone()["id"]
         home_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
         db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
@@ -98,10 +104,11 @@ def user_bearbeiten(token, uid):
         rolle    = request.form.get("rolle", edit["rolle"] if edit["rolle"] else "gast")
         if rolle not in ("eltern", "kind", "gast"):
             rolle = "gast"
+        ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"), edit["ki_token_limit"])
         if uid == user["id"]:
             is_admin = 1
-        db.execute("UPDATE users SET name=?,farbe=?,is_admin=?,rolle=? WHERE id=?",
-                   (name, farbe, is_admin, rolle, uid))
+        db.execute("UPDATE users SET name=?,farbe=?,is_admin=?,rolle=?,ki_token_limit=? WHERE id=?",
+                   (name, farbe, is_admin, rolle, ki_token_limit, uid))
         db.commit()
         return redirect(url_for("admin_app.index", token=token))
     return render_template("admin_user_form.html",

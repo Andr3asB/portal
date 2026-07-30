@@ -170,7 +170,7 @@ def cmd_listusers(_):
 def cmd_listwuensche(_):
     db = connect()
     rows = db.execute("""
-        SELECT w.id, w.text, w.app_slug, w.erstellt, w.erledigt, u.name
+        SELECT w.id, w.text, w.app_slug, w.ansicht, w.erstellt, w.erledigt, u.name
         FROM   wuensche w LEFT JOIN users u ON u.id = w.user_id
         ORDER  BY w.erstellt DESC
     """).fetchall()
@@ -178,7 +178,8 @@ def cmd_listwuensche(_):
     for r in rows:
         status = "✅" if r["erledigt"] else "⏳"
         who = r["name"] or "anonym"
-        app = f" [{r['app_slug']}]" if r["app_slug"] else ""
+        ort = r["ansicht"] or r["app_slug"]
+        app = f" [{ort}]" if ort else ""
         print(f"  {status} #{r['id']} {r['erstellt'][:16]}{app} {who}: {r['text']}")
 
 
@@ -202,7 +203,9 @@ def cmd_wunsch_erledigt(args):
     if not args:
         sys.exit("Verwendung: wunsch_erledigt <id>")
     db = connect()
-    db.execute("UPDATE wuensche SET erledigt=1 WHERE id=?", (int(args[0]),))
+    db.execute(
+        "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP WHERE id=?", (int(args[0]),)
+    )
     db.commit()
     db.close()
     print(f"Wunsch #{args[0]} als erledigt markiert.")
@@ -213,11 +216,12 @@ def cmd_backlog(_):
     db = connect()
     print("=== Offene Wünsche (✨) ===")
     for r in db.execute("""
-        SELECT w.id, w.text, w.app_slug, w.erstellt, u.name
+        SELECT w.id, w.text, w.app_slug, w.ansicht, w.erstellt, u.name
         FROM wuensche w LEFT JOIN users u ON u.id = w.user_id
         WHERE w.erledigt=0 ORDER BY w.erstellt
     """).fetchall():
-        app = f"[{r['app_slug']}] " if r["app_slug"] else ""
+        ort = r["ansicht"] or r["app_slug"]
+        app = f"[{ort}] " if ort else ""
         who = r["name"] or "anonym"
         print(f"  #{r['id']} {r['erstellt'][:10]} {app}{who}: {r['text']}")
     print()

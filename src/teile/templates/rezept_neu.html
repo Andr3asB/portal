@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% set app_slug = "rezepte" %}
+{% block title %}{% if bearbeiten %}Rezept bearbeiten{% else %}Neues Rezept{% endif %}{% endblock %}
+
+{% block extra_styles %}
+.add-card {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:12px 0 6px;
+}
+.field-label:first-child { margin-top:0; }
+.rezept-input, .rezept-textarea {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text); resize:vertical;
+}
+.rezept-input:focus, .rezept-textarea:focus { border-color:var(--farbe); }
+.btn-add {
+  background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
+  width:100%; margin-top:14px;
+}
+.import-hinweis {
+  background:var(--surface-2); border-radius:10px; padding:10px 12px;
+  font-size:13px; color:var(--text-2); margin-bottom:12px;
+}
+.kategorie-row { display:flex; gap:8px; flex-wrap:wrap; }
+.chip-btn {
+  background:var(--surface-2); border:1.5px solid transparent; border-radius:20px;
+  padding:7px 14px; font-size:14px; color:var(--text); cursor:pointer;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="{% if bearbeiten %}/a/rezepte/{{ token }}/{{ bearbeiten }}{% else %}/a/rezepte/{{ token }}/{% endif %}" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">{% if bearbeiten %}✏️ Rezept bearbeiten{% else %}🍲 Neues Rezept{% endif %}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if vorbelegt and not bearbeiten %}
+  <div class="import-hinweis">🔗 Aus einer Webseite vorausgefüllt – bitte vor dem Speichern prüfen.</div>
+  {% endif %}
+
+  <div class="add-card">
+    <form method="post" action="{% if bearbeiten %}/a/rezepte/{{ token }}/{{ bearbeiten }}/bearbeiten{% else %}/a/rezepte/{{ token }}/neu{% endif %}">
+      <div class="field-label">Name</div>
+      <input class="rezept-input" type="text" name="name"
+             value="{{ vorbelegt.name if vorbelegt else '' }}"
+             placeholder="z. B. Spaghetti Bolognese" required autocomplete="off" autofocus>
+
+      <div class="field-label">Portionen</div>
+      <input class="rezept-input" type="text" name="portionen"
+             value="{{ vorbelegt.portionen if vorbelegt and vorbelegt.portionen else '' }}"
+             placeholder="z. B. 4">
+
+      <div class="field-label">Kategorie</div>
+      <div class="kategorie-row" id="kategorie-row">
+        <button type="button" class="chip-btn{% if not (vorbelegt and vorbelegt.kategorie) %} active{% endif %}" data-value="">Keine</button>
+        {% for wert, label in kategorien.items() %}
+        <button type="button" class="chip-btn{% if vorbelegt and vorbelegt.kategorie == wert %} active{% endif %}" data-value="{{ wert }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="kategorie" id="kategorie-hidden" value="{{ vorbelegt.kategorie if vorbelegt and vorbelegt.kategorie else '' }}">
+      <input type="hidden" name="quelle_url" value="{{ vorbelegt.quelle_url if vorbelegt and vorbelegt.quelle_url else '' }}">
+
+      <div class="field-label">Zutaten (eine pro Zeile)</div>
+      <textarea class="rezept-textarea" name="zutaten" rows="4"
+                placeholder="500g Hackfleisch
+1 Zwiebel
+1 Dose Tomaten">{{ vorbelegt.zutaten|join('\n') if vorbelegt else '' }}</textarea>
+
+      <div class="field-label">Zubereitung (ein Schritt pro Zeile)</div>
+      <textarea class="rezept-textarea" name="anleitung" rows="5"
+                placeholder="Schritt für Schritt, wie es gemacht wird…">{{ vorbelegt.schritte|join('\n') if vorbelegt else '' }}</textarea>
+
+      <button class="btn-add" type="submit">{% if bearbeiten %}Änderungen speichern{% else %}+ Rezept speichern{% endif %}</button>
+    </form>
+  </div>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('kategorie-row').querySelectorAll('.chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#kategorie-row .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('kategorie-hidden').value = btn.dataset.value;
+  });
+});
+</script>
+{% endblock %}

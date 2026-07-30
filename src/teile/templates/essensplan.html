@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% set app_slug = "essensplan" %}
+{% block title %}Essensplan{% endblock %}
+
+{% block extra_styles %}
+.woche-header {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:4px 0 10px;
+}
+.woche-header.naechste { margin-top:28px; }
+
+.vergangene-block { margin-bottom:8px; }
+.vergangene-block summary {
+  cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px;
+  background:var(--surface); border-radius:14px; padding:12px 16px;
+  font-size:13px; font-weight:600; color:var(--text-2);
+  box-shadow:0 1px 3px var(--shadow);
+}
+.vergangene-block summary::-webkit-details-marker { display:none; }
+.vergangene-block summary::before { content:'▸'; display:inline-block; transition:transform .15s; }
+.vergangene-block[open] summary::before { transform:rotate(90deg); }
+.vergangene-block[open] summary { margin-bottom:8px; }
+.vergangene-block .tag-card:last-child { margin-bottom:8px; }
+
+.tag-card {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.tag-card.heute { box-shadow:0 0 0 2px var(--farbe), 0 1px 3px var(--shadow); }
+.tag-card.vergangen { opacity:.45; }
+.tag-header { display:flex; align-items:baseline; gap:8px; margin-bottom:8px; }
+.tag-name { font-size:15px; font-weight:700; }
+.tag-datum { font-size:12px; color:var(--text-2); }
+
+.mahlzeit-slot {
+  padding:8px 0; border-top:1px solid var(--surface-2);
+}
+.mahlzeit-slot:first-of-type { border-top:none; padding-top:0; }
+.mahlzeit-slot.drop-target { background:var(--surface-2); border-radius:8px; }
+.mahlzeit-kopf { display:flex; align-items:center; gap:8px; }
+.mahlzeit-label {
+  font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; flex:1;
+}
+.mahlzeit-drag-handle { font-size:15px; color:var(--text-2); cursor:grab; touch-action:none; }
+.mahlzeit-drag-handle:active { cursor:grabbing; }
+.mahlzeit-edit-toggle {
+  background:none; border:none; font-size:15px; cursor:pointer; color:var(--text-2);
+}
+.mahlzeit-inhalt { margin-top:4px; font-size:15px; color:var(--text); }
+.tag-leer { color:var(--text-2); font-size:14px; font-style:italic; }
+
+.tag-edit-panel {
+  display:none; flex-direction:column; gap:8px; margin-top:8px;
+  padding-top:8px; border-top:1px solid var(--border);
+}
+.tag-edit-panel form { display:flex; flex-direction:column; gap:10px; }
+.tag-select, .tag-input {
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:14px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text); width:100%;
+}
+.tag-select:focus, .tag-input:focus { border-color:var(--farbe); }
+.tag-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:12px 14px; font-size:14px; font-weight:600; cursor:pointer;
+  width:100%; margin-top:6px;
+}
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🍽️ Essensplan</div>
+<div class="nav-sub">{{ tage[0].datum.strftime('%d.%m.') }} – {{ tage[-1].datum.strftime('%d.%m.%Y') }}</div>
+{% endblock %}
+
+{% macro tag_karte(tag, token, rezepte, mahlzeiten, mahlzeit_labels) %}
+    <div class="tag-card {{ tag.status }}">
+      <div class="tag-header">
+        <span class="tag-name">{{ tag.wochentag_name }}</span>
+        <span class="tag-datum">{{ tag.datum.strftime('%d.%m.') }}</span>
+      </div>
+
+      {% for mahlzeit in mahlzeiten %}
+        {% set eintrag = tag.eintraege.get(mahlzeit) %}
+        {% set slot_id = tag.iso ~ '_' ~ mahlzeit %}
+        <div class="mahlzeit-slot" data-tag="{{ tag.iso }}" data-mahlzeit="{{ mahlzeit }}">
+          <div class="mahlzeit-kopf">
+            <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
+            {% if eintrag %}<span class="mahlzeit-drag-handle" title="Verschieben">⠿</span>{% endif %}
+            <button class="mahlzeit-edit-toggle" type="button" onclick="toggleTag('{{ slot_id }}')" title="Bearbeiten">✏️</button>
+          </div>
+          <div class="mahlzeit-inhalt">
+            {% if eintrag and eintrag.rezept_name %}
+              🍲 {{ eintrag.rezept_name }}
+            {% elif eintrag and eintrag.text %}
+              {{ eintrag.text }}
+            {% else %}
+              <span class="tag-leer">–</span>
+            {% endif %}
+          </div>
+
+          <div class="tag-edit-panel" id="tag-edit-{{ slot_id }}">
+            <form method="post" action="/a/essensplan/{{ token }}/eintrag">
+              <input type="hidden" name="tag" value="{{ tag.iso }}">
+              <input type="hidden" name="mahlzeit" value="{{ mahlzeit }}">
+              <select class="tag-select" name="rezept_id">
+                <option value="">– Kein Rezept –</option>
+                {% for r in rezepte %}
+                <option value="{{ r.id }}" {% if eintrag and eintrag.rezept_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                {% endfor %}
+              </select>
+              <input class="tag-input" type="text" name="text" placeholder="…oder frei eintragen"
+                     value="{{ eintrag.text if eintrag and not eintrag.rezept_id else '' }}">
+              <button type="submit" class="tag-save">Speichern</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+{% endmacro %}
+
+{% block body %}
+<main class="main">
+
+  <div class="woche-header">Aktuelle Woche</div>
+  {% if vergangene_tage %}
+  <details class="vergangene-block">
+    <summary>{{ vergangene_tage|length }} {{ 'vergangener Tag' if vergangene_tage|length == 1 else 'vergangene Tage' }}</summary>
+    {% for tag in vergangene_tage %}{{ tag_karte(tag, token, rezepte, mahlzeiten, mahlzeit_labels) }}{% endfor %}
+  </details>
+  {% endif %}
+  {% for tag in aktuelle_rest %}{{ tag_karte(tag, token, rezepte, mahlzeiten, mahlzeit_labels) }}{% endfor %}
+
+  <div class="woche-header naechste">Nächste Woche</div>
+  {% for tag in naechste_woche %}{{ tag_karte(tag, token, rezepte, mahlzeiten, mahlzeit_labels) }}{% endfor %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TOKEN = '{{ token }}';
+
+function toggleTag(slotId) {
+  const p = document.getElementById('tag-edit-' + slotId);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// Rezept und Freitext schliessen sich gegenseitig aus.
+document.querySelectorAll('.tag-edit-panel form').forEach(form => {
+  const select = form.querySelector('.tag-select');
+  const input  = form.querySelector('.tag-input');
+  select.addEventListener('change', () => { if (select.value) input.value = ''; });
+  input.addEventListener('input',  () => { if (input.value)  select.value = ''; });
+});
+
+// Drag & Drop: Eintrag auf einen beliebigen anderen Mahlzeit-Slot ziehen –
+// anderer Tag, andere Mahlzeit oder beides (Wunsch #35). Pointer Events statt
+// HTML5-DnD, damit es auch auf dem Handy funktioniert (HTML5-Drag-Events
+// feuern auf Touch nicht zuverlässig).
+let mzDrag = null;
+
+function initMahlzeitDrag(handle) {
+  handle.addEventListener('pointerdown', onMzDown);
+}
+
+function onMzDown(e) {
+  if (e.button && e.button !== 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const slot   = handle.closest('.mahlzeit-slot');
+  if (!slot) return;
+  handle.setPointerCapture(e.pointerId);
+  mzDrag = { slot, handle, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, started: false, ghost: null };
+  handle.addEventListener('pointermove', onMzMove);
+  handle.addEventListener('pointerup',   onMzUp);
+  handle.addEventListener('pointercancel', onMzCancel);
+}
+
+function onMzMove(e) {
+  if (!mzDrag || mzDrag.handle !== e.currentTarget) return;
+  const dx = e.clientX - mzDrag.startX;
+  const dy = e.clientY - mzDrag.startY;
+  if (!mzDrag.started && Math.hypot(dx, dy) > 8) {
+    mzDrag.started = true;
+    beginMzDrag(e);
+  }
+  if (mzDrag.started) continueMzDrag(e);
+}
+
+function onMzUp(e) {
+  if (!mzDrag || mzDrag.handle !== e.currentTarget) return;
+  removeMzListeners(mzDrag.handle);
+  if (mzDrag.started) finishMzDrag(e);
+  mzDrag = null;
+}
+
+function onMzCancel(e) {
+  if (!mzDrag || mzDrag.handle !== e.currentTarget) return;
+  removeMzListeners(mzDrag.handle);
+  cancelMzDrag();
+  mzDrag = null;
+}
+
+function removeMzListeners(handle) {
+  handle.removeEventListener('pointermove', onMzMove);
+  handle.removeEventListener('pointerup',   onMzUp);
+  handle.removeEventListener('pointercancel', onMzCancel);
+}
+
+function beginMzDrag(e) {
+  const { slot } = mzDrag;
+  const rect = slot.getBoundingClientRect();
+  const ghost = slot.cloneNode(true);
+  ghost.style.cssText = [
+    'position:fixed', 'z-index:1000', 'pointer-events:none',
+    `width:${rect.width}px`, `left:${rect.left}px`, `top:${rect.top}px`,
+    'opacity:.92', 'box-shadow:0 12px 30px rgba(0,0,0,.25)',
+    'background:var(--surface)', 'border-radius:10px', 'padding:6px 0',
+  ].join(';');
+  document.body.appendChild(ghost);
+  mzDrag.ghost   = ghost;
+  mzDrag.offsetX = e.clientX - rect.left;
+  mzDrag.offsetY = e.clientY - rect.top;
+  slot.style.opacity = '.3';
+}
+
+function continueMzDrag(e) {
+  const { ghost, offsetX, offsetY, slot } = mzDrag;
+  ghost.style.left = `${e.clientX - offsetX}px`;
+  ghost.style.top  = `${e.clientY - offsetY}px`;
+
+  document.querySelectorAll('.mahlzeit-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
+  ghost.style.visibility = 'hidden';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  ghost.style.visibility = '';
+  const targetSlot = under && under.closest('.mahlzeit-slot');
+  if (targetSlot && targetSlot !== slot) {
+    targetSlot.classList.add('drop-target');
+  }
+}
+
+async function finishMzDrag(e) {
+  const { slot, ghost } = mzDrag;
+  ghost.style.visibility = 'hidden';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  ghost.remove();
+  slot.style.opacity = '';
+  document.querySelectorAll('.mahlzeit-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
+
+  const targetSlot = under && under.closest('.mahlzeit-slot');
+  if (targetSlot && targetSlot !== slot) {
+    try {
+      const resp = await fetch(`/a/essensplan/${TOKEN}/verschieben`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          von_tag: slot.dataset.tag, von_mahlzeit: slot.dataset.mahlzeit,
+          nach_tag: targetSlot.dataset.tag, nach_mahlzeit: targetSlot.dataset.mahlzeit,
+        }),
+      });
+      const d = await resp.json();
+      if (d.ok) { location.reload(); }
+    } catch (err) { console.warn('verschieben failed', err); }
+  }
+}
+
+function cancelMzDrag() {
+  if (!mzDrag || !mzDrag.started) return;
+  mzDrag.ghost?.remove();
+  mzDrag.slot.style.opacity = '';
+}
+
+document.querySelectorAll('.mahlzeit-drag-handle').forEach(initMahlzeitDrag);
+</script>
+{% endblock %}
