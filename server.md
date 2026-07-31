@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v76: Wunsch #86 mehrere Märkte pro Angebot, Wunsch #87 Filtern + Einkaufsmodus – komplett)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v78: Wunsch #88 Fix Sportschau-Mitternachtsfalle bei "heute")*
 
 ## Host
 
@@ -273,8 +273,12 @@ teile/
                        journal.md 2026-07-30), stündliche Schritt-Buckets
                        werden Tagen zugeordnet und per Zeitüberlappung mit
                        Workout-Fenstern in Trainings-/Sonstige-Schritte
-                       aufgeteilt (Näherung auf Stundenbasis). Nur Andi
-                       granted (persönliche Fitnessdaten)
+                       aufgeteilt (Näherung auf Stundenbasis). `_hae_workouts`
+                       schlägt end_date einen Tag auf, bevor die Anfrage raus
+                       geht (Wunsch #88, siehe Bekannte Issues - hae-Server
+                       parst ein bare-date endDate als Mitternacht, "heute"
+                       wäre sonst immer ausgeschlossen). Nur Andi granted
+                       (persönliche Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
                        Wunsch #66): Kategorie Mensch/Tier (tier_typ='mensch'
@@ -610,6 +614,24 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
 ## Bekannte Issues
+
+- **hae-Server parst ein bare-date `endDate` als Mitternacht UTC jenes
+  Tages, nicht als Ende des Tages.** Betraf Wunsch #88 (v78-Fix,
+  Sportschau): `_hae_workouts()` (`14_sportschau.py`) schickte
+  `endDate=heute.isoformat()` (z. B. "2026-07-31", ohne Uhrzeit) - der
+  hae-Server parst das zu `2026-07-31T00:00:00.000Z` (per eigener
+  Server-Log-Zeile bestätigt) und schließt damit JEDES Training aus, das
+  nach Mitternacht am aktuellen Tag beginnt. Kein Rand-/Sonderfall,
+  sondern strukturell: "heute" wäre ohne Fix jeden Tag aufs Neue nie
+  sichtbar gewesen. Fix: `end_date` bekommt einen Tag aufgeschlagen, bevor
+  die Anfrage rausgeht - ein dadurch zusätzlich mitgeholter "morgen"-Tag
+  ist unschädlich, da `sportschau.html` nur über die feste `tage`-Liste
+  iteriert, die nie über heute hinausreicht. **Gilt allgemein: bei jeder
+  Integration mit dem hae-Server (oder ähnlichen Fremd-APIs) ein bare-date
+  als oberes Zeitfenster-Ende vermeiden** - entweder mit Uhrzeit
+  (`T23:59:59`) oder auf den nächsten Tag aufrunden. Die Schritte-Abfrage
+  (`_hae_steps`) hat dieses Problem nicht, da sie von vornherein exakte
+  Unix-Millisekunden statt eines Datums verwendet.
 
 - **SVG `<use href="#id">`/`clipPath` gegen eine nicht existierende ID
   resolved zu einem leeren Clip-Bereich, ohne Fehler.** Betraf Wunsch #83

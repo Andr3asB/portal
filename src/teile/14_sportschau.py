@@ -55,14 +55,24 @@ def _art_anzeige(roh):
 
 
 def _hae_workouts(start_date, end_date):
-    """Ruft Trainings im Zeitraum ab. None bei Konfigurations-/Netzwerkfehler."""
+    """Ruft Trainings im Zeitraum ab. None bei Konfigurations-/Netzwerkfehler.
+
+    Wunsch #88: end_date bekommt einen Tag aufgeschlagen, bevor er an den
+    hae-Server geht. Der parst ein bare-date endDate als Mitternacht
+    (00:00 UTC) jenes Tages - endDate=heute hätte also JEDES Training des
+    laufenden Tages ausgeschlossen (start_time > Mitternacht), nicht nur
+    an Randfällen, sondern grundsätzlich jeden Tag aufs Neue. Live per
+    hae-Server-eigenen Logs bestätigt (Server loggt das geparste Start/Ende
+    als vollen ISO-Zeitstempel). Ein zusätzlich geholter "morgen"-Tag ist
+    unschädlich, da das Template nur über `tage` iteriert und das nie über
+    heute hinausreicht."""
     url = current_app.config.get("HAE_API_URL", "")
     key = current_app.config.get("HAE_API_KEY", "")
     if not url or not key:
         return None
     query = urllib.parse.urlencode({
         "startDate": start_date.isoformat(),
-        "endDate":   end_date.isoformat(),
+        "endDate":   (end_date + timedelta(days=1)).isoformat(),
     })
     req = urllib.request.Request(
         f"{url}?{query}",

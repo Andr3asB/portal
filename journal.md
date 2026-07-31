@@ -2,6 +2,56 @@
 
 ---
 
+## 2026-07-31 – portal-v78: Wunsch #88 – Fix Sportschau zeigt "heute" nie an
+
+Andi: "Es ist der 31. Juli 20:24 Uhr, ich habe heute bereits ein Training
+auf den Server übertragen und circa 9000 Schritte gelaufen und ebenfalls
+übertragen. Aber die Daten werden nicht in der Grafik angezeigt."
+
+### Root Cause (per hae-Server-eigenen Logs bestätigt)
+
+`_hae_workouts()` schickte `endDate=heute.isoformat()` als bare Datum
+(z. B. "2026-07-31", ohne Uhrzeit). Der hae-Server parst das offenbar als
+Mitternacht UTC jenes Tages – bestätigt durch eine eigene Log-Zeile des
+hae-Servers, die das geparste Start/Ende als vollen Zeitstempel ausgibt:
+`2026-07-31T00:00:00.000Z` für ein übergebenes `endDate=2026-07-31`.
+Ergebnis: JEDES Training, das nach Mitternacht am aktuellen Tag beginnt,
+fällt aus dem Zeitfenster – nicht nur ein Rand-/Sonderfall, sondern ein
+strukturelles Problem, das "heute" grundsätzlich jeden Tag aufs Neue
+ausschließt.
+
+**Fix:** `_hae_workouts()` schlägt jetzt einen Tag auf `end_date` auf,
+bevor die Anfrage rausgeht. Ein dadurch zusätzlich mitgeholter "morgen"-Tag
+ist unschädlich, da das Template nur über die feste `tage`-Liste iteriert,
+die nie über "heute" hinausreicht (geprüft: `sportschau.html` rendert
+Zellen ausschließlich für `tag in tage`).
+
+Live gegen die echte hae-Server-API verifiziert: mit `endDate=heute+1`
+liefert die gleiche Anfrage weiterhin korrekt die erwarteten 10 Trainings
+zurück (kein Regressions-Bruch), und würde ein Training von heute jetzt
+tatsächlich mitnehmen, sobald es ankommt.
+
+### Ein zweiter, getrennter Befund: heutige Daten fehlen noch komplett beim hae-Server
+
+Direkte Testabfragen mit einem sehr weiten `endDate`/`to` (bis weit in die
+Zukunft, 2026-08-15) zeigen: weder ein Training noch Schritte vom 31. Juli
+sind über die API überhaupt abrufbar – der letzte Datenpunkt (Training wie
+Schritte) stammt vom 30. Juli, ca. 20:00 UTC / 22:00 Uhr Ortszeit. Das ist
+**kein Portal-Bug** (die Schritte-Abfrage nutzt ohnehin schon exakte
+Unix-Millisekunden statt eines bare Datums, hat also die Mitternacht-Falle
+gar nicht) – die Daten von heute sind schlicht noch nicht beim hae-Server
+angekommen (Sync von Andis Handy/Uhr offenbar noch nicht durchgelaufen,
+trotz gegenteiliger Annahme). Sobald der Sync nachzieht, sollte die Grafik
+dank des obigen Fixes korrekt reagieren – falls nicht: dann läge das
+Problem auf der hae-Server-Seite selbst (geteilte Infrastruktur, siehe
+`bauplan.md` Abschnitt 0), nicht im Portal-Code.
+
+### Auslieferungspaket
+
+`deploy/portal-v78.tar.gz`
+
+---
+
 ## 2026-07-31 – portal-v76: Wunsch #87 Teil 2 (Einkaufsmodus)
 
 Rückfrage an Andi zu "Einkauf starten" beantwortet: **Einkaufsmodus mit
