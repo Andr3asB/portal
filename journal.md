@@ -2,6 +2,58 @@
 
 ---
 
+## 2026-07-31 – portal-v73/v74: Wunsch #86 (mehrere Märkte pro Angebot) + #87 Filtern (Teil 1)
+
+### Wunsch #86 – mehrere Märkte gleichzeitig im Angebot
+
+Bisher war `einkauf_eintraege.laden_id` ein einzelner Markt. Neue n:m-Tabelle
+`einkauf_eintrag_laeden(eintrag_id, laden_id)`, Migration übernimmt bestehende
+Einzelwerte einmalig und idempotent (`INSERT OR IGNORE ... SELECT id, laden_id
+FROM einkauf_eintraege WHERE laden_id IS NOT NULL`). `laden_id` bleibt als
+totes Altfeld liegen (SQLite kann Spalten nicht gefahrlos droppen, gleiche
+Begründung wie bei `rezepte.anleitung`) – neuer Code liest/schreibt nur noch
+die Join-Tabelle.
+
+`_clean_angebot` wurde zu `_clean_angebot_laeden` (validiert eine Liste statt
+eines einzelnen Werts). Formular: Markt-Chips im Neu-Formular und im
+Bearbeiten-Panel toggeln jetzt unabhängig voneinander (statt sich gegenseitig
+auszuschliessen wie bei der Kategorie), Auswahl landet als kommagetrennte
+Liste in einem versteckten `laden_ids`-Feld. Badge zeigt alle Märkte
+(„% Edeka, Rewe").
+
+**Verifiziert:** Migration lief sauber (bestehende echte Daten wie
+„Dosentomaten" bei Netto 1:1 übernommen). Per `javascript_tool` gegen die
+echte Seite: Artikel mit zwei Märkten anlegen, Badge zeigt beide; im
+Bearbeiten-Panel einen Markt entfernen und einen anderen hinzufügen,
+Badge aktualisiert korrekt; echtes Löschen über den App-eigenen Button
+kaskadiert die Join-Tabelle sauber (`PRAGMA foreign_keys=ON`, von `get_db()`/
+`new_db()` gesetzt – ein manueller Raw-SQL-Test ohne dieses Pragma hinterliess
+zunächst verwaiste Zeilen, das war ein Artefakt des Testaufbaus, kein
+App-Bug, danach manuell bereinigt).
+
+### Wunsch #87 (Teil 1) – Filtern nach Markt/Angebot
+
+Neben „+ Neu" jetzt auch „🔍 Filtern": öffnet ein Panel mit „% Nur Angebote"-
+Chip und Markt-Mehrfachauswahl. Rein clientseitig (die komplette Liste ist
+ohnehin schon gerendert) über `data-angebot`/`data-laeden`-Attribute an jeder
+Artikelkarte, kein Server-Roundtrip, kein sessionStorage (setzt sich bei
+jedem Neuladen zurück, wie die Vokabel-Suche). Kategorie-Überschriften
+verschwinden mit, wenn kein offener Artikel der Kategorie mehr sichtbar ist;
+"Kein Artikel passt zum Filter" erscheint bei leerem Ergebnis.
+
+**"Einkauf starten" (zweiter Teil von #87) ist noch offen** – der Wunsch-Text
+lässt mehrere sehr unterschiedliche Interpretationen zu (reiner Filter-
+Shortcut vs. eigener "Einkaufsmodus" mit größeren Tap-Zielen vs. etwas
+anderes), deshalb erst Rückfrage an Andi, bevor da etwas Falsches gebaut
+wird (siehe `bauplan.md`/`CLAUDE.md`: "Im Zweifel fragen – vorher, nicht
+hinterher").
+
+### Auslieferungspaket
+
+`deploy/portal-v73.tar.gz` (#86) → `v74.tar.gz` (#87 Filtern)
+
+---
+
 ## 2026-07-31 – portal-v71/v72: Wunsch #85 (Einkauf: Formular bleibt offen)
 
 Andi: "Wenn man die App öffnet, dann soll neben der Liste nur ein Neu

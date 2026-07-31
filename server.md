@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v72: Wunsch #85 Einkauf-Formular bleibt offen für mehrere Einträge nacheinander)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v74: Wunsch #86 mehrere Märkte pro Angebot, Wunsch #87 Teil 1 Filtern-Knopf – "Einkauf starten" noch offen)*
 
 ## Host
 
@@ -200,7 +200,17 @@ teile/
                        gleiches Pointer-Events-Muster wie home_gruppen). Eintragen-
                        Formular standardmässig eingeklappt hinter einem "+ Neu"-Knopf,
                        bleibt nach dem Oeffnen ueber mehrere Eintraege/Reloads offen
-                       (sessionStorage-Flag `einkauf_formular_offen`, Wunsch #85)
+                       (sessionStorage-Flag `einkauf_formular_offen`, Wunsch #85).
+                       Angebot kann mehrere Maerkte gleichzeitig haben (Wunsch #86):
+                       n:m-Tabelle einkauf_eintrag_laeden statt des alten einzelnen
+                       laden_id-Felds (bleibt als totes Altfeld liegen); Markt-Chips
+                       toggeln unabhaengig, Auswahl als kommagetrennte laden_ids im
+                       Formular. "Filtern"-Knopf (Wunsch #87 Teil 1) neben "+ Neu":
+                       clientseitiger Filter nach Markt und/oder "Nur Angebote" ueber
+                       data-angebot/data-laeden an jeder Artikelkarte, kein Server-
+                       Roundtrip, setzt sich bei jedem Reload zurueck. "Einkauf
+                       starten" (Wunsch #87 Teil 2) noch offen, siehe journal.md
+                       2026-07-31 - Rueckfrage an Andi noetig vor der Umsetzung
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,

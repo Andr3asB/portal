@@ -32,14 +32,28 @@ def _clean_kategorie_id(db, kategorie_id):
     return row["id"] if row else kategorie_id
 
 
-def _clean_angebot(db, angebot, laden_id):
+def _clean_angebot_laeden(db, angebot, laden_ids):
     """Nur eine gültige Kombination durchlassen – sonst konsequent beides aus,
-    statt einer Markierung ohne Markt (führte früher zu kaputten Zwischenzuständen)."""
-    if angebot and laden_id is not None and db.execute(
-        "SELECT 1 FROM einkauf_laeden WHERE id=?", (laden_id,)
-    ).fetchone():
-        return 1, laden_id
-    return 0, None
+    statt einer Markierung ohne Markt (führte früher zu kaputten Zwischenzuständen).
+    Wunsch #86: mehrere Märkte gleichzeitig möglich, statt nur einem."""
+    if not angebot:
+        return 0, []
+    gueltige = [lid for lid in laden_ids if db.execute(
+        "SELECT 1 FROM einkauf_laeden WHERE id=?", (lid,)
+    ).fetchone()]
+    if not gueltige:
+        return 0, []
+    return 1, gueltige
+
+
+def _laden_ids_aus_form(form):
+    roh = form.get("laden_ids", "")
+    ids = []
+    for teil in roh.split(","):
+        lid = to_int(teil.strip())
+        if lid is not None and lid not in ids:
+            ids.append(lid)
+    return ids
 
 
 @bp.route("/a/einkauf/<token>/")
@@ -57,11 +71,14 @@ def index(token):
 
     # Offen: nach Kategorie gruppiert (Reihenfolge der Kategorien-Tabelle), innerhalb alphabetisch.
     offene = db.execute("""
-        SELECT e.id, e.name, e.kategorie_id, e.angebot, e.laden_id, e.erledigt,
-               e.erledigt_am, l.name AS laden_name
+        SELECT e.id, e.name, e.kategorie_id, e.angebot, e.erledigt, e.erledigt_am,
+               GROUP_CONCAT(l.name, ', ') AS laden_namen,
+               GROUP_CONCAT(l.id, ',') AS laden_ids
         FROM   einkauf_eintraege e
-        LEFT JOIN einkauf_laeden l ON l.id = e.laden_id
+        LEFT JOIN einkauf_eintrag_laeden el ON el.eintrag_id = e.id
+        LEFT JOIN einkauf_laeden l ON l.id = el.laden_id
         WHERE  e.erledigt = 0
+        GROUP  BY e.id
         ORDER  BY e.name COLLATE NOCASE ASC
     """).fetchall()
     gruppen  = {k["id"]: [] for k in kategorien}
@@ -74,11 +91,14 @@ def index(token):
 
     # Erledigt: zuletzt abgehakt zuerst.
     erledigt = db.execute("""
-        SELECT e.id, e.name, e.kategorie_id, e.angebot, e.laden_id, e.erledigt,
-               e.erledigt_am, l.name AS laden_name
+        SELECT e.id, e.name, e.kategorie_id, e.angebot, e.erledigt, e.erledigt_am,
+               GROUP_CONCAT(l.name, ', ') AS laden_namen,
+               GROUP_CONCAT(l.id, ',') AS laden_ids
         FROM   einkauf_eintraege e
-        LEFT JOIN einkauf_laeden l ON l.id = e.laden_id
+        LEFT JOIN einkauf_eintrag_laeden el ON el.eintrag_id = e.id
+        LEFT JOIN einkauf_laeden l ON l.id = el.laden_id
         WHERE  e.erledigt = 1 AND e.erledigt_am >= datetime('now', '-6 hours')
+        GROUP  BY e.id
         ORDER  BY e.erledigt_am DESC
     """).fetchall()
     return render_template("einkauf.html",
@@ -96,15 +116,18 @@ def add(token):
         return redirect(url_for("einkauf_app.index", token=token))
     db = get_db()
     kategorie_id = _clean_kategorie_id(db, to_int(request.form.get("kategorie_id")))
-    angebot, laden_id = _clean_angebot(
+    angebot, laden_ids = _clean_angebot_laeden(
         db,
         1 if request.form.get("angebot") == "1" else 0,
-        to_int(request.form.get("laden_id")),
+        _laden_ids_aus_form(request.form),
     )
-    db.execute(
-        "INSERT INTO einkauf_eintraege(name,kategorie_id,angebot,laden_id,erstellt_von) VALUES(?,?,?,?,?)",
-        (name, kategorie_id, angebot, laden_id, user["id"]),
+    cur = db.execute(
+        "INSERT INTO einkauf_eintraege(name,kategorie_id,angebot,erstellt_von) VALUES(?,?,?,?)",
+        (name, kategorie_id, angebot, user["id"]),
     )
+    eid = cur.lastrowid
+    for lid in laden_ids:
+        db.execute("INSERT OR IGNORE INTO einkauf_eintrag_laeden(eintrag_id,laden_id) VALUES(?,?)", (eid, lid))
     db.commit()
     return redirect(url_for("einkauf_app.index", token=token))
 
@@ -144,15 +167,18 @@ def bearbeiten(token, eid):
         return redirect(url_for("einkauf_app.index", token=token))
     db = get_db()
     kategorie_id = _clean_kategorie_id(db, to_int(request.form.get("kategorie_id")))
-    angebot, laden_id = _clean_angebot(
+    angebot, laden_ids = _clean_angebot_laeden(
         db,
         1 if request.form.get("angebot") == "1" else 0,
-        to_int(request.form.get("laden_id")),
+        _laden_ids_aus_form(request.form),
     )
     db.execute(
-        "UPDATE einkauf_eintraege SET name=?, kategorie_id=?, angebot=?, laden_id=? WHERE id=?",
-        (name, kategorie_id, angebot, laden_id, eid),
+        "UPDATE einkauf_eintraege SET name=?, kategorie_id=?, angebot=? WHERE id=?",
+        (name, kategorie_id, angebot, eid),
     )
+    db.execute("DELETE FROM einkauf_eintrag_laeden WHERE eintrag_id=?", (eid,))
+    for lid in laden_ids:
+        db.execute("INSERT OR IGNORE INTO einkauf_eintrag_laeden(eintrag_id,laden_id) VALUES(?,?)", (eid, lid))
     db.commit()
     return redirect(url_for("einkauf_app.index", token=token))
 

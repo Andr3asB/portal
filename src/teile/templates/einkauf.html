@@ -6,17 +6,20 @@
 .header-title { font-size:22px; font-weight:700; }
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
 /* Eingabe */
-.btn-neu-toggle {
-  width:100%; display:block; background:none; border:1.5px solid var(--farbe);
-  color:var(--farbe); border-radius:12px; padding:12px 16px; font-size:15px;
-  font-weight:600; cursor:pointer; margin-bottom:14px;
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.btn-neu-toggle, .btn-filter-toggle {
+  flex:1; display:block; background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  font-weight:600; cursor:pointer; white-space:nowrap;
 }
-.add-card {
+.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.add-card, .filter-card {
   background:var(--surface); border-radius:16px; padding:14px 16px;
   margin-bottom:14px; box-shadow:0 1px 3px var(--shadow);
   display:none;
 }
-.add-card.open { display:block; }
+.add-card.open, .filter-card.open { display:block; }
+.filter-hinweis { font-size:12px; color:var(--text-2); margin-top:8px; }
 .add-row { display:flex; gap:8px; margin-bottom:8px; }
 .add-input {
   flex:1; border:1.5px solid var(--border); border-radius:10px;
@@ -112,15 +115,17 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
 {% endblock %}
 
 {% macro item_card(item, token, laeden, kategorien) %}
+{% set eigene_laden_ids = (item.laden_ids or '').split(',') %}
 <div class="item-card{% if item.erledigt %} erledigt{% endif %}" id="item-{{ item.id }}"
-     data-kategorie="{{ item.kategorie_id }}">
+     data-kategorie="{{ item.kategorie_id }}" data-angebot="{{ 1 if item.angebot else 0 }}"
+     data-laeden="{{ item.laden_ids or '' }}">
   <input class="item-check" type="checkbox"
          onchange="toggleErledigt({{ item.id }}, this)"
          {% if item.erledigt %}checked{% endif %}>
   <span class="item-name">{{ item.name }}</span>
 
   {% if item.angebot %}
-    <span class="badge-angebot">% {{ item.laden_name or '' }}</span>
+    <span class="badge-angebot">% {{ item.laden_namen or '' }}</span>
   {% endif %}
 
   <!-- Bearbeiten-Toggle: Name, Angebot und Löschen stecken alle im Panel -->
@@ -144,11 +149,11 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
       <button type="button" class="chip-btn angebot-toggle-chip{% if item.angebot %} active{% endif %}">% Angebot</button>
       <div class="btn-row laden-row" style="display:{% if item.angebot %}flex{% else %}none{% endif %}">
         {% for l in laeden %}
-        <button type="button" class="chip-btn chip-btn-sm{% if item.laden_id == l.id %} active{% endif %}" data-value="{{ l.id }}">{{ l.name }}</button>
+        <button type="button" class="chip-btn chip-btn-sm{% if l.id|string in eigene_laden_ids %} active{% endif %}" data-value="{{ l.id }}">{{ l.name }}</button>
         {% endfor %}
       </div>
       <input type="hidden" name="angebot" value="{% if item.angebot %}1{% else %}0{% endif %}" class="angebot-hidden">
-      <input type="hidden" name="laden_id" value="{{ item.laden_id or '' }}" class="laden-hidden">
+      <input type="hidden" name="laden_ids" value="{{ item.laden_ids or '' }}" class="laden-hidden">
 
       <button type="submit" class="btn-angebot-submit form-submit-btn">Speichern</button>
     </form>
@@ -165,7 +170,10 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
 
 <main class="main">
 
-  <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
+  <div class="top-aktionen">
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+  </div>
 
   <div class="add-card" id="add-form-card">
     <form method="post" action="/a/einkauf/{{ token }}/add" id="add-form">
@@ -195,10 +203,25 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
         {% endfor %}
       </div>
       <input type="hidden" name="angebot" class="angebot-hidden" value="0">
-      <input type="hidden" name="laden_id" class="laden-hidden">
+      <input type="hidden" name="laden_ids" class="laden-hidden">
 
       <button class="btn-add form-submit-btn" type="submit" disabled>+ Hinzufügen</button>
     </form>
+  </div>
+
+  <div class="filter-card" id="filter-card">
+    <div class="field-label">Angebote</div>
+    <div class="btn-row">
+      <button type="button" class="chip-btn" id="filter-nur-angebote">% Nur Angebote</button>
+    </div>
+
+    <div class="field-label" style="margin-top:14px">Markt</div>
+    <div class="btn-row" id="filter-laden-row">
+      {% for l in laeden %}
+      <button type="button" class="chip-btn chip-btn-sm" data-value="{{ l.id }}">{{ l.name }}</button>
+      {% endfor %}
+    </div>
+    <div class="filter-hinweis">Bei ausgewähltem Markt werden nur Artikel gezeigt, die dort im Angebot sind.</div>
   </div>
 
   {% set has_items = namespace(v=false) %}
@@ -222,6 +245,8 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
     <span style="font-size:13px">Füge oben etwas hinzu.</span>
   </div>
   {% endif %}
+
+  <div id="filter-keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">Kein Artikel passt zum Filter 🔍</div>
 
   {% if erledigt %}
   <div class="erledigt-section">
@@ -329,6 +354,54 @@ function toggleEditPanel(id) {
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
 }
 
+// Wunsch #87: Filtern nach Markt und/oder "nur Angebote" - rein clientseitig,
+// da die komplette Liste ohnehin schon gerendert ist. Zurückgesetzt bei jedem
+// Neuladen der Seite (wie die Vokabel-Suche), kein sessionStorage nötig.
+document.getElementById('filter-toggle-btn')?.addEventListener('click', function() {
+  const card = document.getElementById('filter-card');
+  const nowOpen = !card.classList.contains('open');
+  card.classList.toggle('open', nowOpen);
+  this.classList.toggle('aktiv', nowOpen);
+});
+
+document.getElementById('filter-nur-angebote')?.addEventListener('click', function() {
+  this.classList.toggle('active');
+  wendeFilterAn();
+});
+
+document.querySelectorAll('#filter-laden-row .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('active');
+    wendeFilterAn();
+  });
+});
+
+function wendeFilterAn() {
+  const nurAngebote = document.getElementById('filter-nur-angebote')?.classList.contains('active');
+  const marktIds = [...document.querySelectorAll('#filter-laden-row .chip-btn.active')].map(b => b.dataset.value);
+  let sichtbareGesamt = 0;
+
+  document.querySelectorAll('.item-card').forEach(card => {
+    const istAngebot = card.dataset.angebot === '1';
+    let sichtbar = true;
+    if (nurAngebote && !istAngebot) sichtbar = false;
+    if (marktIds.length && (!istAngebot || !marktIds.some(id => (card.dataset.laeden || '').split(',').includes(id)))) sichtbar = false;
+    card.style.display = sichtbar ? '' : 'none';
+    if (sichtbar) sichtbareGesamt++;
+  });
+
+  document.querySelectorAll('.kat-label').forEach(label => {
+    const kat = label.dataset.kategorieLabel;
+    const hatSichtbare = [...document.querySelectorAll(`.item-card[data-kategorie="${CSS.escape(kat)}"]`)]
+      .some(el => el.style.display !== 'none' && !el.closest('.erledigt-section'));
+    label.style.display = hatSichtbare ? '' : 'none';
+  });
+
+  const filterAktiv = nurAngebote || marktIds.length > 0;
+  document.getElementById('filter-keine-treffer').style.display =
+    (filterAktiv && sichtbareGesamt === 0) ? 'block' : 'none';
+}
+
 // Gemeinsame Logik für Kategorie-Buttons + Angebot-Toggle/Markt-Buttons,
 // verwendet sowohl vom Neu-Formular als auch von jedem Edit-Panel (Wunsch
 // #23-#25: identisches Verhalten und identische Beschriftung an beiden
@@ -376,11 +449,14 @@ function wireKategorieAngebotForm(root, { requireKategorie }) {
   }
 
   if (ladenRow) {
+    // Wunsch #86: mehrere Märkte gleichzeitig auswählbar (z.B. im Angebot bei
+    // Markt A UND B) - jeder Markt-Chip toggelt unabhängig, statt sich
+    // gegenseitig auszuschliessen wie bei der Kategorie.
     ladenRow.querySelectorAll('.chip-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        ladenRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        ladenHidden.value = btn.dataset.value;
+        btn.classList.toggle('active');
+        const ausgewaehlt = [...ladenRow.querySelectorAll('.chip-btn.active')].map(b => b.dataset.value);
+        ladenHidden.value = ausgewaehlt.join(',');
         updateSubmit();
       });
     });
@@ -408,7 +484,7 @@ function speichereLetzteAuswahl() {
   const daten = {
     kategorie_id: form.querySelector('.kat-hidden').value,
     angebot: form.querySelector('.angebot-hidden').value,
-    laden_id: form.querySelector('.laden-hidden').value,
+    laden_ids: form.querySelector('.laden-hidden').value,
   };
   try { sessionStorage.setItem(EINKAUF_STORAGE_KEY, JSON.stringify(daten)); } catch (e) {}
 }
@@ -424,8 +500,10 @@ function wendeLetzteAuswahlAn() {
   }
   if (daten.angebot === '1') {
     form.querySelector('.angebot-toggle-chip')?.click();
-    if (daten.laden_id) {
-      form.querySelector(`.laden-row .chip-btn[data-value="${CSS.escape(daten.laden_id)}"]`)?.click();
+    if (daten.laden_ids) {
+      daten.laden_ids.split(',').filter(Boolean).forEach(lid => {
+        form.querySelector(`.laden-row .chip-btn[data-value="${CSS.escape(lid)}"]`)?.click();
+      });
     }
   }
 }

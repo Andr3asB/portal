@@ -90,6 +90,11 @@ CREATE TABLE IF NOT EXISTS einkauf_eintraege (
   erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
   erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
+CREATE TABLE IF NOT EXISTS einkauf_eintrag_laeden (
+  eintrag_id INTEGER NOT NULL REFERENCES einkauf_eintraege(id) ON DELETE CASCADE,
+  laden_id   INTEGER NOT NULL REFERENCES einkauf_laeden(id) ON DELETE CASCADE,
+  PRIMARY KEY (eintrag_id, laden_id)
+);
 CREATE TABLE IF NOT EXISTS home_gruppen (
   id       INTEGER PRIMARY KEY,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -780,6 +785,19 @@ def _init_db(app):
             db.execute(
                 "UPDATE einkauf_eintraege SET kategorie_id=? WHERE kategorie_id IS NULL", (sonstiges[0],)
             )
+        db.commit()
+
+        # Einkauf: Angebot in mehreren Märkten gleichzeitig möglich (Wunsch #86)
+        # - einkauf_eintraege.laden_id war bisher ein einzelner Markt, jetzt
+        # einkauf_eintrag_laeden als n:m-Zuordnung. Alte Einzelwerte einmalig
+        # übernehmen (idempotent per INSERT OR IGNORE), laden_id selbst bleibt
+        # als totes Altfeld liegen (SQLite kann Spalten nicht gefahrlos droppen,
+        # siehe Rezepte-Anleitung weiter unten für die gleiche Begründung) - neuer
+        # Code liest/schreibt nur noch einkauf_eintrag_laeden.
+        db.execute("""
+            INSERT OR IGNORE INTO einkauf_eintrag_laeden(eintrag_id, laden_id)
+            SELECT id, laden_id FROM einkauf_eintraege WHERE laden_id IS NOT NULL
+        """)
         db.commit()
 
         # Rezepte: Zubereitung in einzelne Schritte splitten (analog zu
