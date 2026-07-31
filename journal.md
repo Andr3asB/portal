@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-07-31 – portal-v76: Wunsch #87 Teil 2 (Einkaufsmodus)
+
+Rückfrage an Andi zu "Einkauf starten" beantwortet: **Einkaufsmodus mit
+Marktwahl** – Markt auswählen, dann Vollbild-Checkliste nur mit den dort
+relevanten Artikeln (Angebote genau bei diesem Markt + alle Artikel ohne
+Marktbindung), größere Abhak-Flächen für die Bedienung unterwegs im Laden.
+
+**Design-Entscheidung:** Angebote bei einem ANDEREN Markt werden im
+Einkaufsmodus bewusst ausgeblendet, nicht nur die eigenen gezeigt – die
+Logik dahinter: eine Angebot+Markt-Zuordnung heißt "dafür extra zu diesem
+Markt gehen", ist man gerade wo anders, ist der Artikel für einen anderen
+Trip vorgemerkt und soll die aktuelle Einkaufsrunde nicht überladen.
+
+**Umsetzung:** Dritter Knopf "🛒 Einkauf starten" neben "+ Neu"/"🔍 Filtern"
+öffnet eine Marktauswahl (Single-Select, ein Einkauf = ein Markt), "Los
+geht's" schaltet `body.einkaufsmodus` scharf: blendet Eingabeformular,
+Filter und die Knopfleiste selbst aus (CSS `!important`, damit auch ein
+zuvor offen gebliebenes Filter-Panel verschwindet), vergrößert Häkchen
+(32px) und Artikelnamen (18px), zeigt oben eine sticky Leiste mit "Beenden".
+Rein clientseitig über dieselben `data-angebot`/`data-laeden`-Attribute wie
+Wunsch #87 Teil 1, kein Server-Roundtrip, kein sessionStorage (Zustand ist
+für die aktuelle Einkaufsrunde gedacht, nicht zum Fortsetzen nach einem
+Reload).
+
+**Verifiziert:** Per `javascript_tool` gegen die echte Seite – Markt "Edeka"
+gewählt, "Dosentomaten" (Angebot nur bei Netto) korrekt ausgeblendet, alle
+anderen 31 Artikel sichtbar; Knopfleiste/Formulare per `getComputedStyle`
+bestätigt ausgeblendet, Häkchen-Breite 32px, Artikelname-Schriftgröße 18px;
+"Beenden" stellt alle 32 Artikel und die normale Ansicht sauber wieder her.
+
+### Auslieferungspaket
+
+`deploy/portal-v76.tar.gz`
+
+---
+
 ## 2026-07-31 – portal-v73/v74: Wunsch #86 (mehrere Märkte pro Angebot) + #87 Filtern (Teil 1)
 
 ### Wunsch #86 – mehrere Märkte gleichzeitig im Angebot

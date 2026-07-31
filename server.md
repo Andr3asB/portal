@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v74: Wunsch #86 mehrere Märkte pro Angebot, Wunsch #87 Teil 1 Filtern-Knopf – "Einkauf starten" noch offen)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v76: Wunsch #86 mehrere Märkte pro Angebot, Wunsch #87 Filtern + Einkaufsmodus – komplett)*
 
 ## Host
 
@@ -208,9 +208,13 @@ teile/
                        Formular. "Filtern"-Knopf (Wunsch #87 Teil 1) neben "+ Neu":
                        clientseitiger Filter nach Markt und/oder "Nur Angebote" ueber
                        data-angebot/data-laeden an jeder Artikelkarte, kein Server-
-                       Roundtrip, setzt sich bei jedem Reload zurueck. "Einkauf
-                       starten" (Wunsch #87 Teil 2) noch offen, siehe journal.md
-                       2026-07-31 - Rueckfrage an Andi noetig vor der Umsetzung
+                       Roundtrip, setzt sich bei jedem Reload zurueck. "🛒 Einkauf
+                       starten" (Wunsch #87 Teil 2): Marktwahl, dann body.einkaufsmodus
+                       blendet Formular/Filter/Knopfleiste aus, zeigt nur Artikel
+                       relevant fuer den gewaehlten Markt (eigene Angebote + Artikel
+                       ohne Marktbindung; Angebote bei ANDEREM Markt bleiben bewusst
+                       ausgeblendet - fuer einen anderen Einkaufstrip vorgemerkt),
+                       groessere Tap-Flaechen fuer die Bedienung im Laden
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,

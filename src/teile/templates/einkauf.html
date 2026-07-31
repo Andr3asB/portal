@@ -7,7 +7,7 @@
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
 /* Eingabe */
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
-.btn-neu-toggle, .btn-filter-toggle {
+.btn-neu-toggle, .btn-filter-toggle, .btn-einkauf-start {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
   color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
   font-weight:600; cursor:pointer; white-space:nowrap;
@@ -20,6 +20,24 @@
 }
 .add-card.open, .filter-card.open { display:block; }
 .filter-hinweis { font-size:12px; color:var(--text-2); margin-top:8px; }
+.btn-los { margin-top:12px; }
+.btn-los:disabled { opacity:.4; cursor:default; }
+/* Einkaufsmodus (Wunsch #87): grössere Tap-Flächen, Bedienelemente ausgeblendet */
+#einkaufsmodus-leiste {
+  display:none; position:sticky; top:0; z-index:5; background:var(--farbe); color:#fff;
+  align-items:center; justify-content:space-between; padding:10px 14px;
+  border-radius:12px; margin-bottom:14px; font-weight:600;
+}
+.btn-einkaufsmodus-beenden {
+  background:#fff; color:var(--farbe); border:none; border-radius:8px;
+  padding:7px 16px; font-weight:600; cursor:pointer;
+}
+body.einkaufsmodus .top-aktionen, body.einkaufsmodus .add-card, body.einkaufsmodus .filter-card {
+  display:none !important;
+}
+body.einkaufsmodus .item-check { width:32px; height:32px; }
+body.einkaufsmodus .item-card { padding:16px 18px; }
+body.einkaufsmodus .item-name { font-size:18px; }
 .add-row { display:flex; gap:8px; margin-bottom:8px; }
 .add-input {
   flex:1; border:1.5px solid var(--border); border-radius:10px;
@@ -170,9 +188,25 @@ body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
 
 <main class="main">
 
+  <div id="einkaufsmodus-leiste">
+    <span>🛒 Einkauf bei <span id="einkaufsmodus-markt-name"></span></span>
+    <button type="button" class="btn-einkaufsmodus-beenden" id="einkaufsmodus-beenden-btn">Beenden</button>
+  </div>
+
   <div class="top-aktionen">
     <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
     <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    <button type="button" class="btn-einkauf-start" id="einkauf-start-btn">🛒 Einkauf starten</button>
+  </div>
+
+  <div class="filter-card" id="einkauf-markt-card">
+    <div class="field-label">In welchem Markt bist du gerade?</div>
+    <div class="btn-row" id="einkauf-markt-row">
+      {% for l in laeden %}
+      <button type="button" class="chip-btn" data-value="{{ l.id }}">{{ l.name }}</button>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn-add btn-los" id="einkauf-los-btn" disabled>Los geht's</button>
   </div>
 
   <div class="add-card" id="add-form-card">
@@ -376,6 +410,15 @@ document.querySelectorAll('#filter-laden-row .chip-btn').forEach(btn => {
   });
 });
 
+function aktualisiereKatLabels() {
+  document.querySelectorAll('.kat-label').forEach(label => {
+    const kat = label.dataset.kategorieLabel;
+    const hatSichtbare = [...document.querySelectorAll(`.item-card[data-kategorie="${CSS.escape(kat)}"]`)]
+      .some(el => el.style.display !== 'none' && !el.closest('.erledigt-section'));
+    label.style.display = hatSichtbare ? '' : 'none';
+  });
+}
+
 function wendeFilterAn() {
   const nurAngebote = document.getElementById('filter-nur-angebote')?.classList.contains('active');
   const marktIds = [...document.querySelectorAll('#filter-laden-row .chip-btn.active')].map(b => b.dataset.value);
@@ -390,17 +433,60 @@ function wendeFilterAn() {
     if (sichtbar) sichtbareGesamt++;
   });
 
-  document.querySelectorAll('.kat-label').forEach(label => {
-    const kat = label.dataset.kategorieLabel;
-    const hatSichtbare = [...document.querySelectorAll(`.item-card[data-kategorie="${CSS.escape(kat)}"]`)]
-      .some(el => el.style.display !== 'none' && !el.closest('.erledigt-section'));
-    label.style.display = hatSichtbare ? '' : 'none';
-  });
+  aktualisiereKatLabels();
 
   const filterAktiv = nurAngebote || marktIds.length > 0;
   document.getElementById('filter-keine-treffer').style.display =
     (filterAktiv && sichtbareGesamt === 0) ? 'block' : 'none';
 }
+
+// Wunsch #87 Teil 2: Einkaufsmodus - Markt wählen, dann nur noch die dort
+// relevanten Artikel zeigen (Angebote bei genau diesem Markt + alle Artikel
+// ohne Marktbindung; Angebote bei ANDEREN Märkten sind bewusst ausgeblendet,
+// die sind für einen anderen Einkaufstrip vorgemerkt). Grössere Tap-Flächen
+// per body.einkaufsmodus-Klasse (siehe CSS), kein Server-Roundtrip.
+document.getElementById('einkauf-start-btn')?.addEventListener('click', () => {
+  const card = document.getElementById('einkauf-markt-card');
+  card.classList.toggle('open');
+});
+
+let einkaufsmodusMarktId = null;
+
+document.querySelectorAll('#einkauf-markt-row .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#einkauf-markt-row .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    einkaufsmodusMarktId = btn.dataset.value;
+    document.getElementById('einkauf-los-btn').disabled = false;
+  });
+});
+
+document.getElementById('einkauf-los-btn')?.addEventListener('click', () => {
+  if (!einkaufsmodusMarktId) return;
+  const marktBtn = document.querySelector(`#einkauf-markt-row .chip-btn[data-value="${CSS.escape(einkaufsmodusMarktId)}"]`);
+  document.getElementById('einkauf-markt-card').classList.remove('open');
+  document.getElementById('einkaufsmodus-markt-name').textContent = marktBtn?.textContent || '';
+  document.body.classList.add('einkaufsmodus');
+  document.getElementById('einkaufsmodus-leiste').style.display = 'flex';
+
+  document.querySelectorAll('.item-card').forEach(card => {
+    const istAngebot = card.dataset.angebot === '1';
+    const eigeneMaerkte = (card.dataset.laeden || '').split(',').filter(Boolean);
+    const relevant = !istAngebot || eigeneMaerkte.includes(einkaufsmodusMarktId);
+    card.style.display = relevant ? '' : 'none';
+  });
+  aktualisiereKatLabels();
+});
+
+document.getElementById('einkaufsmodus-beenden-btn')?.addEventListener('click', () => {
+  document.body.classList.remove('einkaufsmodus');
+  document.getElementById('einkaufsmodus-leiste').style.display = 'none';
+  document.querySelectorAll('.item-card').forEach(card => { card.style.display = ''; });
+  aktualisiereKatLabels();
+  einkaufsmodusMarktId = null;
+  document.querySelectorAll('#einkauf-markt-row .chip-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('einkauf-los-btn').disabled = true;
+});
 
 // Gemeinsame Logik für Kategorie-Buttons + Angebot-Toggle/Markt-Buttons,
 // verwendet sowohl vom Neu-Formular als auch von jedem Edit-Panel (Wunsch
