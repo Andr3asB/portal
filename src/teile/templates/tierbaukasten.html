@@ -31,13 +31,13 @@
   {% endif %}
 {% endmacro %}
 
-{% macro koerper_vorne(typ) %}
+{% macro koerper_vorne(typ, suffix='') %}
   {% if typ == 'katze' %}
   <path d="M 68,55 L 58,18 L 88,48 Z" style="fill:var(--koerper-farbe)"/>
   <path d="M 132,55 L 142,18 L 112,48 Z" style="fill:var(--koerper-farbe)"/>
   <path d="M 70,44 L 65,29 L 80,46 Z" fill="#ffc9d9" opacity=".85"/>
   <path d="M 130,44 L 135,29 L 120,46 Z" fill="#ffc9d9" opacity=".85"/>
-  <ellipse cx="100" cy="155" rx="42" ry="50" id="body-vorne-katze" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="155" rx="42" ry="50" id="body-vorne-katze{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="83" cy="122" rx="15" ry="10" fill="#fff" opacity=".14" transform="rotate(-15 83 122)"/>
   <path d="M 138,175 C 175,165 185,120 165,95" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="14" stroke-linecap="round"/>
   <ellipse cx="80" cy="201" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
@@ -54,7 +54,7 @@
   {% elif typ == 'hund' %}
   <ellipse cx="62" cy="85" rx="16" ry="32" transform="rotate(-15 62 85)" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="138" cy="85" rx="16" ry="32" transform="rotate(15 138 85)" style="fill:var(--koerper-farbe)"/>
-  <ellipse cx="100" cy="155" rx="45" ry="48" id="body-vorne-hund" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="155" rx="45" ry="48" id="body-vorne-hund{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="82" cy="122" rx="16" ry="10" fill="#fff" opacity=".14" transform="rotate(-15 82 122)"/>
   <path d="M 140,170 C 165,175 170,155 158,140" fill="none" style="stroke:var(--koerper-farbe)" stroke-width="13" stroke-linecap="round"/>
   <ellipse cx="78" cy="199" rx="15" ry="9" style="fill:var(--koerper-farbe)"/>
@@ -68,7 +68,7 @@
   <ellipse cx="118" cy="28" rx="11" ry="38" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="82" cy="30" rx="5" ry="28" fill="#ffc9d9"/>
   <ellipse cx="118" cy="30" rx="5" ry="28" fill="#ffc9d9"/>
-  <ellipse cx="100" cy="155" rx="40" ry="48" id="body-vorne-hase" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="155" rx="40" ry="48" id="body-vorne-hase{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="83" cy="122" rx="14" ry="9" fill="#fff" opacity=".14" transform="rotate(-15 83 122)"/>
   <circle cx="145" cy="175" r="12" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="82" cy="199" rx="14" ry="8" style="fill:var(--koerper-farbe)"/>
@@ -78,7 +78,7 @@
   <circle cx="130" cy="48" r="16" style="fill:var(--koerper-farbe)"/>
   <circle cx="70" cy="49" r="8" fill="#00000018"/>
   <circle cx="130" cy="49" r="8" fill="#00000018"/>
-  <ellipse cx="100" cy="158" rx="50" ry="52" id="body-vorne-baer" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="158" rx="50" ry="52" id="body-vorne-baer{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="80" cy="125" rx="17" ry="11" fill="#fff" opacity=".14" transform="rotate(-15 80 125)"/>
   <ellipse cx="75" cy="205" rx="16" ry="10" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="125" cy="205" rx="16" ry="10" style="fill:var(--koerper-farbe)"/>
@@ -87,7 +87,7 @@
     <path d="M 128,150 Q 120,156 126,164"/>
   </g>
   {% elif typ == 'vogel' %}
-  <ellipse cx="100" cy="145" rx="34" ry="46" id="body-vorne-vogel" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="145" rx="34" ry="46" id="body-vorne-vogel{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <ellipse cx="128" cy="150" rx="18" ry="28" transform="rotate(25 128 150)" style="fill:var(--koerper-farbe);opacity:.7"/>
   <g stroke="#00000030" stroke-width="1.2" fill="none">
     <path d="M 120,135 Q 130,150 120,165"/>
@@ -97,7 +97,7 @@
   <line x1="90" y1="195" x2="90" y2="212" stroke="#f5a623" stroke-width="4"/>
   <line x1="110" y1="195" x2="110" y2="212" stroke="#f5a623" stroke-width="4"/>
   {% elif typ == 'fisch' %}
-  <ellipse cx="100" cy="130" rx="40" ry="55" id="body-vorne-fisch" style="fill:var(--koerper-farbe)"/>
+  <ellipse cx="100" cy="130" rx="40" ry="55" id="body-vorne-fisch{{ suffix }}" style="fill:var(--koerper-farbe)"/>
   <path d="M 80,180 L 100,222 L 65,203 Z" style="fill:var(--koerper-farbe)"/>
   <path d="M 120,180 L 100,222 L 135,203 Z" style="fill:var(--koerper-farbe)"/>
   <path d="M 85,42 L 100,14 L 115,42 Z" style="fill:var(--koerper-farbe)"/>
@@ -203,7 +203,7 @@
   </defs>
   {{ boden_schatten() }}
   <g style="transform-box:view-box; transform-origin:100px 140px; transform:scaleX({{ '%.3f'|format(0.82 + ((koerperbau or 50) / 100) * 0.36) }})">
-    {{ koerper_vorne(einzel_typ) }}
+    {{ koerper_vorne(einzel_typ, suffix) }}
     {% if muster_wert %}
     <g clip-path="url(#clip-{{ einzel_typ }}{{ suffix }})">
       {% if muster_wert == 'streifen' %}{{ muster_streifen() }}{% elif muster_wert == 'punkte' %}{{ muster_punkte() }}{% elif muster_wert == 'flecken' %}{{ muster_flecken() }}{% endif %}

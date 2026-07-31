@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Foto-Import{% endblock %}
+
+{% block extra_styles %}
+.add-card {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:0 0 6px;
+}
+.chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.sprache-chip {
+  border:1.5px solid var(--border); border-radius:20px; padding:7px 14px;
+  font-size:14px; background:var(--surface-2); color:var(--text); cursor:pointer;
+}
+.sprache-chip.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.foto-input {
+  width:100%; border:1.5px dashed var(--border); border-radius:10px;
+  padding:14px 12px; font-size:14px; font-family:inherit;
+  background:var(--surface); color:var(--text); box-sizing:border-box;
+}
+.btn-add {
+  background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
+  width:100%; margin-top:14px;
+}
+.import-fehler {
+  background:#ffebe9; color:#cf222e; border-radius:10px; padding:10px 12px;
+  font-size:13px; margin-bottom:12px;
+}
+.import-hinweis { color:var(--text-2); font-size:13px; margin-top:10px; }
+.import-lade { display:none; text-align:center; color:var(--text-2); font-size:14px; margin-top:14px; }
+.empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📷 Foto-Import</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if fehler %}
+  <div class="import-fehler">{{ fehler }}</div>
+  {% endif %}
+
+  {% if not sprachen %}
+  <div class="empty">Aktiviere zuerst mindestens eine Sprache im Menü unter „Sprachen".</div>
+  {% else %}
+  <div class="add-card">
+    <form method="post" enctype="multipart/form-data" id="foto-form">
+      <div class="field-label">Sprache</div>
+      <div class="chip-row" id="sprache-chips">
+        {% for s in sprachen %}
+        <button type="button" class="sprache-chip{% if loop.first %} aktiv{% endif %}"
+                data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this)">{{ s.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="sprache_id" id="sprache-id" value="{{ sprachen[0].id }}" required>
+
+      <div class="field-label">Foto der Vokabelliste</div>
+      <input class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" capture="environment" required>
+
+      <button class="btn-add" type="submit">Vokabeln erkennen</button>
+      <div class="import-lade" id="import-lade">⏳ Foto wird gelesen und Vokabeln erkannt…</div>
+      <div class="import-hinweis">Funktioniert am besten bei gut lesbaren, nicht zu vollen Seiten. Das Ergebnis kannst du vor dem Speichern noch prüfen und anpassen.</div>
+    </form>
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function spracheWaehlen(btn) {
+  document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
+  btn.classList.add('aktiv');
+  document.getElementById('sprache-id').value = btn.dataset.spracheId;
+}
+
+document.getElementById('foto-form')?.addEventListener('submit', () => {
+  document.getElementById('import-lade').style.display = 'block';
+});
+</script>
+{% endblock %}

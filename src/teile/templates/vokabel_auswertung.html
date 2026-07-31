@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Auswertung{% endblock %}
+
+{% block extra_styles %}
+.section-label { font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin:18px 0 8px; }
+.section-label:first-child { margin-top:0; }
+.pill-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+.pill {
+  border:1.5px solid var(--border); border-radius:20px; padding:6px 14px;
+  font-size:13px; background:var(--surface-2); color:var(--text); text-decoration:none;
+}
+.pill.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.empty { text-align:center; padding:32px 20px; color:var(--text-2); font-size:14px; }
+
+.bar-card { background:var(--surface); border-radius:12px; padding:12px 14px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow); }
+.bar-head { display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+.bar-head-name { font-weight:600; }
+.bar-head-meta { color:var(--text-2); }
+.bar-track { height:10px; border-radius:5px; background:var(--surface-2); overflow:hidden; }
+.bar-fill { height:100%; background:var(--farbe); border-radius:5px; }
+
+.legende { display:flex; gap:16px; font-size:12px; color:var(--text-2); margin-bottom:10px; }
+.legende span { display:inline-flex; align-items:center; gap:5px; }
+.legende-dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
+.stacked-track { height:14px; border-radius:7px; background:var(--surface-2); overflow:hidden; display:flex; }
+.stacked-richtig { background:#34c759; height:100%; }
+.stacked-falsch  { background:#ff3b30; height:100%; margin-left:2px; }
+.wort-liste { font-size:12px; margin-top:8px; }
+.wort-liste-label { font-weight:600; margin-bottom:2px; }
+.wort-liste.gelernt .wort-liste-label { color:#248a3d; }
+.wort-liste.schwierig .wort-liste-label { color:#d70015; }
+.wort-liste.ungeuebt .wort-liste-label { color:var(--text-2); }
+.wort-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.wort-chip { background:var(--surface-2); border-radius:10px; padding:2px 8px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📊 Auswertung</div>
+{% if ziel.id != user.id %}<div class="nav-sub">{{ ziel.name }}</div>{% endif %}
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if darf_andere_sehen and alle_nutzer|length > 1 %}
+  <div class="section-label">Nutzer</div>
+  <div class="pill-row">
+    {% for n in alle_nutzer %}
+    <a class="pill{% if n.id == ziel.id %} aktiv{% endif %}"
+       href="/a/vokabeln/{{ token }}/auswertung?fuer={{ n.id }}">{{ n.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section-label">Trainingszeit je Sprache</div>
+  {% if trainingszeit %}
+    {% for t in trainingszeit %}
+    <div class="bar-card">
+      <div class="bar-head">
+        <span class="bar-head-name">{{ t.sprache }}</span>
+        <span class="bar-head-meta">{{ t.minuten|round|int }} Min · {{ t.anzahl }} Training{{ 's' if t.anzahl != 1 else '' }}</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:{{ ((t.minuten / max_minuten * 100) if max_minuten else 0)|round(1) }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty">Noch keine abgeschlossenen Trainings.</div>
+  {% endif %}
+
+  {% if sprachen %}
+  <div class="section-label">Kapitel</div>
+  <div class="pill-row">
+    {% for s in sprachen %}
+    <a class="pill{% if s.id == sprache_id %} aktiv{% endif %}"
+       href="/a/vokabeln/{{ token }}/auswertung?fuer={{ ziel.id }}&sprache={{ s.id }}">{{ s.name }}</a>
+    {% endfor %}
+  </div>
+
+  {% if kapitel_auswertung %}
+  <div class="legende">
+    <span><span class="legende-dot" style="background:#34c759"></span>Richtig</span>
+    <span><span class="legende-dot" style="background:#ff3b30"></span>Falsch</span>
+  </div>
+  {% for k in kapitel_auswertung %}
+  <div class="bar-card">
+    <div class="bar-head">
+      <span class="bar-head-name">{{ k.name }}</span>
+      <span class="bar-head-meta">{{ k.richtig }} richtig · {{ k.falsch }} falsch</span>
+    </div>
+    {% set gesamt = k.richtig + k.falsch %}
+    {% if gesamt %}
+    <div class="stacked-track">
+      <div class="stacked-richtig" style="width:{{ (k.richtig / gesamt * 100)|round(1) }}%"></div>
+      <div class="stacked-falsch" style="width:{{ (k.falsch / gesamt * 100)|round(1) }}%"></div>
+    </div>
+    {% endif %}
+
+    {% if k.schwierig %}
+    <div class="wort-liste schwierig">
+      <div class="wort-liste-label">⚠️ Noch schwierig</div>
+      <div class="wort-chips">{% for w in k.schwierig %}<span class="wort-chip">{{ w }}</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+    {% if k.gelernt %}
+    <div class="wort-liste gelernt">
+      <div class="wort-liste-label">✅ Gelernt</div>
+      <div class="wort-chips">{% for w in k.gelernt %}<span class="wort-chip">{{ w }}</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+    {% if k.ungeuebt %}
+    <div class="wort-liste ungeuebt">
+      <div class="wort-liste-label">○ Noch nicht geübt</div>
+      <div class="wort-chips">{% for w in k.ungeuebt %}<span class="wort-chip">{{ w }}</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">Noch keine Vokabeln in dieser Sprache.</div>
+  {% endif %}
+  {% endif %}
+
+</main>
+{% endblock %}

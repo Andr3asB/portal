@@ -44,6 +44,13 @@ UniFi-Gateway zu den Containern (10.0.0.192/26).
 Nach jeder Auslieferung die Checkliste aus `bauplan.md` Abschnitt 9
 abarbeiten.
 
+Nach jeder Entwicklungssession (sobald bauen → ausliefern → testen →
+dokumentieren abgeschlossen ist) das Repo **ohne gesonderte Aufforderung**
+nach GitHub pushen (`git push`, ggf. vorher committen). Gilt als generelle,
+dauerhafte Anweisung – keine Rückfrage nötig, außer bei ungewöhnlichen
+Situationen (z. B. Force-Push, fremde Änderungen im Weg, potenzielle
+Geheimnisse in den Änderungen).
+
 „Implementiere alle Wünsche" heißt: **alle außer den mit Priorität
 `zurueckgestellt` markierten** (siehe Docstring in `05_werkstatt_app.py`).
 Deren Priorität ändert ausschließlich ein Admin manuell – nie automatisiert,

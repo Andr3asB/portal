@@ -8,23 +8,61 @@
   box-shadow:0 1px 3px var(--shadow); margin-top:4px;
 }
 .heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
-.heatmap-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.heatmap-row { padding:8px 0; border-bottom:1px solid var(--border-subtle); }
+.heatmap-row:last-child { border-bottom:none; }
 .heatmap-name {
-  font-size:13px; font-weight:600; width:120px; flex-shrink:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:13px; font-weight:600; margin-bottom:6px;
+  white-space:normal; word-break:break-word;
 }
-.heatmap-cells { display:flex; gap:4px; flex:1; }
+.heatmap-cells { display:flex; gap:4px; }
 .heatmap-cell {
   flex:1; aspect-ratio:1; border-radius:4px; background:var(--surface-2);
   max-width:22px; transition:background .2s;
 }
 .heatmap-cell.gruen { background:#34c759; }
 .empty { text-align:center; padding:48px 16px; color:var(--text-2); font-size:16px; }
+
+.steps-section {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-top:12px;
+}
+.steps-legende { display:flex; gap:16px; font-size:12px; color:var(--text-2); margin-bottom:10px; }
+.steps-legende span { display:inline-flex; align-items:center; gap:5px; }
+.steps-legende-dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
+.steps-chart {
+  position:relative; height:150px; box-sizing:border-box; padding-top:16px;
+}
+.steps-gridline {
+  position:absolute; left:0; right:0; border-top:1px dashed var(--border-subtle);
+}
+.steps-gridline-label {
+  position:absolute; right:0; top:-14px; font-size:10px; color:var(--text-2);
+  background:var(--surface); padding-left:4px;
+}
+.steps-bars {
+  position:relative; height:100%; display:flex; align-items:flex-end; gap:3px;
+}
+/* .steps-bar-col braucht eine DEFINITE Höhe (100% von .steps-bars, das wiederum
+   100% von .steps-chart hat) - sonst resolven die Prozent-Höhen der Balken
+   darunter ins Leere (CSS: %-Höhe wird gegenüber einer auto-Höhe ignoriert). */
+.steps-bar-col {
+  flex:1; height:100%; display:flex; align-items:flex-end; justify-content:center;
+  min-width:0;
+}
+.steps-bar-stack {
+  width:100%; max-width:16px; display:flex; flex-direction:column;
+  border-radius:3px 3px 0 0; overflow:hidden;
+}
+.steps-bar-nontraining { width:100%; background:var(--text-2); flex:1; }
+.steps-bar-training    { width:100%; background:var(--farbe); }
+.steps-labels { display:flex; gap:3px; margin-top:4px; }
+.steps-bar-label-col { flex:1; text-align:center; min-width:0; }
+.steps-bar-label { font-size:9px; color:var(--text-2); }
 {% endblock %}
 
 {% block nav_title %}
 <div class="nav-title">🏃 Sportschau</div>
-<div class="nav-sub">Letzte 10 Tage</div>
+<div class="nav-sub">Letzte {{ tage|length }} Tage</div>
 {% endblock %}
 
 {% block body %}
@@ -39,14 +77,14 @@
 {% elif not trainingsarten %}
   <div class="empty">
     <div style="font-size:48px;margin-bottom:12px">🏃</div>
-    Keine Trainings in den letzten 10 Tagen.
+    Keine Trainings in den letzten {{ tage|length }} Tagen.
   </div>
 {% else %}
   <div class="heatmap-section">
-    <div class="heatmap-title">📊 Letzte 10 Tage</div>
+    <div class="heatmap-title">📊 Letzte {{ tage|length }} Tage</div>
     {% for art in trainingsarten %}
     <div class="heatmap-row">
-      <span class="heatmap-name">{{ art }}</span>
+      <div class="heatmap-name">{{ art }}</div>
       <div class="heatmap-cells">
         {% for tag in tage %}
         <span class="heatmap-cell{% if tag in trainings_tage.get(art, []) %} gruen{% endif %}"
@@ -55,6 +93,44 @@
       </div>
     </div>
     {% endfor %}
+  </div>
+{% endif %}
+
+{% if not fehler_schritte and schritte_balken %}
+  <div class="steps-section">
+    <div class="heatmap-title">🚶 Schritte je Tag</div>
+    <div class="steps-legende">
+      <span><span class="steps-legende-dot" style="background:var(--farbe)"></span>Beim Training</span>
+      <span><span class="steps-legende-dot" style="background:var(--text-2)"></span>Sonstige Schritte</span>
+    </div>
+    <div class="steps-chart">
+      <div class="steps-bars">
+        {% for g in gridlines %}
+        <div class="steps-gridline" style="bottom:{{ g.pct|round(1) }}%">
+          <span class="steps-gridline-label">{{ g.wert }}</span>
+        </div>
+        {% endfor %}
+        {% for b in schritte_balken %}
+        <div class="steps-bar-col">
+          <div class="steps-bar-stack" style="height:{{ b.pct_gesamt|round(1) }}%"
+               title="{{ b.tag }}: {{ b.gesamt }} Schritte ({{ b.training }} beim Training)">
+            <div class="steps-bar-nontraining"></div>
+            <div class="steps-bar-training" style="height:{{ b.pct_training|round(1) }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="steps-labels">
+      {% for b in schritte_balken %}
+      <div class="steps-bar-label-col"><span class="steps-bar-label">{{ b.tag_kurz }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+{% elif fehler_schritte %}
+  <div class="steps-section">
+    <div class="heatmap-title">🚶 Schritte je Tag</div>
+    <div class="empty" style="padding:16px">Schrittdaten gerade nicht abrufbar.</div>
   </div>
 {% endif %}
 

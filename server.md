@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-30 (portal-v61: Wunsch #72 Rezepte-Wunschmarkierung Ja/Nein, Wunsch #73 Vokabeln komplett neu gebaut)*
+*Letzte Aktualisierung: 2026-07-30 (portal-v70: Wunsch #83 Fix Tierbaukasten-Galerie-Muster, Wunsch #84 Anhören auch auf Vokabeln-Übersichtsseite)*
 
 ## Host
 
@@ -130,14 +130,23 @@ app.py               – Flask-App, lädt nummerierte Module aus teile/ automati
                        lädt VAPID_PRIVATE_KEY/PUBLIC_KEY/SUBJECT + OPENROUTER_API_KEY aus .env
 glogging_redact.py   – Gunicorn RedactingLogger: ersetzt Tokens in Logzeilen durch <redacted>
 manage.py            – CLI: createadmin, adduser, addapp, grant, listusers,
-                       listwuensche, listtodos, wunsch_erledigt, backlog
+                       listwuensche, listtodos, wunsch_erledigt, backlog,
+                       ki_modell/ki_stimme/listki (Wunsch #81: Modell/Stimme je
+                       KI-Zweck bzw. je Vokabeln-Sprache ohne Deploy ändern)
 teile/
   __init__.py        – registriert 00_kern als teile.kern
   00_kern.py         – DB-Schema, get_db()/new_db(), grant(), new_token(), to_int(),
                        push_send() (VAPID, Thread), ki_anfrage() (generischer KI-Aufruf
                        über OpenRouter, Token-Kontingent pro Nutzer/Monat über
                        users.ki_token_limit, protokolliert in ki_nutzung – von jedem
-                       KI-Feature nutzbar, nicht nur Rezept-Import), /health, _init_db(),
+                       KI-Feature nutzbar, nicht nur Rezept-Import; optionaler
+                       `bilder`-Parameter für Vision-Eingabe, Wunsch #80),
+                       ki_modell_fuer(zweck) (Wunsch #81 – Grundprinzip: Modell
+                       je Verwendungszweck kommt aus ki_konfiguration statt fest
+                       im Code, Fallback KI_MODELL), ki_stimme_fuer(sprache_id) +
+                       ki_text_zu_sprache() (TTS über OpenRouter /audio/speech,
+                       mp3→pcm-Fallback + WAV-Verpackung falls das Modell nur
+                       PCM liefert, siehe Bekannte Issues), /health, _init_db(),
                        _auto_grant_all() (hilfe + einkauf an alle Nutzer)
   01_start_token.py  – / (Landing), /p/<token> (Startseite mit Gruppen),
                        POST /p/<token>/reorder (Apps), /gruppe/reorder (Gruppen selbst),
@@ -231,11 +240,24 @@ teile/
                        der Wochentag von morgen für Kinder gesperrt
                        (_gesperrter_wochentag(), rein zeitberechnet)
   14_sportschau.py   – /a/sportschau/<token>/ Trainings-Heatmap (Wunsch #62),
-                       letzte 10 Tage, eine Zeile pro Trainingsart. Ruft
+                       letzte 14 Tage (Wunsch #78, `_TAGE_ANZAHL`-Konstante),
+                       eine Zeile pro Trainingsart. Ruft
                        live GET /api/workouts vom hae-Server ab (kein
                        Speichern in portal.db), URL/Key aus HAE_API_URL/
                        HAE_API_KEY (.env), UTC→Europe/Berlin per zoneinfo.
-                       Nur Andi granted (persönliche Fitnessdaten)
+                       `_ART_KORREKTUREN` (Wunsch #75) korrigiert schlechte
+                       deutsche Übersetzungen des hae-Servers per Substring
+                       ("Ausführen"→"Laufen", "Spaziergang"→"Gehen"),
+                       unbekannte Werte bleiben unverändert. Zusätzlich
+                       Schritte-Balkendiagramm (Wunsch #77): eigener Endpoint
+                       `/api/metrics/step_count` (aus HAE_API_URL abgeleitet,
+                       `from`/`to` als Unix-Millisekunden statt ISO-Datum –
+                       andere Konvention als /api/workouts, siehe
+                       journal.md 2026-07-30), stündliche Schritt-Buckets
+                       werden Tagen zugeordnet und per Zeitüberlappung mit
+                       Workout-Fenstern in Trainings-/Sonstige-Schritte
+                       aufgeteilt (Näherung auf Stundenbasis). Nur Andi
+                       granted (persönliche Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
                        Wunsch #66): Kategorie Mensch/Tier (tier_typ='mensch'
@@ -253,7 +275,14 @@ teile/
                        liefert bei jeder Änderung ein frisch gerendertes
                        SVG für die Live-Vorschau. /speichern (POST),
                        /loeschen/<id> (POST, nur eigene Kreationen). Jeder
-                       Nutzer sieht nur seine eigene Galerie
+                       Nutzer sieht nur seine eigene Galerie. Galerie-Vorschau
+                       (Macro figur_vorschau) rendert jede Kreation ueber
+                       eigenen suffixierten Clip-Pfad (`suffix='-'~kreation.id`),
+                       damit mehrere gespeicherte Tiere derselben Art keine
+                       doppelten SVG-IDs erzeugen - koerper_vorne(typ, suffix='')
+                       muss diesen Suffix mit an seine Element-IDs weitergeben,
+                       sonst laeuft der Clip-Pfad der Galerie ins Leere und das
+                       Muster verschwindet (Wunsch #83, siehe Bekannte Issues)
   16_vokabeln.py     – /a/vokabeln/<token>/ Vokabeln lernen (Wunsch #73,
                        kompletter Neubau – Wunsch #67 war ein Fehlversuch):
                        Sprachen global (Standard Englisch/Latein, neue per
@@ -272,8 +301,32 @@ teile/
                        oder Fremdsprache ab, falsche Antworten wandern ans
                        Ende der Warteschlange, /versuch (JSON) protokolliert
                        jeden Versuch, /session/<id>/beenden schliesst die
-                       Sitzung (Button + pagehide/sendBeacon). Jeder Nutzer
-                       sieht nur seine eigenen Vokabeln/Kapitel/Sessions
+                       Sitzung (Button + pagehide/sendBeacon). /auswertung
+                       (Wunsch #79): Trainingszeit je Sprache (nur Sessions
+                       mit mindestens einem Versuch zaehlen) + richtig/
+                       falsch je Kapitel (ueber vokabel_kapitel_zuordnung,
+                       Status "gelernt"/"schwierig" nach letztem Versuch pro
+                       Vokabel); ?fuer=<user_id> fuer Eltern/Admin
+                       (`_darf_andere_sehen`), serverseitig erzwungen, Kinder
+                       sehen immer nur sich selbst. /foto-import (Wunsch #80,
+                       GET+POST) + /foto-import/speichern: Foto hochladen
+                       (max. 8 MB, JPG/PNG/HEIC), KI (ki_anfrage mit `bilder`)
+                       extrahiert Vokabelpaare als JSON, landet zur Kontrolle
+                       in vokabel_foto_pruefen.html (jede Zeile editierbar/
+                       abwaehlbar, ein Kapitel fuer den ganzen Stapel), nie
+                       direkt gespeichert. /wort/<vid>/audio (Wunsch #81):
+                       KI-Aussprache des fremdsprachigen Worts, per
+                       ki_text_zu_sprache() erzeugt und dauerhaft unter
+                       DATA_DIR/vokabel_audio/<sprache_id>/<hash>.audio
+                       gecacht (Schluessel: normalisierter Text, nicht
+                       vokabel_id); send_file(..., download_name=...) gibt
+                       explizit die passende Dateiendung vor - iOS/Safari
+                       verlaesst sich beim Formaterkennen zusaetzlich zu
+                       Content-Type auf die Endung im Dateinamen. Jeder
+                       Nutzer sieht sonst nur seine eigenen Vokabeln/Kapitel/
+                       Sessions. 🔊-Knopf fuer /wort/<vid>/audio auch direkt
+                       in der Vokabelliste auf der Hauptseite, nicht nur im
+                       Trainer (Wunsch #84)
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -342,8 +395,17 @@ teile/
                               drei Tages-Listen)
     kinderplan.html         – Aufgabenplan: Wochentag-Karten, Aufgaben-Chips zum
                               Zuweisen, Abhaken für heute, Wessen-Plan-Umschalter
-    sportschau.html         – Trainings-Heatmap (Wunsch #62), Heatmap-CSS 1:1 aus
-                              geholfen.html übernommen, Zeilen sind Trainingsarten
+    sportschau.html         – Trainings-Heatmap (Wunsch #62), Zeilen sind
+                              Trainingsarten; Name steht in eigener Zeile über
+                              den Heatmap-Zellen statt fester Breite mit
+                              Ellipsis (Wunsch #74 – geholfen.html hat kurze
+                              Namen und ist davon nicht betroffen, dort
+                              unverändert); darunter gestapeltes
+                              Balkendiagramm Schritte je Tag (Wunsch #77,
+                              reines CSS/Flexbox, keine Chart-Bibliothek),
+                              Hilfslinien alle 2000 Schritte, native
+                              `title`-Tooltips je Balken (gleiches Muster wie
+                              `title` auf `.heatmap-cell`)
     tierbaukasten.html      – SVG-Tierbaukasten (Wunsch #64), 3-Schritte-
                               Assistent + Mensch-Figur + Ansichten-Rotation
                               (Wunsch #66): Jinja-Macros pro Typ (Kopf/Körper
@@ -386,7 +448,23 @@ teile/
                               (`|tojson` OHNE forceescape, siehe Bekannte Issues),
                               zufällige Abfragerichtung, falsche Antworten ans
                               Ende der Warteschlange, /versuch je Antwort,
-                              Sitzungsende per Button, pagehide + sendBeacon
+                              Sitzungsende per Button, pagehide + sendBeacon;
+                              "🔊 Anhören"-Knopf nach jeder Antwort (Wunsch #81,
+                              spielt /wort/<vid>/audio über `new Audio()` ab)
+    vokabel_foto_import.html – Foto-Upload (Wunsch #80): Sprache-Chips,
+                              Datei-Input mit `capture="environment"` fürs
+                              Handy, gleiches Fehler-Anzeige-Muster wie
+                              rezept_importieren.html
+    vokabel_foto_pruefen.html – Von der KI erkannte Vokabelpaare zur Kontrolle:
+                              jede Zeile mit Checkbox (behalten/verwerfen) +
+                              editierbaren Fremd-/Deutsch-Feldern, ein
+                              gemeinsames Kapitel für den ganzen Stapel,
+                              speichert erst bei explizitem Absenden
+    vokabel_auswertung.html – Auswertung (Wunsch #79): Balken für Trainingszeit
+                              je Sprache (Einzelfarbe var(--farbe)), gestapelter
+                              Balken richtig/falsch je Kapitel (Grün/Rot 1:1 aus
+                              vokabel_training.html), Wortlisten-Chips gelernt/
+                              schwierig/ungeübt; Nutzer-Pills nur für Eltern/Admin
 static/
   manifest.json      – PWA-Manifest (Fallback ohne Nutzer-Token)
   icon-192.png       – Generiert im Dockerfile (weiße "16" auf Marken-Blau, kein Pillow)
@@ -429,6 +507,8 @@ static/
 | `vokabel_kapitel_zuordnung` | vokabel_id (FK vokabeln, cascade), kapitel_id (FK vokabel_kapitel, cascade); UNIQUE(vokabel_id,kapitel_id) – m:n, eine Vokabel kann mehreren Kapiteln oder keinem angehören |
 | `vokabel_sessions` | id, user_id (FK users, cascade), sprache_id (FK vokabel_sprachen), gestartet, beendet (NULL = noch offen) – ein Trainer-Durchgang |
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
+| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
+| `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.
@@ -513,6 +593,72 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
 ## Bekannte Issues
+
+- **SVG `<use href="#id">`/`clipPath` gegen eine nicht existierende ID
+  resolved zu einem leeren Clip-Bereich, ohne Fehler.** Betraf Wunsch #83
+  (v70-Fix, Tierbaukasten-Galerie): `figur_vorschau()` (`tierbaukasten.html`)
+  baut pro Galerie-Eintrag einen eigenen `clipPath` mit suffixierter ID
+  (`clip-katze-5` → `<use href="#body-vorne-katze-5"/>`), damit mehrere
+  gespeicherte Tiere derselben Art nicht dieselbe SVG-ID teilen. Das
+  wiederverwendete Macro `koerper_vorne(typ)` kannte diesen `suffix`-
+  Parameter aber nicht und vergab immer nur die feste, unsuffixierte ID –
+  der `<use>`-Verweis lief ins Leere, die `clipPath` blieb leer, die
+  Mustergruppe wurde komplett weggeclippt (unsichtbar), während der direkt
+  gerenderte Körper normal sichtbar blieb. Kein Fehler, keine Warnung, in
+  keinem Browser. Fix: `koerper_vorne(typ, suffix='')` wie das
+  Schwester-Macro `koerper_seite` schon lange hat, IDs konsequent
+  `{{ typ }}{{ suffix }}`. **Gilt allgemein: bei jeder SVG-Vorlage mit
+  wiederverwendbaren Elementen und `<use>`/`clip-path`-Referenzen sicherstellen,
+  dass ALLE beteiligten Macros denselben Suffix-Mechanismus kennen und
+  konsequent anwenden** – sonst zeigt curl (sieht nur Attribute) UND ein
+  Screenshot (Körper bleibt ja sichtbar) den Fehler nicht zuverlässig; per
+  `javascript_tool` `getBBox()` auf das `<use>`-Ziel prüfen (0×0 = tote
+  Referenz).
+
+- **OpenRouter-TTS: `response_format` ist modellabhängig, nicht generisch
+  mp3/pcm wählbar.** Betraf Wunsch #81 (v67→v68-Fix): Die OpenRouter-Doku für
+  `/api/v1/audio/speech` nennt "mp3 oder pcm" als Optionen, aber
+  `google/gemini-3.1-flash-tts-preview` akzeptiert ausschließlich `pcm` und
+  lehnt `mp3` mit `400 "Gemini TTS only supports response_format=\"pcm\""` ab
+  – live erst beim tatsächlichen Testen aufgefallen, nicht aus der Doku
+  ablesbar. `ki_text_zu_sprache()` (`00_kern.py`) versucht deshalb erst mp3,
+  weicht bei genau dieser Fehlermeldung auf PCM aus und verpackt das Ergebnis
+  selbst in einen WAV-Container (`wave`-Modul aus der Standardbibliothek,
+  24 kHz/16-bit/Mono laut Google-Doku für Gemini TTS) – **künftige TTS-Modelle
+  in `ki_stimmen` können andere Formatgrenzen und andere PCM-Parameter haben**,
+  bei einem Modellwechsel per `manage.py ki_stimme` diesen Fallback-Pfad neu
+  gegenprüfen.
+
+- **iOS/Safari verlässt sich beim Erkennen des Audioformats zusätzlich auf
+  die Dateiendung im `Content-Disposition`-Header, nicht nur auf
+  `Content-Type`.** Betraf Wunsch #81 (v68→v69-Fix): `send_file()` lieferte
+  den internen Cache-Dateinamen mit generischer `.audio`-Endung aus (das
+  tatsächliche Format steht erst nach dem ersten KI-Aufruf fest, siehe
+  `_audio_pfad` in `16_vokabeln.py`) – trotz korrektem `Content-Type:
+  audio/wav` spielte iOS die Datei stumm nicht ab, andere Browser hatten
+  kein Problem. Fix: `send_file(..., download_name="aussprache.wav")` –
+  die Cache-Datei selbst bleibt `.audio`, nur der ausgelieferte Name bekommt
+  die zum tatsächlichen Inhalt passende Endung. **Gilt allgemein für jede
+  künftige Route, die Mediendateien mit uneinheitlicher/generischer
+  Cache-Dateiendung ausliefert** – `download_name` immer explizit setzen,
+  nicht auf `Content-Type` allein verlassen.
+
+- **CSS-Falle: Prozent-Höhe gegen eine `auto`-Höhe resolved zu nichts, ohne
+  Fehler.** Betraf das Schritte-Balkendiagramm (Wunsch #77, v65→v66-Fix):
+  `.steps-bar-stack` hatte `height:X%`, sein Elternelement `.steps-bar-col`
+  aber keine eigene definite Höhe (nur `display:flex`, kein `height`) – die
+  Kette war unterbrochen, alle Balken kollabierten lautlos auf 0px. Kein
+  Konsolenfehler, kein 500er, curl zeigt die (korrekten!) HTML-Attribute
+  weiterhin an – nur das gerenderte Layout ist kaputt. **Jede Prozent-Höhe
+  braucht eine lückenlose Kette definiter Höhen bis zur Wurzel** (hier:
+  `.steps-chart` mit `height:150px` fix → `.steps-bars` mit `height:100%` →
+  `.steps-bar-col` mit `height:100%` → erst dann darf `.steps-bar-stack`
+  sinnvoll `height:X%` haben). Verifiziert wurde der Fix nicht per
+  Screenshot (Chrome-Erweiterung hing fest), sondern über
+  `mcp__claude-in-chrome__javascript_tool` mit `getBoundingClientRect()` im
+  echten Tab – bei ähnlichen Layout-Bugs künftig bevorzugt so prüfen, wenn
+  Playwright/Screenshots gerade nicht verfügbar sind, da curl allein
+  Rendering-Fehler dieser Art nicht aufdeckt.
 
 - **SVG-Falle: gemeinsam genutzte Overlay-Gruppe an nur EINER DOM-Position.**
   SVG malt strikt in Dokumentreihenfolge – eine später im DOM stehende Form

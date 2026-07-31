@@ -56,7 +56,7 @@
 .vokabel-text { flex:1; min-width:0; font-size:15px; }
 .vokabel-fremd { font-weight:600; }
 .vokabel-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
-.vokabel-edit-btn {
+.vokabel-edit-btn, .vokabel-anhoeren-btn {
   background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2); flex-shrink:0;
 }
 .vokabel-edit-panel {
@@ -131,6 +131,7 @@
         <span class="vokabel-fremd">{{ v.fremd }}</span> – {{ v.deutsch }}
         <div class="vokabel-meta">{{ v.sprache_name }}{% if v.kapitel_namen %} · {{ v.kapitel_namen }}{% endif %}</div>
       </div>
+      <button class="vokabel-anhoeren-btn" type="button" onclick="wortAnhoeren({{ v.id }})" title="Anhören">🔊</button>
       <button class="vokabel-edit-btn" type="button" onclick="toggleEdit({{ v.id }})" title="Bearbeiten">✏️</button>
     </div>
 
@@ -209,6 +210,13 @@ document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
     document.getElementById('neu-fremd')?.focus();
   }
 });
+
+let anhoerenAudio = null;
+function wortAnhoeren(id) {
+  if (anhoerenAudio) { anhoerenAudio.pause(); anhoerenAudio = null; }
+  anhoerenAudio = new Audio(`/a/vokabeln/${TOKEN}/wort/${id}/audio`);
+  anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
+}
 
 function toggleEdit(id) {
   const p = document.getElementById('edit-' + id);

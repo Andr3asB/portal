@@ -2,6 +2,364 @@
 
 ---
 
+## 2026-07-30 – portal-v70: Wunsch #83 (Fix Tierbaukasten-Galerie) + #84 (Anhören auf Übersichtsseite)
+
+### Wunsch #83 – Muster in der Galerie verschwunden
+
+Andi meldete: "Bei den gespeicherten Tieren verschwinden die Muster. Sind
+die nicht gespeichert oder nur nicht angezeigt?" Antwort: nur nicht
+angezeigt, kein Datenverlust – `muster`/`muster_farbe` waren in der DB
+korrekt gespeichert.
+
+**Ursache:** Die Galerie rendert jede Figur über das eigene Macro
+`figur_vorschau(einzel_typ, suffix, muster_wert, koerperbau)`
+(`tierbaukasten.html`), dessen `clipPath` auf
+`#body-vorne-{{ einzel_typ }}{{ suffix }}` verweist (`suffix = '-' ~ k.id`,
+z. B. `-5`, damit mehrere gespeicherte Tiere derselben Art keine doppelten
+IDs erzeugen). Das zugrunde liegende Macro `koerper_vorne(typ)` – das
+sowohl der interaktive Baukasten als auch die Galerie zur Körperform
+nutzen – kannte diesen `suffix`-Parameter aber gar nicht und vergab immer
+nur die feste ID (z. B. `id="body-vorne-katze"`, nie `-5`). Das
+Schwester-Macro `koerper_seite(typ, suffix='')` hatte diesen Parameter
+schon lange, `koerper_vorne` war beim Bau der Galerie (später als der
+Baukasten selbst) offenbar übersehen worden. Damit lief `<use
+href="#body-vorne-katze-5"/>` ins Leere, die `clipPath` blieb leer, und
+die Mustergruppe (`<g clip-path="...">`) wurde komplett weggeclippt – der
+Körper selbst wird direkt gerendert, nicht über den Clip, blieb also
+sichtbar. Passt exakt zum gemeldeten Symptom.
+
+**Fix:** `koerper_vorne` bekam ebenfalls `suffix=''` als Parameter, jede
+der sechs Tierart-IDs wurde auf `id="body-vorne-{typ}{{ suffix }}"`
+umgestellt, `figur_vorschau` reicht `suffix` jetzt an `koerper_vorne`
+durch. Der Baukasten selbst ruft `koerper_vorne(k)` weiterhin ohne Suffix
+auf (Standardwert `''`) – unverändertes Verhalten dort, sein eigener
+`clip-{{ k }}`/`#body-vorne-{{ k }}` erwartete nie einen Suffix.
+
+**Verifiziert:** Playwright/Screenshot weiterhin nicht nutzbar (siehe
+unten), stattdessen per `javascript_tool` gegen die echte Seite geprüft:
+alle fünf Galerie-`clipPath`s mit numerischem Suffix (`clip-katze-1`,
+`clip-baer-10`, …) lösen jetzt zu existierenden Zielen mit realer BBox
+auf (z. B. 84×100px statt vorher unauffindbar), die zugehörige
+Mustergruppe hat eine reale BBox (~95×99px) mit `fill:var(--muster-farbe)`
+– das Muster ist tatsächlich sichtbar, nicht nur die ID vorhanden.
+
+### Wunsch #84 – Anhören auch auf der Übersichtsseite
+
+Wunsch #81 brachte den "🔊 Anhören"-Knopf nur in den Trainer. Jetzt hat
+auch jede Zeile in der Vokabelliste (`vokabeln.html`) einen 🔊-Knopf
+neben dem ✏️-Bearbeiten-Knopf, der denselben Endpunkt
+`/a/vokabeln/<token>/wort/<vid>/audio` abspielt (`wortAnhoeren(id)`,
+identisches Prinzip wie im Trainer: einzelnes wiederverwendetes
+`Audio`-Objekt, vorheriges wird pausiert, bevor ein neues startet).
+Hilfe-Kapitel „📚 Vokabeln" entsprechend ergänzt.
+
+**Verifiziert:** Alle 6 Vokabel-Zeilen der Testseite haben einen
+funktionierenden Knopf (`onclick="wortAnhoeren(10)"` etc.); der
+Audio-Endpunkt liefert per curl ein gültiges WAV
+(`RIFF...WAVE`-Header, `Content-Type: audio/wav`,
+`Content-Disposition: ...filename=aussprache.wav` – der iOS-Fix aus
+Wunsch #81 greift auch hier, da derselbe Endpunkt).
+
+### Auslieferungspaket
+
+`deploy/portal-v70.tar.gz`
+
+---
+
+## 2026-07-30 – portal-v67 bis v69: Wünsche #80 (Foto-Import) + #81 (Aussprache), Grundprinzip KI-Modellwahl
+
+### Was gebaut wurde
+
+- **Grundprinzip (Wunsch #81, ausdrücklich für ALLE KI-Anwendungen gefordert):**
+  Neue Tabellen `ki_konfiguration` (Modell je Verwendungszweck, z. B.
+  "rezepte_import") und `ki_stimmen` (Modell+Stimme je Vokabeln-Sprache) in
+  `00_kern.py`. `ki_anfrage()` liest das Modell jetzt über `ki_modell_fuer(feature)`
+  aus der DB statt der festen Konstante `KI_MODELL` zu verwenden – die bleibt
+  nur noch Fallback, falls keine Zeile existiert. Neu: `manage.py ki_modell`/
+  `ki_stimme`/`listki` zum Ändern ohne Deploy, falls sich die Modell-Landschaft
+  weiterentwickelt. `ki_anfrage()` bekam außerdem einen optionalen `bilder`-
+  Parameter für Bildeingabe (Vision), den Wunsch #80 braucht.
+
+- **Wunsch #80 (Foto-Import):** `/a/vokabeln/<token>/foto-import` – Foto
+  hochladen (max. 8 MB, JPG/PNG/HEIC), Sprache wählen, KI (`vokabeln_ocr`-
+  Zweck, aktuell dasselbe `anthropic/claude-haiku-4.5` wie beim Rezept-Import,
+  da bereits vision-fähig und günstig) extrahiert Vokabelpaare als JSON.
+  Ergebnis landet zur Kontrolle in `vokabel_foto_pruefen.html` (jede Zeile
+  editierbar/abwählbar, ein gemeinsames Kapitel für den ganzen Stapel) –
+  gleiches Prinzip wie der Rezept-URL-Import, nie direkt speichern.
+
+- **Wunsch #81 (Aussprache):** Im Trainer erscheint nach jeder Antwort ein
+  "🔊 Anhören"-Knopf (`vokabel_training.html`), der `/a/vokabeln/<token>/wort/
+  <vid>/audio` abspielt. Erster Aufruf pro (Sprache, Wort) erzeugt die Datei
+  per `ki_text_zu_sprache()` (OpenRouter-Endpoint `/api/v1/audio/speech`,
+  Standardmodell `google/gemini-3.1-flash-tts-preview` mit Stimme "Kore" –
+  deckt alle 5 Vokabeln-Sprachen inkl. Latein/Dänisch ab, die günstigere
+  Modelle wie Kokoro nicht abdecken; bei kurzen Einzelwörtern ist der
+  Preisunterschied ohnehin vernachlässigbar) und cacht sie dauerhaft unter
+  `DATA_DIR/vokabel_audio/<sprache_id>/<hash>.audio` (Schlüssel: normalisierter
+  Text, nicht vokabel_id – identische Wörter teilen sich die Datei). Zählt
+  bewusst NICHT gegen das tokenbasierte KI-Kontingent (TTS wird pro Zeichen
+  abgerechnet, anderes Maß).
+
+### Zwei Bugs, beide erst live gefunden
+
+1. **Gemini TTS akzeptiert kein `response_format=mp3`**, nur `pcm` – die
+   generische OpenRouter-Doku nennt beide Formate als Option, das konkrete
+   Modell aber nur eins. `ki_text_zu_sprache()` versucht jetzt erst mp3,
+   weicht bei genau dieser Fehlermeldung auf PCM aus und packt das Ergebnis
+   selbst in einen WAV-Container (Python-`wave`-Modul, keine neue
+   Abhängigkeit) – 24 kHz/16-bit/Mono laut Google-Doku für Gemini TTS.
+   Live gegen die echte API verifiziert, bevor deployt wurde.
+
+2. **iOS/Safari spielte die WAV-Datei trotz korrektem `Content-Type: audio/wav`
+   nicht ab** – Andi meldete "Audiofile wird auf iOS nicht abgespielt".
+   Ursache: `send_file()` lieferte den `Content-Disposition`-Header mit dem
+   internen Cache-Dateinamen (Endung `.audio`, generisch gewählt, weil das
+   Format erst nach dem ersten KI-Aufruf feststeht). iOS' Medienpipeline
+   verlässt sich beim Erkennen des Formats teils zusätzlich auf die
+   Dateiendung im Namen, nicht nur auf `Content-Type`. Fix: `send_file(...,
+   download_name="aussprache.wav")` – die Cache-Datei selbst bleibt
+   `.audio`, nur der ausgelieferte Name bekommt die passende Endung. Von
+   Andi auf dem echten iPhone bestätigt.
+
+### Testergebnisse
+
+Playwright/Chromium weiterhin nicht per Screenshot nutzbar. OCR-Pipeline per
+curl mit einem winzigen 1×1-Test-PNG geprüft (Multipart-Upload, Vision-Aufruf,
+JSON-Parsing, Fehlerpfad bei „keine Vokabeln erkannt" – alles korrekt
+durchlaufen; echte Erkennungsqualität an einem realen Foto steht noch aus).
+TTS live gegen die echte OpenRouter-API getestet (mp3 schlägt wie erwartet
+fehl, pcm liefert 46080 Bytes, WAV-Verpackung ergibt gültigen RIFF-Header),
+danach von Andi auf dem iPhone bestätigt – dabei zufällig entdeckt, dass
+Friederike bereits aktiv mit der App arbeitet (eigene Latein-Vokabel "Ave =
+Hallo" real angelegt, keine Testdaten). Erzeugte Audiodatei für "Run"
+(Englisch) ist eine echte, dauerhaft nützliche Cache-Datei, keine Testdaten –
+nicht gelöscht.
+
+### Auslieferungspaket
+
+`deploy/portal-v67.tar.gz` (Grundgerüst #80/#81) → `v68.tar.gz` (PCM/WAV-Fix)
+→ `v69.tar.gz` (iOS-Dateiname-Fix, aktueller Stand)
+
+---
+
+## 2026-07-30 – portal-v66: Fix – Schritte-Balken in v65 unsichtbar
+
+### Was kaputt war
+
+Andi meldete: keine Schritte im neuen Balkendiagramm (Wunsch #77, v65)
+sichtbar, obwohl curl-Tests zuvor plausible Werte in den `title`-Attributen
+zeigten. Ursache: klassische CSS-Falle bei Prozent-Höhen. `.steps-bar-stack`
+bekam seine Höhe per `style="height:X%"`, aber sein Elternelement
+`.steps-bar-col` hatte KEINE eigene definite Höhe (nur `display:flex;
+align-items:center` ohne `height`) – Kette der Höhenvererbung war
+unterbrochen. CSS ignoriert Prozent-Höhen, deren Bezugsbox selbst nur
+`auto` (inhaltsbestimmt) ist, komplett; die Balken kollabierten auf 0,
+ohne Fehler, ohne Warnung. curl sieht nur das HTML/die Attribute, nicht das
+gerenderte Layout – deshalb ist dieser Bug-Typ mit curl allein unsichtbar.
+
+**Lektion:** Bei jedem Prozent-Höhen-Layout die komplette Elternkette bis
+zu einer definiten Höhe durchgehen, sonst rendert nichts, ohne dass
+irgendein Fehler auftaucht.
+
+### Fix
+
+`.steps-bar-col` bekommt jetzt explizit `height:100%` (relativ zu
+`.steps-bars`, das wiederum `height:100%` von `.steps-chart` mit fixer
+`height:150px` erbt – jede Stufe der Kette ist jetzt definite). Zusätzlich
+Tageslabels aus den Balkenspalten in eine eigene `.steps-labels`-Zeile
+unterhalb des Charts verschoben (vermeidet denselben Fallstrick für
+zukünftige Anpassungen) und Gridlines von `.steps-chart` nach `.steps-bars`
+verschoben, damit ihre Prozent-Position exakt zur Balkenfläche passt statt
+zur äußeren, um das Padding größeren Box.
+
+### Testergebnisse
+
+Playwright/Chromium weiterhin nicht per Screenshot nutzbar (Chrome-
+Erweiterung hängt fest, auch in frisch erstelltem Tab). Stattdessen
+`javascript_tool` direkt im echten Tab genutzt, um `getBoundingClientRect()`
+der gerenderten Elemente auszulesen - objektiver und in diesem Fall
+aussagekräftiger als ein Screenshot: `.steps-chart` 150px, `.steps-bars`
+134px, alle 14 `.steps-bar-stack`-Elemente mit korrekten, unterschiedlichen
+Pixel-Höhen (0-134px) statt überall 0. Trainings-Anteil exakt geprüft (z. B.
+18.07.: 5746/12081 Schritte = 47,6% - gerenderte `trainingH` 63.8px von
+134px Stack-Höhe = exakt 47,6%). Farben per `getComputedStyle` bestätigt
+(Training = var(--farbe) = rgb(52,152,219), Sonstige = var(--text-2) =
+rgb(142,142,147)). Gridlines gleichmäßig verteilt (alle ~22px Abstand bei
+2000er-Schritten). Diese Art von Bug künftig eher über `javascript_tool`/
+`getBoundingClientRect()` statt nur curl absichern, wenn Playwright/
+Screenshots gerade nicht verfügbar sind.
+
+### Auslieferungspaket
+
+`deploy/portal-v66.tar.gz`
+
+---
+
+## 2026-07-30 – portal-v65: Wunsch #77 (Sportschau-Schritte-Balkendiagramm)
+
+### Was gebaut wurde
+
+Neue Section unter der Heatmap: gestapeltes Balkendiagramm der Schritte je
+Tag (14 Tage, dieselbe Konstante wie die Heatmap), Trainings-Schritte
+(var(--farbe)) vs. sonstige Schritte (var(--text-2)) gestapelt, Hilfslinien
+alle 2000 Schritte.
+
+Datenquelle war zunächst unklar (`/api/workouts` liefert keine Schritte) –
+Andi nannte den Endpoint `/api/metrics/step_count?from=${__from}&to=${__to}`
+(aus einer Grafana-Panel-Query kopiert). Live geprüft: anders als
+`/api/workouts` (ISO-Datum) erwartet dieser Endpoint `from`/`to` als
+Unix-Millisekunden – funktioniert nicht mit ISO-Strings, keine
+Fehlermeldung, einfach leeres/falsches Ergebnis. Antwort: stündliche
+Buckets `{"date": ISO-UTC, "qty": Schrittzahl, "source": "..."}`, teils zwei
+Quellen (Watch + iPhone) fürs selbe Fenster, dann aufsummiert.
+
+Zuordnung "Trainings-Schritte": keine feinere Verknüpfung zwischen
+Schritt-Bucket und Workout verfügbar, deshalb Näherung auf Stundenbasis –
+eine Stunde zählt als Training, wenn ihr Zeitfenster ein Workout-Fenster aus
+`/api/workouts` berührt (Intervall-Überlappungstest). Bei kurzen Workouts
+innerhalb einer Stunde mit sonst wenig Bewegung kann das die
+Trainings-Schritte leicht überschätzen – genauere Daten liefert die API
+nicht, für eine grobe visuelle Einordnung ausreichend.
+
+Farben (var(--farbe) für Training, var(--text-2) für sonstige Schritte)
+bewusst als "Akzent vs. neutral" gewählt statt zwei konkurrierende
+Kategorie-Farben – dataviz-Skill-Prinzip "categorical hues nur bei echten
+gleichrangigen Kategorien, sonst Akzent/neutral" angewendet, keine neue
+Palette nötig.
+
+### Testergebnisse
+
+Playwright/Chromium weiterhin nicht verfügbar (Chrome-Erweiterung hängt
+fest, auch nach mehreren Stunden noch). Per curl gegen die echte Domain:
+14 Balken vorhanden, Tooltip-Werte plausibel (z. B. "2026-07-18: 12081
+Schritte (5746 beim Training)"), Trainings-Anteil überall ≤ Gesamt,
+Hilfslinien korrekt bei 2000/4000/.../12000.
+
+### Auslieferungspaket
+
+`deploy/portal-v65.tar.gz`
+
+---
+
+## 2026-07-30 – portal-v64: Wünsche #76, #78, #79
+
+### Was gebaut wurde
+
+- **Wunsch #76 (Vokabeln):** Drei neue Standardsprachen (Dänisch, Italienisch,
+  Französisch) zu `_DEFAULT_SPRACHEN` ergänzt. Dabei einen latenten Bug in der
+  Seed-Logik gefixt: Sie fügte Sprachen bisher nur ein, wenn `vokabel_sprachen`
+  komplett leer war (`if COUNT==0`) – da die Tabelle längst Zeilen hatte
+  (Englisch/Latein), wären die drei neuen nie angelegt worden. Jetzt
+  unconditionell `INSERT OR IGNORE` je Sprache, idempotent über
+  `UNIQUE(name)`. Neue Sprachen aktivieren sich Nutzer selbst auf der
+  Sprachen-Unterseite (kein Auto-Grant für Bestandsnutzer, die schon eine
+  Auswahl getroffen haben).
+
+- **Wunsch #78 (Sportschau):** Heatmap von 10 auf 14 Tage erweitert
+  (`_TAGE_ANZAHL`-Konstante in `14_sportschau.py`, Template-Texte nutzen
+  `tage|length` statt hartkodierter Zahl).
+
+- **Wunsch #79 (Vokabeln, neue Unterseite "Auswertung"):** Trainingszeit je
+  Sprache (Balken, Minuten aus `vokabel_sessions.beendet - gestartet`, nur
+  Sessions mit mindestens einem `vokabel_versuche`-Eintrag zählen) sowie
+  richtig/falsch-Auswertung je Kapitel (gestapelter Balken, Wortlisten
+  "✅ Gelernt"/"⚠️ Noch schwierig"/"○ Noch nicht geübt" nach letztem Versuch
+  pro Vokabel). Kinder sehen nur die eigene Auswertung, Eltern/Admin können
+  per Pill-Auswahl (`?fuer=<user_id>`) jeden Nutzer ansehen – serverseitig
+  durchgesetzt, nicht nur UI-Versteckung (getestet: Kind kann `?fuer=` nicht
+  umgehen). **Datenmodell-Hinweis:** `vokabel_sessions` speichert nur
+  `sprache_id`, kein Kapitel (eine Session kann mehrere/alle Kapitel
+  umfassen) – Trainingsdauer ist deshalb nur je Sprache sauber aggregierbar,
+  nicht je Kapitel. Richtig/Falsch-Zählung hängt dagegen an der Vokabel
+  selbst (über `vokabel_kapitel_zuordnung`) und ist je Kapitel exakt.
+  Farben (Grün/Rot für richtig/falsch) 1:1 aus `vokabel_training.html`
+  übernommen statt neu erfunden – dataviz-Skill vor dem Bau geladen,
+  Formwahl dokumentiert im Code-Kommentar der Route.
+
+- **Zurückgestellt (kein Wunsch, sondern offene Rückfrage):** Wunsch #77
+  (Schritte-Balkendiagramm) braucht Schrittdaten, die `/api/workouts` vom
+  hae-Server nicht liefert (nur workout_type/start_time/end_time/
+  duration_minutes/calories_burned, live geprüft). Kein Endpoint dafür
+  bekannt oder dokumentiert – Rückfrage an Andi nötig, ob es einen
+  Schritte-Endpoint gibt oder der hae-Server das liefern könnte.
+
+### Testergebnisse
+
+Per curl gegen die echte Domain (Playwright/Chromium weiterhin nicht
+verfügbar). Dabei zufällig entdeckt: Andi und Friederike nutzen die
+Vokabeln-App bereits produktiv (echte Sessions/Vokabeln in der DB, keine
+Testdaten von mir) – vor jeder Prüfung Zeitstempel kontrolliert, um echte
+Nutzerdaten nicht mit Testresten zu verwechseln, nichts gelöscht.
+Auswertungsseite mit dieser echten Datenlage geprüft: Trainingszeit-Balken,
+richtig/falsch-Stacked-Bar (75%/25% bei 3 richtig/1 falsch, "letzter
+Versuch zählt"-Logik korrekt), Sprachen-Filterung korrekt, Zugriffsschutz
+für Kind-Rolle bestätigt (eigener Token + `?fuer=1` liefert trotzdem nur
+eigene Daten). 14-Tage-Heatmap: 28 Zellen (2 Zeilen × 14 Tage) bestätigt.
+
+### Auslieferungspaket
+
+`deploy/portal-v64.tar.gz`
+
+---
+
+## 2026-07-30 – portal-v63: Wunsch #75 (Sportschau-Übersetzung)
+
+### Was gebaut wurde
+
+Der hae-Server liefert `workout_type` bereits deutsch lokalisiert, aber mit
+schlechter Wortwahl: "Ausführen" statt "Laufen" für Run, "Spaziergang" statt
+"Gehen" für Walk (vermutlich eine generische HealthKit-Übersetzung, die
+"Run" als Verb liest). Da der hae-Server ein fremdes System ist (bauplan.md),
+wird das im Portal selbst korrigiert: `_ART_KORREKTUREN`-Dict in
+`14_sportschau.py`, ersetzt bekannte Fehlübersetzungen per Substring
+("Ausführen"→"Laufen", "Spaziergang"→"Gehen"), unbekannte Werte (z. B.
+"Wandern") bleiben unangetastet. Neue Fehlübersetzungen kommen bei Bedarf
+per Wunsch in dieselbe Tabelle.
+
+### Testergebnisse
+
+Live gegen die echte hae-API geprüft (`docker exec portal python` von
+diesem Rechner aus, ruft die letzten 30 Tage ab): tatsächliche Rohwerte
+waren "Outdoor Ausführen", "Outdoor Spaziergang", "Wandern". Nach Deploy
+zeigt `/a/sportschau/` korrekt "Outdoor Laufen" und "Outdoor Gehen".
+Playwright/Chromium weiterhin nicht verfügbar (Chrome-Erweiterung hängt seit
+vorheriger Sitzung fest) – wie zuvor per curl gegen die echte Domain
+verifiziert, visueller Check steht weiterhin aus.
+
+### Auslieferungspaket
+
+`deploy/portal-v63.tar.gz`
+
+---
+
+## 2026-07-30 – portal-v62: Wunsch #74 (Sportschau-Namen abgeschnitten)
+
+### Was gebaut wurde
+
+`sportschau.html`: `.heatmap-name` hatte eine feste Breite (120px) mit
+`text-overflow:ellipsis` – 1:1 aus `geholfen.html` übernommen, wo Namen
+kurz sind (z. B. "Andi"). Trainingsarten vom hae-Server sind aber deutlich
+länger ("Outdoor Ausführen", "Outdoor Spaziergang") und wurden abgeschnitten.
+Fix: Name steht jetzt in einer eigenen Zeile über der Heatmap-Zellenreihe
+(umbricht frei, kein Abschneiden), Zeilen durch `border-bottom` getrennt.
+`geholfen.html` selbst unverändert, da dort kein Problem besteht.
+
+### Testergebnisse
+
+Playwright/Chromium stand weiterhin nicht zur Verfügung (Chrome-Erweiterung
+hängt seit der letzten Sitzung fest, auch `example.com` liefert keinen
+Screenshot). Stattdessen per `curl` gegen die echte Domain geprüft: neues
+CSS ausgeliefert, beide echten Trainingsarten ("Outdoor Ausführen",
+"Outdoor Spaziergang") erscheinen vollständig im HTML. Visueller Check
+steht weiterhin aus, sobald das Browser-Tool wieder reagiert.
+
+### Auslieferungspaket
+
+`deploy/portal-v62.tar.gz`
+
+---
+
 ## 2026-07-30 – portal-v61: Wünsche #72 (Rezepte) + #73 (Vokabeln-Neubau)
 
 ### Was gebaut wurde

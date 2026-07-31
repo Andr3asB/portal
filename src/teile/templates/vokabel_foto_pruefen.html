@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% set app_slug = "vokabeln" %}
+{% block title %}Vokabeln prüfen{% endblock %}
+
+{% block extra_styles %}
+.hinweis { color:var(--text-2); font-size:13px; margin-bottom:14px; }
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin:0 0 8px;
+}
+.chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.kapitel-chip {
+  display:inline-flex; align-items:center; gap:5px; background:var(--surface-2);
+  border:1.5px solid var(--border); border-radius:16px; padding:6px 12px; font-size:13px; cursor:pointer;
+}
+.kapitel-chip input { margin:0; }
+.paar-row {
+  display:flex; align-items:center; gap:8px; background:var(--surface);
+  border-radius:12px; padding:10px 12px; margin-bottom:6px; box-shadow:0 1px 3px var(--shadow);
+}
+.paar-row.verworfen { opacity:.4; }
+.paar-check { flex-shrink:0; width:18px; height:18px; }
+.paar-input {
+  flex:1; min-width:0; border:1.5px solid var(--border); border-radius:8px;
+  padding:7px 9px; font-size:14px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.paar-input:focus { border-color:var(--farbe); }
+.btn-speichern {
+  margin-top:16px; width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:12px 0; font-size:15px; font-weight:600; cursor:pointer;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/vokabeln/{{ token }}/foto-import" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">✓ Vokabeln prüfen</div>
+<div class="nav-sub">{{ paare|length }} erkannt · {{ sprache.name }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  <div class="hinweis">Bitte kontrollieren und bei Bedarf korrigieren. Häkchen entfernen, um eine Zeile nicht zu übernehmen.</div>
+
+  <form method="post" action="/a/vokabeln/{{ token }}/foto-import/speichern">
+    <input type="hidden" name="sprache_id" value="{{ sprache.id }}">
+
+    {% if kapitel %}
+    <div class="field-label">Kapitel (optional, gilt für alle übernommenen Vokabeln)</div>
+    <div class="chip-row">
+      {% for k in kapitel %}
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}"> {{ k.name }}</label>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for p in paare %}
+    <div class="paar-row" id="paar-{{ loop.index0 }}">
+      <input class="paar-check" type="checkbox" name="behalten" value="{{ loop.index0 }}"
+             checked onchange="document.getElementById('paar-{{ loop.index0 }}').classList.toggle('verworfen', !this.checked)">
+      <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Fremdsprache">
+      <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn-speichern">{{ paare|length }} Vokabeln übernehmen</button>
+  </form>
+</main>
+{% endblock %}

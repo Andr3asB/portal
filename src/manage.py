@@ -8,6 +8,9 @@ Aufruf im Container:
   docker exec portal python manage.py grant 1 todo
   docker exec portal python manage.py listusers
   docker exec portal python manage.py listwuensche
+  docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
+  docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
+  docker exec portal python manage.py listki
 """
 import os, sys, sqlite3, secrets
 from pathlib import Path
@@ -238,6 +241,58 @@ def cmd_backlog(_):
     db.close()
 
 
+def cmd_ki_modell(args):
+    """Wunsch #81 (Grundprinzip): Modell je KI-Zweck ohne Deploy aendern.
+    ki_konfiguration/ki_stimmen existieren erst, sobald der Portal-Container
+    einmal gestartet ist (00_kern.py._init_db legt sie an) - dieses Skript
+    hat absichtlich nur ein Mini-Schema fuer die Ersteinrichtung."""
+    if len(args) < 2:
+        sys.exit("Verwendung: ki_modell <zweck> <modell>")
+    zweck, modell = args[0], args[1]
+    db = connect()
+    db.execute(
+        "INSERT INTO ki_konfiguration(zweck, modell) VALUES(?,?) "
+        "ON CONFLICT(zweck) DO UPDATE SET modell=excluded.modell",
+        (zweck, modell),
+    )
+    db.commit()
+    db.close()
+    print(f"KI-Modell fuer '{zweck}': {modell}")
+
+
+def cmd_ki_stimme(args):
+    if len(args) < 3:
+        sys.exit("Verwendung: ki_stimme <sprache_name> <modell> <stimme>")
+    sprache_name, modell, stimme = args[0], args[1], args[2]
+    db = connect()
+    row = db.execute("SELECT id FROM vokabel_sprachen WHERE name=?", (sprache_name,)).fetchone()
+    if not row:
+        sys.exit(f"Sprache '{sprache_name}' nicht gefunden.")
+    db.execute(
+        "INSERT INTO ki_stimmen(sprache_id, modell, stimme) VALUES(?,?,?) "
+        "ON CONFLICT(sprache_id) DO UPDATE SET modell=excluded.modell, stimme=excluded.stimme",
+        (row["id"], modell, stimme),
+    )
+    db.commit()
+    db.close()
+    print(f"TTS fuer '{sprache_name}': {modell} / {stimme}")
+
+
+def cmd_listki(_):
+    db = connect()
+    print("=== KI-Modelle je Zweck ===")
+    for r in db.execute("SELECT zweck, modell FROM ki_konfiguration ORDER BY zweck").fetchall():
+        print(f"  {r['zweck']}: {r['modell']}")
+    print()
+    print("=== TTS-Stimmen je Sprache ===")
+    for r in db.execute("""
+        SELECT s.name, t.modell, t.stimme FROM ki_stimmen t
+        JOIN vokabel_sprachen s ON s.id = t.sprache_id ORDER BY s.name
+    """).fetchall():
+        print(f"  {r['name']}: {r['modell']} / {r['stimme']}")
+    db.close()
+
+
 CMDS = {
     "createadmin":     cmd_createadmin,
     "adduser":         cmd_adduser,
@@ -248,6 +303,9 @@ CMDS = {
     "listtodos":       cmd_listtodos,
     "wunsch_erledigt": cmd_wunsch_erledigt,
     "backlog":         cmd_backlog,
+    "ki_modell":       cmd_ki_modell,
+    "ki_stimme":       cmd_ki_stimme,
+    "listki":          cmd_listki,
 }
 
 if __name__ == "__main__":

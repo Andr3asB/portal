@@ -221,9 +221,18 @@ CREATE TABLE IF NOT EXISTS vokabel_versuche (
   richtig     INTEGER NOT NULL,
   beantwortet TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS ki_konfiguration (
+  zweck  TEXT PRIMARY KEY,
+  modell TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ki_stimmen (
+  sprache_id INTEGER PRIMARY KEY REFERENCES vokabel_sprachen(id) ON DELETE CASCADE,
+  modell     TEXT NOT NULL,
+  stimme     TEXT NOT NULL
+);
 """
 
-_DEFAULT_SPRACHEN = ["Englisch", "Latein"]
+_DEFAULT_SPRACHEN = ["Englisch", "Latein", "Dänisch", "Italienisch", "Französisch"]
 
 _CORE_APPS = [
     ("home",        "Portal",       "🏠", "Persönliche Startseite"),
@@ -394,7 +403,21 @@ def push_send(user_id: int, title: str, body: str,
     threading.Thread(target=_send, daemon=True).start()
 
 
+# Standard-Modell, falls fuer einen Zweck keine Zeile in ki_konfiguration
+# existiert. Wunsch #81 macht das zum Grundprinzip fuer ALLE KI-Anwendungen:
+# das tatsaechlich verwendete Modell steht in der DB (ki_konfiguration /
+# ki_stimmen), nicht fest im Code - per manage.py aenderbar, ohne Deploy,
+# falls sich die Modell-Landschaft weiterentwickelt.
 KI_MODELL = "anthropic/claude-haiku-4.5"
+
+# TTS ueber OpenRouters /audio/speech-Endpoint (Wunsch #81). Gemini 3.1 Flash
+# TTS deckt 70+ Sprachen ab (u.a. alle aktuellen Vokabeln-Sprachen inkl.
+# Latein/Daenisch, die guenstigere Modelle wie Kokoro nicht abdecken) - bei
+# kurzen Einzelwoertern ist der Preisunterschied ohnehin vernachlaessigbar,
+# da jedes Wort nur einmal erzeugt und dann dauerhaft im Datenordner
+# gecacht wird. "Kore" ist eine neutrale Standardstimme.
+TTS_STANDARD_MODELL = "google/gemini-3.1-flash-tts-preview"
+TTS_STANDARD_STIMME = "Kore"
 
 
 class KiLimitError(Exception):
@@ -405,7 +428,30 @@ class KiFehler(Exception):
     """Allgemeiner Fehler beim KI-Aufruf (kein Key, Netzwerk, ungültige Antwort)."""
 
 
-def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens: int = 1500) -> str:
+def ki_modell_fuer(zweck: str) -> str:
+    """Modellwahl je Verwendungszweck (Wunsch #81 - Grundprinzip): schaut in
+    ki_konfiguration nach, faellt auf KI_MODELL zurueck, wenn dort nichts
+    hinterlegt ist. `zweck` ist dieselbe Zeichenkette wie ki_anfrage()s
+    `feature` (z.B. "rezepte_import"), damit kein zweiter Bezeichner noetig ist."""
+    db = get_db()
+    row = db.execute("SELECT modell FROM ki_konfiguration WHERE zweck=?", (zweck,)).fetchone()
+    return row["modell"] if row else KI_MODELL
+
+
+def ki_stimme_fuer(sprache_id: int):
+    """(modell, stimme) fuers TTS einer Vokabel-Sprache (Wunsch #81) - je
+    Sprache in ki_stimmen hinterlegt, austauschbar ohne Code-Aenderung."""
+    db = get_db()
+    row = db.execute(
+        "SELECT modell, stimme FROM ki_stimmen WHERE sprache_id=?", (sprache_id,)
+    ).fetchone()
+    if row:
+        return row["modell"], row["stimme"]
+    return TTS_STANDARD_MODELL, TTS_STANDARD_STIMME
+
+
+def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens: int = 1500,
+               bilder=None) -> str:
     """Generischer KI-Aufruf über OpenRouter – von jedem KI-Feature verwendbar.
 
     Kontingent ist pro Nutzer und Kalendermonat gemeinsam über alle Features
@@ -413,7 +459,11 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     damit künftige KI-Funktionen keine eigene Limit-Logik brauchen. Wirft
     KiLimitError bei aufgebrauchtem Kontingent, KiFehler bei anderen Problemen.
     Bei Erfolg wird der tatsächliche Verbrauch aus der Antwort in ki_nutzung
-    protokolliert."""
+    protokolliert.
+
+    `bilder` (Wunsch #80, OCR-Import): optionale Liste aus (mime_type,
+    base64_daten)-Tupeln fuer Bildeingabe (Vision) – OpenRouter/OpenAI-
+    kompatibles content-Array statt reinem Text."""
     import json, urllib.request, urllib.error
     from flask import current_app
 
@@ -431,13 +481,23 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     if not key:
         raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
 
+    if bilder:
+        user_content = [{"type": "text", "text": prompt}]
+        for mime, b64 in bilder:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64}"},
+            })
+    else:
+        user_content = prompt
+
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
         data=json.dumps({
-            "model": KI_MODELL,
+            "model": ki_modell_fuer(feature),
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": user_content},
             ],
             "max_tokens": max_tokens,
         }).encode(),
@@ -460,6 +520,72 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     )
     db.commit()
     return antwort
+
+
+def _tts_anfrage(text, modell, stimme, key, response_format):
+    import json, urllib.request
+
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/audio/speech",
+        data=json.dumps({
+            "model": modell,
+            "input": text,
+            "voice": stimme,
+            "response_format": response_format,
+        }).encode(),
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return resp.read()
+
+
+def ki_text_zu_sprache(text: str, sprache_id: int):
+    """Wandelt Text per OpenRouter-TTS-Endpoint in Sprache um. Gibt
+    (audio_bytes, mimetype) zurueck (Wunsch #81) - der Aufrufer braucht den
+    Mimetype, um die Datei korrekt auszuliefern/zu cachen, statt die Bytes
+    selbst erraten zu muessen. Modell/Stimme kommen aus ki_stimme_fuer() -
+    je Sprache konfigurierbar. Manche Modelle (z.B. Gemini TTS) unterstuetzen
+    nur response_format=pcm statt mp3 - erst mp3 versuchen, bei genau diesem
+    Fehler auf PCM ausweichen und selbst in einen WAV-Container packen
+    (Python-Standardbibliothek, keine neue Abhaengigkeit noetig), damit
+    <audio>-Tags im Browser die Datei ohne Zusatzwissen abspielen koennen.
+    Zaehlt bewusst NICHT gegen users.ki_token_limit: das Kontingent ist
+    tokenbasiert (LLM-Text), TTS wird pro Zeichen abgerechnet und ist bei
+    kurzen Einzelwoertern vernachlaessigbar, zumal jedes Wort nur einmal
+    erzeugt und dauerhaft gecacht wird (Aufrufer speichert das Ergebnis
+    als Datei, siehe 16_vokabeln.py)."""
+    import io, urllib.error, wave
+    from flask import current_app
+
+    key = current_app.config.get("OPENROUTER_API_KEY", "")
+    if not key:
+        raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
+
+    modell, stimme = ki_stimme_fuer(sprache_id)
+    try:
+        return _tts_anfrage(text, modell, stimme, key, "mp3"), "audio/mpeg"
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode()[:300]
+        if e.code != 400 or "pcm" not in detail.lower():
+            raise KiFehler(f"TTS-Fehler {e.code}: {detail}")
+    except Exception as e:
+        raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")
+
+    try:
+        pcm = _tts_anfrage(text, modell, stimme, key, "pcm")
+    except urllib.error.HTTPError as e:
+        raise KiFehler(f"TTS-Fehler {e.code}: {e.read().decode()[:200]}")
+    except Exception as e:
+        raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")
+
+    # Gemini TTS liefert 24kHz/16-bit/Mono-PCM ohne Container (Google-Doku).
+    puffer = io.BytesIO()
+    with wave.open(puffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(24000)
+        wav.writeframes(pcm)
+    return puffer.getvalue(), "audio/wav"
 
 
 def _auto_grant_all(db, slug):
@@ -496,10 +622,30 @@ def _init_db(app):
 
         db.executescript(SCHEMA)
 
-        if db.execute("SELECT COUNT(*) FROM vokabel_sprachen").fetchone()[0] == 0:
-            for name in _DEFAULT_SPRACHEN:
-                db.execute("INSERT OR IGNORE INTO vokabel_sprachen(name) VALUES(?)", (name,))
-            db.commit()
+        # Unconditionell statt nur bei leerer Tabelle (Wunsch #76): neue
+        # Sprachen in _DEFAULT_SPRACHEN sollen bei jedem Deploy nachgezogen
+        # werden, auch wenn schon aeltere Sprachen existieren. UNIQUE(name)
+        # + INSERT OR IGNORE macht das idempotent.
+        for name in _DEFAULT_SPRACHEN:
+            db.execute("INSERT OR IGNORE INTO vokabel_sprachen(name) VALUES(?)", (name,))
+        db.commit()
+
+        # Wunsch #81 (Grundprinzip): Standardmodell je bestehendem KI-Zweck
+        # einmalig eintragen, damit `manage.py ki_modell`/`ki_stimme` von
+        # Anfang an etwas zum Aendern vorfinden, statt stumm auf KI_MODELL
+        # zurueckzufallen. INSERT OR IGNORE - ein von Andi gesetzter Wert
+        # wird bei folgenden Deploys nicht ueberschrieben.
+        for zweck in ("rezepte_import", "vokabeln_ocr"):
+            db.execute(
+                "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
+                (zweck, KI_MODELL),
+            )
+        for (sprache_id,) in db.execute("SELECT id FROM vokabel_sprachen").fetchall():
+            db.execute(
+                "INSERT OR IGNORE INTO ki_stimmen(sprache_id, modell, stimme) VALUES(?,?,?)",
+                (sprache_id, TTS_STANDARD_MODELL, TTS_STANDARD_STIMME),
+            )
+        db.commit()
 
         if vokabeln_migrieren:
             englisch = db.execute(
