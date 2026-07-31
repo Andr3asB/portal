@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v82: Einkauf offline-fähig – lokale Warteschlange für Abhaken/Neu-Eintragen, idempotenter Toggle-Endpunkt)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v83: Einkauf – freundlicher Toast statt Browser-Fehlerseite bei Bearbeiten/Löschen offline)*
 
 ## Host
 
@@ -224,6 +224,13 @@ teile/
                        explizites `ziel` (0/1) entgegen und SETZT darauf,
                        statt reinem Toggle (idempotent, sicher wiederholbar).
                        Bearbeiten/Loeschen bewusst NICHT offline-sicher
+                       (keine Warteschlange), zeigen aber vorher einen
+                       Toast statt der Browser-eigenen Fehlerseite
+                       (`pruefeVerbindungOderZeigeHinweis()`/
+                       `pruefeLoeschenOnline()` in einkauf.html - beim
+                       Loeschen VOR dem confirm()-Dialog geprueft, damit
+                       nicht erst gefragt wird und die Aktion dann doch
+                       nicht geht)
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,
@@ -529,7 +536,11 @@ einfach. Für `einkauf` gibt es zusätzlich eine clientseitige Warteschlange
 Neu-Eintragen: schlägt der Live-Request fehl, landet die Aktion dort statt
 zu scheitern, wird synchronisiert bei `online`-Event oder beim nächsten
 Laden der Seite (siehe `10_einkauf.py`/`einkauf.html` und journal.md
-2026-07-31). Bearbeiten/Löschen sind bewusst NICHT Teil davon.
+2026-07-31). Bearbeiten/Löschen sind bewusst NICHT Teil davon - laufen
+weiterhin als normales natives Formular, zeigen aber vor dem Absenden
+einen Toast statt der Browser-eigenen Fehlerseite, wenn `navigator.onLine`
+false ist (`pruefeVerbindungOderZeigeHinweis()`/`pruefeLoeschenOnline()`,
+Löschen prüft VOR dem `confirm()`-Dialog).
 
 ## Datenbankschema (SQLite, WAL)
 

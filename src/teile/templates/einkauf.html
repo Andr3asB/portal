@@ -159,7 +159,8 @@ body.dark .badge-pending { background:#333; color:#bbb; }
           title="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
-    <form method="post" action="/a/einkauf/{{ token }}/bearbeiten/{{ item.id }}" class="edit-form">
+    <form method="post" action="/a/einkauf/{{ token }}/bearbeiten/{{ item.id }}" class="edit-form"
+          onsubmit="return pruefeVerbindungOderZeigeHinweis('Bearbeiten')">
       <div class="angebot-form-label">Name</div>
       <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
 
@@ -184,7 +185,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     </form>
 
     <form method="post" action="/a/einkauf/{{ token }}/loeschen/{{ item.id }}"
-          onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          onsubmit="return pruefeLoeschenOnline({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
     </form>
   </div>
@@ -297,11 +298,47 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   {% endif %}
 
 </main>
+
+<!-- Hinweis-Toast (z.B. "braucht Verbindung") -->
+<div id="toast" style="
+  display:none; position:fixed; top:calc(20px + var(--st)); left:50%; transform:translateX(-50%);
+  background:#333; color:#fff; border-radius:20px; padding:12px 24px;
+  font-size:15px; font-weight:600; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.2);
+  white-space:nowrap; text-align:center;
+"></div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 const TOKEN = '{{ token }}';
+
+// Bearbeiten/Löschen sind bewusst NICHT über die Offline-Warteschlange
+// abgesichert (siehe journal.md) - liefen bisher aber als normales natives
+// Formular, das offline mit der hässlichen Browser-eigenen "Keine
+// Verbindung"-Fehlerseite scheiterte und die Eingabe dabei mitriss. Statt
+// nichts zu tun, jetzt vorher freundlich abfangen: Löschen soll ja gerade
+// NICHT versehentlich doch durchgehen und später wieder auftauchen, wenn
+// jemand es für erledigt hielt.
+let toastTimer;
+function zeigeToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.style.display = 'none', 2500);
+}
+
+function pruefeVerbindungOderZeigeHinweis(aktion) {
+  if (navigator.onLine) return true;
+  zeigeToast(`📡 ${aktion} braucht eine Verbindung`);
+  return false;
+}
+
+function pruefeLoeschenOnline(nachricht) {
+  if (!pruefeVerbindungOderZeigeHinweis('Löschen')) return false;
+  return confirm(nachricht);
+}
 
 // Wartet 5s nach dem Abhaken, bevor die Karte physisch zu "Erledigt" wandert
 // (Wunsch #13) - so kann ein versehentliches Antippen noch zurückgenommen

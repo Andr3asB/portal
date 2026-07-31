@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-07-31 – portal-v83: Einkauf – freundlicher Hinweis statt Browser-Fehler bei Bearbeiten/Löschen offline
+
+Anschlussfrage nach dem Offline-Umbau: "Die Beiden Fälle Bearbeiten und
+Löschen sind dann auch offline nicht aufrufbar, oder werden die geänderten
+daten dann einfach verworfen?" Antwort war ehrlich: keins von beidem -
+beide sind weiterhin ganz normale native Formulare (kein `fetch()`, keine
+Warteschlange), also technisch anklickbar, scheitern aber offline hart mit
+der **Browser-eigenen** "Keine Verbindung"-Fehlerseite statt einer
+App-Meldung, und die Eingabe ist in dem Moment weg. Andi wollte das
+abgefangen haben - explizit wegen der Sorge, dass ein eigentlich gelöschter
+Artikel offline scheinbar verschwindet, dann aber (weil serverseitig nie
+angekommen) wieder auftaucht und für Verwirrung/Ärger sorgt.
+
+**Fix:** Vor dem eigentlichen Absenden wird jetzt `navigator.onLine`
+geprüft (`pruefeVerbindungOderZeigeHinweis()` in `einkauf.html`) - ist kein
+Netz da, erscheint ein Toast ("📡 Bearbeiten/Löschen braucht eine
+Verbindung") und das Formular wird gar nicht erst abgeschickt. Beim
+Löschen-Formular läuft die Prüfung VOR dem `confirm()`-Dialog
+(`pruefeLoeschenOnline()`) - macht keinen Sinn, erst "wirklich löschen?"
+zu fragen und danach zu sagen, dass es sowieso nicht geht. Toast-Element
+und -Funktion sind bewusst 1:1 nach dem bereits bestehenden Muster aus
+`geholfen.html` gebaut, keine neue UI-Komponente erfunden.
+
+**Bewusst weiterhin keine Warteschlange für Bearbeiten/Löschen** - nur der
+harte Fehlschlag wurde durch eine freundliche, unmissverständliche Meldung
+ersetzt. Die Änderung selbst ist nach wie vor weg, wenn offline versucht
+wird - das war explizit gewünscht (siehe Andis Formulierung), nicht als
+Kompromiss zu verstehen.
+
+### Verifiziert
+
+Per `javascript_tool` gegen die echte Seite (`navigator.onLine` künstlich
+auf `false`): Löschen-Formular abgeschickt → `confirm()` wird nachweislich
+NIE aufgerufen (überschriebene Test-Version blieb ungenutzt), Toast zeigt
+"📡 Löschen braucht eine Verbindung"; Bearbeiten-Formular abgeschickt →
+`event.defaultPrevented === true`, Toast zeigt "📡 Bearbeiten braucht eine
+Verbindung". Danach `navigator.onLine` zurück auf `true`: Löschen zeigt
+den `confirm()`-Dialog wieder ganz normal mit der korrekten Artikel-
+Nachricht, Abbrechen verhindert das Absenden wie schon immer - keine
+Regression am bestehenden Online-Verhalten.
+
+### Auslieferungspaket
+
+`deploy/portal-v83.tar.gz`
+
+---
+
 ## 2026-07-31 – portal-v81/v82: Einkauf offline-fähig (per Chat-Anfrage, kein ✨-Wunsch)
 
 Direkter Anschluss an die Offline-Grundinfrastruktur: "Die Einkaufen App
