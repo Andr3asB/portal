@@ -2,6 +2,89 @@
 
 ---
 
+## 2026-07-31 – portal-v81/v82: Einkauf offline-fähig (per Chat-Anfrage, kein ✨-Wunsch)
+
+Direkter Anschluss an die Offline-Grundinfrastruktur: "Die Einkaufen App
+jetzt offline fähig werden! Das brauchen wir für die Akzeptanz!" - Abhaken
+und Neu-Eintragen sollen im Supermarkt ohne Empfang funktionieren, nicht
+nur die Ansicht selbst.
+
+### Backend-Änderung: Toggle-Endpunkt idempotent gemacht
+
+`POST /a/einkauf/<token>/erledigt/<eid>` war bisher ein reiner Toggle
+(dreht den aktuellen Zustand um). Für eine Offline-Warteschlange ist das
+gefährlich: würde ein technisch schon erfolgreicher, aber dessen Antwort
+verlorener Request später nochmal wiederholt, würde ein reiner Toggle den
+Zustand ein zweites Mal umdrehen - falsch. Fix: die Route nimmt jetzt ein
+explizites `ziel` (0/1) entgegen und SETZT darauf, statt zu toggeln (Fallback
+auf den alten Toggle nur falls `ziel` mal fehlt, z. B. bei sehr altem
+gecachtem Frontend). Macht die Route idempotent - beliebig oft wiederholbar,
+ohne den Endzustand zu verändern.
+
+### Frontend: lokale Offline-Warteschlange (`einkauf.html`)
+
+- **`toggleErledigt`**: wendet den neuen Zustand jetzt sofort optimistisch
+  an (Checkbox + `.erledigt`-Klasse) und macht das bei einem Fehlschlag
+  NICHT mehr rückgängig (früher: `cb.checked = !cb.checked`). Stattdessen
+  landet die Aktion (`{type:'toggle', id, ziel}`) in einer Warteschlange
+  in `localStorage` (nicht `sessionStorage` - muss auch einen App-Neustart
+  überstehen, iOS pausiert/killt Hintergrund-Tabs), der Artikel bekommt ein
+  "⏳ wartet"-Abzeichen.
+- **Neu-Formular**: läuft jetzt über `fetch()` statt eines nativen POST,
+  damit ein Netzwerkfehler abgefangen werden kann. Bei Erfolg: Reload wie
+  vorher. Bei Fehlschlag: Eintrag in die Warteschlange (`{type:'add', ...}`
+  mit einer lokalen `temp-`-ID), eine Platzhalter-Karte wird direkt
+  angezeigt (Checkbox deaktiviert, "⏳ wartet"), das Formular bleibt offen
+  und wird für den nächsten Eintrag geleert - kein Reload nötig, Wunsch #85
+  greift dadurch automatisch weiter.
+- **`synchronisiereWarteschlange()`**: spielt die Warteschlange der Reihe
+  nach ab, bricht beim ersten weiterhin scheiternden Request ab (Rest bleibt
+  liegen), lädt bei mindestens einem Erfolg die Seite neu - holt so den
+  echten Serverstand und ersetzt jede Platzhalter-Karte durch den echten
+  Artikel mit echter ID, statt die IDs manuell abzugleichen. Läuft beim
+  Laden der Seite UND bei jedem `online`-Event.
+- **`wendeWarteschlangeAufUiAn()`**: reconciled beim Laden sofort alle noch
+  offenen Warteschlangen-Einträge in die Oberfläche (abgehakte Artikel +
+  Platzhalter), bevor überhaupt versucht wird zu synchronisieren - sonst
+  würde man kurz den alten, noch nicht synchronisierten Stand sehen.
+
+**Bewusst NICHT offline-sicher:** Bearbeiten und Löschen - geringere
+Priorität für den Anwendungsfall "im Laden abhaken/eintragen", zusätzliche
+Komplexität durch Konfliktpotential (z. B. ein offline gelöschter, aber
+noch nicht synchronisierter Artikel).
+
+`apps.offline_faehig` für `einkauf` jetzt auf 1 gesetzt.
+
+### Verifiziert
+
+Per `javascript_tool` gegen die echte Seite - `window.fetch` temporär durch
+eine immer scheiternde Funktion ersetzt, um einen echten Netzwerkfehler
+zu simulieren (nicht nur `navigator.onLine`, sondern der tatsächliche
+Request-Pfad):
+- Artikel abgehakt während "offline": bleibt angehakt, bekommt "⏳ wartet",
+  Aktion landet korrekt in der Warteschlange (`{type:'toggle', id, ziel:true}`).
+- Neuer Artikel "offline" eingetragen: Platzhalter-Karte erscheint sofort
+  (Checkbox deaktiviert, "⏳ wartet"), Formular bleibt offen und geleert,
+  Aktion korrekt in der Warteschlange.
+- Echtes `fetch` wiederhergestellt + Seite neu geladen: Warteschlange wird
+  automatisch abgearbeitet, beide Aktionen erfolgreich, Seite lädt sich
+  danach selbst neu - Warteschlange leer, abgehakter Artikel korrekt
+  synchronisiert, neuer Artikel jetzt mit echter Server-ID statt Platzhalter-ID.
+- `online`-Event ohne vorherigen Reload getestet: löst dieselbe
+  Synchronisierung korrekt aus.
+- Startseite: Einkauf-Kachel bleibt bei simuliertem Offline-Zustand
+  anklickbar (nicht mehr grau), da `offline_faehig=1`.
+
+Test-Artikel danach über die App selbst wieder entfernt (nicht per Raw-SQL,
+damit `ON DELETE CASCADE` für die Angebot-Markt-Zuordnung sauber greift).
+
+### Auslieferungspaket
+
+`deploy/portal-v81.tar.gz` (Grundgerüst) → `v82.tar.gz` (Hilfe-Text ergänzt,
+aktueller Stand)
+
+---
+
 ## 2026-07-31 – portal-v79/v80: Offline-Grundinfrastruktur (per Chat-Anfrage, kein ✨-Wunsch)
 
 Nach der Sportschau-Diagnose kam die Anschlussfrage auf, ob das Portal

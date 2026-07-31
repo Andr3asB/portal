@@ -134,12 +134,19 @@ def add(token):
 
 @bp.route("/a/einkauf/<token>/erledigt/<int:eid>", methods=["POST"])
 def toggle_erledigt(token, eid):
+    """Wunsch: Einkauf offline-faehig. ziel wird jetzt explizit mitgeschickt
+    (statt reinem Toggle) und macht die Route idempotent - noetig, damit ein
+    aus der Offline-Warteschlange wiederholter Request nicht versehentlich
+    ein zwischenzeitlich schon erfolgreich uebertragenes Toggle nochmal
+    umdreht. ziel fehlt nur bei sehr altem, gecachtem Frontend-Code -
+    faellt dann auf den alten Toggle zurueck."""
     _user(token)
     db  = get_db()
     row = db.execute("SELECT erledigt FROM einkauf_eintraege WHERE id=?", (eid,)).fetchone()
     if not row:
         abort(404)
-    neu = 0 if row["erledigt"] else 1
+    ziel_roh = request.form.get("ziel")
+    neu = (1 if ziel_roh == "1" else 0) if ziel_roh is not None else (0 if row["erledigt"] else 1)
     db.execute(
         "UPDATE einkauf_eintraege SET erledigt=?, erledigt_am=CASE WHEN ?=1 THEN datetime('now') ELSE NULL END WHERE id=?",
         (neu, neu, eid),

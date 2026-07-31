@@ -96,6 +96,13 @@ body.einkaufsmodus .item-name { font-size:18px; }
   white-space:nowrap;
 }
 body.dark .badge-angebot { background:#3d2e00; color:#ffc107; }
+.badge-pending {
+  display:inline-flex; align-items:center; gap:3px;
+  background:#e0e0e0; color:#555; border-radius:8px;
+  padding:2px 8px; font-size:12px; font-weight:600;
+  white-space:nowrap;
+}
+body.dark .badge-pending { background:#333; color:#bbb; }
 /* Angebot-Toggle-Formular */
 .angebot-toggle-btn {
   background:none; border:none; font-size:13px; cursor:pointer;
@@ -302,37 +309,43 @@ const TOKEN = '{{ token }}';
 const PENDING_MOVE = new Map();
 
 function toggleErledigt(id, cb) {
+  const zielChecked = cb.checked;
+  const card = document.getElementById('item-' + id);
+
+  // Optimistisch sofort anwenden - anders als frueher NICHT mehr bei einem
+  // Fehlschlag rueckgaengig gemacht (Einkauf offline-faehig): schlaegt der
+  // Request fehl (kein Netz), bleibt der Zustand trotzdem so stehen und
+  // landet in der Warteschlange statt zu "verschwinden".
+  if (card) card.classList.toggle('erledigt', zielChecked);
+
   fetch(`/a/einkauf/${TOKEN}/erledigt/${id}`, {
     method: 'POST',
-    headers: {'X-Requested-With': 'fetch'},
+    headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `ziel=${zielChecked ? '1' : '0'}`,
   }).then(r => r.json()).then(d => {
-    if (!d.ok) { cb.checked = !cb.checked; return; }
-    const card = document.getElementById('item-' + id);
-    if (!card) return;
-
+    if (!d.ok || !card) return;
     if (d.erledigt) {
-      cb.checked = true;
-      card.classList.add('erledigt');
       const timeoutId = setTimeout(() => {
         PENDING_MOVE.delete(id);
         moveToErledigtTop(card);
       }, 5000);
       PENDING_MOVE.set(id, timeoutId);
-    } else {
-      cb.checked = false;
-      card.classList.remove('erledigt');
-      if (PENDING_MOVE.has(id)) {
-        // Wurde innerhalb der 5s wieder abgewählt - Karte stand noch nie
-        // physisch bei Erledigt, also einfach den Umzug abbrechen.
-        clearTimeout(PENDING_MOVE.get(id));
-        PENDING_MOVE.delete(id);
-      } else if (card.closest('.erledigt-section')) {
-        // Karte war schon bei Erledigt einsortiert - für eine korrekte
-        // Kategorie-/Alphabet-Einordnung einfach neu laden.
-        location.reload();
-      }
+    } else if (PENDING_MOVE.has(id)) {
+      // Wurde innerhalb der 5s wieder abgewählt - Karte stand noch nie
+      // physisch bei Erledigt, also einfach den Umzug abbrechen.
+      clearTimeout(PENDING_MOVE.get(id));
+      PENDING_MOVE.delete(id);
+    } else if (card.closest('.erledigt-section')) {
+      // Karte war schon bei Erledigt einsortiert - für eine korrekte
+      // Kategorie-/Alphabet-Einordnung einfach neu laden.
+      location.reload();
     }
-  }).catch(() => { cb.checked = !cb.checked; });
+  }).catch(() => {
+    // Kein Netz - Aktion in die Warteschlange, wird synchronisiert sobald
+    // wieder Verbindung da ist (ziel ist explizit, deshalb sicher wiederholbar).
+    zurWarteschlange({ type: 'toggle', id, ziel: zielChecked });
+    if (card) markierePending(card);
+  });
 }
 
 function moveToErledigtTop(card) {
@@ -357,6 +370,137 @@ function moveToErledigtTop(card) {
     document.querySelector(`.kat-label[data-kategorie-label="${CSS.escape(kategorie)}"]`)?.remove();
   }
 }
+
+// Offline-Warteschlange (Einkauf offline-faehig): Abhaken und Neu-Eintragen
+// laufen bei Netzwerkfehler nicht mehr ins Leere, sondern landen hier und
+// werden synchronisiert, sobald wieder Verbindung da ist. localStorage statt
+// sessionStorage, weil die Warteschlange auch einen Tab-/App-Neustart
+// überstehen muss (iOS pausiert/killt Hintergrund-Tabs) - anders als die
+// reinen UI-Vorlieben weiter unten, die bewusst nur pro Tab-Sitzung gelten.
+// Bearbeiten/Löschen sind bewusst NICHT Teil davon (geringere Priorität für
+// den Laden-Anwendungsfall, mehr Aufwand wegen Konfliktpotential).
+const EINKAUF_QUEUE_KEY = 'einkauf_offline_queue';
+
+function holeWarteschlange() {
+  try { return JSON.parse(localStorage.getItem(EINKAUF_QUEUE_KEY) || '[]'); } catch (e) { return []; }
+}
+
+function speichereWarteschlange(queue) {
+  try { localStorage.setItem(EINKAUF_QUEUE_KEY, JSON.stringify(queue)); } catch (e) {}
+}
+
+function zurWarteschlange(aktion) {
+  let queue = holeWarteschlange();
+  if (aktion.type === 'toggle') {
+    // Nur der zuletzt gewünschte Zustand pro Artikel zählt - keine zwei
+    // widersprüchlichen Toggles nacheinander abspielen.
+    queue = queue.filter(a => !(a.type === 'toggle' && a.id === aktion.id));
+  }
+  queue.push(aktion);
+  speichereWarteschlange(queue);
+}
+
+function markierePending(card) {
+  if (!card.querySelector('.badge-pending')) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-pending';
+    badge.textContent = '⏳ wartet';
+    card.appendChild(badge);
+  }
+}
+
+function erzeugePlatzhalterKarte(aktion) {
+  const card = document.createElement('div');
+  card.className = 'item-card';
+  card.id = 'item-' + aktion.tempId;
+
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.className = 'item-check';
+  check.disabled = true;
+  check.title = 'Erst nach der Synchronisierung abhakbar';
+
+  const name = document.createElement('span');
+  name.className = 'item-name';
+  name.textContent = aktion.name;
+
+  card.appendChild(check);
+  card.appendChild(name);
+  markierePending(card);
+  return card;
+}
+
+// Beim Laden schon vorhandene Warteschlangen-Einträge sofort sichtbar
+// machen (abgehakte Artikel + neu angelegte Platzhalter), bevor überhaupt
+// versucht wird zu synchronisieren - sonst würde die Seite kurz den alten,
+// noch nicht synchronisierten Serverstand zeigen.
+function wendeWarteschlangeAufUiAn() {
+  holeWarteschlange().forEach(aktion => {
+    if (aktion.type === 'toggle') {
+      const card = document.getElementById('item-' + aktion.id);
+      if (!card) return;
+      card.classList.toggle('erledigt', aktion.ziel);
+      const cb = card.querySelector('.item-check');
+      if (cb) cb.checked = aktion.ziel;
+      markierePending(card);
+    } else if (aktion.type === 'add' && !document.getElementById('item-' + aktion.tempId)) {
+      document.getElementById('filter-card')?.insertAdjacentElement('afterend', erzeugePlatzhalterKarte(aktion));
+    }
+  });
+}
+
+let wirdSynchronisiert = false;
+
+async function synchronisiereWarteschlange() {
+  if (wirdSynchronisiert) return;
+  wirdSynchronisiert = true;
+  let queue = holeWarteschlange();
+  let etwasErledigt = false;
+
+  while (queue.length) {
+    const aktion = queue[0];
+    let erfolgreich = false;
+    try {
+      if (aktion.type === 'toggle') {
+        const resp = await fetch(`/a/einkauf/${TOKEN}/erledigt/${aktion.id}`, {
+          method: 'POST',
+          headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded'},
+          body: `ziel=${aktion.ziel ? '1' : '0'}`,
+        });
+        const d = await resp.json();
+        erfolgreich = !!d.ok;
+      } else if (aktion.type === 'add') {
+        const resp = await fetch(`/a/einkauf/${TOKEN}/add`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({
+            name: aktion.name,
+            kategorie_id: aktion.kategorie_id || '',
+            angebot: aktion.angebot ? '1' : '0',
+            laden_ids: aktion.laden_ids || '',
+          }),
+        });
+        erfolgreich = resp.ok;
+      }
+    } catch (e) {
+      erfolgreich = false;
+    }
+    if (!erfolgreich) break; // weiterhin offline - Rest bleibt liegen, später erneut versuchen
+    queue.shift();
+    speichereWarteschlange(queue);
+    etwasErledigt = true;
+  }
+
+  wirdSynchronisiert = false;
+  // Holt den echten Serverstand und ersetzt jeden Platzhalter durch den
+  // echten, gespeicherten Artikel - einfacher und robuster als die
+  // Platzhalter-Karten manuell gegen echte IDs auszutauschen.
+  if (etwasErledigt) location.reload();
+}
+
+wendeWarteschlangeAufUiAn();
+synchronisiereWarteschlange();
+window.addEventListener('online', synchronisiereWarteschlange);
 
 // Wunsch #85: Standardmäßig ist nur der "+ Neu"-Knopf sichtbar, das
 // Eintragen-Formular bleibt nach dem Öffnen über mehrere Einträge hinweg
@@ -594,7 +738,58 @@ function wendeLetzteAuswahlAn() {
   }
 }
 
-document.getElementById('add-form')?.addEventListener('submit', speichereLetzteAuswahl);
+function formularZuruecksetzen(form) {
+  form.querySelector('#add-name').value = '';
+  form.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+  form.querySelector('.kat-hidden').value = '';
+  form.querySelector('.angebot-hidden').value = '0';
+  form.querySelector('.laden-hidden').value = '';
+  form.querySelector('.laden-row').style.display = 'none';
+  form.querySelector('.form-submit-btn').disabled = true;
+}
+
+// Neu-Formular läuft jetzt über fetch() statt eines nativen POST, damit ein
+// Netzwerkfehler abgefangen und in die Offline-Warteschlange umgeleitet
+// werden kann, statt als normale gescheiterte Navigation zu enden.
+document.getElementById('add-form')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const name = form.querySelector('#add-name').value.trim();
+  if (!name) return;
+  speichereLetzteAuswahl();
+
+  const daten = {
+    name,
+    kategorie_id: form.querySelector('.kat-hidden').value,
+    angebot: form.querySelector('.angebot-hidden').value === '1',
+    laden_ids: form.querySelector('.laden-hidden').value,
+  };
+
+  fetch(form.action, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: new URLSearchParams({
+      name: daten.name,
+      kategorie_id: daten.kategorie_id,
+      angebot: daten.angebot ? '1' : '0',
+      laden_ids: daten.laden_ids,
+    }),
+  }).then(resp => {
+    if (!resp.ok) throw new Error('http-fehler');
+    location.reload(); // holt den echten Serverstand, gleiches Verhalten wie beim alten nativen POST
+  }).catch(() => {
+    // Kein Netz - Eintrag in die Warteschlange, Platzhalter direkt zeigen.
+    // Kein Reload nötig, das Formular bleibt dadurch automatisch offen
+    // (Wunsch #85), nur die Felder werden für den nächsten Eintrag geleert.
+    const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    zurWarteschlange({ type: 'add', tempId, ...daten });
+    document.getElementById('filter-card')?.insertAdjacentElement(
+      'afterend', erzeugePlatzhalterKarte({ tempId, name: daten.name })
+    );
+    formularZuruecksetzen(form);
+    document.getElementById('add-name')?.focus();
+  });
+});
 wendeLetzteAuswahlAn();
 
 // Vorschlag per Enter/Tab bestätigen und Fokus halten

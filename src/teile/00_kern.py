@@ -734,9 +734,14 @@ def _init_db(app):
         # gesetzt), nicht als frei umschaltbare Admin-Einstellung - ob eine
         # App offline sicher funktioniert (keine live-schreibenden Interak-
         # tionen ohne eigene Warteschlange), ist eine Entwicklerentscheidung,
-        # die sowieso einen Deploy braucht. "hilfe" ist der erste Kandidat:
-        # rein statischer Text, keine Formulare/Schreibzugriffe.
-        db.execute("UPDATE apps SET offline_faehig=1 WHERE slug='hilfe'")
+        # die sowieso einen Deploy braucht. "hilfe": rein statischer Text,
+        # keine Formulare/Schreibzugriffe. "einkauf": Abhaken + Neu-Eintragen
+        # laufen jetzt ueber eine lokale Warteschlange (localStorage), die bei
+        # Netzwerkfehler statt sofort zu scheitern optimistisch weiterlaeuft
+        # und synchronisiert, sobald wieder Verbindung da ist - Bearbeiten/
+        # Loeschen bleiben bewusst NICHT offline-sicher (geringere Prioritaet
+        # fuer den Laden-Anwendungsfall, siehe einkauf.html).
+        db.execute("UPDATE apps SET offline_faehig=1 WHERE slug IN ('hilfe', 'einkauf')")
         db.commit()
         if db.execute("SELECT COUNT(*) FROM geholfen_aufgaben").fetchone()[0] == 0:
             for name, emoji, gew in _DEFAULT_AUFGABEN:

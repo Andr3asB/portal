@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v80: Offline-Grundinfrastruktur – apps.offline_faehig, Service-Worker-Caching, Startseiten-Kachel-Gating)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v82: Einkauf offline-fähig – lokale Warteschlange für Abhaken/Neu-Eintragen, idempotenter Toggle-Endpunkt)*
 
 ## Host
 
@@ -216,7 +216,14 @@ teile/
                        relevant fuer den gewaehlten Markt (eigene Angebote + Artikel
                        ohne Marktbindung; Angebote bei ANDEREM Markt bleiben bewusst
                        ausgeblendet - fuer einen anderen Einkaufstrip vorgemerkt),
-                       groessere Tap-Flaechen fuer die Bedienung im Laden
+                       groessere Tap-Flaechen fuer die Bedienung im Laden.
+                       Offline-faehig (apps.offline_faehig=1): Abhaken und
+                       Neu-Eintragen laufen ueber eine lokale Warteschlange
+                       in localStorage (siehe "Offline-Faehigkeit" unten und
+                       Bekannte Issues) - /erledigt/<eid> nimmt dafuer ein
+                       explizites `ziel` (0/1) entgegen und SETZT darauf,
+                       statt reinem Toggle (idempotent, sicher wiederholbar).
+                       Bearbeiten/Loeschen bewusst NICHT offline-sicher
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,
@@ -508,13 +515,21 @@ Rein-App-Infrastruktur (kein ✨-Wunsch, per Chat-Anfrage 2026-07-31): jede
 App hat ein `apps.offline_faehig`-Flag (Default 0, per Migration in
 `00_kern.py` gesetzt, NICHT per `manage.py` frei umschaltbar - das ist eine
 Entwicklerentscheidung, ob die App offline sicher ist, kein Admin-Setting).
-`manage.py listapps` zeigt den Stand. Aktuell nur `hilfe` (rein statischer
-Text) offline_faehig=1, alle anderen Apps werden auf der Startseite grau +
-nicht anklickbar, sobald `navigator.onLine` false ist. Der Service Worker
-selbst cached opportunistisch JEDE besuchte Seite (unabhängig vom Flag,
-technisch harmlos) - die eigentliche Sperre ist reines Startseiten-Kachel-
-Gating, nicht der Service Worker. Kein Offline-Schreiben (Formulare/POST
-laufen nie über den Service Worker, scheitern offline einfach normal).
+`manage.py listapps` zeigt den Stand. Aktuell `hilfe` (rein statischer Text)
+und `einkauf` (siehe unten) offline_faehig=1, alle anderen Apps werden auf
+der Startseite grau + nicht anklickbar, sobald `navigator.onLine` false ist.
+Der Service Worker selbst cached opportunistisch JEDE besuchte Seite
+(unabhängig vom Flag, technisch harmlos) - die eigentliche Sperre ist reines
+Startseiten-Kachel-Gating, nicht der Service Worker.
+
+**Offline-Schreiben (bisher nur `einkauf`):** Formulare/POST laufen normal
+NIE über den Service Worker (der fängt nur GET ab) und scheitern offline
+einfach. Für `einkauf` gibt es zusätzlich eine clientseitige Warteschlange
+(`localStorage`, Schlüssel `einkauf_offline_queue`) für Abhaken und
+Neu-Eintragen: schlägt der Live-Request fehl, landet die Aktion dort statt
+zu scheitern, wird synchronisiert bei `online`-Event oder beim nächsten
+Laden der Seite (siehe `10_einkauf.py`/`einkauf.html` und journal.md
+2026-07-31). Bearbeiten/Löschen sind bewusst NICHT Teil davon.
 
 ## Datenbankschema (SQLite, WAL)
 
@@ -654,6 +669,20 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   serverseitig prüfen** - per `navigator.serviceWorker.getRegistrations()`
   und `.scope` nachsehen, ein Test allein über "registriert sich ohne
   Fehler" reicht nicht.
+
+- **Ein reiner Toggle-Endpunkt ist gefährlich für Offline-Warteschlangen
+  mit Wiederholung.** Betraf Einkauf offline-fähig (v81-Fix, 2026-07-31):
+  `/erledigt/<eid>` drehte bisher den aktuellen Zustand einfach um. Landet
+  ein technisch schon erfolgreicher, aber dessen Antwort verlorener Request
+  in einer Offline-Warteschlange und wird später nochmal geschickt, würde
+  ein reiner Toggle den Zustand ein zweites Mal umdrehen - falsches
+  Endergebnis, ohne dass irgendetwas einen Fehler zeigt. Fix: die Route
+  nimmt jetzt ein explizites `ziel` (0/1) entgegen und SETZT darauf statt
+  zu toggeln - macht sie idempotent, beliebig oft sicher wiederholbar.
+  **Gilt allgemein: jeder Endpunkt, der Teil einer Offline-Warteschlange
+  oder sonst wiederholbaren Anfrage werden könnte, muss idempotent sein**
+  (Ziel-Zustand explizit statt reinem Toggle/Inkrement) - sonst führt eine
+  harmlos gemeinte Wiederholung zu einem stillen Datenfehler.
 
 - **hae-Server parst ein bare-date `endDate` als Mitternacht UTC jenes
   Tages, nicht als Ende des Tages.** Betraf Wunsch #88 (v78-Fix,
