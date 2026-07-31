@@ -141,6 +141,7 @@
   <div class="todo-body">
     <div class="todo-text">{{ t.inhalt }}</div>
     <div class="todo-meta">
+      {% if t.serie_id %}<span class="chip" style="background:#8e8e93" title="Wiederkehrende Aufgabe">🔁</span>{% endif %}
       {% if t.privat %}<span class="chip" style="background:#8e8e93">🔒</span>{% endif %}
       {% if t.zugewiesen_rollen %}
         <span class="chip" style="background:#8e8e93">→ {% if t.zugewiesen_rollen == 'alle' %}Alle{% else %}{% for r in t.zugewiesen_rollen.split(',') %}{{ rollen_labels.get(r, r) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</span>

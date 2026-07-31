@@ -66,7 +66,7 @@
 
 {% block nav_title %}
 <div class="nav-title">🗓️ Aufgabenplan</div>
-<div class="nav-sub">{{ ziel.name if ziel else 'Noch keine Kinder' }}</div>
+<div class="nav-sub">{{ ziel.name if ziel else 'Noch niemand angelegt' }}</div>
 {% endblock %}
 
 {% block body %}
@@ -87,7 +87,7 @@
 
   {% if not ziel %}
   <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
-    Noch keine Kinder angelegt.
+    Noch niemand angelegt.
   </div>
   {% else %}
     {% for tag in plan %}
@@ -100,7 +100,7 @@
         {% endif %}
       </div>
 
-      {% if tag.eintraege %}
+      {% if tag.eintraege or tag.serien_eintraege %}
         {% for e in tag.eintraege %}
         <div class="aufgabe-row{% if e.erledigt_heute %} done{% endif %}">
           {% if tag.ist_heute %}
@@ -113,6 +113,18 @@
             {% endif %}
           {% endif %}
           <span>{{ e.emoji }} {{ e.name }}</span>
+        </div>
+        {% endfor %}
+        {% for e in tag.serien_eintraege %}
+        <div class="aufgabe-row{% if e.erledigt %} done{% endif %}">
+          {% if darf_editieren %}
+          <button class="aufgabe-check" type="button"
+                  onclick="serieErledigen({{ e.id }}, this)"
+                  {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
+          {% else %}
+          <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
+          {% endif %}
+          <span>🔁 {{ e.inhalt }}</span>
         </div>
         {% endfor %}
       {% else %}
@@ -133,6 +145,20 @@
           </form>
           {% endfor %}
         </div>
+
+        {% if serien_pool %}
+        <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
+        <div class="btn-row">
+          {% for s in serien_pool %}
+          <form method="post" action="/a/kinderplan/{{ token }}/serie_einsortieren" style="display:contents">
+            <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
+            <input type="hidden" name="serie_id" value="{{ s.id }}">
+            <input type="hidden" name="wochentag" value="{{ tag.wochentag }}">
+            <button type="submit" class="chip-btn">{{ s.inhalt }}</button>
+          </form>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
       {% endif %}
     </div>
@@ -158,6 +184,22 @@ function abhaken(zielId, aufgabeId, btn) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ziel_id: zielId, aufgabe_id: aufgabeId}),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      btn.textContent = '✓';
+      btn.closest('.aufgabe-row').classList.add('done');
+    } else {
+      btn.disabled = false;
+    }
+  }).catch(() => { btn.disabled = false; });
+}
+
+function serieErledigen(tid, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  fetch(`/a/kinderplan/${TOKEN}/serie_erledigen/${tid}`, {
+    method: 'POST',
+    headers: {'X-Requested-With': 'fetch'},
   }).then(r => r.json()).then(d => {
     if (d.ok) {
       btn.textContent = '✓';

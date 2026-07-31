@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v83: Einkauf – freundlicher Toast statt Browser-Fehlerseite bei Bearbeiten/Löschen offline)*
+*Letzte Aktualisierung: 2026-08-01 (portal-v85: Wunsch #89 Sportschau-Balken-Reihenfolge, #90 Wiederkehrende-Aufgaben-Pool, #91 Aufgabenplan für Eltern)*
 
 ## Host
 
@@ -134,7 +134,10 @@ manage.py            – CLI: createadmin, adduser, addapp, grant, listusers,
                        ki_modell/ki_stimme/listki (Wunsch #81: Modell/Stimme je
                        KI-Zweck bzw. je Vokabeln-Sprache ohne Deploy ändern)
 teile/
-  __init__.py        – registriert 00_kern als teile.kern
+  __init__.py        – registriert 00_kern als teile.kern, seit Wunsch #90
+                       zusaetzlich 04_todo als teile.todo (erster Cross-Modul-
+                       Import ausserhalb von kern - kinderplan braucht
+                       serien_pool_liste()/serie_einsortieren())
   00_kern.py         – DB-Schema, get_db()/new_db(), grant(), new_token(), to_int(),
                        push_send() (VAPID, Thread), ki_anfrage() (generischer KI-Aufruf
                        über OpenRouter, Token-Kontingent pro Nutzer/Monat über
@@ -168,7 +171,16 @@ teile/
                        /bearbeiten/<id> (Wunsch #43: alle Felder – Text, Ziel
                        Person/Rolle(n)/Alle, Privat – gleiche UX wie /neu; Eltern
                        alle/Kinder eigene bzw. rollenpassende; Status bleibt beim
-                       Bearbeiten unangetastet; nur Textänderungen landen im Verlauf)
+                       Bearbeiten unangetastet; nur Textänderungen landen im Verlauf).
+                       Wiederkehrende Aufgaben-Vorlagen/Pool (Wunsch #90):
+                       /serien (GET+POST, Template todo_serien.html) verwaltet
+                       todo_serien (Inhalt + Wiederkehr-Regel: 'intervall' X Tage
+                       nach Erledigung ODER 'wochentag' fest, pro Vorlage gewählt).
+                       serien_pool_liste()/serie_einsortieren() sind fuer andere
+                       Module gedacht (importiert von kinderplan ueber den Alias
+                       teile.todo, siehe teile/__init__.py) - eine eingesetzte
+                       Instanz ist ein normales todos-Row mit serie_id+wochentag
+                       gesetzt, taucht mit 🔁-Chip in der normalen Todo-Liste auf
   05_werkstatt_app.py – /a/werkstatt/<token>/ Wunschliste; Admin: Priorität setzen
                        (niedrig/mittel/hoch/sehr_hoch/zurueckgestellt – Wunsch #61;
                        zurueckgestellt sortiert als letztes, siehe Docstring am
@@ -266,12 +278,21 @@ teile/
                        Mahlzeit dürfen sich unterscheiden); Tages-Status
                        (vergangen/heute/zukunft) wird bei jedem Aufruf aus
                        date.today() berechnet, nicht gespeichert
-  13_kinderplan.py   – /a/kinderplan/<token>/ Aufgabenplan: Kinder ordnen
-                       geholfen_aufgaben Wochentagen zu (?fuer=<kind-id> zum
-                       Wechseln der Ansicht); /zuweisen (Toggle), /abhaken
-                       (schreibt direkt in geholfen_eintraege); ab 20 Uhr ist
-                       der Wochentag von morgen für Kinder gesperrt
-                       (_gesperrter_wochentag(), rein zeitberechnet)
+  13_kinderplan.py   – /a/kinderplan/<token>/ Aufgabenplan: Kinder UND
+                       Eltern (Wunsch #91, vorher nur Kinder - Eltern konnten
+                       zwar fremde Plaene verwalten, hatten aber keinen
+                       eigenen) ordnen geholfen_aufgaben Wochentagen zu
+                       (?fuer=<person-id> zum Wechseln der Ansicht, Eltern
+                       landen jetzt wie Kinder standardmaessig auf ihrem
+                       eigenen Plan); /zuweisen (Toggle), /abhaken (schreibt
+                       direkt in geholfen_eintraege); ab 20 Uhr ist der
+                       Wochentag von morgen fuer Kinder gesperrt
+                       (_gesperrter_wochentag(), rein zeitberechnet, Eltern/
+                       Admin ausgenommen). Wunsch #90: zusaetzlich
+                       /serie_einsortieren (Pool-Vorlage aus teile.todo fuer
+                       eine Person+Wochentag einsetzen) und /serie_erledigen/
+                       <id> (schreibt direkt in todos, nicht geholfen_eintraege
+                       - andere Mechanik als die bestehenden geholfen_aufgaben)
   14_sportschau.py   – /a/sportschau/<token>/ Trainings-Heatmap (Wunsch #62),
                        letzte 14 Tage (Wunsch #78, `_TAGE_ANZAHL`-Konstante),
                        eine Zeile pro Trainingsart. Ruft
@@ -293,8 +314,12 @@ teile/
                        schlägt end_date einen Tag auf, bevor die Anfrage raus
                        geht (Wunsch #88, siehe Bekannte Issues - hae-Server
                        parst ein bare-date endDate als Mitternacht, "heute"
-                       wäre sonst immer ausgeschlossen). Nur Andi granted
-                       (persönliche Fitnessdaten)
+                       wäre sonst immer ausgeschlossen). Gestapelte Balken in
+                       `sportschau.html`: Training-Segment steht im Markup VOR
+                       dem Sonstige-Segment, damit es im flex-column-Stack oben
+                       liegt und Sonstige (flex:1) die Basis bildet (Wunsch #89
+                       - Reihenfolge im Markup bestimmt oben/unten). Nur Andi
+                       granted (persönliche Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
                        Wunsch #66): Kategorie Mensch/Tier (tier_typ='mensch'
@@ -553,7 +578,8 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am |
-| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten) |
+| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (0=Mo..6=So, nur bei serie_id gesetzt) |
+| `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (0=Mo..6=So), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
 | `todo_historie` | id, todo_id (FK todos, cascade), alter_inhalt, geaendert_von, geaendert_am |
 | `geholfen_aufgaben` | id, name, emoji, gewichtung, aktiv |
 | `geholfen_eintraege` | id, aufgabe_id, user_id, zeitstempel |

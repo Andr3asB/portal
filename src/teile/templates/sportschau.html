@@ -114,8 +114,8 @@
         <div class="steps-bar-col">
           <div class="steps-bar-stack" style="height:{{ b.pct_gesamt|round(1) }}%"
                title="{{ b.tag }}: {{ b.gesamt }} Schritte ({{ b.training }} beim Training)">
-            <div class="steps-bar-nontraining"></div>
             <div class="steps-bar-training" style="height:{{ b.pct_training|round(1) }}%"></div>
+            <div class="steps-bar-nontraining"></div>
           </div>
         </div>
         {% endfor %}

@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS todos (
   erledigt_am   TEXT,
   erstellt      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS todo_serien (
+  id               INTEGER PRIMARY KEY,
+  inhalt           TEXT    NOT NULL,
+  wiederkehr_typ   TEXT    NOT NULL DEFAULT 'intervall',
+  intervall_tage   INTEGER,
+  fester_wochentag INTEGER,
+  aktiv            INTEGER NOT NULL DEFAULT 1,
+  erstellt_von     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  erstellt         TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS todo_historie (
   id            INTEGER PRIMARY KEY,
   todo_id       INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
@@ -708,6 +718,13 @@ def _init_db(app):
         for col, definition in [
             ("status", "TEXT NOT NULL DEFAULT 'offen'"),
             ("zugewiesen_rollen", "TEXT"),
+            # Wunsch #90: wiederkehrende Aufgaben-Vorlagen (todo_serien) -
+            # eine konkrete, in einen Wochentag einsortierte Instanz ist ein
+            # ganz normales todos-Row mit serie_id gesetzt, damit alle
+            # bestehende Todo-Mechanik (Status, Historie, Löschen, Anzeige
+            # in der Todo-App) unveraendert mitgenutzt wird.
+            ("serie_id", "INTEGER REFERENCES todo_serien(id) ON DELETE SET NULL"),
+            ("wochentag", "INTEGER"),
         ]:
             try:
                 db.execute(f"ALTER TABLE todos ADD COLUMN {col} {definition}")

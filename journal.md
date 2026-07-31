@@ -2,6 +2,96 @@
 
 ---
 
+## 2026-08-01 – portal-v85: Wünsche #89 (Sportschau-Stacking), #90 (Wiederkehrende Aufgaben/Pool), #91 (Aufgabenplan für Eltern)
+
+### Wunsch #89 – Sonstige Schritte als Basis, Training oben
+
+Andi: "Sonstige Schritte sind Alltägliche Schritte. Diese sollten bei
+stacked bars unten dargestellt werden, weil sie die Basis sind. Trainings
+kommen 'on Top'." Reiner DOM-Reihenfolge-Fix in `sportschau.html`: in
+einem `flex-direction:column`-Stack bestimmt die Reihenfolge der Kind-
+Elemente, welches oben/unten landet. `.steps-bar-training` steht jetzt
+VOR `.steps-bar-nontraining` im Markup - Training (fixe Höhe) füllt den
+oberen Teil des Stacks, Sonstige (flex:1, füllt den Rest) bildet die
+Basis gegen die Grundlinie. Verifiziert per `getBoundingClientRect()`:
+`trainRect.top < nontrainRect.top` (Training liegt oben).
+
+### Wunsch #91 – Aufgabenplan auch für Eltern
+
+Bisher konnten Eltern in `kinderplan.py` nur fremde (Kinder-)Pläne
+verwalten, hatten aber keinen eigenen. Alle `rolle='kind'`-Filter auf
+`rolle IN ('kind','eltern')` erweitert (Personen-Auswahl, Ziel-Validierung
+in `zuweisen`/`abhaken`), Eltern landen jetzt standardmäßig auf ihrem
+eigenen Plan (vorher nur bei Kindern der Fall). Die 20-Uhr-Sperre bleibt
+für Eltern/Admin ohnehin ausgenommen (`_darf_verwalten()`), auch am
+eigenen Plan - unverändert. Grants für `kinderplan` waren bei Andi/Simone
+bereits vorhanden (nötig fürs Verwalten fremder Pläne), keine neuen Grants
+nötig. Verifiziert: Andi sieht jetzt standardmäßig seinen eigenen Plan,
+Picker zeigt alle vier Familienmitglieder, alle 7 Tage editierbar.
+
+### Wunsch #90 – Wiederkehrende Aufgaben-Vorlagen mit Pool
+
+Größter der drei Wünsche, zwei echte Architekturfragen vorab geklärt:
+Einsortieren in Wochentage passiert in der bestehenden Aufgabenplanung
+(kinderplan), nicht in einer neuen eigenen Ansicht; die Wiederkehr-Regel
+ist pro Vorlage wählbar - entweder "Intervall nach Erledigung" (z. B.
+alle 7 Tage) oder "fester Wochentag" (z. B. jeden Montag).
+
+**Datenmodell:** Neue Tabelle `todo_serien` (Vorlage: Inhalt + Wiederkehr-
+Regel + aktiv-Flag), `todos` bekommt `serie_id`+`wochentag`. Eine aus dem
+Pool eingesetzte Instanz ist ein ganz normales `todos`-Row mit gesetztem
+`serie_id` - nutzt die komplette bestehende Todo-Mechanik (Status,
+Historie, Löschen, Anzeige in der Todo-App mit neuem 🔁-Chip) unverändert
+mit, kein separates Tracking.
+
+**Pool-Logik** (`04_todo.py`): `_serie_ist_im_pool()` prüft: keine offene
+Instanz vorhanden, und - falls schon mal erledigt - die Wiederkehr-
+Schwelle erreicht. Bei "wochentag" ist die Schwelle immer der NÄCHSTE
+passende Wochentag NACH dem Erledigungsdatum, nie derselbe Tag (sonst
+würde eine am eigenen Zieltag erledigte Aufgabe sofort wieder auftauchen).
+Rein lazy berechnet bei jedem Seitenaufruf, kein neuer Scheduler-Job.
+
+**Cross-App-Zugriff:** `teile/__init__.py` bekam einen zweiten Alias
+(`teile.todo` für `04_todo.py`, analog zum bestehenden `teile.kern`),
+damit `kinderplan.py` sauber `from teile.todo import serien_pool_liste,
+serie_einsortieren` schreiben kann - `todos_neu()`s Docstring versprach
+das schon länger für andere Module, aber niemand hatte bisher einen
+Alias dafür angelegt.
+
+**Neue Oberflächen:** `/a/todo/<token>/serien` (neues Template
+`todo_serien.html`, verlinkt im Hamburger-Menü der Todo-App) zum Anlegen/
+Pausieren/Löschen von Vorlagen. In `kinderplan.html` erscheint im
+Bearbeiten-Modus jeder Tageskarte ein neuer "🔁 Aus Pool holen"-Bereich
+mit den gerade verfügbaren Vorlagen als Chips; eingesetzte Instanzen
+zeigen sich als normale Aufgaben-Zeile mit eigenem Abhaken-Knopf
+(`serie_erledigen`-Route, schreibt direkt in `todos`, kein Umweg über
+`geholfen_eintraege` wie beim bestehenden Kinderplan-Mechanismus).
+
+**Bewusst nicht gebaut:** Bearbeiten/Löschen einer bereits eingesetzten
+Instanz direkt aus der Aufgabenplanung heraus - dafür einfach in die
+Todo-App wechseln, ist ja ein ganz normales Todo.
+
+### Verifiziert
+
+Per `javascript_tool` gegen die echte Seite, kompletter Kreislauf:
+Vorlage "alle 7 Tage" angelegt → erscheint korrekt im Pool → als Chip in
+kinderplan sichtbar → eingesetzt für Montag/Andi → erzeugt nachweislich
+ein `todos`-Row mit `serie_id`+`wochentag` (per DB-Abfrage bestätigt) →
+verschwindet korrekt aus dem Pool → erscheint in der Todo-App mit
+🔁-Chip → über kinderplan abgehakt → `erledigt_am` korrekt gesetzt →
+`erledigt_am` künstlich 8 Tage zurückdatiert → taucht korrekt wieder im
+Pool auf. Zweite Vorlage mit "fester Wochentag = Montag" angelegt,
+Wiederkehr-Schwelle direkt gegen `_serie_ist_im_pool()` mit drei
+verschiedenen historischen Erledigungsdaten getestet - Schwelle lag in
+allen drei Fällen exakt auf dem erwarteten "nächsten Montag danach".
+Alle Testdaten (Vorlagen + Todos) danach wieder entfernt.
+
+### Auslieferungspaket
+
+`deploy/portal-v85.tar.gz`
+
+---
+
 ## 2026-07-31 – portal-v83: Einkauf – freundlicher Hinweis statt Browser-Fehler bei Bearbeiten/Löschen offline
 
 Anschlussfrage nach dem Offline-Umbau: "Die Beiden Fälle Bearbeiten und

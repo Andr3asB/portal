@@ -235,7 +235,8 @@
     {% set zeigt_geholfen_items = app_slug is defined and app_slug == 'geholfen' and token is defined and token %}
     {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin and token is defined and token %}
     {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
-    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items %}
+    {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and token is defined and token %}
+    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items %}
     <div class="menu-divider"></div>
 
     {% if zeigt_geholfen_items %}
@@ -270,6 +271,12 @@
     </a>
     <a class="menu-item" href="/a/vokabeln/{{ token }}/kapitel">
       <span class="menu-emoji">🗂️</span>Kapitel verwalten
+    </a>
+    {% endif %}
+
+    {% if zeigt_todo_items %}
+    <a class="menu-item" href="/a/todo/{{ token }}/serien">
+      <span class="menu-emoji">🔁</span>Wiederkehrende Aufgaben
     </a>
     {% endif %}
 

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% set app_slug = "todo" %}
+{% block title %}Wiederkehrende Aufgaben{% endblock %}
+
+{% block extra_styles %}
+.form-card {
+  background:var(--surface); border-radius:14px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.form-label {
+  font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin:10px 0 6px;
+}
+.form-label:first-child { margin-top:0; }
+.form-input {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text); box-sizing:border-box;
+}
+.form-input:focus { border-color:var(--farbe); }
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:8px 14px; font-size:14px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.btn-add {
+  margin-top:14px; width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:11px 0; font-size:15px; font-weight:600; cursor:pointer;
+}
+.btn-add:disabled { opacity:.4; cursor:default; }
+
+.serie-item {
+  background:var(--surface); border-radius:12px; padding:12px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.serie-item.inaktiv { opacity:.4; }
+.serie-row { display:flex; align-items:center; gap:10px; }
+.serie-name { flex:1; font-size:15px; font-weight:500; }
+.serie-regel { font-size:12px; color:var(--text-2); margin-top:2px; }
+.badge-pool {
+  display:inline-flex; align-items:center; gap:3px;
+  background:#d4edda; color:#155724; border-radius:8px;
+  padding:2px 8px; font-size:11px; font-weight:600; white-space:nowrap;
+}
+body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
+.btn-toggle {
+  background:none; border:1.5px solid var(--border); border-radius:8px;
+  padding:6px 10px; font-size:13px; cursor:pointer; color:var(--text-2); white-space:nowrap;
+}
+.btn-loeschen-inline {
+  background:none; border:none; color:#ff3b30; font-size:13px;
+  cursor:pointer; padding:4px 0;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/todo/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🔁 Wiederkehrende Aufgaben</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="form-card">
+    <form method="post" id="serie-form">
+      <input type="hidden" name="action" value="neu">
+      <div class="form-label">Aufgabe</div>
+      <input class="form-input" type="text" name="inhalt" placeholder="z.B. Blumen gießen" required>
+
+      <div class="form-label">Wiederkehr</div>
+      <div class="btn-row">
+        <button type="button" class="chip-btn" data-typ="intervall">Intervall (X Tage nach Erledigung)</button>
+        <button type="button" class="chip-btn" data-typ="wochentag">Fester Wochentag</button>
+      </div>
+      <input type="hidden" name="wiederkehr_typ" id="wiederkehr-typ-hidden">
+
+      <div id="intervall-feld" style="display:none">
+        <div class="form-label">Alle wie viele Tage?</div>
+        <input class="form-input" type="number" name="intervall_tage" min="1" placeholder="z.B. 7">
+      </div>
+
+      <div id="wochentag-feld" style="display:none">
+        <div class="form-label">Welcher Wochentag?</div>
+        <div class="btn-row" id="wochentag-chips">
+          {% for w in wochentage %}
+          <button type="button" class="chip-btn" data-value="{{ loop.index0 }}">{{ w }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="fester_wochentag" id="fester-wochentag-hidden">
+      </div>
+
+      <button class="btn-add" type="submit" id="serie-submit-btn" disabled>+ Vorlage anlegen</button>
+    </form>
+  </div>
+
+  {% if not serien %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Noch keine wiederkehrenden Aufgaben angelegt.
+  </div>
+  {% endif %}
+
+  {% for s in serien %}
+  <div class="serie-item{% if not s.aktiv %} inaktiv{% endif %}">
+    <div class="serie-row">
+      <div style="flex:1">
+        <div class="serie-name">
+          {{ s.inhalt }}
+          {% if s.id in im_pool %}<span class="badge-pool">🔁 im Pool</span>{% endif %}
+        </div>
+        <div class="serie-regel">
+          {% if s.wiederkehr_typ == 'intervall' %}
+            Alle {{ s.intervall_tage }} Tage nach Erledigung
+          {% else %}
+            Jeden {{ wochentage[s.fester_wochentag] }}
+          {% endif %}
+        </div>
+      </div>
+      <form method="post" style="margin:0">
+        <input type="hidden" name="action" value="toggle">
+        <input type="hidden" name="id" value="{{ s.id }}">
+        <button class="btn-toggle" type="submit">{% if s.aktiv %}Pausieren{% else %}Aktivieren{% endif %}</button>
+      </form>
+    </div>
+    {% if darf_loeschen %}
+    <form method="post" onsubmit="return confirm({{ ('„' ~ s.inhalt|truncate(40) ~ '“ dauerhaft löschen?')|tojson|forceescape }})">
+      <input type="hidden" name="action" value="loeschen">
+      <input type="hidden" name="id" value="{{ s.id }}">
+      <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const typHidden = document.getElementById('wiederkehr-typ-hidden');
+const intervallFeld = document.getElementById('intervall-feld');
+const wochentagFeld = document.getElementById('wochentag-feld');
+const wochentagHidden = document.getElementById('fester-wochentag-hidden');
+const submitBtn = document.getElementById('serie-submit-btn');
+const intervallInput = document.querySelector('input[name="intervall_tage"]');
+
+function pruefeAbsendbar() {
+  if (typHidden.value === 'intervall') {
+    submitBtn.disabled = !intervallInput.value || parseInt(intervallInput.value) < 1;
+  } else if (typHidden.value === 'wochentag') {
+    submitBtn.disabled = !wochentagHidden.value;
+  } else {
+    submitBtn.disabled = true;
+  }
+}
+
+document.querySelectorAll('#serie-form > .btn-row:not(#wochentag-chips) .chip-btn[data-typ]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.chip-btn[data-typ]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    typHidden.value = btn.dataset.typ;
+    intervallFeld.style.display = btn.dataset.typ === 'intervall' ? 'block' : 'none';
+    wochentagFeld.style.display = btn.dataset.typ === 'wochentag' ? 'block' : 'none';
+    pruefeAbsendbar();
+  });
+});
+
+document.querySelectorAll('#wochentag-chips .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#wochentag-chips .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    wochentagHidden.value = btn.dataset.value;
+    pruefeAbsendbar();
+  });
+});
+
+intervallInput?.addEventListener('input', pruefeAbsendbar);
+</script>
+{% endblock %}

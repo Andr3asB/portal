@@ -16,7 +16,21 @@ unverändertes Alt-Verhalten) ODER an eine/mehrere Rollen bzw. explizit "alle"
 (neue Spalte zugewiesen_rollen, kommagetrennt, Sentinel "alle" = alle Rollen).
 Nur die neue Rollen/Alle-Zuweisung landet initial im Backlog statt in Offen –
 eine direkte Personen-Zuweisung (auch der Leerwert) verhält sich wie zuvor.
+
+Wiederkehrende Aufgaben-Vorlagen / Pool (Wunsch #90): eine todo_serien-Zeile
+ist eine Vorlage mit Wiederkehr-Regel (entweder "intervall" – X Tage nach
+Erledigung wieder verfügbar – oder "wochentag" – an einem festen Wochentag
+wieder verfügbar, jeweils pro Vorlage gewählt), verwaltet hier unter
+/serien. Die eigentliche Einsortierung in ein Wochentagsraster passiert
+NICHT hier, sondern in der Aufgabenplanung (kinderplan) – deshalb sind
+serien_pool_liste()/serie_einsortieren() als Schnittstelle für andere
+Module gedacht (importierbar über den Alias 'teile.todo', siehe
+teile/__init__.py). Eine einsortierte Instanz ist ein ganz normales
+todos-Row mit gesetztem serie_id+wochentag – nutzt die komplette
+bestehende Todo-Mechanik (Status, Historie, Löschen) mit, kein separates
+Tracking.
 """
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
 
@@ -27,6 +41,7 @@ STATUS_ORDER  = ["backlog", "offen", "in_arbeit", "erledigt"]
 STATUS_LABELS = {"backlog": "Backlog", "offen": "Offen", "in_arbeit": "In Arbeit", "erledigt": "Erledigt"}
 ROLLEN        = ["eltern", "kind", "gast"]
 ROLLEN_LABELS = {"eltern": "Eltern", "kind": "Kind", "gast": "Gast"}
+WOCHENTAGE    = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
 
 def _darf_loeschen(user) -> bool:
@@ -287,6 +302,105 @@ def loeschen(token, tid):
     db.execute("DELETE FROM todos WHERE id=?", (tid,))
     db.commit()
     return redirect(url_for("todo_app.index", token=token))
+
+
+def _serie_ist_im_pool(db, serie) -> bool:
+    """True, wenn die Vorlage aktuell im Pool verfügbar ist: keine offene
+    (unerledigte) Instanz vorhanden, und - falls schon mal erledigt - die
+    Wiederkehr-Schwelle ist erreicht oder überschritten (Wunsch #90)."""
+    offen = db.execute(
+        "SELECT 1 FROM todos WHERE serie_id=? AND erledigt=0", (serie["id"],)
+    ).fetchone()
+    if offen:
+        return False
+    letzte = db.execute(
+        "SELECT erledigt_am FROM todos WHERE serie_id=? AND erledigt=1 "
+        "ORDER BY erledigt_am DESC LIMIT 1", (serie["id"],)
+    ).fetchone()
+    if not letzte or not letzte["erledigt_am"]:
+        return True  # noch nie erledigt -> sofort im Pool verfuegbar
+    letzter_zeitpunkt = datetime.fromisoformat(letzte["erledigt_am"])
+    if serie["wiederkehr_typ"] == "intervall":
+        schwelle = letzter_zeitpunkt + timedelta(days=serie["intervall_tage"] or 0)
+    else:
+        # 'wochentag': naechste Wiederkehr ist der naechste passende Wochentag
+        # NACH dem Erledigungsdatum, nie derselbe Tag (sonst wuerde eine an
+        # ihrem eigenen Zieltag erledigte Aufgabe sofort wieder auftauchen).
+        tage_bis = (serie["fester_wochentag"] - letzter_zeitpunkt.weekday()) % 7 or 7
+        schwelle = letzter_zeitpunkt + timedelta(days=tage_bis)
+    return datetime.now() >= schwelle
+
+
+def serien_pool_liste(db):
+    """Alle aktiven Vorlagen, die gerade im Pool verfügbar sind - Schnittstelle
+    für die Aufgabenplanung (kinderplan), siehe teile/__init__.py."""
+    alle = db.execute(
+        "SELECT * FROM todo_serien WHERE aktiv=1 ORDER BY inhalt COLLATE NOCASE"
+    ).fetchall()
+    return [s for s in alle if _serie_ist_im_pool(db, s)]
+
+
+def serie_einsortieren(db, serie_id, ziel_user_id, wochentag, erstellt_von_user_id):
+    """Erzeugt aus einer Pool-Vorlage eine konkrete Todo-Instanz für eine
+    Person an einem Wochentag - Schnittstelle für die Aufgabenplanung."""
+    serie = db.execute("SELECT * FROM todo_serien WHERE id=? AND aktiv=1", (serie_id,)).fetchone()
+    if not serie or not _serie_ist_im_pool(db, serie):
+        return False
+    db.execute(
+        "INSERT INTO todos(inhalt, erstellt_von, zugewiesen_an, serie_id, wochentag, status) "
+        "VALUES(?,?,?,?,?,'offen')",
+        (serie["inhalt"], erstellt_von_user_id, ziel_user_id, serie_id, wochentag),
+    )
+    db.commit()
+    return True
+
+
+@bp.route("/a/todo/<token>/serien", methods=["GET", "POST"])
+def serien(token):
+    """Verwaltung der wiederkehrenden Aufgaben-Vorlagen (Wunsch #90) - die
+    Einsortierung in Wochentage passiert in der Aufgabenplanung, nicht hier."""
+    user = check_grant(token, APP)
+    if not user:
+        abort(403)
+    db = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "neu":
+            inhalt = request.form.get("inhalt", "").strip()
+            typ = request.form.get("wiederkehr_typ")
+            if inhalt and typ in ("intervall", "wochentag"):
+                intervall_tage    = to_int(request.form.get("intervall_tage")) if typ == "intervall" else None
+                fester_wochentag  = to_int(request.form.get("fester_wochentag")) if typ == "wochentag" else None
+                gueltig = (typ == "intervall" and intervall_tage and intervall_tage > 0) or \
+                          (typ == "wochentag" and fester_wochentag is not None and 0 <= fester_wochentag <= 6)
+                if gueltig:
+                    db.execute(
+                        "INSERT INTO todo_serien(inhalt, wiederkehr_typ, intervall_tage, fester_wochentag, erstellt_von) "
+                        "VALUES(?,?,?,?,?)",
+                        (inhalt, typ, intervall_tage, fester_wochentag, user["id"]),
+                    )
+                    db.commit()
+        elif action == "toggle":
+            sid = to_int(request.form.get("id"), 0)
+            row = db.execute("SELECT aktiv FROM todo_serien WHERE id=?", (sid,)).fetchone()
+            if row:
+                db.execute("UPDATE todo_serien SET aktiv=? WHERE id=?", (0 if row["aktiv"] else 1, sid))
+                db.commit()
+        elif action == "loeschen" and _darf_loeschen(user):
+            sid = to_int(request.form.get("id"), 0)
+            db.execute("DELETE FROM todo_serien WHERE id=?", (sid,))
+            db.commit()
+        return redirect(url_for("todo_app.serien", token=token))
+
+    alle_serien = db.execute(
+        "SELECT * FROM todo_serien ORDER BY aktiv DESC, inhalt COLLATE NOCASE"
+    ).fetchall()
+    im_pool = {s["id"] for s in alle_serien if s["aktiv"] and _serie_ist_im_pool(db, s)}
+    return render_template("todo_serien.html",
+        user=user, token=token, farbe=user["farbe"],
+        serien=alle_serien, im_pool=im_pool, darf_loeschen=_darf_loeschen(user),
+        wochentage=WOCHENTAGE,
+    )
 
 
 def init_app(app):
