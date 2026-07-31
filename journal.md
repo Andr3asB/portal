@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-07-31 – portal-v71/v72: Wunsch #85 (Einkauf: Formular bleibt offen)
+
+Andi: "Wenn man die App öffnet, dann soll neben der Liste nur ein Neu
+Button sichtbar sein. Das Formular zum eintragen öffnet sich dann auf der
+Seite und bleibt offen bis man die App verlässt, damit man mehrere
+Einträge nacheinander erfassen kann."
+
+**Umsetzung (`einkauf.html`):** Das Eintragen-Formular (`.add-card`) ist
+jetzt standardmäßig `display:none`, stattdessen steht oben ein einzelner
+"+ Neu"-Knopf (`.btn-neu-toggle`, gleiche Optik wie das Pendant in
+`vokabeln.html`). Klick öffnet das Formular und setzt ein Flag in
+`sessionStorage` (`einkauf_formular_offen`) – dasselbe Prinzip wie das
+schon bestehende `einkauf_letzte_auswahl` für Kategorie/Angebot/Markt:
+übersteht den Seiten-Reload nach jedem Absenden (Formular bleibt über
+mehrere Einträge hinweg offen, genau wie gewünscht), wird aber beim
+echten Schließen des Tabs/Browsers verworfen – dann startet die App
+wieder mit eingeklapptem Formular.
+
+**Verifiziert:** Per `javascript_tool` gegen die echte Seite geprüft –
+frischer Zustand (kein sessionStorage-Flag) zeigt nur den Knopf
+(`display:none` auf `.add-card`); Klick öffnet das Formular und
+fokussiert das Namensfeld; ein echtes Absenden eines Testeintrags
+("Testeintrag-Wunsch85") plus anschließendem Seiten-Reload zeigt sowohl
+den neuen Artikel in der Liste als auch das weiterhin offene Formular –
+Testeintrag danach wieder aus der DB entfernt. Hilfe-Kapitel „🛒
+Einkaufsliste" entsprechend ergänzt.
+
+### Auslieferungspaket
+
+`deploy/portal-v71.tar.gz` (Fix) → `v72.tar.gz` (Hilfe-Text ergänzt,
+aktueller Stand)
+
+---
+
 ## 2026-07-30 – portal-v70: Wunsch #83 (Fix Tierbaukasten-Galerie) + #84 (Anhören auf Übersichtsseite)
 
 ### Wunsch #83 – Muster in der Galerie verschwunden

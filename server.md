@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-30 (portal-v70: Wunsch #83 Fix Tierbaukasten-Galerie-Muster, Wunsch #84 Anhören auch auf Vokabeln-Übersichtsseite)*
+*Letzte Aktualisierung: 2026-07-31 (portal-v72: Wunsch #85 Einkauf-Formular bleibt offen für mehrere Einträge nacheinander)*
 
 ## Host
 
@@ -197,7 +197,10 @@ teile/
                        /a/einkauf/<token>/kategorien (Admin, Wunsch #37: anlegen/
                        umbenennen/deaktivieren, Hamburger-Menü); /kategorien/reorder
                        (Admin, JSON, Wunsch #38: Sortierreihenfolge per Drag & Drop,
-                       gleiches Pointer-Events-Muster wie home_gruppen)
+                       gleiches Pointer-Events-Muster wie home_gruppen). Eintragen-
+                       Formular standardmässig eingeklappt hinter einem "+ Neu"-Knopf,
+                       bleibt nach dem Oeffnen ueber mehrere Eintraege/Reloads offen
+                       (sessionStorage-Flag `einkauf_formular_offen`, Wunsch #85)
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,
