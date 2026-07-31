@@ -34,6 +34,7 @@
 .tile:not(.edit-mode *):active { transform: scale(.96); }
 .tile-emoji { font-size: 40px; line-height: 1; pointer-events: none; }
 .tile-name  { font-size: 14px; font-weight: 500; color: var(--text-3); pointer-events: none; }
+.tile.tile-gesperrt { opacity: .35; filter: grayscale(1); cursor: default; }
 .empty {
   text-align: center; padding: 48px 16px;
   color: var(--text-2); font-size: 16px; line-height: 1.6;
@@ -152,7 +153,7 @@
       <div class="grid gruppe-grid">
         {% for app in gruppe.apps %}
         <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
-           data-grant-id="{{ app.grant_id }}">
+           data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji">{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
         </a>
@@ -171,7 +172,7 @@
       <div class="grid gruppe-grid">
         {% for app in allgemein %}
         <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
-           data-grant-id="{{ app.grant_id }}">
+           data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji">{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
         </a>
@@ -203,6 +204,26 @@
   const el  = document.getElementById('greeting-title');
   if (el) el.textContent = el.textContent.replace(/^[^,]+/, g);
 })();
+
+// Nicht offline-faehige Apps grau + nicht anklickbar, sobald offline.
+// Klick-Sperre prueft navigator.onLine live beim Klick selbst (nicht nur
+// beim letzten online/offline-Event), damit kein Zustand veralten kann.
+document.querySelectorAll('.tile[data-offline]').forEach(tile => {
+  tile.addEventListener('click', e => {
+    if (!navigator.onLine && tile.dataset.offline !== '1') e.preventDefault();
+  });
+});
+
+function aktualisiereOfflineKacheln() {
+  const offline = !navigator.onLine;
+  document.querySelectorAll('.tile[data-offline]').forEach(tile => {
+    const faehig = tile.dataset.offline === '1';
+    tile.classList.toggle('tile-gesperrt', offline && !faehig);
+  });
+}
+window.addEventListener('online', aktualisiereOfflineKacheln);
+window.addEventListener('offline', aktualisiereOfflineKacheln);
+aktualisiereOfflineKacheln();
 
 // Push-Opt-in
 (async function(){

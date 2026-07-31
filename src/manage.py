@@ -293,6 +293,16 @@ def cmd_listki(_):
     db.close()
 
 
+def cmd_listapps(_):
+    """Nur lesend - offline_faehig ist eine Code-/Deploy-Entscheidung, kein
+    per manage.py frei umschaltbares Admin-Setting (siehe 00_kern.py)."""
+    db = connect()
+    for r in db.execute("SELECT slug, name, offline_faehig FROM apps ORDER BY slug").fetchall():
+        status = "offline-faehig" if r["offline_faehig"] else "nur online"
+        print(f"  {r['slug']:15} {r['name']:15} {status}")
+    db.close()
+
+
 CMDS = {
     "createadmin":     cmd_createadmin,
     "adduser":         cmd_adduser,
@@ -306,6 +316,7 @@ CMDS = {
     "ki_modell":       cmd_ki_modell,
     "ki_stimme":       cmd_ki_stimme,
     "listki":          cmd_listki,
+    "listapps":        cmd_listapps,
 }
 
 if __name__ == "__main__":

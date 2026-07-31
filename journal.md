@@ -2,6 +2,79 @@
 
 ---
 
+## 2026-07-31 – portal-v79/v80: Offline-Grundinfrastruktur (per Chat-Anfrage, kein ✨-Wunsch)
+
+Nach der Sportschau-Diagnose kam die Anschlussfrage auf, ob das Portal
+selbst offline funktioniert (z. B. kein Empfang im Supermarkt). Antwort
+war: nein, aktuell nicht - kein `fetch`-Handler im Service Worker, keine
+Seiten-/Asset-Caches, und die Einkauf-App schreibt jeden Haken live per
+`fetch()` zum Server (schlägt offline fehl, Checkbox macht sich selbst
+rückgängig). Andi wollte daraufhin einen ersten, kleinen Schritt:
+
+- Die App soll offline zumindest **starten** können.
+- Ein Hinweis-Banner zeigt den Offline-Zustand an.
+- Nicht offline-fähige Apps werden auf der Startseite grau + nicht anklickbar.
+- Offline-Fähigkeit ist ein Flag pro App, das separat definiert wird.
+
+### Architektur
+
+- **`apps.offline_faehig`** (neue Spalte, Default 0): bewusst nicht per
+  `manage.py` frei umschaltbar, sondern in `00_kern.py` per Migration
+  gesetzt - ob eine App offline sicher ist (keine live-schreibenden
+  Interaktionen ohne eigene Warteschlange), ist eine Entwicklerentscheidung,
+  die ohnehin einen Deploy braucht. `manage.py listapps` (rein lesend) zum
+  Nachschauen. Erste (und bisher einzige) offline-fähige App: **"hilfe"**
+  (rein statischer Text, keine Formulare).
+- **Service Worker (`sw.js`)**: bekam einen echten `fetch`-Handler -
+  Network-first mit Cache-Fallback für eigene GET-Requests. Cached
+  grundsätzlich jede besuchte Seite (auch nicht offline-fähige - technisch
+  harmlos, zeigt höchstens einen alten Stand), POST-Requests werden nie
+  abgefangen. Die eigentliche Sperre passiert nicht im Service Worker,
+  sondern als Kachel-Gating auf der Startseite.
+- **Startseite**: Kacheln bekommen `data-offline`, JS grau + sperrt Klick
+  (per `e.preventDefault()`, live gegen `navigator.onLine` geprüft, nicht
+  nur beim letzten Event) für alles ohne Flag, sobald offline.
+- **`base.html`**: neues Offline-Banner ("📡 Offline – manche Funktionen
+  sind eingeschränkt") auf jeder Seite, nicht nur der Startseite - reagiert
+  auf `online`/`offline`-Events.
+
+### Ein Bug unterwegs gefunden und gefixt
+
+`navigator.serviceWorker.register('/static/sw.js')` gibt dem Worker per
+Default nur den Scope `/static/` - er hätte `/p/...` und `/a/.../...`
+NIE kontrolliert, egal wie gut der fetch-Handler ist. Fix: Registrierung
+mit `{ scope: '/' }`, dafür braucht es zusätzlich den Response-Header
+`Service-Worker-Allowed: /` beim Ausliefern von `sw.js` (sonst lehnt der
+Browser den erweiterten Scope als SecurityError ab) - neuer
+`@app.after_request`-Hook in `00_kern.py`, nur für genau diese eine Route.
+Ohne diesen zweiten Teil hätte die ganze Funktion silent nichts getan.
+
+### Verifiziert
+
+Per `javascript_tool` gegen die echte Seite: Service Worker registriert
+sich jetzt mit Scope `/` (vorher fälschlich `/static/`), kontrolliert die
+Seite nach einem Reload; Startseite und "Hilfe"-Seite landen nachweislich
+im Cache (`caches.open('portal-cache-v1')` zeigt die eigenen URLs);
+`navigator.onLine` künstlich auf `false` gesetzt + `offline`-Event
+gefeuert: Banner erscheint, alle 11 Kacheln (keine davon "hilfe" - die
+taucht als Kachel gar nicht auf der Startseite auf) werden grau,
+ein simulierter Klick wird nachweislich per `preventDefault()` blockiert;
+zurück auf online: alles setzt sich sauber zurück, Klick geht wieder durch.
+
+**Nicht testbar mit den verfügbaren Tools:** eine echte Netz-Unterbrechung
+zu simulieren, um den `fetch`-Handler-Catch-Pfad (Cache-Fallback bei
+echtem Netzwerkfehler) end-to-end zu verifizieren - das Browser-Tool bietet
+keine Netzwerk-Emulation. Die Logik selbst folgt dem Standard-Pattern
+(Network-first, Catch → `caches.match()`) und wurde per Syntax-Check
+gegengeprüft, aber nicht live unter echtem Empfangsverlust getestet.
+
+### Auslieferungspaket
+
+`deploy/portal-v79.tar.gz` (Grundgerüst) → `v80.tar.gz`
+(Service-Worker-Allowed-Fix, aktueller Stand)
+
+---
+
 ## 2026-07-31 – portal-v78: Wunsch #88 – Fix Sportschau zeigt "heute" nie an
 
 Andi: "Es ist der 31. Juli 20:24 Uhr, ich habe heute bereits ein Training

@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-07-31 (portal-v78: Wunsch #88 Fix Sportschau-Mitternachtsfalle bei "heute")*
+*Letzte Aktualisierung: 2026-07-31 (portal-v80: Offline-Grundinfrastruktur – apps.offline_faehig, Service-Worker-Caching, Startseiten-Kachel-Gating)*
 
 ## Host
 
@@ -147,7 +147,9 @@ teile/
                        ki_text_zu_sprache() (TTS über OpenRouter /audio/speech,
                        mp3→pcm-Fallback + WAV-Verpackung falls das Modell nur
                        PCM liefert, siehe Bekannte Issues), /health, _init_db(),
-                       _auto_grant_all() (hilfe + einkauf an alle Nutzer)
+                       _auto_grant_all() (hilfe + einkauf an alle Nutzer),
+                       @app.after_request setzt Service-Worker-Allowed: / nur
+                       fuer /static/sw.js (siehe sw.js weiter unten)
   01_start_token.py  – / (Landing), /p/<token> (Startseite mit Gruppen),
                        POST /p/<token>/reorder (Apps), /gruppe/reorder (Gruppen selbst),
                        /gruppe/neu, /gruppe/<id>/umbenennen, /gruppe/<id>/loeschen
@@ -492,8 +494,27 @@ static/
   icon-512.png
   favicon-32.png     – Browser-Tab-Icon
   favicon-16.png
-  sw.js              – Service Worker für Push-Benachrichtigungen
+  sw.js              – Service Worker für Push-Benachrichtigungen + Offline-
+                       Caching (Network-first/Cache-Fallback fuer eigene
+                       GET-Requests, siehe Kapitel "Offline-Faehigkeit" unten).
+                       Registrierung in base.html mit `{scope:'/'}` -
+                       braucht den Service-Worker-Allowed-Header von 00_kern.py,
+                       sonst bleibt der Scope auf /static/ beschraenkt
 ```
+
+### Offline-Fähigkeit
+
+Rein-App-Infrastruktur (kein ✨-Wunsch, per Chat-Anfrage 2026-07-31): jede
+App hat ein `apps.offline_faehig`-Flag (Default 0, per Migration in
+`00_kern.py` gesetzt, NICHT per `manage.py` frei umschaltbar - das ist eine
+Entwicklerentscheidung, ob die App offline sicher ist, kein Admin-Setting).
+`manage.py listapps` zeigt den Stand. Aktuell nur `hilfe` (rein statischer
+Text) offline_faehig=1, alle anderen Apps werden auf der Startseite grau +
+nicht anklickbar, sobald `navigator.onLine` false ist. Der Service Worker
+selbst cached opportunistisch JEDE besuchte Seite (unabhängig vom Flag,
+technisch harmlos) - die eigentliche Sperre ist reines Startseiten-Kachel-
+Gating, nicht der Service Worker. Kein Offline-Schreiben (Formulare/POST
+laufen nie über den Service Worker, scheitern offline einfach normal).
 
 ## Datenbankschema (SQLite, WAL)
 
@@ -614,6 +635,25 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
 ## Bekannte Issues
+
+- **Service Worker unter `/static/sw.js` registriert hat per Default nur
+  den Scope `/static/`, nicht die ganze Seite.** Betraf die Offline-
+  Grundinfrastruktur (v79→v80-Fix, 2026-07-31): `navigator.serviceWorker
+  .register('/static/sw.js')` (ohne `scope`-Option) gibt dem Worker
+  maximal den Scope seines eigenen Verzeichnisses - er hätte NIE `fetch`-
+  Events für `/p/...` oder `/a/.../...` bekommen, egal wie der Handler
+  selbst aussieht. Kein Fehler, keine Warnung - der Worker registriert und
+  aktiviert sich ganz normal, kontrolliert einfach nur die falschen (bzw.
+  gar keine echten) Seiten. Fix: Registrierung mit `{ scope: '/' }` PLUS
+  einen `Service-Worker-Allowed: /`-Response-Header beim Ausliefern von
+  `sw.js` selbst (sonst lehnt der Browser den erweiterten Scope mit einem
+  SecurityError ab) - `@app.after_request`-Hook in `00_kern.py`, nur für
+  genau diese eine Route. **Gilt allgemein: bei jedem Service Worker, der
+  mehr als sein eigenes Verzeichnis kontrollieren soll, IMMER explizit
+  `scope` bei der Registrierung UND den `Service-Worker-Allowed`-Header
+  serverseitig prüfen** - per `navigator.serviceWorker.getRegistrations()`
+  und `.scope` nachsehen, ein Test allein über "registriert sich ohne
+  Fehler" reicht nicht.
 
 - **hae-Server parst ein bare-date `endDate` als Mitternacht UTC jenes
   Tages, nicht als Ende des Tages.** Betraf Wunsch #88 (v78-Fix,

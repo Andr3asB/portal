@@ -1,6 +1,6 @@
 import sqlite3, secrets, logging
 from contextlib import contextmanager
-from flask import g, current_app, jsonify
+from flask import g, current_app, jsonify, request
 
 log = logging.getLogger("portal.kern")
 
@@ -15,11 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
   rolle     TEXT    NOT NULL DEFAULT 'gast'
 );
 CREATE TABLE IF NOT EXISTS apps (
-  id           INTEGER PRIMARY KEY,
-  slug         TEXT    UNIQUE NOT NULL,
-  name         TEXT    NOT NULL,
-  emoji        TEXT    NOT NULL DEFAULT '📱',
-  beschreibung TEXT
+  id             INTEGER PRIMARY KEY,
+  slug           TEXT    UNIQUE NOT NULL,
+  name           TEXT    NOT NULL,
+  emoji          TEXT    NOT NULL DEFAULT '📱',
+  beschreibung   TEXT,
+  offline_faehig INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS grants (
   id      INTEGER PRIMARY KEY,
@@ -724,6 +725,19 @@ def _init_db(app):
         # Umbenennung Todos -> Aufgaben (Wunsch #11): INSERT OR IGNORE oben
         # aktualisiert bestehende Zeilen nicht, deshalb einmalig nachziehen.
         db.execute("UPDATE apps SET name='Aufgaben' WHERE slug='todo' AND name='Todos'")
+        try:
+            db.execute("ALTER TABLE apps ADD COLUMN offline_faehig INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Offline-Faehigkeit ist bewusst hier in Code definiert (per Migration
+        # gesetzt), nicht als frei umschaltbare Admin-Einstellung - ob eine
+        # App offline sicher funktioniert (keine live-schreibenden Interak-
+        # tionen ohne eigene Warteschlange), ist eine Entwicklerentscheidung,
+        # die sowieso einen Deploy braucht. "hilfe" ist der erste Kandidat:
+        # rein statischer Text, keine Formulare/Schreibzugriffe.
+        db.execute("UPDATE apps SET offline_faehig=1 WHERE slug='hilfe'")
+        db.commit()
         if db.execute("SELECT COUNT(*) FROM geholfen_aufgaben").fetchone()[0] == 0:
             for name, emoji, gew in _DEFAULT_AUFGABEN:
                 db.execute(
@@ -875,3 +889,12 @@ def init_app(app):
     def health():
         get_db().execute("SELECT 1")
         return jsonify(status="ok")
+
+    @app.after_request
+    def _sw_scope_header(resp):
+        # sw.js liegt unter /static/, dessen Verzeichnis waere ohne diesen
+        # Header der maximale Scope - der Service Worker muss aber die ganze
+        # Seite (/p/..., /a/.../...) kontrollieren koennen, nicht nur /static/.
+        if request.path == "/static/sw.js":
+            resp.headers["Service-Worker-Allowed"] = "/"
+        return resp

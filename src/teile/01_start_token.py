@@ -39,7 +39,7 @@ def startseite(token):
     """, (row["id"],)).fetchall()
 
     apps_rows = db.execute("""
-        SELECT a.slug, a.name, a.emoji, g.token AS app_token,
+        SELECT a.slug, a.name, a.emoji, a.offline_faehig, g.token AS app_token,
                g.id AS grant_id, g.gruppe_id, g.position,
                COALESCE(hg.position, 9999) AS gruppe_pos
         FROM   grants g

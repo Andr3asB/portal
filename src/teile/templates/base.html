@@ -93,6 +93,13 @@
     .nav-extra {
       padding: 14px calc(16px + var(--sr)) 14px calc(16px + var(--sl));
     }
+    .offline-banner {
+      background: rgba(0,0,0,.18);
+      color: #fff;
+      font-size: 13px; font-weight: 600;
+      text-align: center;
+      padding: 6px calc(12px + var(--sr)) 6px calc(12px + var(--sl));
+    }
 
     .main { padding: 16px; }
 
@@ -205,6 +212,7 @@
     <span class="nav-ghost"></span>
     {% endif %}
   </div>
+  <div class="offline-banner" id="offline-banner" style="display:none">📡 Offline – manche Funktionen sind eingeschränkt</div>
   {% block header_extra %}{% endblock %}
 </header>
 
@@ -372,9 +380,24 @@
 {% block extra_scripts %}{% endblock %}
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js')
+  // scope:'/' noetig, damit der Worker die ganze Seite kontrolliert, nicht
+  // nur /static/ (Default-Scope waere sonst das Verzeichnis des Skripts) -
+  // der Server muss dafuer den Service-Worker-Allowed-Header setzen (siehe
+  // 00_kern.py).
+  navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
     .catch(e => console.warn('SW:', e));
 }
+
+// Offline-Banner auf jeder Seite, nicht nur der Startseite - die eigentliche
+// Sperre nicht offline-faehiger Apps passiert auf der Startseite selbst.
+(function() {
+  const banner = document.getElementById('offline-banner');
+  if (!banner) return;
+  function aktualisiere() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+  window.addEventListener('online', aktualisiere);
+  window.addEventListener('offline', aktualisiere);
+  aktualisiere();
+})();
 </script>
 </body>
 </html>
