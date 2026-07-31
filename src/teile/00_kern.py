@@ -719,12 +719,20 @@ def _init_db(app):
             ("status", "TEXT NOT NULL DEFAULT 'offen'"),
             ("zugewiesen_rollen", "TEXT"),
             # Wunsch #90: wiederkehrende Aufgaben-Vorlagen (todo_serien) -
-            # eine konkrete, in einen Wochentag einsortierte Instanz ist ein
-            # ganz normales todos-Row mit serie_id gesetzt, damit alle
-            # bestehende Todo-Mechanik (Status, Historie, Löschen, Anzeige
-            # in der Todo-App) unveraendert mitgenutzt wird.
+            # eine konkrete, eingesetzte Instanz ist ein ganz normales
+            # todos-Row mit serie_id gesetzt, damit alle bestehende Todo-
+            # Mechanik (Status, Historie, Löschen, Anzeige in der Todo-App)
+            # unveraendert mitgenutzt wird.
             ("serie_id", "INTEGER REFERENCES todo_serien(id) ON DELETE SET NULL"),
+            # "wochentag" war der urspruengliche Wunsch-#90-Ansatz (Instanz an
+            # einen abstrakten Wochentag 0-6 gebunden, passend zum damaligen
+            # Wochentag-Raster der Aufgabenplanung). Wunsch #92 (selbe Sitzung,
+            # noch keine echten Daten betroffen) baute die Aufgabenplanung auf
+            # eine rollierende 14-Tage-Liste mit echten Datumswerten um (wie
+            # der Essensplan) - "wochentag" bleibt als totes Altfeld liegen,
+            # "plan_tag" (ISO-Datum) ist die neue, tatsaechlich genutzte Spalte.
             ("wochentag", "INTEGER"),
+            ("plan_tag", "TEXT"),
         ]:
             try:
                 db.execute(f"ALTER TABLE todos ADD COLUMN {col} {definition}")

@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-01 (portal-v85: Wunsch #89 Sportschau-Balken-Reihenfolge, #90 Wiederkehrende-Aufgaben-Pool, #91 Aufgabenplan für Eltern)*
+*Letzte Aktualisierung: 2026-08-01 (portal-v88: Wunsch #92 Aufgabenplan als rollierende 14-Tage-Liste + Zeitzonen-Fix für die 20-Uhr-Sperre)*
 
 ## Host
 
@@ -281,18 +281,33 @@ teile/
   13_kinderplan.py   – /a/kinderplan/<token>/ Aufgabenplan: Kinder UND
                        Eltern (Wunsch #91, vorher nur Kinder - Eltern konnten
                        zwar fremde Plaene verwalten, hatten aber keinen
-                       eigenen) ordnen geholfen_aufgaben Wochentagen zu
-                       (?fuer=<person-id> zum Wechseln der Ansicht, Eltern
-                       landen jetzt wie Kinder standardmaessig auf ihrem
-                       eigenen Plan); /zuweisen (Toggle), /abhaken (schreibt
-                       direkt in geholfen_eintraege); ab 20 Uhr ist der
-                       Wochentag von morgen fuer Kinder gesperrt
-                       (_gesperrter_wochentag(), rein zeitberechnet, Eltern/
-                       Admin ausgenommen). Wunsch #90: zusaetzlich
-                       /serie_einsortieren (Pool-Vorlage aus teile.todo fuer
-                       eine Person+Wochentag einsetzen) und /serie_erledigen/
-                       <id> (schreibt direkt in todos, nicht geholfen_eintraege
-                       - andere Mechanik als die bestehenden geholfen_aufgaben)
+                       eigenen). Seit Wunsch #92 rollierende 14-Tage-Liste
+                       (aktuelle+naechste Woche, vergangene Tage einklappbar)
+                       wie 12_essensplan.py, keine Wochentag-Grid-Ansicht mehr:
+                       Geholfen-Aufgaben haengen weiterhin an einer woechentlich
+                       wiederkehrenden Regel (kinderplan_eintraege.wochentag,
+                       bewusst unveraendert - bestehende Wochenroutinen bleiben
+                       automatisch bestehen), fuer jeden der 14 echten Kalender-
+                       tage wird per d.weekday() nachgeschaut, welche Regeln
+                       passen; /zuweisen schreibt weiter auf diese Regel (gilt
+                       fuer JEDEN Tag mit diesem Wochentag, nicht nur den einen
+                       angeklickten), /abhaken weiterhin direkt in
+                       geholfen_eintraege. Todo-Pool-Instanzen (Wunsch #90)
+                       haengen dagegen an einem echten Kalendertag
+                       (todos.plan_tag, ISO-Datum - ersetzt das urspruengliche
+                       todos.wochentag, das nie mit Produktivdaten gefuellt war
+                       und als totes Altfeld liegen bleibt): /serie_einsortieren
+                       (Pool-Vorlage aus teile.todo fuer eine Person+Datum
+                       einsetzen, einmalig, kein wiederkehrendes Muster) und
+                       /serie_erledigen/<id> (schreibt direkt in todos, nicht
+                       geholfen_eintraege). _gesperrter_tag_datum() (vorher
+                       _gesperrter_wochentag()) sperrt ab 20 Uhr DEUTSCHER Zeit
+                       (ZoneInfo("Europe/Berlin"), siehe Bekannte Issues -
+                       Container laeuft in UTC) den naechsten echten Kalendertag
+                       fuer Kinder, Eltern/Admin ausgenommen. Bewusst KEIN
+                       Drag & Drop zwischen Tagen (anders als Essensplan) - fuer
+                       die wochentag-basierten Geholfen-Regeln ergibt das keinen
+                       Sinn (wuerde die ganze Regel verschieben, nicht nur einen Tag)
   14_sportschau.py   – /a/sportschau/<token>/ Trainings-Heatmap (Wunsch #62),
                        letzte 14 Tage (Wunsch #78, `_TAGE_ANZAHL`-Konstante),
                        eine Zeile pro Trainingsart. Ruft
@@ -578,7 +593,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am |
-| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (0=Mo..6=So, nur bei serie_id gesetzt) |
+| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92) |
 | `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (0=Mo..6=So), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
 | `todo_historie` | id, todo_id (FK todos, cascade), alter_inhalt, geaendert_von, geaendert_am |
 | `geholfen_aufgaben` | id, name, emoji, gewichtung, aktiv |
@@ -687,6 +702,24 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
 ## Bekannte Issues
+
+- **Der Container läuft in UTC, nicht in deutscher Zeit** (`docker exec
+  portal python3 -c "import time; print(time.tzname)"` → `('UTC','UTC')`).
+  `datetime.now()` ohne `tzinfo` liefert also UTC, nicht Europe/Berlin -
+  jeder Code, der eine BESTIMMTE UHRZEIT DES TAGES prüft ("ab 20 Uhr",
+  "ist es schon Mitternacht"), braucht `datetime.now(ZoneInfo("Europe/
+  Berlin"))`, sonst verschiebt sich die Prüfung um 1-2 Stunden (je nach
+  Sommer-/Winterzeit). Betraf `13_kinderplan.py`s 20-Uhr-Sperre (v87→v88-
+  Fix, Wunsch #92): live nachgewiesen, dass die Sperre um 01:13 Uhr
+  deutscher Zeit fälschlich ausgelöst hätte (UTC-Stunde war noch 23 vom
+  Vortag). `14_sportschau.py` hatte das Problem schon vorher richtig gelöst
+  (`_TZ = ZoneInfo("Europe/Berlin")`) - **dieses Muster für jeden neuen
+  Zeit-Vergleich wiederverwenden, nie nacktes `datetime.now()` für
+  Uhrzeit-Schwellwerte.** Reine Zeitspannen-/Differenzberechnungen (z. B.
+  `_serie_ist_im_pool()` in `04_todo.py`) sind davon NICHT betroffen, da
+  dort nur UTC-gegen-UTC verglichen wird (sowohl `datetime.now()` als auch
+  SQLites `datetime('now')` liefern konsistent UTC) - nur bei echten
+  Wanduhr-Schwellwerten wie "20 Uhr abends" ist die Zeitzone relevant.
 
 - **Service Worker unter `/static/sw.js` registriert hat per Default nur
   den Scope `/static/`, nicht die ganze Seite.** Betraf die Offline-

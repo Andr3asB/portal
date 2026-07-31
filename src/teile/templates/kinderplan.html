@@ -18,14 +18,35 @@
 }
 .nutzer-pill.aktiv { color:#fff; }
 
+/* Wunsch #92: gleiche Wochen-/Einklapp-Gliederung wie der Essensplan */
+.woche-header {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:4px 0 10px;
+}
+.woche-header.naechste { margin-top:28px; }
+.vergangene-block { margin-bottom:8px; }
+.vergangene-block summary {
+  cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px;
+  background:var(--surface); border-radius:14px; padding:12px 16px;
+  font-size:13px; font-weight:600; color:var(--text-2);
+  box-shadow:0 1px 3px var(--shadow);
+}
+.vergangene-block summary::-webkit-details-marker { display:none; }
+.vergangene-block summary::before { content:'▸'; display:inline-block; transition:transform .15s; }
+.vergangene-block[open] summary::before { transform:rotate(90deg); }
+.vergangene-block[open] summary { margin-bottom:8px; }
+.vergangene-block .tag-card:last-child { margin-bottom:8px; }
+
 .tag-card {
   background:var(--surface); border-radius:14px; padding:14px 16px;
   margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
 }
 .tag-card.heute { box-shadow:0 0 0 2px var(--farbe), 0 1px 3px var(--shadow); }
+.tag-card.vergangen { opacity:.6; }
 .tag-card.gesperrt { opacity:.7; }
-.tag-header { display:flex; align-items:center; gap:8px; }
-.tag-name { font-size:15px; font-weight:700; flex:1; }
+.tag-header { display:flex; align-items:baseline; gap:8px; }
+.tag-name { font-size:15px; font-weight:700; }
+.tag-datum { font-size:12px; color:var(--text-2); flex:1; }
 .lock-badge { font-size:11px; color:var(--text-2); white-space:nowrap; }
 .tag-edit-toggle {
   background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2);
@@ -62,12 +83,91 @@
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
 .chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.hinweis { font-size:12px; color:var(--text-2); }
 {% endblock %}
 
 {% block nav_title %}
 <div class="nav-title">🗓️ Aufgabenplan</div>
 <div class="nav-sub">{{ ziel.name if ziel else 'Noch niemand angelegt' }}</div>
 {% endblock %}
+
+{% macro tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) %}
+<div class="tag-card {{ tag.status }}{% if tag.gesperrt %} gesperrt{% endif %}">
+  <div class="tag-header">
+    <span class="tag-name">{{ tag.wochentag_name }}</span>
+    <span class="tag-datum">{{ tag.datum.strftime('%d.%m.') }}</span>
+    {% if tag.gesperrt %}<span class="lock-badge">🔒 nur Eltern</span>{% endif %}
+    {% if darf_editieren and not tag.gesperrt %}
+    <button class="tag-edit-toggle" type="button" onclick="togglePlan('{{ tag.iso }}')" title="Bearbeiten">✏️</button>
+    {% endif %}
+  </div>
+
+  {% if tag.eintraege or tag.serien_eintraege %}
+    {% for e in tag.eintraege %}
+    <div class="aufgabe-row{% if e.erledigt %} done{% endif %}">
+      {% if tag.status == 'heute' %}
+        {% if darf_editieren %}
+        <button class="aufgabe-check" type="button"
+                onclick="abhaken({{ ziel.id }}, {{ e.aufgabe_id }}, this)"
+                {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
+        {% else %}
+        <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
+        {% endif %}
+      {% else %}
+        <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
+      {% endif %}
+      <span>{{ e.emoji }} {{ e.name }}</span>
+    </div>
+    {% endfor %}
+    {% for e in tag.serien_eintraege %}
+    <div class="aufgabe-row{% if e.erledigt %} done{% endif %}">
+      {% if darf_editieren %}
+      <button class="aufgabe-check" type="button"
+              onclick="serieErledigen({{ e.id }}, this)"
+              {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
+      {% else %}
+      <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
+      {% endif %}
+      <span>🔁 {{ e.inhalt }}</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="tag-leer">Nichts geplant</div>
+  {% endif %}
+
+  {% if darf_editieren and not tag.gesperrt %}
+  <div class="tag-edit-panel" id="plan-edit-{{ tag.iso }}">
+    <div class="angebot-form-label">Aufgaben für {{ tag.wochentag_name }}, {{ tag.datum.strftime('%d.%m.') }}</div>
+    <div class="btn-row">
+      {% for a in aufgaben %}
+      {% set zugewiesen = tag.eintraege|selectattr('aufgabe_id','eq',a.id)|list|length > 0 %}
+      <form method="post" action="/a/kinderplan/{{ token }}/zuweisen" style="display:contents">
+        <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
+        <input type="hidden" name="aufgabe_id" value="{{ a.id }}">
+        <input type="hidden" name="tag" value="{{ tag.iso }}">
+        <button type="submit" class="chip-btn{% if zugewiesen %} active{% endif %}">{{ a.emoji }} {{ a.name }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    <div class="hinweis" style="margin-top:4px">💡 Gilt für jeden {{ tag.wochentag_name }}, nicht nur diesen einen Tag.</div>
+
+    {% if serien_pool %}
+    <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
+    <div class="btn-row">
+      {% for s in serien_pool %}
+      <form method="post" action="/a/kinderplan/{{ token }}/serie_einsortieren" style="display:contents">
+        <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
+        <input type="hidden" name="serie_id" value="{{ s.id }}">
+        <input type="hidden" name="tag" value="{{ tag.iso }}">
+        <button type="submit" class="chip-btn">{{ s.inhalt }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
 
 {% block body %}
 <main class="main">
@@ -90,79 +190,17 @@
     Noch niemand angelegt.
   </div>
   {% else %}
-    {% for tag in plan %}
-    <div class="tag-card{% if tag.ist_heute %} heute{% endif %}{% if tag.gesperrt %} gesperrt{% endif %}">
-      <div class="tag-header">
-        <span class="tag-name">{{ tag.name }}</span>
-        {% if tag.gesperrt %}<span class="lock-badge">🔒 nur Eltern</span>{% endif %}
-        {% if darf_editieren and not tag.gesperrt %}
-        <button class="tag-edit-toggle" type="button" onclick="togglePlan({{ tag.wochentag }})" title="Bearbeiten">✏️</button>
-        {% endif %}
-      </div>
+    <div class="woche-header">Aktuelle Woche</div>
+    {% if vergangene_tage %}
+    <details class="vergangene-block">
+      <summary>{{ vergangene_tage|length }} {{ 'vergangener Tag' if vergangene_tage|length == 1 else 'vergangene Tage' }}</summary>
+      {% for tag in vergangene_tage %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
+    </details>
+    {% endif %}
+    {% for tag in aktuelle_rest %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
 
-      {% if tag.eintraege or tag.serien_eintraege %}
-        {% for e in tag.eintraege %}
-        <div class="aufgabe-row{% if e.erledigt_heute %} done{% endif %}">
-          {% if tag.ist_heute %}
-            {% if darf_editieren %}
-            <button class="aufgabe-check" type="button"
-                    onclick="abhaken({{ ziel.id }}, {{ e.aufgabe_id }}, this)"
-                    {% if e.erledigt_heute %}disabled{% endif %}>{{ '✓' if e.erledigt_heute else '' }}</button>
-            {% else %}
-            <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt_heute else '' }}</span>
-            {% endif %}
-          {% endif %}
-          <span>{{ e.emoji }} {{ e.name }}</span>
-        </div>
-        {% endfor %}
-        {% for e in tag.serien_eintraege %}
-        <div class="aufgabe-row{% if e.erledigt %} done{% endif %}">
-          {% if darf_editieren %}
-          <button class="aufgabe-check" type="button"
-                  onclick="serieErledigen({{ e.id }}, this)"
-                  {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
-          {% else %}
-          <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
-          {% endif %}
-          <span>🔁 {{ e.inhalt }}</span>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="tag-leer">Nichts geplant</div>
-      {% endif %}
-
-      {% if darf_editieren and not tag.gesperrt %}
-      <div class="tag-edit-panel" id="plan-edit-{{ tag.wochentag }}">
-        <div class="angebot-form-label">Aufgaben für {{ tag.name }}</div>
-        <div class="btn-row">
-          {% for a in aufgaben %}
-          {% set zugewiesen = tag.eintraege|selectattr('aufgabe_id','eq',a.id)|list|length > 0 %}
-          <form method="post" action="/a/kinderplan/{{ token }}/zuweisen" style="display:contents">
-            <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
-            <input type="hidden" name="aufgabe_id" value="{{ a.id }}">
-            <input type="hidden" name="wochentag" value="{{ tag.wochentag }}">
-            <button type="submit" class="chip-btn{% if zugewiesen %} active{% endif %}">{{ a.emoji }} {{ a.name }}</button>
-          </form>
-          {% endfor %}
-        </div>
-
-        {% if serien_pool %}
-        <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
-        <div class="btn-row">
-          {% for s in serien_pool %}
-          <form method="post" action="/a/kinderplan/{{ token }}/serie_einsortieren" style="display:contents">
-            <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
-            <input type="hidden" name="serie_id" value="{{ s.id }}">
-            <input type="hidden" name="wochentag" value="{{ tag.wochentag }}">
-            <button type="submit" class="chip-btn">{{ s.inhalt }}</button>
-          </form>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <div class="woche-header naechste">Nächste Woche</div>
+    {% for tag in naechste_woche %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
   {% endif %}
 
 </main>
@@ -172,8 +210,8 @@
 <script>
 const TOKEN = '{{ token }}';
 
-function togglePlan(wd) {
-  const p = document.getElementById('plan-edit-' + wd);
+function togglePlan(iso) {
+  const p = document.getElementById('plan-edit-' + iso);
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
 }
 

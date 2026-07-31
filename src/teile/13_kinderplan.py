@@ -1,28 +1,47 @@
 """
-Aufgabenplan (intern "kinderplan") – ordnet wiederkehrende Aufgaben
-(aus geholfen_aufgaben) Wochentagen zu, ursprünglich nur für Kinder,
-seit Wunsch #91 auch für Eltern (eigener Plan, nicht nur Verwalten fremder
-Pläne).
+Aufgabenplan (intern "kinderplan") – rollierende 14-Tage-Liste (aktuelle +
+nächste Woche), analog zum Essensplan (Wunsch #92, vorher ein abstraktes
+Wochentag-Raster ohne echte Daten). Zeigt für jeden der 14 Kalendertage:
+  - Geholfen-Aufgaben aus einer weiterhin wöchentlich wiederkehrenden Regel
+    (kinderplan_eintraege.wochentag, UNVERÄNDERT gegenüber vorher – bewusste
+    Entscheidung: bestehende Wochenroutinen bleiben automatisch bestehen,
+    nur die Darstellung wird zur Datumsliste statt Wochentag-Raster)
+  - Aus dem Todo-Pool eingesetzte Instanzen (Wunsch #90), jetzt an ein
+    echtes Kalenderdatum gebunden (todos.plan_tag), nicht mehr an einen
+    abstrakten Wochentag – jede Einsortierung ist ein einmaliges Ereignis,
+    kein wiederkehrendes Muster wie bei den Geholfen-Aufgaben.
 URL-Präfix: /a/kinderplan/<token>/
 
-Abhaken schreibt direkt in geholfen_eintraege (dieselbe Tabelle wie die
-Geholfen-App) – kein doppelter Zustand, "erledigt heute" wird daraus
-abgeleitet statt separat gespeichert.
+Abhaken einer Geholfen-Aufgabe schreibt direkt in geholfen_eintraege
+(dieselbe Tabelle wie die Geholfen-App) – kein doppelter Zustand, der
+Erledigt-Status je Tag wird daraus abgeleitet statt separat gespeichert.
+Abhaken einer Todo-Pool-Instanz schreibt direkt in todos (siehe
+serie_erledigen) – ebenfalls kein separates Tracking.
 
 Berechtigung (Wunsch #36, Rollen-Kreis um Eltern erweitert per Wunsch #91):
   Ansehen    – jedes Kind/Elternteil sieht alle Kind-/Eltern-Pläne
   Editieren  – nur den eigenen Plan; Eltern/Admin dürfen jeden Plan editieren
-  Sperre     – ab 20 Uhr ist der Plan für morgen für Kinder gesperrt (Eltern/
-               Admin sind über _darf_verwalten() ohnehin von der Sperre
-               ausgenommen, auch beim eigenen Plan)
+  Sperre     – ab 20 Uhr ist der jeweils NÄCHSTE Kalendertag für Kinder
+               gesperrt (echtes Datum, nicht mehr eine abstrakte Wochentag-
+               Nummer – sonst wäre z. B. IMMER "nächsten Montag" gesperrt,
+               nicht nur der eine konkrete kommende Montag). Eltern/Admin
+               sind über _darf_verwalten() ohnehin ausgenommen, auch am
+               eigenen Plan.
 
 Wunsch #90 (Pool wiederkehrender Aufgaben): die Vorlagen selbst werden in
 der Todo-App verwaltet (teile.todo, importiert über den Alias aus
 teile/__init__.py), hier passiert nur das Einsortieren einer Pool-Vorlage
-in einen Wochentag für eine Person - erzeugt ein ganz normales todos-Row
-(serie_id+wochentag gesetzt), keine eigene Datenhaltung dafür.
+auf einen Kalendertag für eine Person - erzeugt ein ganz normales
+todos-Row (serie_id+plan_tag gesetzt), keine eigene Datenhaltung dafür.
+
+Bewusst NICHT gebaut: Drag & Drop zwischen Tagen (anders als beim
+Essensplan) - für Geholfen-Aufgaben ergibt das keinen Sinn (eine einzelne
+Karte verschieben würde die GANZE wöchentliche Regel verschieben, nicht
+nur diesen einen Tag), für Todo-Pool-Instanzen wäre es technisch möglich,
+aber für einen ersten Wurf zurückgestellt.
 """
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant, to_int
 from teile.todo import serien_pool_liste, serie_einsortieren
@@ -31,6 +50,7 @@ bp  = Blueprint("kinderplan_app", __name__)
 APP = "kinderplan"
 
 WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+_TZ = ZoneInfo("Europe/Berlin")
 
 
 def _user(token):
@@ -44,11 +64,18 @@ def _darf_verwalten(user) -> bool:
     return bool(user["is_admin"] or user["rolle"] == "eltern")
 
 
-def _gesperrter_wochentag():
-    """Ab 20 Uhr ist der Wochentag von morgen für Kinder gesperrt."""
-    now = datetime.now()
+def _heute():
+    """Container laeuft in UTC, "heute"/"20 Uhr" muss aber deutsche Ortszeit
+    meinen (wie in 14_sportschau.py) - sonst verschiebt sich Mitternacht und
+    die 20-Uhr-Sperre um 1-2 Stunden gegenueber dem, was die Familie sieht."""
+    return datetime.now(_TZ).date()
+
+
+def _gesperrter_tag_datum():
+    """Ab 20 Uhr (deutsche Ortszeit) ist der naechste Kalendertag fuer Kinder gesperrt."""
+    now = datetime.now(_TZ)
     if now.hour >= 20:
-        return (now.date() + timedelta(days=1)).weekday()
+        return now.date() + timedelta(days=1)
     return None
 
 
@@ -74,7 +101,7 @@ def index(token):
             ziel = kinder[0]
 
     darf_editieren = bool(ziel and (user["id"] == ziel["id"] or _darf_verwalten(user)))
-    gesperrter_tag = _gesperrter_wochentag()
+    gesperrter_tag = _gesperrter_tag_datum()
 
     aufgaben = db.execute(
         "SELECT id, name, emoji FROM geholfen_aufgaben WHERE aktiv=1 ORDER BY id"
@@ -82,9 +109,15 @@ def index(token):
 
     serien_pool = serien_pool_liste(db) if (ziel and darf_editieren) else []
 
+    heute  = _heute()
+    montag = heute - timedelta(days=heute.weekday())
+    tage_daten = [montag + timedelta(days=i) for i in range(14)]  # aktuelle + folgende Woche, wie Essensplan
+
     plan = []
     if ziel:
-        rows = db.execute("""
+        # Geholfen: bestehende woechentliche Regel (unveraendert gespeichert,
+        # gilt weiter fuer JEDEN passenden Wochentag in der 14-Tage-Liste).
+        regeln = db.execute("""
             SELECT k.aufgabe_id, k.wochentag, a.name, a.emoji
             FROM   kinderplan_eintraege k
             JOIN   geholfen_aufgaben a ON a.id = k.aufgabe_id
@@ -92,64 +125,93 @@ def index(token):
             ORDER  BY k.wochentag, k.position
         """, (ziel["id"],)).fetchall()
 
-        erledigt_heute = {r["aufgabe_id"] for r in db.execute("""
-            SELECT aufgabe_id FROM geholfen_eintraege
-            WHERE user_id=? AND date(zeitstempel) = date('now')
-        """, (ziel["id"],)).fetchall()}
+        # Erledigt-Status je Tag im 14-Tage-Fenster (nicht mehr nur "heute").
+        erledigt_rows = db.execute("""
+            SELECT aufgabe_id, date(zeitstempel) AS tag FROM geholfen_eintraege
+            WHERE  user_id=? AND date(zeitstempel) BETWEEN ? AND ?
+        """, (ziel["id"], tage_daten[0].isoformat(), tage_daten[-1].isoformat())).fetchall()
+        erledigt_set = {(r["aufgabe_id"], r["tag"]) for r in erledigt_rows}
 
-        # Wunsch #90: aus dem Pool eingesetzte Todo-Instanzen fuer diese
-        # Person, gruppiert nach Wochentag - ganz normale todos-Rows mit
-        # gesetztem serie_id, unerledigte UND heute erledigte (fuer den
-        # Haken-Status), aeltere erledigte bleiben stehen bis die Vorlage
-        # per Wiederkehr-Regel wieder im Pool verfuegbar ist.
+        # Wunsch #90/#92: aus dem Pool eingesetzte Todo-Instanzen fuer diese
+        # Person, jetzt an ein echtes Datum gebunden (plan_tag), nicht mehr
+        # an einen abstrakten Wochentag.
         serien_rows = db.execute("""
-            SELECT id, inhalt, wochentag, erledigt
+            SELECT id, inhalt, plan_tag, erledigt
             FROM   todos
             WHERE  zugewiesen_an=? AND serie_id IS NOT NULL
-            ORDER  BY wochentag, id
-        """, (ziel["id"],)).fetchall()
+              AND  plan_tag BETWEEN ? AND ?
+            ORDER  BY plan_tag, id
+        """, (ziel["id"], tage_daten[0].isoformat(), tage_daten[-1].isoformat())).fetchall()
+        serien_map = {}
+        for r in serien_rows:
+            serien_map.setdefault(r["plan_tag"], []).append(dict(r))
 
-        heute_wd = date.today().weekday()
-        for wd in range(7):
+        for d in tage_daten:
+            iso = d.isoformat()
+            wd  = d.weekday()
+            if d < heute:
+                status = "vergangen"
+            elif d == heute:
+                status = "heute"
+            else:
+                status = "zukunft"
+
             eintraege = []
-            for r in rows:
+            for r in regeln:
                 if r["wochentag"] != wd:
                     continue
                 e = dict(r)
-                e["erledigt_heute"] = (wd == heute_wd and e["aufgabe_id"] in erledigt_heute)
+                e["erledigt"] = (r["aufgabe_id"], iso) in erledigt_set
                 eintraege.append(e)
-            serien_eintraege = [dict(r) for r in serien_rows if r["wochentag"] == wd]
+
             plan.append({
-                "wochentag":        wd,
-                "name":             WOCHENTAGE[wd],
+                "iso":              iso,
+                "datum":            d,
+                "wochentag_name":   WOCHENTAGE[wd],
+                "status":           status,
                 "eintraege":        eintraege,
-                "serien_eintraege": serien_eintraege,
-                "ist_heute":        wd == heute_wd,
-                "gesperrt":         (wd == gesperrter_tag) and not _darf_verwalten(user),
+                "serien_eintraege": serien_map.get(iso, []),
+                "gesperrt":         (d == gesperrter_tag) and not _darf_verwalten(user),
             })
+
+    # Wunsch #92: gleiche Gliederung wie der Essensplan - eigene
+    # Wochenkopfzeilen, vergangene Tage einklappbar.
+    aktuelle_woche  = plan[:7]
+    naechste_woche  = plan[7:]
+    vergangene_tage = [t for t in aktuelle_woche if t["status"] == "vergangen"]
+    aktuelle_rest   = [t for t in aktuelle_woche if t["status"] != "vergangen"]
 
     return render_template("kinderplan.html",
         user=user, token=token, farbe=user["farbe"],
         kinder=kinder, ziel=ziel, darf_editieren=darf_editieren,
-        aufgaben=aufgaben, plan=plan, serien_pool=serien_pool,
+        aufgaben=aufgaben, serien_pool=serien_pool,
+        vergangene_tage=vergangene_tage, aktuelle_rest=aktuelle_rest, naechste_woche=naechste_woche,
     )
 
 
 @bp.route("/a/kinderplan/<token>/zuweisen", methods=["POST"])
 def zuweisen(token):
-    """Tippen auf einen Aufgaben-Chip weist zu bzw. entfernt wieder (Toggle)."""
+    """Tippen auf einen Aufgaben-Chip weist zu bzw. entfernt wieder (Toggle).
+    Schreibt weiterhin auf die woechentliche Regel (kinderplan_eintraege),
+    nicht auf einen einzelnen Tag - gilt also fuer JEDEN Kalendertag mit
+    diesem Wochentag, nicht nur die eine Karte, auf der geklickt wurde."""
     user = _user(token)
     db   = get_db()
     ziel_id    = to_int(request.form.get("ziel_id"))
     aufgabe_id = to_int(request.form.get("aufgabe_id"))
-    wochentag  = to_int(request.form.get("wochentag"))
-    if ziel_id is None or aufgabe_id is None or wochentag is None or not (0 <= wochentag <= 6):
+    tag_iso    = request.form.get("tag", "").strip()
+    try:
+        tag_datum = date.fromisoformat(tag_iso)
+    except ValueError:
+        abort(400)
+    wochentag = tag_datum.weekday()
+    if ziel_id is None or aufgabe_id is None:
         abort(400)
     if not db.execute("SELECT 1 FROM users WHERE id=? AND rolle IN ('kind','eltern')", (ziel_id,)).fetchone():
         abort(404)
     if not (user["id"] == ziel_id or _darf_verwalten(user)):
         abort(403)
-    if wochentag == _gesperrter_wochentag() and not _darf_verwalten(user):
+    if tag_datum == _gesperrter_tag_datum() and not _darf_verwalten(user):
         abort(403)
     if not db.execute("SELECT 1 FROM geholfen_aufgaben WHERE id=? AND aktiv=1", (aufgabe_id,)).fetchone():
         abort(404)
@@ -203,21 +265,26 @@ def abhaken(token):
 @bp.route("/a/kinderplan/<token>/serie_einsortieren", methods=["POST"])
 def serie_einsortieren_route(token):
     """Holt eine Pool-Vorlage und legt sie fuer eine Person auf einen
-    Wochentag (Wunsch #90) - erzeugt ein ganz normales todos-Row."""
+    echten Kalendertag (Wunsch #90/#92) - erzeugt ein ganz normales
+    todos-Row, einmalig, kein wiederkehrendes Muster."""
     user = _user(token)
     db   = get_db()
-    ziel_id   = to_int(request.form.get("ziel_id"))
-    serie_id  = to_int(request.form.get("serie_id"))
-    wochentag = to_int(request.form.get("wochentag"))
-    if ziel_id is None or serie_id is None or wochentag is None or not (0 <= wochentag <= 6):
+    ziel_id  = to_int(request.form.get("ziel_id"))
+    serie_id = to_int(request.form.get("serie_id"))
+    tag_iso  = request.form.get("tag", "").strip()
+    try:
+        tag_datum = date.fromisoformat(tag_iso)
+    except ValueError:
+        abort(400)
+    if ziel_id is None or serie_id is None:
         abort(400)
     if not db.execute("SELECT 1 FROM users WHERE id=? AND rolle IN ('kind','eltern')", (ziel_id,)).fetchone():
         abort(404)
     if not (user["id"] == ziel_id or _darf_verwalten(user)):
         abort(403)
-    if wochentag == _gesperrter_wochentag() and not _darf_verwalten(user):
+    if tag_datum == _gesperrter_tag_datum() and not _darf_verwalten(user):
         abort(403)
-    serie_einsortieren(db, serie_id, ziel_id, wochentag, user["id"])
+    serie_einsortieren(db, serie_id, ziel_id, tag_iso, user["id"])
     return redirect(url_for("kinderplan_app.index", token=token, fuer=ziel_id))
 
 

@@ -21,14 +21,15 @@ Wiederkehrende Aufgaben-Vorlagen / Pool (Wunsch #90): eine todo_serien-Zeile
 ist eine Vorlage mit Wiederkehr-Regel (entweder "intervall" – X Tage nach
 Erledigung wieder verfügbar – oder "wochentag" – an einem festen Wochentag
 wieder verfügbar, jeweils pro Vorlage gewählt), verwaltet hier unter
-/serien. Die eigentliche Einsortierung in ein Wochentagsraster passiert
-NICHT hier, sondern in der Aufgabenplanung (kinderplan) – deshalb sind
+/serien. Die eigentliche Einsortierung in einen Kalendertag passiert NICHT
+hier, sondern in der Aufgabenplanung (kinderplan, seit Wunsch #92 eine
+rollierende 14-Tage-Liste wie der Essensplan) – deshalb sind
 serien_pool_liste()/serie_einsortieren() als Schnittstelle für andere
 Module gedacht (importierbar über den Alias 'teile.todo', siehe
 teile/__init__.py). Eine einsortierte Instanz ist ein ganz normales
-todos-Row mit gesetztem serie_id+wochentag – nutzt die komplette
-bestehende Todo-Mechanik (Status, Historie, Löschen) mit, kein separates
-Tracking.
+todos-Row mit gesetztem serie_id+plan_tag (ISO-Datum) – nutzt die
+komplette bestehende Todo-Mechanik (Status, Historie, Löschen) mit, kein
+separates Tracking.
 """
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort
@@ -340,16 +341,17 @@ def serien_pool_liste(db):
     return [s for s in alle if _serie_ist_im_pool(db, s)]
 
 
-def serie_einsortieren(db, serie_id, ziel_user_id, wochentag, erstellt_von_user_id):
+def serie_einsortieren(db, serie_id, ziel_user_id, plan_tag, erstellt_von_user_id):
     """Erzeugt aus einer Pool-Vorlage eine konkrete Todo-Instanz für eine
-    Person an einem Wochentag - Schnittstelle für die Aufgabenplanung."""
+    Person an einem echten Kalendertag (Wunsch #92: plan_tag ISO-Datum,
+    vorher wochentag 0-6) - Schnittstelle für die Aufgabenplanung."""
     serie = db.execute("SELECT * FROM todo_serien WHERE id=? AND aktiv=1", (serie_id,)).fetchone()
     if not serie or not _serie_ist_im_pool(db, serie):
         return False
     db.execute(
-        "INSERT INTO todos(inhalt, erstellt_von, zugewiesen_an, serie_id, wochentag, status) "
+        "INSERT INTO todos(inhalt, erstellt_von, zugewiesen_an, serie_id, plan_tag, status) "
         "VALUES(?,?,?,?,?,'offen')",
-        (serie["inhalt"], erstellt_von_user_id, ziel_user_id, serie_id, wochentag),
+        (serie["inhalt"], erstellt_von_user_id, ziel_user_id, serie_id, plan_tag),
     )
     db.commit()
     return True

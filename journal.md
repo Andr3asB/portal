@@ -2,6 +2,85 @@
 
 ---
 
+## 2026-08-01 – portal-v87/v88: Wunsch #92 – Aufgabenplan als rollierende 14-Tage-Liste
+
+Direkter Folgewunsch zu #89-#91, kam waehrend deren Umsetzung rein: "Der
+Aufgabenplaner muss wie der Essensplaner eine rolierende 14 Tageliste
+sein, mit den gleichen Funktionen, nur dass hier Aufgaben aus Geholfen und
+aus dem Aufgabenpool je Familienmitglied gezogen werden."
+
+**Vorab geklaert (echte Familiendaten betroffen - Friederikes/Johannes'
+bestehende Wochenroutine):** Sollen die bestehenden woechentlich
+wiederkehrenden Geholfen-Zuweisungen automatisch erhalten bleiben, oder
+komplett auf Pool-Prinzip umgestellt werden? Antwort: automatisch
+erhalten - nur die Darstellung wird zur Datumsliste, an der Speicherung
+der Wochenregel aendert sich nichts.
+
+### Umsetzung
+
+`13_kinderplan.py` komplett neu geschrieben, Struktur an `12_essensplan.py`
+angelehnt: `montag = heute - timedelta(days=heute.weekday())`,
+`tage_daten = [montag + timedelta(days=i) for i in range(14)]`, Aufteilung
+in `vergangene_tage`/`aktuelle_rest`/`naechste_woche` genau wie beim
+Essensplan. Fuer jeden der 14 echten Kalendertage:
+- **Geholfen-Aufgaben**: weiterhin ueber `kinderplan_eintraege.wochentag`
+  (unveraendert, bewusst NICHT umgestellt) - pro Tag wird per `d.weekday()`
+  nachgeschaut, welche Regeln passen. Erledigt-Status jetzt ueber den
+  ganzen 14-Tage-Bereich abgefragt (`geholfen_eintraege` gruppiert nach
+  Datum), nicht mehr nur "heute".
+- **Todo-Pool-Instanzen** (Wunsch #90): `todos.wochentag` (0-6) durch
+  `todos.plan_tag` (ISO-Datum) ersetzt - eine Einsortierung ist jetzt an
+  einen echten Kalendertag gebunden, kein abstraktes Wochentag-Muster.
+  `wochentag` bleibt als totes Altfeld liegen (SQLite droppt keine Spalten
+  gefahrlos), betrifft aber keine echten Daten - die Spalte existierte erst
+  seit derselben Sitzung (#90) und wurde nie mit Produktivdaten befuellt.
+  `04_todo.py`s `serie_einsortieren()` entsprechend angepasst.
+- **Sperre**: `_gesperrter_wochentag()` (Wochentag-Zahl) wurde zu
+  `_gesperrter_tag_datum()` (echtes Datum) - sonst waere z. B. IMMER
+  "naechsten Montag" gesperrt gewesen, nicht nur der eine konkrete
+  kommende Montag.
+
+**Bewusst nicht gebaut:** Drag & Drop zwischen Tagen (anders als beim
+Essensplan) - fuer Geholfen-Aufgaben ergibt das keinen Sinn (eine Karte
+verschieben wuerde die GANZE Wochenregel verschieben, nicht nur diesen
+einen Tag), fuer Todo-Pool-Instanzen waere es technisch moeglich, aber
+fuer diesen ersten Wurf zurueckgestellt.
+
+### Ein zweiter Bug nebenbei gefunden und gefixt: Server-Zeitzone
+
+Beim Testen der 20-Uhr-Sperre aufgefallen: der Container laeuft in UTC
+(`docker exec portal python3 -c "import time; print(time.tzname)"` ->
+`('UTC','UTC')`), aber `datetime.now()` (naiv, ohne Zeitzone) wurde direkt
+mit "ab 20 Uhr" verglichen - das meint aber deutsche Ortszeit, nicht UTC.
+Live nachgewiesen: um 01:13 Uhr deutscher Zeit war die UTC-Stunde noch 23
+(Vortag) - der ALTE Code haette den Plan faelschlich gesperrt (23 >= 20),
+obwohl es faktisch kurz nach Mitternacht war, weit weg von "20 Uhr
+abends". Fix: `ZoneInfo("Europe/Berlin")` (gleiches Muster wie in
+`14_sportschau.py`) fuer sowohl die Sperre als auch die "heute"-Bestimmung
+(letzteres war bisher nur in einem schmalen 1-2-Stunden-Fenster um
+UTC-Mitternacht falsch, aber ebenfalls ein echter Fehler).
+
+### Verifiziert
+
+Live an Friederikes echtem Plan (user_id=3, "Tisch decken" an Mittwochen):
+"Tisch decken" erscheint nach dem Umbau exakt an BEIDEN Mittwochen im
+14-Tage-Fenster (29.07. und 05.08.), keine Daten verloren oder verfaelscht.
+Neue Testvorlage im Pool angelegt, fuer "heute" eingesetzt -> `todos`-Row
+mit korrektem `plan_tag` (echtes ISO-Datum) und `wochentag=NULL` bestaetigt
+per DB-Abfrage; Abhaken funktioniert. Zeitzonen-Fix verifiziert: vor dem
+Fix haette "heute" faelschlich den Vortag gezeigt und der Plan waere
+gesperrt gewesen, nach dem Fix zeigt "heute" korrekt das deutsche Datum,
+0 Karten gesperrt (passend zur echten Uhrzeit kurz nach Mitternacht).
+Johannes' (bisher leerer) Plan und Andis eigener Plan (Wunsch #91) beide
+fehlerfrei mit "Nichts geplant" bzw. eigenen Eintraegen geladen. Testdaten
+danach entfernt.
+
+### Auslieferungspaket
+
+`deploy/portal-v87.tar.gz` (Grundumbau) → `v88.tar.gz` (Zeitzonen-Fix)
+
+---
+
 ## 2026-08-01 – portal-v85: Wünsche #89 (Sportschau-Stacking), #90 (Wiederkehrende Aufgaben/Pool), #91 (Aufgabenplan für Eltern)
 
 ### Wunsch #89 – Sonstige Schritte als Basis, Training oben
