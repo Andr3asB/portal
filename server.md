@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-01 (portal-v90: Wunsch #93 Todo-Formular einklappbar, Wunsch #94 Todo-Filtern nach Benutzer/Status mit Persistenz)*
+*Letzte Aktualisierung: 2026-08-01 (portal-v92: Wunsch #95 Sportschau-Zeitraum wählbar 14/30/60/90 Tage)*
 
 ## Host
 
@@ -319,8 +319,11 @@ teile/
                        die wochentag-basierten Geholfen-Regeln ergibt das keinen
                        Sinn (wuerde die ganze Regel verschieben, nicht nur einen Tag)
   14_sportschau.py   – /a/sportschau/<token>/ Trainings-Heatmap (Wunsch #62),
-                       letzte 14 Tage (Wunsch #78, `_TAGE_ANZAHL`-Konstante),
-                       eine Zeile pro Trainingsart. Ruft
+                       Zeitraum waehlbar per ?tage=14/30/60/90 (Wunsch #95,
+                       `_TAGE_STANDARD`=14 Default + `_TAGE_OPTIONEN`-Liste,
+                       ungueltiger/fehlender Wert faellt sicher auf Standard
+                       zurueck; vorher feste `_TAGE_ANZAHL`-Konstante seit
+                       Wunsch #78), eine Zeile pro Trainingsart. Ruft
                        live GET /api/workouts vom hae-Server ab (kein
                        Speichern in portal.db), URL/Key aus HAE_API_URL/
                        HAE_API_KEY (.env), UTC→Europe/Berlin per zoneinfo.

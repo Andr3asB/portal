@@ -17,6 +17,12 @@ kein Fehler - andere Konvention). Antwort: stündliche Buckets
 Schritte" sind, wird per Zeitüberlappung mit den Workout-Fenstern aus
 /api/workouts bestimmt (grobe Näherung auf Stundenbasis, feinere Daten
 liefert die API nicht).
+
+Wunsch #95: Zeitraum ist waehlbar (?tage=14/30/60/90, Default 14 wie bisher)
+statt fest verdrahtet - `_TAGE_ANZAHL` wurde zur Konstante `_TAGE_STANDARD`,
+`_TAGE_OPTIONEN` definiert die erlaubten Werte fuer den Knopf-Umschalter im
+Template. Heatmap-Zellen und Schritte-Balken werden bei mehr Tagen einfach
+schmaler (bestehendes flex:1 je Zelle/Balken, kein Sonderlayout noetig).
 """
 import json
 import urllib.error
@@ -25,14 +31,15 @@ import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, current_app, render_template
-from teile.kern import grant as check_grant
+from flask import Blueprint, current_app, render_template, request
+from teile.kern import grant as check_grant, to_int
 
 bp  = Blueprint("sportschau_app", __name__)
 APP = "sportschau"
 
 _TZ = ZoneInfo("Europe/Berlin")
-_TAGE_ANZAHL = 14  # Wunsch #78 (vorher 10)
+_TAGE_STANDARD  = 14  # Wunsch #78 (vorher 10)
+_TAGE_OPTIONEN  = [14, 30, 60, 90]  # Wunsch #95
 
 # Wunsch #75: Der hae-Server liefert workout_type bereits deutsch lokalisiert,
 # aber mit schlechter Wortwahl ("Ausführen" statt "Laufen" fuer Run, analog
@@ -128,10 +135,14 @@ def index(token):
     if not user:
         return render_template("denied.html", reason="invalid"), 403
 
-    heute = date.today()
-    tage  = [(heute - timedelta(days=i)).isoformat() for i in range(_TAGE_ANZAHL - 1, -1, -1)]
+    tage_anzahl = to_int(request.args.get("tage"))
+    if tage_anzahl not in _TAGE_OPTIONEN:
+        tage_anzahl = _TAGE_STANDARD
 
-    workouts = _hae_workouts(heute - timedelta(days=_TAGE_ANZAHL - 1), heute)
+    heute = date.today()
+    tage  = [(heute - timedelta(days=i)).isoformat() for i in range(tage_anzahl - 1, -1, -1)]
+
+    workouts = _hae_workouts(heute - timedelta(days=tage_anzahl - 1), heute)
     fehler = workouts is None
 
     # {trainingsart: {tag, tag, ...}} – lokale Zeitzone, da start_time als UTC kommt.
@@ -153,7 +164,7 @@ def index(token):
     trainingsarten = sorted(trainings_tage.keys())
 
     now_ms   = int(datetime.now(timezone.utc).timestamp() * 1000)
-    start_ms = now_ms - _TAGE_ANZAHL * 24 * 3600 * 1000
+    start_ms = now_ms - tage_anzahl * 24 * 3600 * 1000
     steps_roh = _hae_steps(start_ms, now_ms)
     fehler_schritte = steps_roh is None
     tages_schritte = _tages_schritte(steps_roh, workout_fenster, tage) if not fehler_schritte else {}
@@ -182,7 +193,7 @@ def index(token):
     return render_template("sportschau.html",
         user=user, token=token, farbe=user["farbe"],
         tage=tage, trainingsarten=trainingsarten, trainings_tage=trainings_tage,
-        fehler=fehler,
+        fehler=fehler, tage_anzahl=tage_anzahl, tage_optionen=_TAGE_OPTIONEN,
         fehler_schritte=fehler_schritte, schritte_balken=schritte_balken, gridlines=gridlines,
     )
 

@@ -3,6 +3,14 @@
 {% block title %}Sportschau{% endblock %}
 
 {% block extra_styles %}
+.zeitraum-row { display:flex; gap:8px; margin-bottom:14px; }
+.zeitraum-btn {
+  flex:1; text-align:center; border:1.5px solid var(--border); border-radius:12px;
+  padding:9px 0; font-size:14px; font-weight:600; font-family:inherit;
+  background:var(--surface); color:var(--text); cursor:pointer;
+  text-decoration:none; display:block;
+}
+.zeitraum-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
 .heatmap-section {
   background:var(--surface); border-radius:14px; padding:14px 16px;
   box-shadow:0 1px 3px var(--shadow); margin-top:4px;
@@ -68,6 +76,12 @@
 {% block body %}
 
 <main class="main">
+
+<div class="zeitraum-row">
+  {% for t in tage_optionen %}
+  <a class="zeitraum-btn{% if t == tage_anzahl %} active{% endif %}" href="?tage={{ t }}">{{ t }} Tage</a>
+  {% endfor %}
+</div>
 
 {% if fehler %}
   <div class="empty">

@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-08-01 – portal-v92: Wunsch #95 – Sportschau: wählbarer Zeitraum
+
+"Im Standard werden heute 14 Tage angezeigt. Über einen Button sollen
+zusätzlich 30, 60 und 90 Tage auswählbar sein. Die Grafiken verändern
+sich dann."
+
+`_TAGE_ANZAHL` (feste Konstante) wurde zu `_TAGE_STANDARD` (Default) +
+`_TAGE_OPTIONEN = [14, 30, 60, 90]`. Neue Query-Param `?tage=X` in
+`index()`, validiert gegen die Optionsliste (ungültiger/fehlender Wert
+fällt sicher auf 14 zurück, kein Crash-Risiko durch `to_int()`). Im
+Template eine Button-Reihe (`?tage=14/30/60/90`, aktueller Wert
+hervorgehoben). Heatmap-Zellen und Schritte-Balken brauchten keine
+Sonderbehandlung für größere Zeiträume - beide nutzen bereits `flex:1`
+pro Zelle/Balken, schrumpfen also einfach automatisch bei mehr Tagen
+(genau das von Andi erwartete "Die Grafiken verändern sich dann").
+
+### Verifiziert
+
+`curl` gegen alle vier Optionen plus einen ungültigen Wert (`?tage=999`):
+korrekte Zellenzahl je Zeitraum (33/96/369/549 für 14/30/60/90 Tage),
+ungültiger Wert fällt korrekt auf 14 zurück. Per `javascript_tool` bei
+90 Tagen: aktiver Button korrekt markiert, 90 Heatmap-Zellen und 90
+Balken gerendert, kein horizontaler Overflow (`scrollWidth ==
+clientWidth`) - Layout passt sich sauber an, keine abgeschnittenen
+Elemente.
+
+### Auslieferungspaket
+
+`deploy/portal-v92.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v90: Wünsche #93 + #94 – Todo-App: Formular einklappbar, Filtern
 
 ### Wunsch #93 – "+ Neue Aufgabe" als Knopf statt offenem Formular
