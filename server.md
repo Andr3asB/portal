@@ -203,7 +203,9 @@ teile/
                        können je Eintrag Zeit/Nutzer/Aufgabe bearbeiten oder löschen
                        über /eintrag/<id>/bearbeiten + /eintrag/<id>/loeschen);
                        /uebersicht (Kalender 30 Tage, 7-Tage-Stats, admin-only)
-                       + Aufgaben; eltern/admin können für andere eintragen
+                       + Aufgaben; eltern/admin können für andere eintragen;
+                       /aufgaben unterstützt seit Wunsch #96 auch Umbenennen
+                       (action=umbenennen, eigenes ✏️-Panel je Aufgabe)
   07_push.py         – /push/vapid-public-key, /push/subscribe, /push/unsubscribe
   08_settings.py     – /einstellungen/<token> (Dark Mode), /manifest/<token>.json
                        (personalisiertes PWA-Manifest mit Nutzer-Token als start_url)
@@ -275,7 +277,16 @@ teile/
                        user_id), gibt neuen Durchschnitt zurück; /<rid>/wunsch/toggle
                        (JSON, Wunsch #65): "Wünsch ich mir"-Markierung, max. 5 pro
                        Nutzer (MAX_REZEPT_WUENSCHE), ruft bereinige_erfuellte_
-                       rezeptwuensche() (00_kern.py) vor jeder Anzeige/Änderung auf
+                       rezeptwuensche() (00_kern.py) vor jeder Anzeige/Änderung auf;
+                       /importieren-bild (GET+POST, Wunsch #97): Rezept per Foto
+                       (Kamera/Mediathek) – _rezept_per_ki_bild() ruft ki_anfrage()
+                       mit Bildeingabe (eigener KI-Zweck "rezepte_foto_import",
+                       unabhängig vom URL-Import konfigurierbar), gleiche Datei-
+                       Validierung wie beim Vokabeln-Foto-Import (_FOTO_MAX_BYTES
+                       8 MB, _FOTO_MIME jpg/png/heic); Ergebnis landet wie beim
+                       URL-Import nur vorausgefüllt in rezept_neu.html, keine
+                       eigene Prüf-Ansicht nötig (anders als Vokabeln-Foto-Import,
+                       wo ein Foto mehrere Vokabelpaare liefert)
   12_essensplan.py   – /a/essensplan/<token>/ 14-Tage-Ansicht (aktuelle + folgende
                        Woche ab Wochenmontag), pro Tag Slots "mittag"/"abend";
                        liefert vergangene_tage/aktuelle_rest/naechste_woche als
@@ -437,7 +448,8 @@ teile/
     geholfen_verlauf.html   – Letzte 50 Einträge, eigene Seite (Menü: "Zuletzt geholfen")
     geholfen_uebersicht.html – 7-Tage-Statistik, Punkte pro Nutzer, 30-Tage-Kalender
                               (Menü: "Statistik", admin-only)
-    geholfen_aufgaben.html  – Aufgaben verwalten (hinzufügen, deaktivieren)
+    geholfen_aufgaben.html  – Aufgaben verwalten (hinzufügen, deaktivieren,
+                              umbenennen über ✏️-Panel je Aufgabe – Wunsch #96)
     hilfe.html              – Erklärungen zu allen Apps und Funktionen; Inhaltsverzeichnis
                               am Anfang mit Sprunglinks zu allen 13 Kapiteln (id="kapitel-N",
                               Wunsch #57) + fixer Nach-oben-Button (Wunsch #56)
@@ -471,6 +483,9 @@ teile/
     rezept_importieren.html – URL-Eingabe für den Rezept-Import, zeigt Fehler
                               (nicht abrufbar, kein Rezept erkannt, KI-Kontingent
                               aufgebraucht) statt eines 500ers
+    rezept_bild_importieren.html – Foto-Upload für den Rezept-Import (Wunsch #97,
+                              Kamera/Mediathek via capture="environment"), zeigt
+                              dieselben Fehlerarten wie rezept_importieren.html
     rezept_detail.html      – Ein Rezept: Info-Abschnitt oben (Portionen +
                               Durchschnittsbewertung + eigener Sterne-Picker,
                               Wunsch #52/#53, plus Ja/Nein-Wunschliste-Knopf seit
@@ -629,7 +644,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `vokabel_kapitel_zuordnung` | vokabel_id (FK vokabeln, cascade), kapitel_id (FK vokabel_kapitel, cascade); UNIQUE(vokabel_id,kapitel_id) – m:n, eine Vokabel kann mehreren Kapiteln oder keinem angehören |
 | `vokabel_sessions` | id, user_id (FK users, cascade), sprache_id (FK vokabel_sprachen), gestartet, beendet (NULL = noch offen) – ein Trainer-Durchgang |
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
-| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
+| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.

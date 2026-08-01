@@ -15,11 +15,21 @@ beiden Fällen nur vorausgefüllt im bestehenden Neu-Formular – nie ungeprüft
 direkt in der DB, weil sowohl JSON-LD als auch KI-Extraktion daneben liegen
 können.
 
+Rezept-Import per Foto (Wunsch #97): Kamera oder Mediathek, OCR+Extraktion
+über ki_anfrage() mit Bildeingabe (eigener KI-Zweck "rezepte_foto_import",
+unabhängig vom URL-Import konfigurierbar). Liefert dieselbe Datenform wie
+_rezept_aus_jsonld()/_rezept_per_ki() (name/portionen/zutaten/schritte) und
+landet deshalb genau wie der URL-Import nur vorausgefüllt im bestehenden
+Neu-Formular - keine eigene Prüf-Seite nötig, anders als beim Vokabeln-
+Foto-Import (Wunsch #80), wo ein Foto mehrere Vokabelpaare gleichzeitig
+liefert und deshalb eine eigene Zeilen-Prüf-Ansicht braucht.
+
 Bearbeiten (bearbeiten()) nutzt dasselbe Formular (rezept_neu.html) wie
 Neuanlegen und Import-Vorschau, unterschieden nur über den bearbeiten-Parameter
 (Ziel-Route, Titel, Speichern-Button-Text). Zutaten/Schritte werden beim
 Speichern komplett ersetzt, kein Zeilen-Diffing.
 """
+import base64
 import ipaddress
 import json
 import re
@@ -40,6 +50,12 @@ bp  = Blueprint("rezepte_app", __name__)
 APP = "rezepte"
 
 KATEGORIEN = {"kochen": "🍳 Kochen", "backen": "🍰 Backen"}
+
+# Wunsch #97: Foto-Import - gleiche Grenzen/MIME-Zuordnung wie beim
+# Vokabeln-Foto-Import (16_vokabeln.py), bewusst dupliziert statt
+# cross-importiert (kleine Konstanten, kein gemeinsames Modul dafür noetig).
+_FOTO_MAX_BYTES = 8 * 1024 * 1024
+_FOTO_MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic"}
 
 
 def _clean_kategorie(value):
@@ -302,6 +318,86 @@ def neu(token):
         )
     db.commit()
     return redirect(url_for("rezepte_app.detail", token=token, rid=rezept_id))
+
+
+def _rezept_per_ki_bild(user_id: int, mime: str, bild_b64: str):
+    """Wunsch #97: Rezept aus einem Foto (Kochbuch-Seite, handschriftliches
+    Rezept) per KI-Vision extrahieren – gleiches Muster wie _vokabeln_per_ki()
+    in 16_vokabeln.py, eigener KI-Zweck 'rezepte_foto_import'. Wirft
+    KiLimitError/KiFehler/ValueError, der Aufrufer faengt sie ab."""
+    system = (
+        'Du liest ein Foto einer Rezeptseite (Kochbuch, handschriftliches Rezept, '
+        'Zeitschriftenausschnitt) und extrahierst das Rezept. Antworte AUSSCHLIESSLICH '
+        'mit einem JSON-Objekt der Form {"name": "...", "portionen": "...", '
+        '"zutaten": ["..."], "schritte": ["..."]}. "portionen" ist die Anzahl '
+        'Personen/Portionen als kurzer Text (z. B. "4" oder "4-6 Portionen"), leerer '
+        'String wenn nicht erkennbar. "schritte" ist eine Liste einzelner '
+        'Zubereitungsschritte, kein zusammenhängender Text. Keine Erklärung, kein '
+        'Markdown, kein Codeblock.'
+    )
+    antwort = ki_anfrage(
+        user_id, "rezepte_foto_import", system,
+        "Extrahiere das Rezept von diesem Foto.",
+        max_tokens=4000, bilder=[(mime, bild_b64)],
+    )
+    bereinigt = antwort.strip()
+    if bereinigt.startswith("```"):
+        bereinigt = bereinigt.strip("`")
+        if bereinigt.lower().startswith("json"):
+            bereinigt = bereinigt[4:]
+    daten = json.loads(bereinigt)
+    zutaten  = daten.get("zutaten") or []
+    schritte = daten.get("schritte") or []
+    name = str(daten.get("name") or "").strip()
+    if not name:
+        raise ValueError("KI hat keinen Rezeptnamen erkannt")
+    return {
+        "name": name,
+        "portionen": str(daten.get("portionen") or "").strip() or None,
+        "zutaten": [str(z).strip() for z in zutaten if str(z).strip()],
+        "schritte": [str(s).strip() for s in schritte if str(s).strip()],
+    }
+
+
+@bp.route("/a/rezepte/<token>/importieren-bild", methods=["GET", "POST"])
+def importieren_bild(token):
+    """Wunsch #97: Rezept per Foto (Kamera/Mediathek) importieren. Ergebnis
+    landet wie beim URL-Import nur vorausgefuellt im Neu-Formular, nie direkt
+    gespeichert – keine eigene Pruef-Ansicht noetig (siehe Docstring oben)."""
+    user = _user(token)
+    if request.method == "GET":
+        return render_template("rezept_bild_importieren.html",
+            user=user, token=token, farbe=user["farbe"], fehler=None)
+
+    def _fehler(text):
+        return render_template("rezept_bild_importieren.html",
+            user=user, token=token, farbe=user["farbe"], fehler=text)
+
+    datei = request.files.get("foto")
+    if not datei or not datei.filename:
+        return _fehler("Bitte ein Foto auswählen.")
+    endung = datei.filename.rsplit(".", 1)[-1].lower() if "." in datei.filename else ""
+    mime = _FOTO_MIME.get(endung)
+    if not mime:
+        return _fehler("Nur JPG, PNG oder HEIC werden unterstützt.")
+    rohdaten = datei.read()
+    if not rohdaten:
+        return _fehler("Die Datei ist leer.")
+    if len(rohdaten) > _FOTO_MAX_BYTES:
+        return _fehler("Das Foto ist zu groß (maximal 8 MB).")
+
+    try:
+        rezept = _rezept_per_ki_bild(user["id"], mime, base64.b64encode(rohdaten).decode())
+    except KiLimitError:
+        return _fehler(
+            "Monatliches KI-Kontingent aufgebraucht – bitte manuell eintragen "
+            "oder später erneut versuchen.")
+    except Exception:
+        return _fehler(
+            "Auf dem Foto konnte kein Rezept erkannt werden – bitte manuell eintragen.")
+
+    return render_template("rezept_neu.html",
+        user=user, token=token, farbe=user["farbe"], vorbelegt=rezept, kategorien=KATEGORIEN)
 
 
 @bp.route("/a/rezepte/<token>/importieren", methods=["GET", "POST"])

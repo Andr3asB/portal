@@ -2,6 +2,64 @@
 
 ---
 
+## 2026-08-01 – portal-v94: Wünsche #96 + #97 – Geholfen-Aufgaben umbenennen/ergänzen, Rezept-Foto-Import
+
+### Wunsch #96 – Geholfen-Aufgaben umbenennen und ergänzen
+
+Friederikes Wunsch: "Spülmaschine ein" → "Spülmaschine einräumen",
+"Wäsche falten" → "Wäsche zusammenlegen", neu dazu "Spülmaschine
+ausräumen". Umbenennen war bisher nur per Code-Migration möglich (feste
+`_DEFAULT_AUFGABEN`-Liste in `00_kern.py`) – jetzt zusätzlich direkt in
+der Aufgabenverwaltung (`/a/geholfen/<token>/aufgaben`, admin-only) über
+ein neues ✏️-Panel je Aufgabe, damit künftige Umbenennungen ohne Deploy
+möglich sind. Migration in `00_kern.py` benennt bestehende Zeilen per
+`UPDATE ... WHERE name='...'` um (idempotent) und seedet die neue
+Aufgabe nur, falls sie noch nicht existiert.
+
+### Wunsch #97 – Rezept-Import per Foto
+
+"Neben URL importieren soll es einen neuen Button geben: Bild
+importieren. Dann soll man per Kamera oder Mediathek ein Foto von einem
+Rezept machen können und es wird per OCR und KI in ein Rezept
+gewandelt." Neuer Button "📷 Bild importieren" neben "🔗 Aus URL
+importieren" auf der Rezepte-Übersicht, führt zu
+`/a/rezepte/<token>/importieren-bild` (neues Template
+`rezept_bild_importieren.html`, Datei-Upload mit
+`capture="environment"`). `_rezept_per_ki_bild()` in `11_rezepte.py`
+ruft `ki_anfrage()` mit Bildeingabe auf – gleiches Muster wie
+`_vokabeln_per_ki()` (Wunsch #80), eigener KI-Zweck
+`"rezepte_foto_import"`, unabhängig vom URL-Import-Zweck
+`"rezepte_import"` konfigurierbar (`manage.py ki_modell`). Ergebnis
+landet wie beim URL-Import nur vorausgefüllt in `rezept_neu.html`, nie
+direkt gespeichert – keine eigene Prüf-Ansicht nötig, anders als beim
+Vokabeln-Foto-Import (dort liefert ein Foto mehrere Vokabelpaare
+gleichzeitig, hier immer genau ein Rezept). Datei-Validierung
+(Größe, MIME) identisch zu `foto_import()` in `16_vokabeln.py`.
+
+### Verifiziert
+
+- `curl` gegen `/a/geholfen/<token>/aufgaben`: umbenannte Aufgaben
+  ("Wäsche zusammenlegen", "Spülmaschine einräumen") und die neue
+  Aufgabe ("Spülmaschine ausräumen") korrekt gerendert.
+- Umbenennen-Roundtrip per `curl -X POST action=umbenennen`: Name
+  geändert, dann zurückgesetzt – Route funktioniert, Daten unverändert
+  hinterlassen.
+- `/a/rezepte/<token>/importieren-bild`: neuer Button auf der Übersicht
+  verlinkt korrekt, Formularseite lädt (HTTP 200).
+- Echtes Foto-OCR getestet: synthetisches Testbild eines Apfelkuchen-
+  Rezepts (Name, Portionen, 6 Zutaten, 5 Zubereitungsschritte) hochgeladen
+  – alle Felder korrekt im Formular vorausgefüllt, Formular postet wie
+  beim URL-Import an die bestehende `/neu`-Route.
+- Fehlerfälle geprüft: falscher Dateityp ("Nur JPG, PNG oder HEIC werden
+  unterstützt."), fehlende Datei ("Bitte ein Foto auswählen.").
+
+### Auslieferungspaket
+
+`deploy/portal-v94.tar.gz` (Code), `deploy/portal-v95.tar.gz` (Hilfe-App-
+Kapitel für #96/#97 nachgezogen, gleicher Änderungssatz)
+
+---
+
 ## 2026-08-01 – portal-v92: Wunsch #95 – Sportschau: wählbarer Zeitraum
 
 "Im Standard werden heute 14 Tage angezeigt. Über einen Button sollen

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set app_slug = "rezepte" %}
+{% block title %}Rezept per Foto{% endblock %}
+
+{% block extra_styles %}
+.add-card {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:0 0 6px;
+}
+.foto-input {
+  width:100%; border:1.5px dashed var(--border); border-radius:10px;
+  padding:14px 12px; font-size:14px; font-family:inherit;
+  background:var(--surface); color:var(--text); box-sizing:border-box;
+}
+.btn-add {
+  background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
+  width:100%; margin-top:14px;
+}
+.import-fehler {
+  background:#ffebe9; color:#cf222e; border-radius:10px; padding:10px 12px;
+  font-size:13px; margin-bottom:12px;
+}
+.import-hinweis { color:var(--text-2); font-size:13px; margin-top:10px; }
+.import-lade { display:none; text-align:center; color:var(--text-2); font-size:14px; margin-top:14px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/rezepte/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📷 Rezept per Foto</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if fehler %}
+  <div class="import-fehler">{{ fehler }}</div>
+  {% endif %}
+
+  <div class="add-card">
+    <form method="post" enctype="multipart/form-data" id="foto-form">
+      <div class="field-label">Foto des Rezepts</div>
+      <input class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" capture="environment" required>
+
+      <button class="btn-add" type="submit">Rezept erkennen</button>
+      <div class="import-lade" id="import-lade">⏳ Foto wird gelesen und Rezept erkannt…</div>
+      <div class="import-hinweis">Funktioniert am besten bei gut lesbaren Kochbuchseiten oder handschriftlichen Rezepten. Das Ergebnis kannst du vor dem Speichern noch prüfen und anpassen.</div>
+    </form>
+  </div>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('foto-form').addEventListener('submit', () => {
+  document.getElementById('import-lade').style.display = 'block';
+});
+</script>
+{% endblock %}

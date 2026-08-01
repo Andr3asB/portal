@@ -222,6 +222,15 @@ def aufgaben_verwalten(token):
                 db.execute("UPDATE geholfen_aufgaben SET aktiv=? WHERE id=?",
                            (0 if row["aktiv"] else 1, aid))
                 db.commit()
+        elif action == "umbenennen":
+            # Wunsch #96: Aufgaben umbenennen war bisher nur per Code-Migration
+            # moeglich - jetzt genau wie bei einkauf_kategorien.html direkt in
+            # der Verwaltung, damit sowas kuenftig ohne Deploy geht.
+            aid  = to_int(request.form.get("id"), 0)
+            name = request.form.get("name", "").strip()
+            if name:
+                db.execute("UPDATE geholfen_aufgaben SET name=? WHERE id=?", (name, aid))
+                db.commit()
         return redirect(url_for("geholfen_app.aufgaben_verwalten", token=token))
     aufgaben = db.execute("SELECT * FROM geholfen_aufgaben ORDER BY aktiv DESC, id").fetchall()
     return render_template("geholfen_aufgaben.html",

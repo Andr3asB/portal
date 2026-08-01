@@ -16,7 +16,7 @@
 .aufg-item {
   background:var(--surface); border-radius:12px; padding:12px 16px;
   margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
-  display:flex; align-items:center; gap:12px;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
 }
 .aufg-item.inaktiv { opacity:.4; }
 .aufg-emoji { font-size:28px; }
@@ -26,6 +26,17 @@
 .btn-toggle {
   background:none; border:1.5px solid var(--border); border-radius:8px;
   padding:6px 10px; font-size:13px; cursor:pointer; color:var(--text-2);
+}
+.btn-edit-toggle {
+  background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2);
+}
+.aufg-edit-panel {
+  display:none; gap:8px; margin-top:10px; padding-top:10px;
+  border-top:1px solid var(--border); flex-basis:100%;
+}
+.aufg-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
 }
 {% endblock %}
 
@@ -60,12 +71,30 @@
       <div class="aufg-name">{{ a.name }}</div>
       <div class="aufg-gew">{{ a.gewichtung }} Punkte</div>
     </div>
+    <button class="btn-edit-toggle" type="button" onclick="toggleAufgEdit({{ a.id }})" title="Umbenennen">✏️</button>
     <form method="post">
       <input type="hidden" name="action" value="toggle">
       <input type="hidden" name="id" value="{{ a.id }}">
       <button class="btn-toggle" type="submit">{% if a.aktiv %}Deaktivieren{% else %}Aktivieren{% endif %}</button>
     </form>
+    <div class="aufg-edit-panel" id="aufg-edit-{{ a.id }}">
+      <form method="post" style="display:flex; gap:8px; flex:1">
+        <input type="hidden" name="action" value="umbenennen">
+        <input type="hidden" name="id" value="{{ a.id }}">
+        <input class="form-input" type="text" name="name" value="{{ a.name }}" required>
+        <button type="submit" class="aufg-save">Speichern</button>
+      </form>
+    </div>
   </div>
   {% endfor %}
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleAufgEdit(id) {
+  const p = document.getElementById('aufg-edit-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+</script>
 {% endblock %}

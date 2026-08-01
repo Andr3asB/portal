@@ -270,14 +270,15 @@ _DEFAULT_KATEGORIEN = [
 ]
 
 _DEFAULT_AUFGABEN = [
-    ("Tisch decken",       "🍽️", 1.0),
-    ("Tisch abräumen",     "🥣", 1.0),
-    ("Wäsche falten",      "🧺", 1.5),
-    ("Rasen mähen",        "🌿", 3.0),
-    ("Zimmer aufräumen",   "🧹", 2.0),
-    ("Einkaufen helfen",   "🛒", 1.5),
-    ("Beim Kochen helfen", "🍳", 2.0),
-    ("Spülmaschine ein",   "🍳", 1.0),
+    ("Tisch decken",           "🍽️", 1.0),
+    ("Tisch abräumen",         "🥣", 1.0),
+    ("Wäsche zusammenlegen",   "🧺", 1.5),
+    ("Rasen mähen",            "🌿", 3.0),
+    ("Zimmer aufräumen",       "🧹", 2.0),
+    ("Einkaufen helfen",       "🛒", 1.5),
+    ("Beim Kochen helfen",     "🍳", 2.0),
+    ("Spülmaschine einräumen", "🍳", 1.0),
+    ("Spülmaschine ausräumen", "🍳", 1.0),
 ]
 
 
@@ -651,7 +652,7 @@ def _init_db(app):
         # Anfang an etwas zum Aendern vorfinden, statt stumm auf KI_MODELL
         # zurueckzufallen. INSERT OR IGNORE - ein von Andi gesetzter Wert
         # wird bei folgenden Deploys nicht ueberschrieben.
-        for zweck in ("rezepte_import", "vokabeln_ocr"):
+        for zweck in ("rezepte_import", "vokabeln_ocr", "rezepte_foto_import"):
             db.execute(
                 "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
                 (zweck, KI_MODELL),
@@ -774,6 +775,16 @@ def _init_db(app):
                     "INSERT INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
                     (name, emoji, gew),
                 )
+        # Wunsch #96: zwei Umbenennungen + eine neue Aufgabe. Kein UNIQUE(name)
+        # auf geholfen_aufgaben, deshalb Existenz-Check statt INSERT OR IGNORE.
+        db.execute("UPDATE geholfen_aufgaben SET name='Spülmaschine einräumen' WHERE name='Spülmaschine ein'")
+        db.execute("UPDATE geholfen_aufgaben SET name='Wäsche zusammenlegen' WHERE name='Wäsche falten'")
+        if not db.execute("SELECT 1 FROM geholfen_aufgaben WHERE name='Spülmaschine ausräumen'").fetchone():
+            db.execute(
+                "INSERT INTO geholfen_aufgaben(name,emoji,gewichtung) VALUES(?,?,?)",
+                ("Spülmaschine ausräumen", "🍳", 1.0),
+            )
+        db.commit()
         if db.execute("SELECT COUNT(*) FROM einkauf_laeden").fetchone()[0] == 0:
             for laden in _DEFAULT_LAEDEN:
                 db.execute("INSERT OR IGNORE INTO einkauf_laeden(name) VALUES(?)", (laden,))
