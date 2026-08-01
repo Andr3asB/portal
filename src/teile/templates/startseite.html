@@ -28,9 +28,13 @@
   min-height: 100px;
   -webkit-tap-highlight-color: transparent;
   transition: transform .1s;
-  touch-action: none;
   user-select: none;
 }
+/* Wunsch #103: touch-action:none nur im Bearbeiten-Modus (noetig fuer den
+   Pointer-Drag beim Verschieben) - vorher galt es immer und blockierte
+   dadurch auch normales Scrollen, sobald der Finger auf einer Kachel
+   aufsetzte, egal ob gerade gezogen wurde oder nicht. */
+.edit-mode .tile { touch-action: none; }
 .tile:not(.edit-mode *):active { transform: scale(.96); }
 .tile-emoji { font-size: 40px; line-height: 1; pointer-events: none; }
 .tile-name  { font-size: 14px; font-weight: 500; color: var(--text-3); pointer-events: none; }

@@ -2,6 +2,65 @@
 
 ---
 
+## 2026-08-02 – portal-v100: Wünsche #103 + #104 + #105 – Scroll-Bug, Werkstatt-Layout, Formular-Kollision
+
+### Wunsch #103 – Scrollen blockiert, wenn der Finger auf einer App-Kachel aufsetzt
+
+"Wenn ich auf der Seite scrollen will, dann muss ich eine Stelle ohne
+Kachel antippen. Tippe ich eine App-Kachel an, kann ich nicht scrollen."
+Ursache: `.tile { touch-action: none; }` in `startseite.html` galt
+IMMER, nicht nur im Bearbeiten-Modus - dabei ist `touch-action:none` nur
+für den Pointer-Drag beim Verschieben der Kacheln nötig (`onDown()`
+prüft ohnehin `if (!editMode) return`). Fix: `touch-action:none` nur noch
+unter `.edit-mode .tile`, ausserhalb des Bearbeiten-Modus verhält sich
+eine Kachel touch-technisch wie ein normaler Link und blockiert kein
+Scrollen mehr.
+
+### Wunsch #104 – Detailansicht in der Werkstatt auf dem iPhone "durcheinander"
+
+Ursache: `.wunsch-card` (Wunsch-Listenkarte) fehlte `flex-wrap:wrap`. Das
+neue Detail-Panel aus Wunsch #101 nutzt `flex:1 0 100%`, um unter der
+Karte in eine eigene Zeile umzubrechen (gleicher Trick wie die
+Edit-Panels in `einkauf.html`/`geholfen_aufgaben.html`) - der Trick
+funktioniert aber nur, wenn der Flex-Container `flex-wrap:wrap` hat.
+Ohne das blieb `.wunsch-card` bei `nowrap` (Default) und das Detail-Panel
+quetschte sich stattdessen mit `.wunsch-body`/`.wunsch-actions` in eine
+einzige Zeile - auf breiten Bildschirmen kaum auffällig, auf dem iPhone
+deutlich als zerschossenes Layout sichtbar. Fix: `flex-wrap:wrap`
+ergänzt.
+
+### Wunsch #105 – Verbesserungswunsch-Formular sieht in der Werkstatt anders aus
+
+Ursache: Klassennamen-Kollision. base.html definiert `.wunsch-card`/
+`.wunsch-actions` fürs globale ✨-Formular (Overlay, von jeder Seite aus
+erreichbar). `werkstatt_app.html` verwendete für seine eigenen
+Wunschlisten-Karten zufällig dieselben Namen - deren `extra_styles`
+landen im selben `<style>`-Block wie base.html, aber danach, gewinnen bei
+gleicher Spezifität also automatisch. Nur auf der Werkstatt-Seite selbst
+sah das ✨-Formular deshalb anders aus als überall sonst im Portal. Fix:
+base.html nutzt jetzt eindeutige `.wunsch-modal-card`/
+`.wunsch-modal-actions` statt der generischen Namen - siehe auch neuer
+Eintrag in server.md "Bekannte Issues" mit der allgemeinen Regel dazu
+(globale base.html-Klassen brauchen kollisionsresistente Namen).
+
+### Verifiziert
+
+- Wunsch #103: `getComputedStyle('.tile').touchAction` liefert `auto`
+  ausserhalb, `none` innerhalb `.edit-mode` - geprüft per `javascript_tool`.
+- Wunsch #104: `getComputedStyle('.wunsch-card').flexWrap` liefert jetzt
+  `wrap` statt `nowrap` (vorher live als Bug bestätigt, DAS war die Wurzel
+  des von Andi beschriebenen Layout-Durcheinanders).
+- Wunsch #105: `grep` bestätigt keine verbleibenden `.wunsch-card`/
+  `.wunsch-actions`-Referenzen in base.html, nur noch `.wunsch-modal-*`;
+  JS in base.html selektiert diese Klassen ohnehin nur über IDs, keine
+  Anpassung dort nötig.
+
+### Auslieferungspaket
+
+`deploy/portal-v100.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v99: Wunsch #102 – Sportschau: Trainingsdaten grün statt blau
 
 "Ich will die Trainingsdaten jetzt in grün anzeigen statt in blau."

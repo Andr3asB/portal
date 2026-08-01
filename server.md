@@ -155,7 +155,13 @@ teile/
                        fuer /static/sw.js (siehe sw.js weiter unten)
   01_start_token.py  – / (Landing), /p/<token> (Startseite mit Gruppen),
                        POST /p/<token>/reorder (Apps), /gruppe/reorder (Gruppen selbst),
-                       /gruppe/neu, /gruppe/<id>/umbenennen, /gruppe/<id>/loeschen
+                       /gruppe/neu, /gruppe/<id>/umbenennen, /gruppe/<id>/loeschen.
+                       `.tile` in startseite.html: `touch-action:none` gilt seit
+                       Wunsch #103 nur noch mit `.edit-mode` davor (statt immer) -
+                       vorher blockierte es das normale Scrollen der Seite, sobald
+                       der Finger beim Wischen auf einer Kachel aufsetzte, auch
+                       ausserhalb des Bearbeiten-Modus, wo der Pointer-Drag dafuer
+                       gar nicht aktiv ist.
   02_werkstatt.py    – POST /wunsch (JSON, identifiziert Nutzer über Token);
                        _ansicht_aus_pfad() verdichtet window.location.pathname
                        zu "app_slug/unterseite", token-frei (Wunsch #47)
@@ -477,7 +483,17 @@ teile/
                               Neu-Formular, gemeinsames Macro ziel_auswahl())
     werkstatt_app.html      – Wunschliste mit Admin-Aktionen; Karte antippen
                               klappt Detailansicht auf (Wunsch #101: Wunsch,
-                              Benutzer, Wunsch-/Implementierungsdatum, Umsetzung)
+                              Benutzer, Wunsch-/Implementierungsdatum, Umsetzung).
+                              `.wunsch-card` braucht `flex-wrap:wrap` (Wunsch #104 -
+                              fehlte, das `flex:1 0 100%`-Detailpanel darunter konnte
+                              deshalb nicht in eine eigene Zeile umbrechen und
+                              quetschte sich stattdessen mit in die Kopfzeile, auf
+                              schmalen Bildschirmen (iPhone) deutlich sichtbar).
+                              Die Klassennamen `.wunsch-card`/`.wunsch-actions`
+                              kollidierten ausserdem mit den gleichnamigen Klassen
+                              des globalen ✨-Formulars in base.html (Wunsch #105 -
+                              siehe dort, base.html nutzt seit dem Fix eigene
+                              `.wunsch-modal-*`-Namen)
     geholfen.html           – Tipp-Grid (Fetch-AJAX, kompakte Kacheln), 10-Tage-Heatmap
                               je Nutzer (eltern/kind), "Als wer?"-Pill (eltern/admin)
     geholfen_verlauf.html   – Letzte 50 Einträge, eigene Seite (Menü: "Zuletzt geholfen")
@@ -924,6 +940,21 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   (kein Verlass auf einen Spalten-Default). Neue Installationen bekommen den
   "sauberen" `NOT NULL DEFAULT (datetime('now'))` direkt aus `SCHEMA`, da dort
   nur `CREATE TABLE` läuft, nie `ALTER TABLE ADD COLUMN`.
+
+- **CSS-Klassennamen aus base.html können von `{% block extra_styles %}` eines
+  Kindtemplates lautlos überschrieben werden.** `{% block extra_styles %}`
+  landet im selben `<style>`-Block wie base.html, aber NACH dessen Regeln -
+  bei gleicher Spezifität gewinnt also immer das Kindtemplate, ganz ohne
+  Fehlermeldung. Betraf Wunsch #105: base.html definiert `.wunsch-card`/
+  `.wunsch-actions` fürs globale ✨-Formular, `werkstatt_app.html` definierte
+  dieselben Namen für seine Wunschlisten-Karten und überschrieb damit
+  unbeabsichtigt das Formular - sichtbar nur auf der Werkstatt-Seite selbst,
+  überall sonst sah das Formular normal aus. **Global/gemeinsam genutzte
+  Klassen aus base.html (Modals, Overlays u. ä.) brauchen deshalb eindeutige,
+  kollisionsresistente Namen** (hier: `.wunsch-modal-card`/
+  `.wunsch-modal-actions` statt der generischen `.wunsch-card`/
+  `.wunsch-actions`) - einzelne App-Templates dürfen dagegen frei generische
+  Namen für ihre eigenen, lokalen Elemente verwenden.
 
 - **Gunicorn 26 Control Socket**: `[Errno 13] Permission denied: '/.gunicorn'` beim Start.
   Nicht-fatal (1 Worker, App läuft stabil). Ursache: Gunicorn 26 hardcoded `os.sep + '.gunicorn'`

@@ -156,21 +156,25 @@
       z-index: 300;
     }
     #wunsch-overlay.open { display: flex; }
-    .wunsch-card {
+    /* Wunsch #105: eigene "-modal-"-Namen statt .wunsch-card/.wunsch-actions -
+       die generischen Namen kollidierten mit den gleichnamigen Klassen der
+       Wunsch-Listenkarten in werkstatt_app.html (deren extra_styles landen im
+       selben <style>-Block, NACH diesen Regeln, und ueberschrieben sie dort). */
+    .wunsch-modal-card {
       background: var(--surface); border-radius: 20px 20px 0 0;
       padding: 20px 20px calc(20px + var(--sb));
       width: 100%; max-width: 500px;
     }
-    .wunsch-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
-    .wunsch-card textarea {
+    .wunsch-modal-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+    .wunsch-modal-card textarea {
       width: 100%; border: 1.5px solid var(--border);
       border-radius: 10px; padding: 10px 12px;
       font-size: 16px; font-family: inherit;
       resize: none; outline: none;
       background: var(--surface); color: var(--text);
     }
-    .wunsch-card textarea:focus { border-color: var(--farbe); }
-    .wunsch-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+    .wunsch-modal-card textarea:focus { border-color: var(--farbe); }
+    .wunsch-modal-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
     .btn {
       padding: 10px 20px; border-radius: 10px;
       font-size: 15px; font-weight: 500; border: none; cursor: pointer;
@@ -300,10 +304,10 @@
 
 <!-- Wunsch-Overlay -->
 <div id="wunsch-overlay">
-  <div class="wunsch-card">
+  <div class="wunsch-modal-card">
     <h3>✨ Verbesserungswunsch</h3>
     <textarea id="wunsch-text" rows="4" placeholder="Was soll besser werden?"></textarea>
-    <div class="wunsch-actions">
+    <div class="wunsch-modal-actions">
       <button class="btn btn-secondary" id="wunsch-cancel">Abbrechen</button>
       <button class="btn btn-primary"   id="wunsch-send">Senden</button>
     </div>
