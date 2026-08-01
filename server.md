@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-01 (portal-v88: Wunsch #92 Aufgabenplan als rollierende 14-Tage-Liste + Zeitzonen-Fix für die 20-Uhr-Sperre)*
+*Letzte Aktualisierung: 2026-08-01 (portal-v90: Wunsch #93 Todo-Formular einklappbar, Wunsch #94 Todo-Filtern nach Benutzer/Status mit Persistenz)*
 
 ## Host
 
@@ -179,8 +179,18 @@ teile/
                        serien_pool_liste()/serie_einsortieren() sind fuer andere
                        Module gedacht (importiert von kinderplan ueber den Alias
                        teile.todo, siehe teile/__init__.py) - eine eingesetzte
-                       Instanz ist ein normales todos-Row mit serie_id+wochentag
-                       gesetzt, taucht mit 🔁-Chip in der normalen Todo-Liste auf
+                       Instanz ist ein normales todos-Row mit serie_id+plan_tag
+                       gesetzt (Wunsch #92, echtes Datum statt Wochentag-Zahl),
+                       taucht mit 🔁-Chip in der normalen Todo-Liste auf.
+                       Eingabeformular seit Wunsch #93 hinter "+ Neue Aufgabe"
+                       eingeklappt (gleiches Muster wie einkauf.html, Wunsch
+                       #85: sessionStorage `todo_formular_offen`). "🔍 Filtern"
+                       (Wunsch #94) nach Benutzer (erstellt_von ODER
+                       zugewiesen_an) und/oder Status, rein clientseitig ueber
+                       data-status/data-nutzer je Aufgabenkarte - bewusst ueber
+                       sessionStorage (`todo_filter`) persistent ueber Reloads
+                       hinweg, bis explizit zurueckgesetzt (anders als Einkaufs
+                       Filtern, Wunsch #87, das sich bei jedem Reload zuruecksetzt)
   05_werkstatt_app.py – /a/werkstatt/<token>/ Wunschliste; Admin: Priorität setzen
                        (niedrig/mittel/hoch/sehr_hoch/zurueckgestellt – Wunsch #61;
                        zurueckgestellt sortiert als letztes, siehe Docstring am

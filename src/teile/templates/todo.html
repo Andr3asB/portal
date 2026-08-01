@@ -5,10 +5,32 @@
 {% block extra_styles %}
 .header-title { font-size:22px; font-weight:700; }
 .header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.btn-neu-toggle, .btn-filter-toggle {
+  flex:1; display:block; background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  font-weight:600; cursor:pointer; white-space:nowrap;
+}
+.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
 .new-todo-card {
   background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
   box-shadow:0 1px 3px var(--shadow);
+  display:none;
 }
+.new-todo-card.open { display:block; }
+.filter-card {
+  background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow);
+  display:none;
+}
+.filter-card.open { display:block; }
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:8px 14px; font-size:13px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
 .new-todo-row { display:flex; gap:8px; margin-bottom:10px; }
 .new-todo-input {
   flex:1; border:1.5px solid var(--border); border-radius:10px;
@@ -137,7 +159,8 @@
 {% macro todo_item(t, token, user, darf_loeschen, historie, status_order, status_labels, rollen_labels, users, rollen) %}
 {% set rolle_passt = t.zugewiesen_rollen and (t.zugewiesen_rollen == 'alle' or user.rolle in t.zugewiesen_rollen.split(',')) %}
 {% set ich_darf_erledigen = darf_loeschen or t.erstellt_von == user.id or t.zugewiesen_an == user.id or (not t.zugewiesen_an and rolle_passt) %}
-<div class="todo-item{% if t.erledigt %} done{% endif %}" id="todo-{{ t.id }}">
+<div class="todo-item{% if t.erledigt %} done{% endif %}" id="todo-{{ t.id }}"
+     data-status="{{ t.status }}" data-nutzer="{{ t.erstellt_von }},{{ t.zugewiesen_an or '' }}">
   <div class="todo-body">
     <div class="todo-text">{{ t.inhalt }}</div>
     <div class="todo-meta">
@@ -201,8 +224,36 @@
 {% block body %}
 
 <main class="main">
+  <div class="top-aktionen">
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neue Aufgabe</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+  </div>
+
+  <div class="filter-card" id="filter-card">
+    <div class="section-label" style="margin:0 0 8px">Benutzer</div>
+    <div class="btn-row" id="filter-nutzer-row">
+      <button type="button" class="chip-btn" data-value="{{ user.id }}">{{ user.name }} (ich)</button>
+      {% for u in users %}
+      {% if u.id != user.id %}
+      <button type="button" class="chip-btn" data-value="{{ u.id }}">{{ u.name }}</button>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="section-label">Status</div>
+    <div class="btn-row" id="filter-status-row">
+      {% for s in status_order %}
+      <button type="button" class="chip-btn" data-value="{{ s }}">{{ status_labels[s] }}</button>
+      {% endfor %}
+    </div>
+
+    <button type="button" class="todo-verlauf-toggle" id="filter-zuruecksetzen-btn" style="display:none; margin-top:10px">Filter zurücksetzen</button>
+  </div>
+
+  <div id="todo-keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">Keine Aufgabe passt zum Filter 🔍</div>
+
   <!-- Neue Aufgabe -->
-  <div class="new-todo-card">
+  <div class="new-todo-card" id="new-todo-card">
     <form method="post" action="/a/todo/{{ token }}/neu">
       <div class="new-todo-row">
         <input class="new-todo-input" type="text" name="inhalt"
@@ -233,6 +284,119 @@
 
 {% block extra_scripts %}
 <script>
+// Wunsch #93: Standardmäßig ist nur der "+ Neue Aufgabe"-Knopf sichtbar,
+// gleiches Muster wie in der Einkaufsliste (Wunsch #85) - Formular bleibt
+// nach dem Öffnen über mehrere Einträge/Reloads offen (sessionStorage),
+// wird aber beim echten Schließen des Tabs/Browsers verworfen.
+const TODO_OFFEN_KEY = 'todo_formular_offen';
+
+function setFormularOffen(offen) {
+  const card = document.getElementById('new-todo-card');
+  if (!card) return;
+  card.classList.toggle('open', offen);
+  try { sessionStorage.setItem(TODO_OFFEN_KEY, offen ? '1' : '0'); } catch (e) {}
+}
+
+document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
+  const card = document.getElementById('new-todo-card');
+  const nowOpen = !card.classList.contains('open');
+  setFormularOffen(nowOpen);
+  if (nowOpen) document.querySelector('#new-todo-card .new-todo-input')?.focus();
+});
+
+if (sessionStorage.getItem(TODO_OFFEN_KEY) === '1') {
+  setFormularOffen(true);
+}
+
+// Wunsch #94: Filtern nach Benutzer UND Status, bleibt aktiv (auch über
+// Reloads hinweg via sessionStorage), bis er manuell zurückgesetzt wird -
+// anders als die rein sitzungsflüchtigen Filter in Einkauf (Wunsch #87),
+// hier ausdrücklich als dauerhaft gewünscht.
+const TODO_FILTER_KEY = 'todo_filter';
+
+function holeTodoFilter() {
+  try { return JSON.parse(sessionStorage.getItem(TODO_FILTER_KEY) || 'null') || { nutzer: [], status: [] }; }
+  catch (e) { return { nutzer: [], status: [] }; }
+}
+
+function speichereTodoFilter(filter) {
+  try { sessionStorage.setItem(TODO_FILTER_KEY, JSON.stringify(filter)); } catch (e) {}
+}
+
+function aktuelleTodoFilterAuswahl() {
+  return {
+    nutzer: [...document.querySelectorAll('#filter-nutzer-row .chip-btn.active')].map(b => b.dataset.value),
+    status: [...document.querySelectorAll('#filter-status-row .chip-btn.active')].map(b => b.dataset.value),
+  };
+}
+
+function wendeTodoFilterAn() {
+  const { nutzer, status } = aktuelleTodoFilterAuswahl();
+  let sichtbareGesamt = 0;
+
+  document.querySelectorAll('.todo-item').forEach(item => {
+    let sichtbar = true;
+    if (nutzer.length) {
+      const beteiligt = (item.dataset.nutzer || '').split(',').filter(Boolean);
+      sichtbar = nutzer.some(id => beteiligt.includes(id));
+    }
+    if (sichtbar && status.length) {
+      sichtbar = status.includes(item.dataset.status);
+    }
+    item.style.display = sichtbar ? '' : 'none';
+    if (sichtbar) sichtbareGesamt++;
+  });
+
+  // Status-Überschrift ausblenden, wenn darunter (bis zur nächsten
+  // Überschrift) kein sichtbares Item mehr übrig ist.
+  document.querySelectorAll('.section-label').forEach(label => {
+    let el = label.nextElementSibling;
+    let hatSichtbare = false;
+    while (el && !el.classList.contains('section-label')) {
+      if (el.classList.contains('todo-item') && el.style.display !== 'none') { hatSichtbare = true; break; }
+      el = el.nextElementSibling;
+    }
+    label.style.display = hatSichtbare ? '' : 'none';
+  });
+
+  const filterAktiv = nutzer.length > 0 || status.length > 0;
+  document.getElementById('filter-toggle-btn')?.classList.toggle('aktiv', filterAktiv);
+  document.getElementById('filter-zuruecksetzen-btn').style.display = filterAktiv ? 'inline-block' : 'none';
+  document.getElementById('todo-keine-treffer').style.display = (filterAktiv && sichtbareGesamt === 0) ? 'block' : 'none';
+
+  speichereTodoFilter({ nutzer, status });
+}
+
+document.getElementById('filter-toggle-btn')?.addEventListener('click', function() {
+  const card = document.getElementById('filter-card');
+  card.classList.toggle('open');
+});
+
+document.querySelectorAll('#filter-nutzer-row .chip-btn, #filter-status-row .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('active');
+    wendeTodoFilterAn();
+  });
+});
+
+document.getElementById('filter-zuruecksetzen-btn')?.addEventListener('click', () => {
+  document.querySelectorAll('#filter-nutzer-row .chip-btn, #filter-status-row .chip-btn').forEach(b => b.classList.remove('active'));
+  wendeTodoFilterAn();
+});
+
+// Beim Laden gespeicherten Filter wiederherstellen (Wunsch #94: bleibt
+// aktiv, bis er deaktiviert wird - übersteht deshalb auch Reloads).
+(function() {
+  const gespeichert = holeTodoFilter();
+  gespeichert.nutzer.forEach(id => {
+    document.querySelector(`#filter-nutzer-row .chip-btn[data-value="${CSS.escape(id)}"]`)?.classList.add('active');
+  });
+  gespeichert.status.forEach(s => {
+    document.querySelector(`#filter-status-row .chip-btn[data-value="${CSS.escape(s)}"]`)?.classList.add('active');
+  });
+  wendeTodoFilterAn();
+})();
+
 function toggleTodoEdit(id) {
   const p = document.getElementById('todo-edit-' + id);
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';

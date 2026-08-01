@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-08-01 – portal-v90: Wünsche #93 + #94 – Todo-App: Formular einklappbar, Filtern
+
+### Wunsch #93 – "+ Neue Aufgabe" als Knopf statt offenem Formular
+
+Gleiches Muster wie Einkauf (Wunsch #85): Eingabeformular ist jetzt hinter
+einem "+ Neue Aufgabe"-Knopf eingeklappt, bleibt nach dem Öffnen über
+mehrere Einträge/Reloads offen (sessionStorage `todo_formular_offen`,
+1:1 aus `einkauf.html` übernommen).
+
+### Wunsch #94 – Filtern nach Benutzer und Status
+
+Wunsch-Text sagte ursprünglich "nach Benutzer und ohne Status" - auf
+Rückfrage bestätigt: Tippfehler, gemeint war "und Status" (zwei
+unabhängige Filter-Dimensionen, keine Status-Ausschluss-Logik).
+
+„🔍 Filtern" öffnet ein Panel mit Chip-Auswahl für Benutzer (erstellt_von
+ODER zugewiesen_an passt) und Status (Backlog/Offen/In Arbeit/Erledigt),
+beide gleichzeitig nutzbar. Rein clientseitig über `data-status`/
+`data-nutzer`-Attribute an jeder Aufgabenkarte. **Anders als bei Einkaufs
+Filtern (Wunsch #87, das sich bei jedem Reload zurücksetzt)**: hier
+ausdrücklich `sessionStorage` (`todo_filter`) genutzt, damit der Filter
+über Reloads hinweg bestehen bleibt, bis er per "Filter zurücksetzen"
+explizit aufgehoben wird - exakt wie im Wunsch beschrieben. Status-
+Überschriften (Backlog/Offen/...) blenden sich mit aus, wenn darunter
+kein sichtbares Element mehr steht (gleiches "durch Geschwister-Elemente
+laufen, bis zur nächsten Überschrift"-Muster wie beim Kategorie-Ausblenden
+in `einkauf.html`).
+
+### Verifiziert
+
+Per `javascript_tool` gegen die echte Seite: Formular startet eingeklappt,
+bleibt nach Öffnen über einen Reload offen. Status-Filter "Offen" zeigt
+korrekt nur passende Karten, mit zusätzlichem Benutzer-Filter kombiniert
+korrekt beide Kriterien gleichzeitig erfüllt. Filter übersteht einen
+Reload unverändert (Chip-Auswahl, aktiv-Markierung am Filter-Knopf,
+sichtbarer "Filter zurücksetzen"-Knopf). "Filter zurücksetzen" stellt
+alle 6 Aufgaben wieder her, leert den gespeicherten Filter. Status-
+Überschriften blenden sich korrekt aus, wenn nur noch eine Gruppe (hier:
+Backlog) sichtbare Einträge hat. Leere Kombination (Status+Benutzer ohne
+Treffer) zeigt korrekt "Keine Aufgabe passt zum Filter".
+
+### Auslieferungspaket
+
+`deploy/portal-v90.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v87/v88: Wunsch #92 – Aufgabenplan als rollierende 14-Tage-Liste
 
 Direkter Folgewunsch zu #89-#91, kam waehrend deren Umsetzung rein: "Der
