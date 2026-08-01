@@ -10,6 +10,12 @@ Anweisung lautet "implementiere alle Wünsche" oder ähnlich pauschal
 formuliert ist. Diese Regel gilt uneingeschränkt für jede KI, die an
 diesem Projekt arbeitet. Ein Admin muss die Priorität eines
 zurückgestellten Wunsches erst ändern, bevor er umgesetzt werden darf.
+
+Wunsch #101: `wuensche.umsetzung` dokumentiert, was bei der Implementierung
+genau gemacht wurde - wird über `manage.py wunsch_erledigt <id> "Text"`
+gesetzt (siehe manage.py), nicht über die Web-UI. Klickt man in der
+Werkstatt-App auf einen Wunsch, klappt eine Detailansicht mit Wunsch,
+Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import get_db, grant as check_grant
@@ -32,11 +38,20 @@ _PRIO_ORDER = """
 
 _SELECT = """
     SELECT w.id, w.text, w.titel, w.prioritaet, w.app_slug, w.ansicht,
-           w.erstellt, w.erledigt, w.erledigt_am,
+           w.erstellt, w.erledigt, w.erledigt_am, w.umsetzung,
            u.name AS urheber_name, u.farbe AS urheber_farbe
     FROM   wuensche w
     LEFT JOIN users u ON u.id = w.user_id
 """
+
+
+def _de_datum(ts):
+    """Wunsch #101: 'YYYY-MM-DD HH:MM:SS' -> 'DD.MM.YYYY, HH:MM Uhr' fuer die
+    gut lesbare Detailansicht - die Rohwerte aus SQLite sind sonst nur als
+    ISO-Zeichenkette abgelegt, kein echtes datetime-Objekt."""
+    if not ts or len(ts) < 16:
+        return ts or ""
+    return f"{ts[8:10]}.{ts[5:7]}.{ts[0:4]}, {ts[11:16]} Uhr"
 
 
 @bp.route("/a/werkstatt/<token>/")
@@ -123,3 +138,4 @@ def titel_setzen(token, wid):
 
 def init_app(app):
     app.register_blueprint(bp)
+    app.jinja_env.filters["de_datum"] = _de_datum

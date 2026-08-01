@@ -707,6 +707,7 @@ def _init_db(app):
             ("prioritaet",  "TEXT"),
             ("erledigt_am", "DATETIME"),
             ("ansicht",     "TEXT"),
+            ("umsetzung",   "TEXT"),  # Wunsch #101: was genau umgesetzt wurde
         ]:
             try:
                 db.execute(f"ALTER TABLE wuensche ADD COLUMN {col} {definition}")

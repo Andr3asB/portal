@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-08-01 – portal-v98: Wunsch #101 – Werkstatt: Umsetzung dokumentieren
+
+"Zu jedem Wunsch soll am Ende der Implementierung auch dokumentiert
+werden, was genau umgesetzt wurde. Klickt man auf einen Wunsch, dann
+wird Wunsch, Benutzer, Wunschdatum und Implementierungsdatum sowie die
+Umsetzung gut lesbar angezeigt."
+
+Neue Spalte `wuensche.umsetzung` (TEXT, nullable). Gesetzt wird sie NICHT
+über die Web-UI, sondern über ein neues optionales zweites Argument von
+`manage.py wunsch_erledigt <id> ["Beschreibung"]` - passt zum bisherigen
+Arbeitsablauf (dieser Befehl markiert ohnehin jeden fertigen Wunsch als
+erledigt) und macht die Dokumentation zu einem festen Teil davon, statt
+einem zusätzlichen manuellen Schritt. Ab sofort bekommt jeder künftige
+`wunsch_erledigt`-Aufruf eine kurze Beschreibung der Umsetzung mit.
+
+In der Werkstatt-App klappt ein Antippen der Wunsch-Karte (offen wie
+erledigt) eine Detailansicht auf: voller Wunschtext, Benutzer,
+Wunschdatum, bei erledigten zusätzlich Implementierungsdatum und die
+Umsetzung ("Noch nicht dokumentiert." als Platzhalter, wo sie fehlt -
+z. B. bei alten, vor Wunsch #101 abgeschlossenen Wünschen). Neuer
+`de_datum`-Jinja-Filter formatiert die rohen SQLite-Zeitstempel
+("YYYY-MM-DD HH:MM:SS") lesbar als "DD.MM.YYYY, HH:MM Uhr". Die Aktions-
+Buttons (Prio, Erledigt, Löschen) liegen bewusst als Geschwister
+außerhalb des antippbaren Bereichs, damit ihre Klicks den Detail-Toggle
+nicht versehentlich mit auslösen.
+
+### Verifiziert
+
+Migration auf der bestehenden DB geprüft: `umsetzung`-Spalte angelegt,
+bestehende Wünsche zeigen korrekt "Noch nicht dokumentiert." in der
+Detailansicht. `manage.py wunsch_erledigt 101 "..."` gesetzt und per
+`javascript_tool` in der Werkstatt-App geprüft: Karte antippen öffnet
+die Detailansicht mit allen fünf Feldern korrekt befüllt und lesbar
+formatiertem Datum; erneutes Antippen klappt sie wieder zu; Klick auf
+die Prio-/Erledigt-/Löschen-Buttons löst den Toggle nicht mit aus.
+
+### Auslieferungspaket
+
+`deploy/portal-v98.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v97: Wunsch #100 – Einkauf: automatische Synchronisierung
 
 "Die Einträge sollten regelmäßig und bei jedem Öffnen synchronisiert

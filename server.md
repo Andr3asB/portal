@@ -196,7 +196,15 @@ teile/
                        zurueckgestellt sortiert als letztes, siehe Docstring am
                        Dateianfang: solche Wünsche NIE automatisiert umsetzen, auch
                        nicht bei "implementiere alle Wünsche"), erledigen, löschen;
-                       POST /titel/<id> (JSON) für Claude-Titel
+                       POST /titel/<id> (JSON) für Claude-Titel. Wunsch #101: Karte
+                       antippen klappt eine Detailansicht auf (Wunsch, Benutzer,
+                       Wunsch-/Implementierungsdatum, `umsetzung` - was genau
+                       implementiert wurde). `umsetzung` wird NICHT über die Web-UI
+                       gesetzt, sondern über `manage.py wunsch_erledigt <id>
+                       "Beschreibung"` (zweites CLI-Argument optional, siehe
+                       manage.py) - ab jetzt bei jedem Wunsch-Abschluss mitgeben.
+                       `_de_datum()`-Jinja-Filter formatiert die SQLite-Zeitstempel
+                       ("YYYY-MM-DD HH:MM:SS") lesbar als "DD.MM.YYYY, HH:MM Uhr".
   06_geholfen.py     – /a/geholfen/<token>/ Tipp-Grid + 10-Tage-Heatmap (erst
                        Eltern, dann Kinder, je alphabetisch – Wunsch #44);
                        /verlauf (letzte 50 Einträge, eigene Seite, Eltern/Admin
@@ -462,7 +470,9 @@ teile/
     todo.html               – Aufgabenliste (neu, zuweisen an Person/Rolle(n)/Alle,
                               erledigen; ✏️-Panel bearbeitet dieselben Felder wie das
                               Neu-Formular, gemeinsames Macro ziel_auswahl())
-    werkstatt_app.html      – Wunschliste mit Admin-Aktionen
+    werkstatt_app.html      – Wunschliste mit Admin-Aktionen; Karte antippen
+                              klappt Detailansicht auf (Wunsch #101: Wunsch,
+                              Benutzer, Wunsch-/Implementierungsdatum, Umsetzung)
     geholfen.html           – Tipp-Grid (Fetch-AJAX, kompakte Kacheln), 10-Tage-Heatmap
                               je Nutzer (eltern/kind), "Als wer?"-Pill (eltern/admin)
     geholfen_verlauf.html   – Letzte 50 Einträge, eigene Seite (Menü: "Zuletzt geholfen")
@@ -640,7 +650,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `grants` | id, user_id, app_id, token (UNIQUE), position (sort), gruppe_id (FK home_gruppen) |
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
-| `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am |
+| `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am, umsetzung (Wunsch #101: was genau implementiert wurde, gesetzt über `manage.py wunsch_erledigt <id> "Text"`) |
 | `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92) |
 | `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (0=Mo..6=So), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
 | `todo_historie` | id, todo_id (FK todos, cascade), alter_inhalt, geaendert_von, geaendert_am |
@@ -988,6 +998,6 @@ docker exec portal python manage.py grant      <user_id> <app_slug>
 docker exec portal python manage.py listusers
 docker exec portal python manage.py listwuensche
 docker exec portal python manage.py listtodos
-docker exec portal python manage.py wunsch_erledigt <id>
+docker exec portal python manage.py wunsch_erledigt <id> ["Beschreibung der Umsetzung"]
 docker exec portal python manage.py backlog
 ```

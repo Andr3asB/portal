@@ -66,12 +66,52 @@
   margin:16px 0 8px;
 }
 .empty { text-align:center; padding:48px 16px; color:var(--text-2); font-size:16px; }
+/* Wunsch #101: Detailansicht klappt beim Antippen des Wunsches auf */
+.wunsch-body { cursor:pointer; }
+.wunsch-detail {
+  display:none; flex:1 0 100%; flex-direction:column; gap:10px;
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+}
+.wunsch-detail.open { display:flex; }
+.detail-label {
+  font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px;
+}
+.detail-value { font-size:14px; color:var(--text); white-space:pre-wrap; line-height:1.5; }
+.detail-value.muted { color:var(--text-2); font-style:italic; }
 {% endblock %}
 
 {% block nav_title %}
 <div class="nav-title">💡 Werkstatt</div>
 <div class="nav-sub">{{ offen|length }} offen{% if erledigt %}, {{ erledigt|length }} erledigt{% endif %}</div>
 {% endblock %}
+
+{% macro wunsch_detail(w) %}
+<div class="wunsch-detail" id="wunsch-detail-{{ w.id }}">
+  <div>
+    <div class="detail-label">Wunsch</div>
+    <div class="detail-value">{{ w.text }}</div>
+  </div>
+  <div>
+    <div class="detail-label">Benutzer</div>
+    <div class="detail-value{% if not w.urheber_name %} muted{% endif %}">{{ w.urheber_name or "Unbekannt" }}</div>
+  </div>
+  <div>
+    <div class="detail-label">Wunschdatum</div>
+    <div class="detail-value">{{ w.erstellt|de_datum }}</div>
+  </div>
+  {% if w.erledigt_am %}
+  <div>
+    <div class="detail-label">Implementierungsdatum</div>
+    <div class="detail-value">{{ w.erledigt_am|de_datum }}</div>
+  </div>
+  {% endif %}
+  <div>
+    <div class="detail-label">Umsetzung</div>
+    <div class="detail-value{% if not w.umsetzung %} muted{% endif %}">{{ w.umsetzung or "Noch nicht dokumentiert." }}</div>
+  </div>
+</div>
+{% endmacro %}
 
 {% block body %}
 
@@ -88,7 +128,7 @@
 <div class="section-label">Offen</div>
 {% for w in offen %}
 <div class="wunsch-card">
-  <div class="wunsch-body">
+  <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
       {% if w.prioritaet %}
@@ -132,6 +172,7 @@
     </form>
   </div>
   {% endif %}
+  {{ wunsch_detail(w) }}
 </div>
 {% endfor %}
 {% endif %}
@@ -140,7 +181,7 @@
 <div class="section-label">Erledigt</div>
 {% for w in erledigt %}
 <div class="wunsch-card done">
-  <div class="wunsch-body">
+  <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
     </div>
@@ -169,9 +210,22 @@
     </form>
   </div>
   {% endif %}
+  {{ wunsch_detail(w) }}
 </div>
 {% endfor %}
 {% endif %}
 
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Wunsch #101: Detailansicht (Wunsch, Benutzer, Wunsch-/Implementierungs-
+// datum, Umsetzung) klappt beim Antippen der Karte auf/zu. Die Aktions-
+// Buttons (Prio, Erledigt, Löschen) liegen als Geschwister außerhalb von
+// .wunsch-body, ihre Klicks lösen den Toggle deshalb nie versehentlich mit aus.
+function toggleWunschDetail(id) {
+  document.getElementById('wunsch-detail-' + id)?.classList.toggle('open');
+}
+</script>
 {% endblock %}

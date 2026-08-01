@@ -8,6 +8,7 @@ Aufruf im Container:
   docker exec portal python manage.py grant 1 todo
   docker exec portal python manage.py listusers
   docker exec portal python manage.py listwuensche
+  docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung"
   docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
@@ -203,11 +204,17 @@ def cmd_listtodos(_):
 
 
 def cmd_wunsch_erledigt(args):
+    """Wunsch #101: die Umsetzung (was genau implementiert wurde) wird als
+    zweites Argument mitgegeben und in der Werkstatt-App beim Anklicken des
+    Wunsches angezeigt - deshalb ab jetzt bei jedem Abschluss mitgeben."""
     if not args:
-        sys.exit("Verwendung: wunsch_erledigt <id>")
+        sys.exit('Verwendung: wunsch_erledigt <id> ["Beschreibung der Umsetzung"]')
     db = connect()
+    umsetzung = args[1] if len(args) > 1 else None
     db.execute(
-        "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP WHERE id=?", (int(args[0]),)
+        "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP, "
+        "umsetzung=COALESCE(?, umsetzung) WHERE id=?",
+        (umsetzung, int(args[0])),
     )
     db.commit()
     db.close()
