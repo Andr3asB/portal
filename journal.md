@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-08-01 – portal-v99: Wunsch #102 – Sportschau: Trainingsdaten grün statt blau
+
+"Ich will die Trainingsdaten jetzt in grün anzeigen statt in blau."
+
+Der Trainingsanteil im Schritte-Balkendiagramm (`.steps-bar-training`) und
+sein Legenden-Punkt färbten sich bisher über `var(--farbe)` - Andis
+persönliche Nutzerfarbe, zufällig Blau (#3498db). Auf ein festes Grün
+(`#34c759`, derselbe Wert wie die bereits grüne Trainings-Heatmap oben)
+umgestellt, damit "Training" unabhängig von der persönlichen Farbwahl
+immer als Grün erkennbar ist und zur Heatmap passt. Reine CSS-Änderung
+in `sportschau.html`, keine Python-Logik betroffen.
+
+### Verifiziert
+
+Per `javascript_tool`: `getComputedStyle()` auf `.steps-bar-training`
+und dem Legenden-Punkt liefert `rgb(52, 199, 89)` (= #34c759), nicht mehr
+Andis blaue Nutzerfarbe. Heatmap-Zellen unverändert grün, Zeitraum-Buttons
+(die weiterhin `var(--farbe)` nutzen, sind kein "Trainingsdaten"-Element)
+unverändert blau.
+
+### Auslieferungspaket
+
+`deploy/portal-v99.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v98: Wunsch #101 – Werkstatt: Umsetzung dokumentieren
 
 "Zu jedem Wunsch soll am Ende der Implementierung auch dokumentiert

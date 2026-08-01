@@ -386,7 +386,12 @@ teile/
                        da `tage` älteste zuerst sortiert) - überlagert jetzt
                        nur noch die ältesten, uninteressanteren Tage links,
                        Balkenausrichtung zum Trainings-Chart bleibt gleich.
-                       Nur Andi granted (persönliche Fitnessdaten)
+                       Trainingsanteil im Schritte-Balken + Legenden-Punkt
+                       fest gruen (`#34c759`, Wunsch #102) statt `var(--farbe)`
+                       - vorher zufaellig blau, weil das Andis persoenliche
+                       Nutzerfarbe ist, jetzt konsistent mit der bereits
+                       gruenen Heatmap oben. Nur Andi granted (persönliche
+                       Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
                        Wunsch #66): Kategorie Mensch/Tier (tier_typ='mensch'

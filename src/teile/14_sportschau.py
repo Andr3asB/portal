@@ -35,6 +35,12 @@ Balken (vorgestern/gestern/heute, da `tage` aeltesten zuerst sortiert und
 der heutige Tag rechts steht). Auf `left:0` umgestellt - ueberlagert jetzt
 die aeltesten (uninteressanteren) Tage links, Balkenreihenfolge/-ausrichtung
 zum Trainings-Chart darueber bleibt unveraendert.
+
+Wunsch #102: Der Trainingsanteil im Schritte-Balken (`.steps-bar-training`
+in sportschau.html) faerbt sich jetzt fest gruen (#34c759, derselbe Wert
+wie `.heatmap-cell.gruen`) statt `var(--farbe)` - vorher zufaellig blau,
+weil das Andis persoenliche Nutzerfarbe ist. Reine CSS-Aenderung, keine
+Python-Logik betroffen.
 """
 import json
 import urllib.error
