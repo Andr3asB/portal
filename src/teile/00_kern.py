@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS einkauf_eintraege (
   erledigt     INTEGER NOT NULL DEFAULT 0,
   erledigt_am  TEXT,
   erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
-  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL
+  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  geaendert    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS einkauf_eintrag_laeden (
   eintrag_id INTEGER NOT NULL REFERENCES einkauf_eintraege(id) ON DELETE CASCADE,
@@ -840,6 +841,19 @@ def _init_db(app):
             db.execute(
                 "UPDATE einkauf_eintraege SET kategorie_id=? WHERE kategorie_id IS NULL", (sonstiges[0],)
             )
+        db.commit()
+
+        # Einkauf: geaendert-Zeitstempel fuer den Sync-Abgleich (Wunsch #100).
+        # SQLite erlaubt bei ALTER TABLE ADD COLUMN keinen nicht-konstanten
+        # Default (datetime('now')/CURRENT_TIMESTAMP schlagen fehl - live
+        # geprueft) - deshalb hier nullable anlegen und per UPDATE backfuellen;
+        # neue Installationen bekommen den NOT NULL DEFAULT direkt aus SCHEMA.
+        try:
+            db.execute("ALTER TABLE einkauf_eintraege ADD COLUMN geaendert TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        db.execute("UPDATE einkauf_eintraege SET geaendert = erstellt WHERE geaendert IS NULL")
         db.commit()
 
         # Einkauf: Angebot in mehreren Märkten gleichzeitig möglich (Wunsch #86)

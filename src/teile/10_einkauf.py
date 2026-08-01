@@ -1,6 +1,14 @@
 """
 Einkaufsliste – gemeinsam von allen Nutzern befüllt.
 URL-Präfix: /a/einkauf/<token>/
+
+Wunsch #100: Damit parallele Einträge/Änderungen anderer Nutzer sichtbar
+werden, ohne dass man manuell neu lädt, pollt das Frontend regelmäßig und
+bei jedem Wiederöffnen der App /stand - ein kompakter Fingerabdruck der
+Liste (siehe _stand()). Ändert er sich, lädt die Seite neu (wie schon beim
+erfolgreichen Abarbeiten der Offline-Warteschlange), aber nur wenn gerade
+nichts Ungespeichertes im Weg steht (Name-Feld leer, kein offenes
+Bearbeiten-Panel) - sonst wird der nächste Sync-Versuch abgewartet.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant, to_int
@@ -44,6 +52,18 @@ def _clean_angebot_laeden(db, angebot, laden_ids):
     if not gueltige:
         return 0, []
     return 1, gueltige
+
+
+def _stand(db):
+    """Wunsch #100: Kompakter Sync-Fingerabdruck der Liste - Anzahl + jüngster
+    geaendert-Zeitstempel deckt Einfügen (Anzahl steigt), Löschen (Anzahl
+    sinkt) und Ändern/Abhaken (Zeitstempel steigt) ab, ohne die komplette
+    Liste zu übertragen. Frontend vergleicht das regelmäßig gegen den beim
+    Laden eingebetteten Wert (siehe /stand-Route unten)."""
+    row = db.execute(
+        "SELECT COUNT(*) AS n, COALESCE(MAX(geaendert), '') AS g FROM einkauf_eintraege"
+    ).fetchone()
+    return f"{row['n']}:{row['g']}"
 
 
 def _laden_ids_aus_form(form):
@@ -104,8 +124,17 @@ def index(token):
     return render_template("einkauf.html",
         user=user, token=token, farbe=user["farbe"],
         kategorien=kategorien, gruppen=gruppen, unsortiert=unsortiert, erledigt=erledigt,
-        laeden=laeden, vorschlaege=vorschlaege,
+        laeden=laeden, vorschlaege=vorschlaege, stand=_stand(db),
     )
+
+
+@bp.route("/a/einkauf/<token>/stand")
+def stand(token):
+    """Wunsch #100: leichtgewichtiger Sync-Check, den das Frontend regelmäßig
+    und bei jedem Wiederöffnen der App abfragt, um Änderungen anderer
+    Nutzer zu erkennen (siehe _stand())."""
+    _user(token)
+    return jsonify(stand=_stand(get_db()))
 
 
 @bp.route("/a/einkauf/<token>/add", methods=["POST"])
@@ -122,7 +151,8 @@ def add(token):
         _laden_ids_aus_form(request.form),
     )
     cur = db.execute(
-        "INSERT INTO einkauf_eintraege(name,kategorie_id,angebot,erstellt_von) VALUES(?,?,?,?)",
+        "INSERT INTO einkauf_eintraege(name,kategorie_id,angebot,erstellt_von,geaendert) "
+        "VALUES(?,?,?,?,datetime('now'))",
         (name, kategorie_id, angebot, user["id"]),
     )
     eid = cur.lastrowid
@@ -148,7 +178,9 @@ def toggle_erledigt(token, eid):
     ziel_roh = request.form.get("ziel")
     neu = (1 if ziel_roh == "1" else 0) if ziel_roh is not None else (0 if row["erledigt"] else 1)
     db.execute(
-        "UPDATE einkauf_eintraege SET erledigt=?, erledigt_am=CASE WHEN ?=1 THEN datetime('now') ELSE NULL END WHERE id=?",
+        "UPDATE einkauf_eintraege SET erledigt=?, "
+        "erledigt_am=CASE WHEN ?=1 THEN datetime('now') ELSE NULL END, "
+        "geaendert=datetime('now') WHERE id=?",
         (neu, neu, eid),
     )
     db.commit()
@@ -180,7 +212,7 @@ def bearbeiten(token, eid):
         _laden_ids_aus_form(request.form),
     )
     db.execute(
-        "UPDATE einkauf_eintraege SET name=?, kategorie_id=?, angebot=? WHERE id=?",
+        "UPDATE einkauf_eintraege SET name=?, kategorie_id=?, angebot=?, geaendert=datetime('now') WHERE id=?",
         (name, kategorie_id, angebot, eid),
     )
     db.execute("DELETE FROM einkauf_eintrag_laeden WHERE eintrag_id=?", (eid,))

@@ -539,6 +539,44 @@ wendeWarteschlangeAufUiAn();
 synchronisiereWarteschlange();
 window.addEventListener('online', synchronisiereWarteschlange);
 
+// Wunsch #100: Parallele Einträge/Änderungen anderer Nutzer sollen
+// sichtbar werden, ohne dass man selbst manuell neu lädt - regelmäßig
+// (alle 30s) UND sofort beim Wiederöffnen der App (visibilitychange/
+// pageshow decken den Fall ab, dass die Seite aus dem Hintergrund/
+// App-Switcher zurückkommt, ohne dass eine echte Navigation stattfindet -
+// die würde ja ohnehin schon frische Serverdaten liefern). Ein simpler
+// "Anzahl:jüngster-Zeitstempel"-Fingerabdruck (siehe _stand() in
+// 10_einkauf.py) statt einer echten Datenübertragung/eines DOM-Diffs -
+// bei einer Änderung einfach location.reload(), genau wie beim
+// erfolgreichen Abarbeiten der Offline-Warteschlange oben.
+let einkaufStandBekannt = '{{ stand }}';
+
+function hatUngespeicherteEingabe() {
+  const name = document.getElementById('add-name');
+  if (name && name.value.trim()) return true;
+  return [...document.querySelectorAll('.edit-panel')].some(p => p.style.display === 'flex');
+}
+
+async function pruefeStandUndSynchronisiere() {
+  // Waehrend des Einkaufsmodus im Laden nicht durch einen Reload stoeren.
+  if (document.body.classList.contains('einkaufsmodus')) return;
+  try {
+    const resp = await fetch(`/a/einkauf/${TOKEN}/stand`);
+    const d = await resp.json();
+    if (d.stand && d.stand !== einkaufStandBekannt && !hatUngespeicherteEingabe()) {
+      location.reload();
+    }
+  } catch (e) {
+    // Offline oder Fehler - beim naechsten Versuch klappt es wieder.
+  }
+}
+
+setInterval(pruefeStandUndSynchronisiere, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') pruefeStandUndSynchronisiere();
+});
+window.addEventListener('pageshow', pruefeStandUndSynchronisiere);
+
 // Wunsch #85: Standardmäßig ist nur der "+ Neu"-Knopf sichtbar, das
 // Eintragen-Formular bleibt nach dem Öffnen über mehrere Einträge hinweg
 // offen (jedes Absenden lädt die Seite neu - der Offen-Zustand übersteht

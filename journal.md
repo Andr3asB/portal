@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-08-01 – portal-v97: Wunsch #100 – Einkauf: automatische Synchronisierung
+
+"Die Einträge sollten regelmäßig und bei jedem Öffnen synchronisiert
+werden, damit parallele Einträge von anderen Benutzern angezeigt werden."
+Bisher lud die Einkaufsliste die Daten nur beim ersten Aufruf/Reload -
+blieb die Seite (PWA) länger offen, während jemand anders etwas einträgt
+oder abhakt, sah man das nicht von selbst.
+
+Neuer Sync-Fingerabdruck statt einer vollen Datenübertragung: Spalte
+`einkauf_eintraege.geaendert` (bei jedem INSERT/UPDATE explizit gesetzt -
+SQLite erlaubt keinen nicht-konstanten `ALTER TABLE ADD COLUMN`-Default,
+siehe Bekannte Issues in server.md), `_stand(db)` in `10_einkauf.py`
+kombiniert `COUNT(*)` + `MAX(geaendert)` zu einem kompakten String, der
+Einfügen/Löschen/Ändern/Abhaken gleichermaßen abdeckt. Neue Route
+`/a/einkauf/<token>/stand` (JSON) liefert diesen Fingerabdruck.
+
+Frontend (`einkauf.html`) pollt `/stand` alle 30 Sekunden UND sofort bei
+`visibilitychange`/`pageshow` (App kommt aus dem Hintergrund zurück - die
+tatsächliche "bei jedem Öffnen"-Anforderung, ein normaler Seitenaufruf
+liefert ja ohnehin schon frische Daten). Weicht der Fingerabdruck vom
+beim Laden eingebetteten Wert ab, lädt die Seite neu - außer gerade ist
+etwas Ungespeichertes im Weg (Name-Feld im "+ Neu"-Formular hat Text,
+oder ein Bearbeiten-Panel ist offen) oder der Einkaufsmodus läuft gerade
+(bewusst nicht mitten im Laden-Trip stören) - dann greift der nächste
+Sync-Versuch.
+
+### Verifiziert
+
+`curl` gegen `/stand`: Fingerabdruck ändert sich korrekt bei Hinzufügen,
+Abhaken und Bearbeiten, bleibt gleich bei reinem erneuten Abruf ohne
+Änderung. Migration auf einer bestehenden DB mit vorhandenen Einträgen
+geprüft: `geaendert` wird per Backfill auf `erstellt` gesetzt, keine
+NULL-Werte übrig. Zwei-Browser-Test: Artikel in Tab A hinzugefügt,
+Tab B zeigt ihn nach spätestens 30s automatisch, ohne dass dort manuell
+neu geladen wurde; Tab B mit offenem "+ Neu"-Formular und eingetipptem
+Text lädt währenddessen NICHT automatisch neu (Eingabe bleibt erhalten).
+
+### Auslieferungspaket
+
+`deploy/portal-v97.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v96: Wünsche #98 + #99 – Sportschau: Schritte-Durchschnitt, Y-Achsen-Beschriftung
 
 ### Wunsch #98 – Durchschnittswert bei den Schritten

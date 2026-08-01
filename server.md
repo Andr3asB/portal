@@ -241,6 +241,16 @@ teile/
                        ohne Marktbindung; Angebote bei ANDEREM Markt bleiben bewusst
                        ausgeblendet - fuer einen anderen Einkaufstrip vorgemerkt),
                        groessere Tap-Flaechen fuer die Bedienung im Laden.
+                       /stand (Wunsch #100, JSON): kompakter Sync-Fingerabdruck
+                       "Anzahl:juengster-geaendert-Zeitstempel" (_stand()) - das
+                       Frontend pollt das alle 30s sowie sofort bei visibilitychange/
+                       pageshow (App aus dem Hintergrund zurueck) und laedt bei
+                       Aenderung neu, ausser das Namensfeld hat Text oder ein
+                       Bearbeiten-Panel ist offen (dann naechster Versuch) oder der
+                       Einkaufsmodus laeuft gerade (bewusst nicht stoeren). `geaendert`-
+                       Spalte wird bei jedem INSERT/UPDATE explizit gesetzt, nicht ueber
+                       einen Spalten-Default (SQLite erlaubt bei ALTER TABLE ADD COLUMN
+                       keinen nicht-konstanten Default, siehe Bekannte Issues).
                        Offline-faehig (apps.offline_faehig=1): Abhaken und
                        Neu-Eintragen laufen ueber eine lokale Warteschlange
                        in localStorage (siehe "Offline-Faehigkeit" unten und
@@ -638,7 +648,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `geholfen_eintraege` | id, aufgabe_id, user_id, zeitstempel |
 | `einkauf_laeden` | id, name, aktiv |
 | `einkauf_kategorien` | id, name (UNIQUE), position, aktiv |
-| `einkauf_eintraege` | id, name, kategorie (Alttext, historisch), kategorie_id (FK einkauf_kategorien), angebot, laden_id, erledigt, erledigt_am, erstellt, erstellt_von |
+| `einkauf_eintraege` | id, name, kategorie (Alttext, historisch), kategorie_id (FK einkauf_kategorien), angebot, laden_id, erledigt, erledigt_am, erstellt, erstellt_von, geaendert (Wunsch #100: bei jedem INSERT/UPDATE explizit gesetzt, Grundlage für den /stand-Sync-Fingerabdruck) |
 | `rezepte` | id, name, portionen (Freitext, z. B. "4" oder "4-6 Portionen"), kategorie ('kochen'/'backen'/NULL – Wunsch #55), quelle_url (NULL außer bei URL-Import – Wunsch #63), anleitung (totes Altfeld, siehe Bekannte Issues), erstellt_von, erstellt |
 | `rezept_zutaten` | id, rezept_id (FK rezepte, cascade), name, position |
 | `rezept_schritte` | id, rezept_id (FK rezepte, cascade), text, position – ein Zubereitungsschritt pro Zeile, analog zu rezept_zutaten |
@@ -887,6 +897,18 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   an der richtigen DOM-Stelle liegende Instanz der Overlay-Gruppe, nicht eine
   gemeinsam wiederverwendete. Gilt für jede künftige SVG-Vorschau mit
   mehreren umschaltbaren Ansichten/Zuständen im selben Dokument.
+
+- **SQLite `ALTER TABLE ADD COLUMN` erlaubt keinen nicht-konstanten Default.**
+  `DEFAULT (datetime('now'))` und auch `DEFAULT CURRENT_TIMESTAMP` schlagen mit
+  "Cannot add a column with non-constant default" fehl (live mit SQLite 3.50
+  geprüft), obwohl `CURRENT_TIMESTAMP` beim Erzeugen der Tabelle selbst (`CREATE
+  TABLE`) völlig normal funktioniert. Betraf `einkauf_eintraege.geaendert`
+  (Wunsch #100, 2026-08-01). Fix: Spalte per `ALTER TABLE` nullable ohne Default
+  anlegen, bestehende Zeilen per separatem `UPDATE ... WHERE spalte IS NULL`
+  backfüllen, künftige INSERT/UPDATE-Statements setzen den Wert immer explizit
+  (kein Verlass auf einen Spalten-Default). Neue Installationen bekommen den
+  "sauberen" `NOT NULL DEFAULT (datetime('now'))` direkt aus `SCHEMA`, da dort
+  nur `CREATE TABLE` läuft, nie `ALTER TABLE ADD COLUMN`.
 
 - **Gunicorn 26 Control Socket**: `[Errno 13] Permission denied: '/.gunicorn'` beim Start.
   Nicht-fatal (1 Worker, App läuft stabil). Ursache: Gunicorn 26 hardcoded `os.sep + '.gunicorn'`
