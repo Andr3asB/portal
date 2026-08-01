@@ -357,8 +357,18 @@ teile/
                        `sportschau.html`: Training-Segment steht im Markup VOR
                        dem Sonstige-Segment, damit es im flex-column-Stack oben
                        liegt und Sonstige (flex:1) die Basis bildet (Wunsch #89
-                       - Reihenfolge im Markup bestimmt oben/unten). Nur Andi
-                       granted (persönliche Fitnessdaten)
+                       - Reihenfolge im Markup bestimmt oben/unten). Rechts
+                       neben der Überschrift "Schritte je Tag" steht der
+                       Durchschnitt für den gewählten Zeitraum OHNE den
+                       heutigen Tag (Wunsch #98 - der ist meist noch nicht
+                       vorbei und würde den Schnitt verzerren). Die Y-Achsen-
+                       Beschriftung der Gridlines sitzt seit Wunsch #99 links
+                       (`left:0` statt `right:0`) statt über den interessanten
+                       jüngsten Balken (vorgestern/gestern/heute stehen rechts,
+                       da `tage` älteste zuerst sortiert) - überlagert jetzt
+                       nur noch die ältesten, uninteressanteren Tage links,
+                       Balkenausrichtung zum Trainings-Chart bleibt gleich.
+                       Nur Andi granted (persönliche Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
                        Wunsch #66): Kategorie Mensch/Tier (tier_typ='mensch'

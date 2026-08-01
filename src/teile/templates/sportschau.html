@@ -44,9 +44,12 @@
   position:absolute; left:0; right:0; border-top:1px dashed var(--border-subtle);
 }
 .steps-gridline-label {
-  position:absolute; right:0; top:-14px; font-size:10px; color:var(--text-2);
-  background:var(--surface); padding-left:4px;
+  position:absolute; left:0; top:-14px; font-size:10px; color:var(--text-2);
+  background:var(--surface); padding-right:4px;
 }
+.steps-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+.steps-header .heatmap-title { margin-bottom:0; }
+.steps-schnitt { font-size:12px; color:var(--text-2); white-space:nowrap; }
 .steps-bars {
   position:relative; height:100%; display:flex; align-items:flex-end; gap:3px;
 }
@@ -112,7 +115,10 @@
 
 {% if not fehler_schritte and schritte_balken %}
   <div class="steps-section">
-    <div class="heatmap-title">🚶 Schritte je Tag</div>
+    <div class="steps-header">
+      <div class="heatmap-title">🚶 Schritte je Tag</div>
+      <div class="steps-schnitt">Ø {{ schritte_schnitt }} ohne heute</div>
+    </div>
     <div class="steps-legende">
       <span><span class="steps-legende-dot" style="background:var(--farbe)"></span>Beim Training</span>
       <span><span class="steps-legende-dot" style="background:var(--text-2)"></span>Sonstige Schritte</span>

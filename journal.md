@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-08-01 – portal-v96: Wünsche #98 + #99 – Sportschau: Schritte-Durchschnitt, Y-Achsen-Beschriftung
+
+### Wunsch #98 – Durchschnittswert bei den Schritten
+
+"Neben der Überschrift 'Schritte je Tag' soll rechts der Durchschnittswert
+für den ausgewählten Zeitraum angezeigt werden. Dabei sollte der heutige
+Tag nicht einberechnet werden, da er das Ergebnis verfälscht." Neues Feld
+`schritte_schnitt` in `14_sportschau.py::index()`: Durchschnitt über
+`schritte_balken` ohne den Eintrag für `heute`. Im Template rechts neben
+der Überschrift ("Ø X ohne heute"), neuer `.steps-header`-Flex-Wrapper.
+
+### Wunsch #99 – Y-Achsen-Beschriftung überlagert die interessanten Tage
+
+"Die Beschriftung der Y-Achse bei den Schritten überlagert die Balken von
+vorgestern, gestern und heute. Entweder links ausgerichtet, damit sie
+weniger interessante Tage überlagert, oder eine andere Darstellung – aber
+die Balkenwerte sollen weiterhin in Linie mit den Trainings aus dem Chart
+darüber dargestellt sein." Die Tage-Liste ist älteste-zuerst sortiert
+(heute steht immer ganz rechts), die Gridline-Beschriftung saß bei
+`right:0` und lag deshalb genau über den jüngsten (interessantesten)
+Balken. Einfacher CSS-Fix: `right:0` → `left:0` (+ `padding-right` statt
+`padding-left`, damit der Hintergrund weiterhin die gestrichelte Linie
+maskiert) – überlagert jetzt die ältesten Tage links, keine Änderung an
+Balkenreihenfolge/-ausrichtung nötig.
+
+### Verifiziert
+
+`curl` gegen `/a/sportschau/<token>/?tage=14/30/60/90`: Durchschnittswert
+erscheint neben der Überschrift, ändert sich korrekt mit dem Zeitraum
+und schließt den heutigen Tag rechnerisch aus (manuell nachgerechnet
+gegen die Rohwerte aus `schritte_balken`). CSS-Änderung der Gridline-
+Beschriftung visuell per `javascript_tool` geprüft: Label sitzt jetzt
+über den ältesten Balken, keine Überlappung mehr mit den letzten drei
+Tagen.
+
+### Auslieferungspaket
+
+`deploy/portal-v96.tar.gz`
+
+---
+
 ## 2026-08-01 – portal-v94: Wünsche #96 + #97 – Geholfen-Aufgaben umbenennen/ergänzen, Rezept-Foto-Import
 
 ### Wunsch #96 – Geholfen-Aufgaben umbenennen und ergänzen

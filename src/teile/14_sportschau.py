@@ -23,6 +23,18 @@ statt fest verdrahtet - `_TAGE_ANZAHL` wurde zur Konstante `_TAGE_STANDARD`,
 `_TAGE_OPTIONEN` definiert die erlaubten Werte fuer den Knopf-Umschalter im
 Template. Heatmap-Zellen und Schritte-Balken werden bei mehr Tagen einfach
 schmaler (bestehendes flex:1 je Zelle/Balken, kein Sonderlayout noetig).
+
+Wunsch #98: Durchschnitt der Schritte im gewaehlten Zeitraum rechts neben
+der Überschrift "Schritte je Tag" - der heutige Tag zaehlt bewusst nicht
+mit, da er meist noch nicht vorbei ist und den Schnitt nach unten verzerren
+wuerde.
+
+Wunsch #99: Die Y-Achsen-Beschriftung (Gridline-Labels) im Schritte-Chart
+sass bisher rechts (`right:0`) und ueberlagerte damit die interessantesten
+Balken (vorgestern/gestern/heute, da `tage` aeltesten zuerst sortiert und
+der heutige Tag rechts steht). Auf `left:0` umgestellt - ueberlagert jetzt
+die aeltesten (uninteressanteren) Tage links, Balkenreihenfolge/-ausrichtung
+zum Trainings-Chart darueber bleibt unveraendert.
 """
 import json
 import urllib.error
@@ -183,6 +195,12 @@ def index(token):
             "pct_gesamt": (gesamt / max_schritte * 100) if max_schritte else 0,
             "pct_training": (werte["training"] / gesamt * 100) if gesamt else 0,
         })
+
+    # Wunsch #98: Durchschnitt fuer den gewaehlten Zeitraum, OHNE den heutigen
+    # Tag - der ist meist noch nicht zu Ende und wuerde den Schnitt nach unten
+    # verzerren.
+    schritte_ohne_heute = [b["gesamt"] for b in schritte_balken if b["tag"] != heute.isoformat()]
+    schritte_schnitt = round(sum(schritte_ohne_heute) / len(schritte_ohne_heute)) if schritte_ohne_heute else 0
     gridlines = []
     if max_schritte >= 2000:
         schwelle = 2000
@@ -195,6 +213,7 @@ def index(token):
         tage=tage, trainingsarten=trainingsarten, trainings_tage=trainings_tage,
         fehler=fehler, tage_anzahl=tage_anzahl, tage_optionen=_TAGE_OPTIONEN,
         fehler_schritte=fehler_schritte, schritte_balken=schritte_balken, gridlines=gridlines,
+        schritte_schnitt=schritte_schnitt,
     )
 
 
