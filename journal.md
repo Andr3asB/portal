@@ -2,6 +2,106 @@
 
 ---
 
+## 2026-08-02 – portal-v103: Wünsche #108 + #109 + #110 – Sportschau: 0-Linie, Ausrichtung, Wochenansicht
+
+### Wunsch #108 – Fehlende 0-Linie bei den Schritten
+
+"Bei den Schritten fehlt eine '0' Linie. Füge die noch hinzu." Die
+Gridline-Berechnung erzeugte bisher nur ab 2000 Schritten überhaupt eine
+Linie (`if max_schritte >= 2000`). Neuer gemeinsamer Helper
+`_gridlines(max_wert, schritt)` liefert jetzt immer eine 0-Linie zusätzlich
+zu den `schritt`-Abstands-Linien.
+
+### Wunsch #109 – Heatmap soll wie das Schritte-Chart gestreckt sein
+
+"Die 14-Tage-Trainingsheatmap soll ebenso wie das Schritte-Barchart
+gestreckt sein, sodass unabhängig von der Bildschirmbreite die Tage
+beider Charts immer übereinanderliegen." Ursache: `.heatmap-cell` trug
+selbst `max-width:22px` - dadurch füllte die ganze Zeile auf breiten
+Bildschirmen nicht die volle Breite aus (blieb bei `14 * 22px + gaps`
+stehen), während die Schritte-Balken über `.steps-bar-col { flex:1 }`
+(Spalte streckt, Balken selbst begrenzt+zentriert) immer die volle Breite
+ausfüllten. Fix: gleiches Muster übernommen - neue `.heatmap-cell-col`
+streckt sich, `.heatmap-cell` selbst ist begrenzt+zentriert. Zusätzlich
+`gap` in `.heatmap-cells` von 4px auf 3px vereinheitlicht (identisch zu
+`.steps-bars`), für pixelgenaue Ausrichtung über beliebig viele Tage.
+
+### Wunsch #110 – Wochenansicht für schmale Bildschirme
+
+"Wenn die Bildschirmbreite unter ein gewisses Maß fällt und die Heatmap
+zu klein wird, soll von einer Tages- auf eine Wochenansicht gewechselt
+werden. Die Heatmap soll wie die Nutzeraktivität bei GitHub mit 7 Zeilen
+(eine je Wochentag) dargestellt werden. Die Schritte werden je Woche
+addiert und als gemeinsamer, aggregierter Balken dargestellt."
+
+Neue Funktion `_wochen_ansicht(tage, schritte_balken)`: gruppiert nach
+ISO-Kalenderwoche (`date.isocalendar()`), liefert pro Woche ein 7-Slot-
+Array (Mo-So, `None` für Tage außerhalb des angefragten Zeitraums - z. B.
+eine angeschnittene erste Woche) plus aufsummierte Schritte
+(gesamt/training). Zweiter Gridline-Satz `wochen_gridlines` mit größerem
+Abstand (10000 statt 2000 - Wochensummen sind ca. 7x höher als Tages-
+werte, sonst viel zu viele Linien).
+
+Template rendert JETZT IMMER BEIDE Ansichten (Tages- und Wochenansicht,
+Klassen `.tagesansicht`/`.wochenansicht`), umgeschaltet rein per CSS
+Media Query - kein Server-Roundtrip beim Umschalten, reagiert live auf
+Fenstergrößenänderung. Umschaltpunkt hängt von `tage_anzahl` ab
+(`tage_anzahl * 25 + 80` Pixel) - bei mehr Tagen (30/60/90) braucht die
+Tagesansicht mehr Platz, bevor sie noch lesbar ist.
+
+Die Wochenansicht der Heatmap nutzt CSS Grid statt der verschachtelten
+Flexbox-Struktur der Tagesansicht: `grid-auto-flow:column` + `grid-
+template-rows:repeat(7,1fr)` ordnet die in Dokumentreihenfolge
+gerenderten Zellen (Woche 1 Mo..So, Woche 2 Mo..So, ...) automatisch
+spaltenweise an - keine Wrapper-Divs pro Woche nötig. Eine separate
+`.woche-labels`-Grid-Spalte (ebenfalls `repeat(7,1fr)`) zeigt die
+Wochentags-Kürzel (Mo-So) und bleibt dank Flexbox-`stretch` (Standard-
+verhalten, kein expliziter Code nötig) exakt auf gleicher Höhe wie die
+Zellen-Spalten - robuster als ein Ansatz mit fest codierten Pixel-Höhen,
+die bei schrumpfenden Zellen (schmale Bildschirme, viele Wochen) nicht
+mehr gepasst hätten. Die Schritte-Wochenansicht nutzt exakt dieselben
+CSS-Klassen wie die Tagesansicht (`.steps-bar-col`/`.steps-bar-stack`),
+nur mit `wochen` statt `schritte_balken` als Datenquelle - dadurch
+automatisch weniger, breitere Balken statt eng gequetschter Tagesbalken.
+
+### Verifiziert
+
+- Wunsch #108: Live im Browser geprüft - 0-Linie mit Label "0" immer
+  vorhanden (auch bei niedrigen Schrittzahlen), weitere Linien wie bisher
+  ab dem gewählten `schritt`.
+- Wunsch #109: Isolierter Python-Test der `_wochen_ansicht()`-Gruppierungs-
+  logik mit synthetischen Daten (14 Tage → exakt 2 volle ISO-Wochen mit
+  korrekten Summen; 10 Tage → eine angeschnittene erste Woche mit
+  `None`-Slots und korrekt reduzierter Summe) - beide Fälle bestanden.
+  Ausrichtung per `javascript_tool`/`getBoundingClientRect()` auf
+  `.heatmap-cell-col` vs. `.steps-bar-col` verglichen: 0px Abweichung über
+  alle 14 Tages-Spalten.
+- Wunsch #110: `resize_window` verändert in dieser Browser-Umgebung nicht
+  die tatsächliche Viewport-Breite (`window.innerWidth` blieb konstant,
+  unabhängig vom angeforderten Fenstermaß) - deshalb die Ansicht direkt per
+  `style.setProperty('display', ..., 'important')` erzwungen, um Inhalt und
+  Layout unabhängig vom Umschalt-Mechanismus zu prüfen. Dabei zunächst
+  einen eigenen Messfehler gefunden und korrigiert: die zentrierte Heatmap-
+  ZELLE wurde gegen die äußere Schritte-SPALTE (statt gegen den ebenfalls
+  zentrierten Schritte-BALKEN) verglichen, was einen scheinbaren
+  400px-Versatz zeigte - nach Korrektur des Vergleichspunkts (Zellen-
+  mittelpunkt vs. Balkenmittelpunkt) 0px Abweichung über beide Wochen-
+  spalten. Grüne Zellen in Tages- und Wochenansicht stimmen exakt überein
+  (identische Trainingstage). Mit `?tage=90` zusätzlich geprüft: 13
+  korrekt gebildete Wochen, eigener (gröberer) Gridline-Abstand für die
+  Wochenansicht, und der Umschaltpunkt skaliert korrekt mit `tage_anzahl`
+  (`90*25+80=2330px` im gerenderten CSS wiedergefunden). Die tatsächliche
+  visuelle Reaktion auf eine echte Fenster-Größenänderung konnte in dieser
+  Browser-Umgebung nicht getestet werden (Tool-Einschränkung) - die CSS-
+  Media-Query-Mechanik selbst ist aber Standardverhalten und wurde korrekt
+  geparst (im Stylesheet wiedergefunden).
+
+### Auslieferungspaket
+
+`deploy/portal-v103.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v102: Wunsch #107 – Einbettung in Home Assistant (iFrame)
 
 "Prüfe, ob die App/das Familienportal auch in einem iFrame unter

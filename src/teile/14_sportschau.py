@@ -41,6 +41,28 @@ in sportschau.html) faerbt sich jetzt fest gruen (#34c759, derselbe Wert
 wie `.heatmap-cell.gruen`) statt `var(--farbe)` - vorher zufaellig blau,
 weil das Andis persoenliche Nutzerfarbe ist. Reine CSS-Aenderung, keine
 Python-Logik betroffen.
+
+Wunsch #108: 0-Linie im Schritte-Chart per neuem `_gridlines()`-Helper -
+vorher gab es erst ab 2000 Schritten ueberhaupt eine Gridline.
+
+Wunsch #109: Heatmap-Zellen stecken jetzt in einer `.heatmap-cell-col`
+(streckt sich wie `.steps-bar-col`), die sichtbare Zelle selbst ist
+begrenzt+zentriert - vorher hatte die Zelle SELBST das max-width, wodurch
+die Zeile auf breiten Bildschirmen nicht die volle Breite ausfuellte und
+nicht mehr mit dem Schritte-Chart darunter uebereinanderlag. Gleicher
+gap-Wert (3px) wie `.steps-bars` fuer pixelgenaue Ausrichtung.
+
+Wunsch #110: Zusaetzliche Wochenansicht (`_wochen_ansicht()`, GitHub-Stil:
+7 Zeilen Mo-So, eine Spalte je ISO-Kalenderwoche) fuer schmale Bildschirme,
+auf denen die Tagesansicht zu eng wird. Schritte werden pro Woche
+aufsummiert, ein Balken je Woche statt je Tag. Rein CSS-gesteuert per
+Media Query (Umschaltpunkt haengt von `tage_anzahl` ab, siehe
+sportschau.html) - Server liefert immer BEIDE Ansichten, kein
+Server-Roundtrip beim Umschalten noetig. Bewusst OHNE eigene Wochentag-
+Beschriftungsspalte links neben dem Grid (Wochentag/Datum nur per Tooltip)
+- eine solche Spalte wuerde den Grid-Start nach rechts verschieben und die
+Ausrichtung mit dem darunterliegenden Schritte-Wochenchart brechen (genau
+die Regression, die Wunsch #109 fuer die Tagesansicht behoben hat).
 """
 import json
 import urllib.error
@@ -147,6 +169,60 @@ def _tages_schritte(steps_roh, workout_fenster, tage):
     return ergebnis
 
 
+def _gridlines(max_wert, schritt):
+    """0-Linie (Wunsch #108) plus weitere Linien im Abstand `schritt`, bis
+    max_wert erreicht ist. `schritt` unterscheidet sich zwischen Tages- und
+    Wochenansicht (Wunsch #110), da Wochensummen deutlich groesser ausfallen
+    und mit demselben 2000er-Abstand viel zu viele Linien ergeben wuerden."""
+    linien = [{"wert": 0, "pct": 0}]
+    if max_wert >= schritt:
+        w = schritt
+        while w <= max_wert:
+            linien.append({"wert": w, "pct": w / max_wert * 100})
+            w += schritt
+    return linien
+
+
+def _wochen_ansicht(tage, schritte_balken):
+    """Wunsch #110: gruppiert tage/schritte_balken nach ISO-Kalenderwoche fuer
+    die GitHub-artige Wochenansicht (7 Zeilen Mo-So, eine Spalte je Woche) -
+    fuer schmale Bildschirme, auf denen die Tagesansicht zu eng wird. Schritte
+    werden pro Woche aufsummiert und als EIN gemeinsamer Balken je Woche
+    dargestellt, statt eines Balkens je Tag. Tage ausserhalb des angefragten
+    Zeitraums (z.B. Anfang einer angeschnittenen ersten Woche) bleiben als
+    None-Slot leer, genau wie bei GitHubs eigenem Kalender."""
+    wochen_reihenfolge = []
+    wochen_tage = {}  # (iso_jahr, iso_woche) -> {wochentag_index(0-6): iso_datum}
+    for t in tage:
+        d = date.fromisoformat(t)
+        iso_jahr, iso_woche, iso_wochentag = d.isocalendar()
+        key = (iso_jahr, iso_woche)
+        if key not in wochen_tage:
+            wochen_tage[key] = {}
+            wochen_reihenfolge.append(key)
+        wochen_tage[key][iso_wochentag - 1] = t
+
+    schritte_je_tag = {b["tag"]: b for b in schritte_balken}
+    wochen = []
+    for key in wochen_reihenfolge:
+        slots = wochen_tage[key]
+        gesamt    = sum(schritte_je_tag[t]["gesamt"]   for t in slots.values() if t in schritte_je_tag)
+        training  = sum(schritte_je_tag[t]["training"] for t in slots.values() if t in schritte_je_tag)
+        wochen.append({
+            "label": f"KW{key[1]}",
+            "tage": [slots.get(i) for i in range(7)],
+            "gesamt": round(gesamt),
+            "training": round(training),
+        })
+
+    max_wochen_schritte = max((w["gesamt"] for w in wochen), default=0)
+    for w in wochen:
+        w["pct_gesamt"]    = (w["gesamt"] / max_wochen_schritte * 100) if max_wochen_schritte else 0
+        w["pct_training"]  = (w["training"] / w["gesamt"] * 100) if w["gesamt"] else 0
+
+    return wochen, max_wochen_schritte
+
+
 @bp.route("/a/sportschau/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -207,12 +283,13 @@ def index(token):
     # verzerren.
     schritte_ohne_heute = [b["gesamt"] for b in schritte_balken if b["tag"] != heute.isoformat()]
     schritte_schnitt = round(sum(schritte_ohne_heute) / len(schritte_ohne_heute)) if schritte_ohne_heute else 0
-    gridlines = []
-    if max_schritte >= 2000:
-        schwelle = 2000
-        while schwelle <= max_schritte:
-            gridlines.append({"wert": schwelle, "pct": schwelle / max_schritte * 100})
-            schwelle += 2000
+    gridlines = _gridlines(max_schritte, 2000)
+
+    # Wunsch #110: Wochenansicht fuer schmale Bildschirme - wird immer mit
+    # berechnet (nicht nur bei Bedarf), da rein CSS-gesteuert per Media Query
+    # zwischen Tages-/Wochenansicht umgeschaltet wird (kein Server-Roundtrip).
+    wochen, max_wochen_schritte = _wochen_ansicht(tage, schritte_balken)
+    wochen_gridlines = _gridlines(max_wochen_schritte, 10000)
 
     return render_template("sportschau.html",
         user=user, token=token, farbe=user["farbe"],
@@ -220,6 +297,7 @@ def index(token):
         fehler=fehler, tage_anzahl=tage_anzahl, tage_optionen=_TAGE_OPTIONEN,
         fehler_schritte=fehler_schritte, schritte_balken=schritte_balken, gridlines=gridlines,
         schritte_schnitt=schritte_schnitt,
+        wochen=wochen, wochen_gridlines=wochen_gridlines,
     )
 
 

@@ -449,7 +449,33 @@ teile/
                        fest gruen (`#34c759`, Wunsch #102) statt `var(--farbe)`
                        - vorher zufaellig blau, weil das Andis persoenliche
                        Nutzerfarbe ist, jetzt konsistent mit der bereits
-                       gruenen Heatmap oben. Nur Andi granted (persönliche
+                       gruenen Heatmap oben. `_gridlines(max_wert, schritt)`
+                       (Wunsch #108) liefert immer eine 0-Linie zusaetzlich zu
+                       den `schritt`-Abstands-Linien - vorher gab es erst ab
+                       2000 Schritten ueberhaupt eine Linie. Heatmap-Zellen
+                       stecken seit Wunsch #109 in einer `.heatmap-cell-col`
+                       (streckt sich wie `.steps-bar-col`), die Zelle selbst
+                       ist begrenzt+zentriert statt selbst das max-width zu
+                       tragen - vorher fuellte die Zeile auf breiten
+                       Bildschirmen nicht die volle Breite aus und lag nicht
+                       mehr mit dem Schritte-Chart darunter uebereinander;
+                       gleicher gap-Wert (3px) in beiden fuer pixelgenaue
+                       Ausrichtung. `_wochen_ansicht()` (Wunsch #110) gruppiert
+                       tage/schritte_balken nach ISO-Kalenderwoche fuer eine
+                       zusaetzliche, GitHub-artige Wochenansicht (7 Zeilen
+                       Mo-So per CSS Grid mit `grid-auto-flow:column`, eine
+                       Spalte je Woche, Schritte pro Woche aufsummiert zu
+                       einem Balken je Woche) - rein CSS-gesteuert per Media
+                       Query umgeschaltet (Umschaltpunkt haengt von
+                       `tage_anzahl` ab: `tage_anzahl * 25 + 80` Pixel), Server
+                       liefert immer beide Ansichten gleichzeitig, kein
+                       Server-Roundtrip beim Umschalten. Bewusst OHNE eigene
+                       Wochentag-Beschriftungsspalte links neben dem Grid
+                       (Wochentag/Datum nur per Tooltip) - eine solche Spalte
+                       verschiebt den Grid-Start nach rechts und bricht die
+                       Ausrichtung mit dem Schritte-Wochenchart darunter
+                       (das keine solche Spalte hat), live als Bug gefunden
+                       und wieder entfernt. Nur Andi granted (persönliche
                        Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
