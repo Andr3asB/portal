@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-08-02 – portal-v101: Wunsch #106 – Foto-Upload: Mediathek auf iPhone fehlte
+
+"Auf dem iPhone kann ich kein Bild auswählen, um ein Rezept hochzuladen.
+Das scheint ein Bug zu sein."
+
+Ursache: `<input type="file" ... capture="environment">` in
+`rezept_bild_importieren.html` (Wunsch #97). Das `capture`-Attribut zwingt
+iOS Safari, beim Antippen direkt die Kamera zu öffnen - ohne die native
+Auswahl "Foto aufnehmen ODER aus Mediathek wählen" anzuzeigen. Für Andi
+sah das aus wie "ich kann kein Bild auswählen", weil die Mediathek-Option
+schlicht nicht angeboten wurde. `capture` einfach entfernt,
+`accept="image/jpeg,image/png,image/heic"` schränkt den Dateityp weiter
+korrekt ein.
+
+Derselbe Bug steckte auch im baugleichen `vokabel_foto_import.html`
+(Wunsch #80, exakt dieselbe Input-Zeile kopiert) - obwohl nicht explizit
+im Wunsch genannt, gleich mitkorrigiert, statt denselben Fehler in einer
+zweiten App auf die nächste Werkstatt-Runde zu vertagen. Neuer Eintrag in
+server.md "Bekannte Issues" mit der allgemeinen Regel für künftige
+Foto-Upload-Formulare.
+
+### Verifiziert
+
+Datei-Input in beiden Templates geprüft: `capture`-Attribut vollständig
+entfernt, `accept` unverändert vorhanden. Da `capture`s Auswirkung nur auf
+echten iOS-Geräten sichtbar ist (Desktop-Chrome zeigt ohnehin immer den
+normalen Datei-Dialog, ignoriert `capture`), lässt sich der eigentliche
+Effekt von hier aus nicht per Browser-Tool nachstellen - die Fehlerursache
+ist aber ein dokumentiertes, eindeutiges iOS-Safari-Verhalten, das exakt
+zu Andis Beschreibung passt. Von Andi live auf dem iPhone bestätigt -
+sowohl Bilder als auch Dateien lassen sich jetzt auswählen.
+
+### Auslieferungspaket
+
+`deploy/portal-v101.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v100: Wünsche #103 + #104 + #105 – Scroll-Bug, Werkstatt-Layout, Formular-Kollision
 
 ### Wunsch #103 – Scrollen blockiert, wenn der Finger auf einer App-Kachel aufsetzt

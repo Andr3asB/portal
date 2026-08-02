@@ -16,7 +16,11 @@ Jeder Versuch wird protokolliert, Sessions haben Start- und Endzeitpunkt.
 
 Wunsch #80: Vokabelpaare per Fotoupload + KI-OCR importieren - Ergebnis
 landet zur Kontrolle/Korrektur in einem Formular, nie direkt gespeichert
-(gleiches Prinzip wie der Rezept-URL-Import in 11_rezepte.py).
+(gleiches Prinzip wie der Rezept-URL-Import in 11_rezepte.py). Der Datei-
+Input in vokabel_foto_import.html hat seit Wunsch #106 KEIN
+capture="environment" mehr - zwang iOS Safari sonst, direkt die Kamera zu
+oeffnen ohne Mediathek-Option in der nativen Auswahl (siehe 11_rezepte.py,
+gleicher Fix dort fuer den analogen Rezept-Foto-Import aus Wunsch #97).
 
 Wunsch #81: Aussprache der Fremdsprache im Trainer per KI-TTS, Ergebnis
 wird als Datei im Datenordner gecacht (siehe _audio_pfad) statt bei jeder

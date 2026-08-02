@@ -22,7 +22,12 @@ _rezept_aus_jsonld()/_rezept_per_ki() (name/portionen/zutaten/schritte) und
 landet deshalb genau wie der URL-Import nur vorausgefüllt im bestehenden
 Neu-Formular - keine eigene Prüf-Seite nötig, anders als beim Vokabeln-
 Foto-Import (Wunsch #80), wo ein Foto mehrere Vokabelpaare gleichzeitig
-liefert und deshalb eine eigene Zeilen-Prüf-Ansicht braucht.
+liefert und deshalb eine eigene Zeilen-Prüf-Ansicht braucht. Der Datei-
+Input in rezept_bild_importieren.html hat bewusst KEIN capture="environment"
+mehr (Wunsch #106) - das Attribut zwingt iOS Safari, direkt die Kamera zu
+öffnen, OHNE die Option "Mediathek" in der nativen Auswahl anzuzeigen, ein
+bekanntes Verhalten mobiler Browser. Ohne capture zeigt iOS die normale
+Auswahl (Foto aufnehmen ODER aus Mediathek wählen).
 
 Bearbeiten (bearbeiten()) nutzt dasselbe Formular (rezept_neu.html) wie
 Neuanlegen und Import-Vorschau, unterschieden nur über den bearbeiten-Parameter

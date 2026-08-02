@@ -535,8 +535,10 @@ teile/
                               (nicht abrufbar, kein Rezept erkannt, KI-Kontingent
                               aufgebraucht) statt eines 500ers
     rezept_bild_importieren.html – Foto-Upload für den Rezept-Import (Wunsch #97,
-                              Kamera/Mediathek via capture="environment"), zeigt
-                              dieselben Fehlerarten wie rezept_importieren.html
+                              Kamera oder Mediathek), zeigt dieselben Fehlerarten
+                              wie rezept_importieren.html. Datei-Input bewusst OHNE
+                              capture="environment" (Wunsch #106 - das Attribut
+                              zwingt iOS Safari zur Kamera, ohne Mediathek-Option)
     rezept_detail.html      – Ein Rezept: Info-Abschnitt oben (Portionen +
                               Durchschnittsbewertung + eigener Sterne-Picker,
                               Wunsch #52/#53, plus Ja/Nein-Wunschliste-Knopf seit
@@ -608,9 +610,10 @@ teile/
                               "🔊 Anhören"-Knopf nach jeder Antwort (Wunsch #81,
                               spielt /wort/<vid>/audio über `new Audio()` ab)
     vokabel_foto_import.html – Foto-Upload (Wunsch #80): Sprache-Chips,
-                              Datei-Input mit `capture="environment"` fürs
-                              Handy, gleiches Fehler-Anzeige-Muster wie
-                              rezept_importieren.html
+                              gleiches Fehler-Anzeige-Muster wie
+                              rezept_importieren.html. Datei-Input bewusst OHNE
+                              capture="environment" (Wunsch #106, siehe
+                              rezept_bild_importieren.html für die Begründung)
     vokabel_foto_pruefen.html – Von der KI erkannte Vokabelpaare zur Kontrolle:
                               jede Zeile mit Checkbox (behalten/verwerfen) +
                               editierbaren Fremd-/Deutsch-Feldern, ein
@@ -940,6 +943,19 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   (kein Verlass auf einen Spalten-Default). Neue Installationen bekommen den
   "sauberen" `NOT NULL DEFAULT (datetime('now'))` direkt aus `SCHEMA`, da dort
   nur `CREATE TABLE` läuft, nie `ALTER TABLE ADD COLUMN`.
+
+- **`<input type="file" capture="environment">` verhindert auf iOS Safari die
+  Mediathek-Auswahl.** Das `capture`-Attribut zwingt mobile Browser (allen
+  voran iOS Safari), beim Antippen des Datei-Inputs DIREKT die Kamera zu
+  öffnen, ohne die native "Foto aufnehmen ODER aus Mediathek wählen"-Auswahl
+  zu zeigen - für Andi äußerte sich das als "kann kein Bild auswählen"
+  (Wunsch #106, betraf sowohl `rezept_bild_importieren.html` als auch das
+  baugleiche `vokabel_foto_import.html`). Fix: `capture` einfach weglassen,
+  `accept="image/..."` reicht für die Typ-Einschränkung völlig aus und lässt
+  iOS die normale Auswahl anzeigen. **Für jeden künftigen Foto-Upload:
+  `capture` nur setzen, wenn wirklich AUSSCHLIESSLICH live fotografiert
+  werden soll (z. B. ein Barcode-Scanner) - nie als Standard für "Foto
+  hochladen"-Formulare.**
 
 - **CSS-Klassennamen aus base.html können von `{% block extra_styles %}` eines
   Kindtemplates lautlos überschrieben werden.** `{% block extra_styles %}`
