@@ -2,14 +2,16 @@
 Aufgabenplan (intern "kinderplan") – rollierende 14-Tage-Liste (aktuelle +
 nächste Woche), analog zum Essensplan (Wunsch #92, vorher ein abstraktes
 Wochentag-Raster ohne echte Daten). Zeigt für jeden der 14 Kalendertage:
-  - Geholfen-Aufgaben aus einer weiterhin wöchentlich wiederkehrenden Regel
-    (kinderplan_eintraege.wochentag, UNVERÄNDERT gegenüber vorher – bewusste
-    Entscheidung: bestehende Wochenroutinen bleiben automatisch bestehen,
-    nur die Darstellung wird zur Datumsliste statt Wochentag-Raster)
-  - Aus dem Todo-Pool eingesetzte Instanzen (Wunsch #90), jetzt an ein
-    echtes Kalenderdatum gebunden (todos.plan_tag), nicht mehr an einen
-    abstrakten Wochentag – jede Einsortierung ist ein einmaliges Ereignis,
-    kein wiederkehrendes Muster wie bei den Geholfen-Aufgaben.
+  - Geholfen-Aufgaben als Einzeltermine (kinderplan_eintraege.plan_tag,
+    echtes Datum – Wunsch #115, vorher eine fortlaufende wöchentliche
+    Regel über kinderplan_eintraege.wochentag). Eine Zuweisung gilt NUR für
+    den einen angeklickten Tag, nicht mehr für jeden Tag mit demselben
+    Wochentag. `wochentag` bleibt als zusätzliche (nicht mehr für die
+    Anzeige genutzte) Spalte bestehen.
+  - Aus dem Todo-Pool eingesetzte Instanzen (Wunsch #90), ebenfalls an ein
+    echtes Kalenderdatum gebunden (todos.plan_tag) – jede Einsortierung ist
+    ein einmaliges Ereignis, gleiches Prinzip wie jetzt bei den
+    Geholfen-Aufgaben.
 URL-Präfix: /a/kinderplan/<token>/
 
 Abhaken einer Geholfen-Aufgabe schreibt direkt in geholfen_eintraege
@@ -35,10 +37,11 @@ auf einen Kalendertag für eine Person - erzeugt ein ganz normales
 todos-Row (serie_id+plan_tag gesetzt), keine eigene Datenhaltung dafür.
 
 Bewusst NICHT gebaut: Drag & Drop zwischen Tagen (anders als beim
-Essensplan) - für Geholfen-Aufgaben ergibt das keinen Sinn (eine einzelne
-Karte verschieben würde die GANZE wöchentliche Regel verschieben, nicht
-nur diesen einen Tag), für Todo-Pool-Instanzen wäre es technisch möglich,
-aber für einen ersten Wurf zurückgestellt.
+Essensplan) - für einen ersten Wurf zurückgestellt, wäre inzwischen
+(seit Wunsch #115 auch Geholfen-Aufgaben Einzeltermine sind) technisch für
+beide Eintragsarten gleichermaßen möglich, kein struktureller Grund mehr
+dagegen wie zu der Zeit, als Geholfen-Zuweisungen noch eine fortlaufende
+Regel waren.
 
 Wunsch #113: die Pool-Kandidaten (welche Serien-Vorlagen "Aus Pool holen"
 anbietet) werden jetzt PRO TAG einzeln berechnet (`serien_pool_fuer_tag()`
@@ -46,6 +49,22 @@ in teile.todo, einmal je sichtbarem Kalendertag statt einmal global) -
 eine Serie kann dadurch mehrere Tage im Voraus eingeplant werden, auch
 wenn eine frühere Instanz noch offen ist, solange der jeweilige Tag
 periodisch zum Intervall passt (siehe Docstring in 04_todo.py).
+
+Wunsch #114: eine aus dem Pool eingesetzte Instanz lässt sich über
+/serie_zuruecklegen wieder entfernen ("zurück in den Pool legen") - echtes
+Löschen der todos-Zeile, kein Status-Toggle, macht die Vorlage für
+betroffene Tage wieder gemäß serie_verfuegbar_am() verfügbar.
+
+Wunsch #115: Geholfen-Zuweisungen sind jetzt Einzeltermine
+(kinderplan_eintraege.plan_tag) statt einer fortlaufenden Wochentag-Regel -
+nach Rückfrage (2026-08-02) hat Andi sich bewusst für die radikalere
+Variante entschieden: ALLE Zuweisungen (auch bereits bestehende
+Wochenroutinen) werden umgestellt, keine Regel bleibt als fortlaufendes
+Muster erhalten. Migration in 00_kern.py materialisiert bestehende
+wochentag-Regeln einmalig zu Einzelterminen für das beim Deploy aktuell
+sichtbare 14-Tage-Fenster (aktuelle + nächste Woche) - Wochen danach
+haben KEINE automatische Fortsetzung mehr, jede Woche muss neu zugewiesen
+werden (Gegenteil der Wunsch-#92-Entscheidung, bewusst so gewählt).
 """
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -127,15 +146,21 @@ def index(token):
 
     plan = []
     if ziel:
-        # Geholfen: bestehende woechentliche Regel (unveraendert gespeichert,
-        # gilt weiter fuer JEDEN passenden Wochentag in der 14-Tage-Liste).
-        regeln = db.execute("""
-            SELECT k.aufgabe_id, k.wochentag, a.name, a.emoji
+        # Wunsch #115: Geholfen-Zuweisungen sind Einzeltermine (plan_tag,
+        # echtes Datum) - eine Zuweisung gilt NUR fuer den einen Tag, keine
+        # fortlaufende Wochentag-Regel mehr (vorher wurden ALLE Tage mit
+        # passendem Wochentag angezeigt, siehe Docstring/journal.md fuer die
+        # Migration bestehender Regeln).
+        regel_rows = db.execute("""
+            SELECT k.plan_tag, k.aufgabe_id, a.name, a.emoji
             FROM   kinderplan_eintraege k
             JOIN   geholfen_aufgaben a ON a.id = k.aufgabe_id
-            WHERE  k.user_id=?
-            ORDER  BY k.wochentag, k.position
-        """, (ziel["id"],)).fetchall()
+            WHERE  k.user_id=? AND k.plan_tag BETWEEN ? AND ?
+            ORDER  BY k.plan_tag, k.position
+        """, (ziel["id"], tage_daten[0].isoformat(), tage_daten[-1].isoformat())).fetchall()
+        regeln_map = {}
+        for r in regel_rows:
+            regeln_map.setdefault(r["plan_tag"], []).append(r)
 
         # Erledigt-Status je Tag im 14-Tage-Fenster (nicht mehr nur "heute").
         erledigt_rows = db.execute("""
@@ -169,9 +194,7 @@ def index(token):
                 status = "zukunft"
 
             eintraege = []
-            for r in regeln:
-                if r["wochentag"] != wd:
-                    continue
+            for r in regeln_map.get(iso, []):
                 e = dict(r)
                 e["erledigt"] = (r["aufgabe_id"], iso) in erledigt_set
                 eintraege.append(e)
@@ -205,9 +228,10 @@ def index(token):
 @bp.route("/a/kinderplan/<token>/zuweisen", methods=["POST"])
 def zuweisen(token):
     """Tippen auf einen Aufgaben-Chip weist zu bzw. entfernt wieder (Toggle).
-    Schreibt weiterhin auf die woechentliche Regel (kinderplan_eintraege),
-    nicht auf einen einzelnen Tag - gilt also fuer JEDEN Kalendertag mit
-    diesem Wochentag, nicht nur die eine Karte, auf der geklickt wurde."""
+    Schreibt seit Wunsch #115 einen Einzeltermin (plan_tag = angeklickter
+    Tag), keine woechentliche Regel mehr - gilt also NUR fuer die eine
+    Karte, auf der geklickt wurde, nicht fuer jeden Tag mit demselben
+    Wochentag."""
     user = _user(token)
     db   = get_db()
     ziel_id    = to_int(request.form.get("ziel_id"))
@@ -230,18 +254,18 @@ def zuweisen(token):
         abort(404)
 
     exists = db.execute(
-        "SELECT 1 FROM kinderplan_eintraege WHERE user_id=? AND aufgabe_id=? AND wochentag=?",
-        (ziel_id, aufgabe_id, wochentag),
+        "SELECT 1 FROM kinderplan_eintraege WHERE user_id=? AND aufgabe_id=? AND plan_tag=?",
+        (ziel_id, aufgabe_id, tag_iso),
     ).fetchone()
     if exists:
         db.execute(
-            "DELETE FROM kinderplan_eintraege WHERE user_id=? AND aufgabe_id=? AND wochentag=?",
-            (ziel_id, aufgabe_id, wochentag),
+            "DELETE FROM kinderplan_eintraege WHERE user_id=? AND aufgabe_id=? AND plan_tag=?",
+            (ziel_id, aufgabe_id, tag_iso),
         )
     else:
         db.execute(
-            "INSERT INTO kinderplan_eintraege(user_id, aufgabe_id, wochentag) VALUES(?,?,?)",
-            (ziel_id, aufgabe_id, wochentag),
+            "INSERT INTO kinderplan_eintraege(user_id, aufgabe_id, wochentag, plan_tag) VALUES(?,?,?,?)",
+            (ziel_id, aufgabe_id, wochentag, tag_iso),
         )
     db.commit()
     return redirect(url_for("kinderplan_app.index", token=token, fuer=ziel_id))
@@ -299,6 +323,30 @@ def serie_einsortieren_route(token):
         abort(403)
     serie_einsortieren(db, serie_id, ziel_id, tag_iso, user["id"])
     return redirect(url_for("kinderplan_app.index", token=token, fuer=ziel_id))
+
+
+@bp.route("/a/kinderplan/<token>/serie_zuruecklegen/<int:tid>", methods=["POST"])
+def serie_zuruecklegen(token, tid):
+    """Wunsch #114: eine aus dem Pool eingesetzte Instanz wieder entfernen -
+    macht die Vorlage fuer diesen Tag (und je nach Intervall/Wochentag auch
+    andere Tage) wieder verfuegbar, siehe serie_verfuegbar_am() in
+    teile.todo. Anders als serie_erledigen() ein echtes Loeschen, kein
+    Status-Toggle - "zurueck in den Pool legen" bedeutet, diese konkrete
+    Einsortierung existiert danach gar nicht mehr."""
+    user = _user(token)
+    db   = get_db()
+    row = db.execute(
+        "SELECT id, zugewiesen_an FROM todos WHERE id=? AND serie_id IS NOT NULL", (tid,)
+    ).fetchone()
+    if not row:
+        abort(404)
+    if not (user["id"] == row["zugewiesen_an"] or _darf_verwalten(user)):
+        abort(403)
+    db.execute("DELETE FROM todos WHERE id=?", (tid,))
+    db.commit()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify(ok=True)
+    return redirect(url_for("kinderplan_app.index", token=token, fuer=row["zugewiesen_an"]))
 
 
 @bp.route("/a/kinderplan/<token>/serie_erledigen/<int:tid>", methods=["POST"])

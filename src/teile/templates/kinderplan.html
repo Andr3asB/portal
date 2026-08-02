@@ -67,6 +67,10 @@
   font-size:13px; color:var(--text-2); opacity:.4;
 }
 .aufgabe-check:disabled { cursor:default; }
+.btn-zuruecklegen {
+  background:none; border:none; font-size:15px; cursor:pointer;
+  color:var(--text-2); flex-shrink:0; padding:2px 4px;
+}
 
 .tag-edit-panel {
   display:none; flex-direction:column; gap:8px; margin-top:10px;
@@ -83,7 +87,6 @@
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
 .chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
-.hinweis { font-size:12px; color:var(--text-2); }
 {% endblock %}
 
 {% block nav_title %}
@@ -128,7 +131,12 @@
       {% else %}
       <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
       {% endif %}
-      <span>🔁 {{ e.inhalt }}</span>
+      <span style="flex:1">🔁 {{ e.inhalt }}</span>
+      {% if darf_editieren %}
+      <button class="btn-zuruecklegen" type="button"
+              onclick="serieZuruecklegen({{ e.id }}, this)"
+              title="Zurück in den Pool legen">↩️</button>
+      {% endif %}
     </div>
     {% endfor %}
   {% else %}
@@ -149,7 +157,6 @@
       </form>
       {% endfor %}
     </div>
-    <div class="hinweis" style="margin-top:4px">💡 Gilt für jeden {{ tag.wochentag_name }}, nicht nur diesen einen Tag.</div>
 
     {% if tag.serien_pool %}
     <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
@@ -242,6 +249,23 @@ function serieErledigen(tid, btn) {
     if (d.ok) {
       btn.textContent = '✓';
       btn.closest('.aufgabe-row').classList.add('done');
+    } else {
+      btn.disabled = false;
+    }
+  }).catch(() => { btn.disabled = false; });
+}
+
+// Wunsch #114: geplante Pool-Instanz wieder entfernen - macht die Vorlage
+// fuer diesen (und ggf. andere) Tag(e) wieder verfuegbar.
+function serieZuruecklegen(tid, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  fetch(`/a/kinderplan/${TOKEN}/serie_zuruecklegen/${tid}`, {
+    method: 'POST',
+    headers: {'X-Requested-With': 'fetch'},
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      location.reload(); // Pool-Kandidaten fuer diesen Tag muessen neu berechnet werden
     } else {
       btn.disabled = false;
     }

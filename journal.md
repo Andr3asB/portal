@@ -2,6 +2,79 @@
 
 ---
 
+## 2026-08-02 – portal-v106: Wünsche #114 + #115 – Pool-Aufgaben zurücklegen, Geholfen-Zuweisungen als Einzeltermine
+
+### Wunsch #114 – Pool-Aufgaben zurücklegen
+
+"Aufgaben, die aus dem Pool geplant wurden, sollen dorthin auch wieder
+zurückgelegt werden können." Neue Route `/serie_zuruecklegen/<id>` +
+↩️-Button neben jedem eingeplanten Pool-Eintrag: löscht die todos-Zeile
+echt (kein Status-Toggle wie beim Abhaken), macht die Vorlage für
+betroffene Tage sofort wieder gemäß `serie_verfuegbar_am()` verfügbar.
+
+### Wunsch #115 – Geholfen-Zuweisungen als Einzeltermine statt Wochenregel
+
+"Aufgaben der Geholfen Kategorie sollen immer nur für den einen Tag
+gelten, wenn sie geplant werden." Kehrt eine bewusste frühere Entscheidung
+(Wunsch #92: "bestehende Routine bleibt automatisch bestehen") um - vorab
+per Rückfrage bestätigt, inklusive der Frage, was mit bereits bestehenden
+Wochenroutinen passieren soll. Andi hat sich für die radikalere Variante
+entschieden: ALLE Zuweisungen (auch bestehende) werden zu Einzelterminen,
+keine Regel bleibt als fortlaufendes Muster erhalten.
+
+`kinderplan_eintraege` bekommt eine neue Spalte `plan_tag` (echtes Datum),
+`wochentag` bleibt als zusätzliche, nicht mehr für die Anzeige genutzte
+Spalte bestehen (weiterhin NOT NULL, wird bei jeder Zuweisung mitgeschrieben).
+Die UNIQUE-Constraint ändert sich von `(user_id,aufgabe_id,wochentag)` zu
+`(user_id,aufgabe_id,plan_tag)` - SQLite kann das nicht per ALTER TABLE,
+deshalb Tabellen-Neubau wie beim Essensplan-Umbau. Migration materialisiert
+jede bestehende Wochenregel zu Einzelterminen für jeden zu ihrem Wochentag
+passenden Tag im beim Deploy aktuell sichtbaren 14-Tage-Fenster (aktuelle +
+nächste Woche) - Wochen danach haben keine automatische Fortsetzung mehr.
+`/zuweisen` schreibt jetzt nur noch für den angeklickten Tag statt für
+jeden Tag mit demselben Wochentag.
+
+### Stolperstein: `_init_db()`-Verbindung hat kein `row_factory=Row`
+
+Erster Deploy-Versuch stürzte beim Start ab: `TypeError: tuple indices
+must be integers or slices, not str` bei `regel["wochentag"]`. Ursache:
+`_init_db()` verbindet sich mit einer rohen `sqlite3.connect(...)` OHNE
+`row_factory=sqlite3.Row` (anders als `get_db()` zur Laufzeit) -
+`fetchall()` liefert dort nur nackte Tupel, Zugriff ausschließlich per
+Index. Der erste, fehlgeschlagene Versuch hatte bereits `ALTER TABLE
+RENAME` + `CREATE TABLE` ausgeführt, bevor er beim Kopieren der Daten
+abstürzte - die neue Tabelle existierte danach schon (mit `plan_tag`),
+aber leer, während `kinderplan_eintraege_alt` mit Friederikes echter
+"Tisch decken"-Regel unangetastet liegen blieb (kein Datenverlust, nur
+unvollständige Migration). Fix: Code auf Tupel-Indizes umgestellt UND die
+Bedingung von "Spalte fehlt" auf "Alt-Tabelle existiert noch" geändert,
+damit ein zweiter Durchlauf eine unterbrochene Migration sauber fortsetzt
+statt sie (weil die neue Spalte ja schon da ist) fälschlich zu überspringen.
+**Für jede künftige `_init_db()`-Migration mit Python-seitiger
+Datenverarbeitung: Tupel-Indizes verwenden, nie `row["spalte"]` - diese
+Verbindung hat keine Row-Factory.**
+
+### Verifiziert
+
+Vor dem Deploy: Produktivstand geprüft (genau eine echte Regel -
+Friederike, "Tisch decken", Mittwochs). Nach dem (korrigierten) Deploy:
+`kinderplan_eintraege_alt` korrekt gelöscht, neue Tabelle enthält genau
+zwei Zeilen (2026-07-29 und 2026-08-05 - die beiden Mittwoche im
+14-Tage-Fenster), exakt wie erwartet. Live im Browser (Friederikes echter
+Plan): "Tisch decken" erscheint nur an diesen zwei Tagen, sonst nirgends.
+Neue Testzuweisung ("Zimmer aufräumen" am 30.07., einem Donnerstag)
+bestätigt: erscheint NICHT am nächsten Donnerstag (06.08.) - echtes
+Einzeltermin-Verhalten, danach wieder entfernt. Wunsch #114 end-to-end
+getestet: "Müll rausbringen" für den 28.07. eingeplant, per ↩️ wieder
+zurückgelegt - Eintrag verschwindet, Tag zeigt den Pool-Kandidaten
+sofort wieder an.
+
+### Auslieferungspaket
+
+`deploy/portal-v106.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v105: Wünsche #112 + #113 – Serienaufgaben: mehrere Wochentage, periodische Wiederkehr
 
 ### Wunsch #112 – Mehrere Wochentage je Serie

@@ -397,30 +397,40 @@ teile/
                        eigenen). Seit Wunsch #92 rollierende 14-Tage-Liste
                        (aktuelle+naechste Woche, vergangene Tage einklappbar)
                        wie 12_essensplan.py, keine Wochentag-Grid-Ansicht mehr:
-                       Geholfen-Aufgaben haengen weiterhin an einer woechentlich
-                       wiederkehrenden Regel (kinderplan_eintraege.wochentag,
-                       bewusst unveraendert - bestehende Wochenroutinen bleiben
-                       automatisch bestehen), fuer jeden der 14 echten Kalender-
-                       tage wird per d.weekday() nachgeschaut, welche Regeln
-                       passen; /zuweisen schreibt weiter auf diese Regel (gilt
-                       fuer JEDEN Tag mit diesem Wochentag, nicht nur den einen
-                       angeklickten), /abhaken weiterhin direkt in
-                       geholfen_eintraege. Todo-Pool-Instanzen (Wunsch #90)
-                       haengen dagegen an einem echten Kalendertag
-                       (todos.plan_tag, ISO-Datum - ersetzt das urspruengliche
-                       todos.wochentag, das nie mit Produktivdaten gefuellt war
-                       und als totes Altfeld liegen bleibt): /serie_einsortieren
-                       (Pool-Vorlage aus teile.todo fuer eine Person+Datum
-                       einsetzen, einmalig, kein wiederkehrendes Muster) und
-                       /serie_erledigen/<id> (schreibt direkt in todos, nicht
-                       geholfen_eintraege). _gesperrter_tag_datum() (vorher
+                       Geholfen-Aufgaben haengen seit Wunsch #115 an einem
+                       echten Einzeltermin (kinderplan_eintraege.plan_tag,
+                       ISO-Datum) statt einer fortlaufenden woechentlichen Regel
+                       (kinderplan_eintraege.wochentag, bleibt als zusaetzliche,
+                       nicht mehr fuer die Anzeige genutzte Spalte bestehen) -
+                       /zuweisen schreibt nur noch fuer den einen angeklickten
+                       Tag (vorher: gilt fuer JEDEN Tag mit demselben
+                       Wochentag). Andi hat sich nach Rueckfrage bewusst fuer
+                       die radikalere Migration entschieden: ALLE bestehenden
+                       Wochenroutinen wurden beim Deploy einmalig zu Einzel-
+                       terminen fuer das damals sichtbare 14-Tage-Fenster
+                       materialisiert (kein automatisches Fortsetzen mehr
+                       danach) - Gegenteil der Wunsch-#92-Entscheidung
+                       ("bestehende Routine bleibt automatisch bestehen").
+                       /abhaken weiterhin direkt in geholfen_eintraege.
+                       Todo-Pool-Instanzen (Wunsch #90) haengen ebenfalls an
+                       einem echten Kalendertag (todos.plan_tag, ISO-Datum -
+                       ersetzt das urspruengliche todos.wochentag, das nie mit
+                       Produktivdaten gefuellt war und als totes Altfeld liegen
+                       bleibt): /serie_einsortieren (Pool-Vorlage aus teile.todo
+                       fuer eine Person+Datum einsetzen, einmalig), /serie_
+                       erledigen/<id> (Status-Toggle, schreibt direkt in todos)
+                       und /serie_zuruecklegen/<id> (Wunsch #114: echtes
+                       Loeschen der todos-Zeile statt Toggle - macht die
+                       Vorlage fuer betroffene Tage wieder verfuegbar gemaess
+                       serie_verfuegbar_am()). _gesperrter_tag_datum() (vorher
                        _gesperrter_wochentag()) sperrt ab 20 Uhr DEUTSCHER Zeit
                        (ZoneInfo("Europe/Berlin"), siehe Bekannte Issues -
                        Container laeuft in UTC) den naechsten echten Kalendertag
                        fuer Kinder, Eltern/Admin ausgenommen. Bewusst KEIN
                        Drag & Drop zwischen Tagen (anders als Essensplan) - fuer
-                       die wochentag-basierten Geholfen-Regeln ergibt das keinen
-                       Sinn (wuerde die ganze Regel verschieben, nicht nur einen Tag).
+                       einen ersten Wurf zurueckgestellt, technisch inzwischen
+                       fuer beide Eintragsarten gleichermassen moeglich (kein
+                       struktureller Grund mehr dagegen seit #115).
                        Seit Wunsch #113 werden die "🔁 Aus Pool holen"-Kandidaten
                        PRO TAG einzeln berechnet (`serien_pool_fuer_tag()`, einmal
                        je sichtbarem Kalendertag statt einmal global) - dadurch
@@ -836,7 +846,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `rezept_bewertungen` | id, rezept_id (FK rezepte, cascade), user_id (FK users, cascade), sterne (1-5), erstellt; UNIQUE(rezept_id, user_id) – eine Bewertung pro Nutzer und Rezept, editierbar per Upsert |
 | `rezept_wuensche` | id, rezept_id (FK rezepte, cascade), user_id (FK users, cascade), erstellt; UNIQUE(rezept_id, user_id) – "Wünsch ich mir"-Markierung, max. 5 aktive pro Nutzer (Wunsch #65), automatisch entfernt sobald das Rezept nach der Markierung auf dem Essensplan war und der Tag vorbei ist |
 | `essensplan_eintraege` | id, tag (ISO-Datum), mahlzeit ('mittag'/'abend'), rezept_id (FK rezepte), text, erstellt_von, erstellt; UNIQUE(tag, mahlzeit) |
-| `kinderplan_eintraege` | id, user_id (FK users, cascade), aufgabe_id (FK geholfen_aufgaben, cascade), wochentag (0=Mo..6=So), position, erstellt; UNIQUE(user_id,aufgabe_id,wochentag) |
+| `kinderplan_eintraege` | id, user_id (FK users, cascade), aufgabe_id (FK geholfen_aufgaben, cascade), wochentag (0=Mo..6=So, seit Wunsch #115 nur noch informativ/nicht mehr fuer die Anzeige genutzt), plan_tag (ISO-Datum, Wunsch #115 - der eigentliche Einzeltermin), position, erstellt; UNIQUE(user_id,aufgabe_id,plan_tag) |
 | `tierbaukasten_kreationen` | id, user_id (FK users, cascade), tier_typ (auch 'mensch' – Wunsch #66, keine eigene Kategorie-Spalte), koerper_farbe, muster (NULL/streifen/punkte/flecken), muster_farbe, accessoire (kommagetrennte Liste, z. B. "hut,brille" – Wunsch #69), koerperbau (0-100, Default 50 – Wunsch #66), dicebear_optionen (JSON, nur bei tier_typ='mensch' befüllt, siehe DiceBear-Notiz unten), name, erstellt – Wunsch #64 |
 | `vokabel_sprachen` | id, name (UNIQUE), aktiv – global, Standard Englisch+Latein, neue per Wunsch – Wunsch #73 |
 | `vokabel_sprachen_nutzer` | user_id (FK users, cascade), sprache_id (FK vokabel_sprachen, cascade); UNIQUE(user_id,sprache_id) – welche Sprachen ein Nutzer aktiviert hat |

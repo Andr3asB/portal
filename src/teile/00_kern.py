@@ -1,5 +1,6 @@
 import sqlite3, secrets, logging
 from contextlib import contextmanager
+from datetime import date, timedelta
 from flask import g, current_app, jsonify, request
 
 log = logging.getLogger("portal.kern")
@@ -193,9 +194,10 @@ CREATE TABLE IF NOT EXISTS kinderplan_eintraege (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   aufgabe_id INTEGER NOT NULL REFERENCES geholfen_aufgaben(id) ON DELETE CASCADE,
   wochentag  INTEGER NOT NULL,
+  plan_tag   TEXT,
   position   INTEGER NOT NULL DEFAULT 0,
   erstellt   TEXT    NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(user_id, aufgabe_id, wochentag)
+  UNIQUE(user_id, aufgabe_id, plan_tag)
 );
 CREATE TABLE IF NOT EXISTS ki_nutzung (
   id       INTEGER PRIMARY KEY,
@@ -860,6 +862,69 @@ def _init_db(app):
                 FROM   essensplan_eintraege_alt
             """)
             db.execute("DROP TABLE essensplan_eintraege_alt")
+            db.commit()
+
+        # Wunsch #115: Geholfen-Zuweisungen im Aufgabenplan sind jetzt
+        # Einzeltermine (plan_tag, echtes Datum) statt einer fortlaufenden
+        # woechentlichen Regel (wochentag) - Andis ausdrueckliche Entscheidung
+        # nach Rueckfrage (2026-08-02): ALLE Zuweisungen werden umgestellt,
+        # auch bestehende, keine Regel bleibt als Muster erhalten. Die
+        # UNIQUE-Constraint aendert sich (...+wochentag -> ...+plan_tag),
+        # SQLite kann das nicht per ALTER TABLE, deshalb Neubau wie beim
+        # Essensplan oben. Kein FK zeigt AUF kinderplan_eintraege (siehe
+        # Bekannte Issues zur RENAME+Neubau-Falle bei referenzierten
+        # Tabellen) - hier also gefahrlos.
+        # HINWEIS: `db` in dieser Funktion ist eine rohe sqlite3-Verbindung
+        # OHNE row_factory=Row (siehe db=sqlite3.connect(...) oben) - fetchall()
+        # liefert also nackte Tupel, Zugriff nur per Index, nie per Spaltenname
+        # (Live-Fehler beim ersten Deploy-Versuch: "tuple indices must be
+        # integers", siehe journal.md 2026-08-02).
+        alt_tabelle_vorhanden = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kinderplan_eintraege_alt'"
+        ).fetchone()
+        cols = [r[1] for r in db.execute("PRAGMA table_info(kinderplan_eintraege)").fetchall()]
+        if "plan_tag" not in cols:
+            db.execute("ALTER TABLE kinderplan_eintraege RENAME TO kinderplan_eintraege_alt")
+            db.execute("""
+                CREATE TABLE kinderplan_eintraege (
+                  id         INTEGER PRIMARY KEY,
+                  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  aufgabe_id INTEGER NOT NULL REFERENCES geholfen_aufgaben(id) ON DELETE CASCADE,
+                  wochentag  INTEGER NOT NULL,
+                  plan_tag   TEXT,
+                  position   INTEGER NOT NULL DEFAULT 0,
+                  erstellt   TEXT    NOT NULL DEFAULT (datetime('now')),
+                  UNIQUE(user_id, aufgabe_id, plan_tag)
+                )
+            """)
+            alt_tabelle_vorhanden = True
+        # Eigene Bedingung (nicht nur "gerade eben umbenannt"): falls ein
+        # frueherer Deploy-Versuch nach dem Umbenennen/Neuanlegen abgestuerzt
+        # ist, existiert kinderplan_eintraege_alt weiterhin mit unmigrierten
+        # Daten, obwohl die neue Tabelle schon plan_tag hat - dieser Zweig
+        # muss dann trotzdem nochmal laufen, um sauber abzuschliessen.
+        if alt_tabelle_vorhanden:
+            # Jede bestehende woechentliche Regel wird fuer jeden zu ihrem
+            # Wochentag passenden Tag im AKTUELL sichtbaren 14-Tage-Fenster
+            # (aktuelle + naechste Woche, gleiche Berechnung wie in
+            # 13_kinderplan.py) zu einem eigenen Einzeltermin.
+            heute_migration  = date.today()
+            montag_migration = heute_migration - timedelta(days=heute_migration.weekday())
+            fenster = [montag_migration + timedelta(days=i) for i in range(14)]
+            alte_regeln = db.execute(
+                "SELECT id, user_id, aufgabe_id, wochentag, position, erstellt FROM kinderplan_eintraege_alt"
+            ).fetchall()
+            for _id, user_id, aufgabe_id, wochentag, position, erstellt in alte_regeln:
+                for tag in fenster:
+                    if tag.weekday() != wochentag:
+                        continue
+                    db.execute(
+                        "INSERT OR IGNORE INTO kinderplan_eintraege"
+                        "(user_id, aufgabe_id, wochentag, plan_tag, position, erstellt) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (user_id, aufgabe_id, wochentag, tag.isoformat(), position, erstellt),
+                    )
+            db.execute("DROP TABLE kinderplan_eintraege_alt")
             db.commit()
 
         # Einkauf-Kategorien: von hardcodierter Liste in eigene Tabelle (Wunsch #37).
