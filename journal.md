@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-08-02 – portal-v102: Wunsch #107 – Einbettung in Home Assistant (iFrame)
+
+"Prüfe, ob die App/das Familienportal auch in einem iFrame unter
+HomeAssistant lauffähig ist, damit die Apps auch auf dem Home Dashboard
+(24" Portrait-Bildschirm unter Linux/Chrome, nur Kiosk-Ansicht, keine
+Android Kiosk-App!) im Esszimmer lauffähig sind. Dokumentiere die
+Anpassungen, die notwendig sind." Home Assistant läuft unter
+`https://wir4.16schwaben.de` (auf Nachfrage von Andi bestätigt).
+
+Untersucht: kein Frame-Busting-JS im Portal, PWA-Manifest irrelevant fürs
+iFrame, Service Worker/Sync-Polling funktionieren unverändert innerhalb
+eines iFrames (first-party, gleicher Origin). Einziger echter Blocker:
+`X-Frame-Options: DENY` in der Caddyfile - verbietet kategorisch JEDES
+Einbetten, unabhängig von der Quelle.
+
+Fix: `X-Frame-Options: DENY` ersetzt durch
+`Content-Security-Policy: frame-ancestors https://wir4.16schwaben.de` -
+erlaubt Einbetten gezielt NUR von dieser einen Quelle (kein pauschales
+`frame-ancestors *`, das wäre ein Sicherheitsrückschritt). `frame-ancestors`
+ersetzt `X-Frame-Options` auf modernen Browsern vollständig, beide
+gleichzeitig zu setzen wäre widersprüchlich. Ausführliche Dokumentation
+inkl. noch offener, bewusst nicht automatisch entschiedener Punkte (welche
+Nutzer-URL eingebettet wird, Layout auf breitem Portrait-Bildschirm,
+Push-Banner beim ersten Öffnen) jetzt in server.md unter "Security-Headers
+(Caddy)".
+
+### Verifiziert
+
+Header per `curl -I https://portal.16schwaben.de/health`: `X-Frame-Options`
+verschwunden, `Content-Security-Policy: frame-ancestors
+https://wir4.16schwaben.de` vorhanden. Zusätzlich mit einer lokalen
+Testseite auf einer NICHT erlaubten Quelle (`http://localhost:8899`)
+geprüft: das Einbetten wird dort weiterhin blockiert (Netzwerk-Log zeigt
+die geblockte iFrame-Anfrage, derselbe URL-Abruf direkt liefert sauber
+200) - die eigentliche Freigabe für `wir4.16schwaben.de` selbst konnte von
+hier aus nicht getestet werden (kein Zugriff auf dieses System).
+
+**Deployment-Besonderheit:** Caddyfile ist ein Single-File-Bind-Mount
+(`./Caddyfile:/etc/caddy/Caddyfile:ro`) - ein einfaches `tar xzf` ersetzt
+die Datei mit neuem Inode, der laufende Container bleibt aber am alten
+Inode hängen (bekanntes Problem, siehe "Bekannte Issues"). Deshalb gezielt
+`docker compose up -d --force-recreate caddy` statt nur `--build`.
+
+### Auslieferungspaket
+
+`deploy/portal-v102.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v101: Wunsch #106 – Foto-Upload: Mediathek auf iPhone fehlte
 
 "Auf dem iPhone kann ich kein Bild auswählen, um ein Rezept hochzuladen.

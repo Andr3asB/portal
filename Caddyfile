@@ -9,7 +9,14 @@ portal.16schwaben.de {
 	header {
 		Referrer-Policy no-referrer
 		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
+		# Wunsch #107: statt X-Frame-Options DENY (blockiert JEDES Einbetten,
+		# egal von wo) gezielt per CSP frame-ancestors nur Home Assistant
+		# (Kiosk-Dashboard im Esszimmer) erlauben. frame-ancestors ersetzt
+		# X-Frame-Options vollstaendig auf modernen Browsern (Chrome/Safari) -
+		# beide gleichzeitig zu setzen waere widerspruechlich, da ein reines
+		# X-Frame-Options DENY das Einbetten weiterhin verbieten wuerde, selbst
+		# wenn CSP es erlaubt.
+		Content-Security-Policy "frame-ancestors https://wir4.16schwaben.de"
 		-Server
 	}
 	reverse_proxy portal:8000

@@ -70,9 +70,62 @@ Caddy setzt folgende Headers auf alle Antworten:
 ```
 Referrer-Policy: no-referrer
 X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
+Content-Security-Policy: frame-ancestors https://wir4.16schwaben.de
 -Server  (entfernt)
 ```
+
+**Wunsch #107 (2026-08-02): Einbettung in Home Assistant per iFrame.**
+Andi wollte das Portal als iFrame ins Home-Dashboard (Home Assistant unter
+`https://wir4.16schwaben.de`, Kiosk-Bildschirm 24" Portrait im Esszimmer,
+Linux/Chrome, KEINE Android-Kiosk-App) einbetten.
+
+- **Ursache/Blocker:** `X-Frame-Options: DENY` verbot bis dahin JEDES
+  Einbetten, unabhängig von der Quelle - der einzige technische Blocker.
+- **Fix:** `X-Frame-Options` ersetzt durch
+  `Content-Security-Policy: frame-ancestors https://wir4.16schwaben.de` -
+  erlaubt Einbetten NUR von dieser einen Quelle, alle anderen bleiben
+  weiterhin blockiert (kein pauschales `frame-ancestors *`, das wäre ein
+  Sicherheitsrückschritt gegenüber vorher). `frame-ancestors` ersetzt
+  `X-Frame-Options` auf allen relevanten modernen Browsern (Chrome, Safari)
+  vollständig - beide gleichzeitig zu setzen wäre widersprüchlich, ein
+  zusätzliches `X-Frame-Options: DENY` würde weiterhin blocken, selbst wenn
+  die CSP es erlaubt.
+- **Sonst keine Code-Änderung nötig:** kein Frame-Busting-JS im Portal
+  vorhanden (`grep` bestätigt), PWA-Manifest (`display:standalone`) ist für
+  die iFrame-Einbettung irrelevant (wirkt nur bei "Zum Home-Bildschirm
+  hinzufügen"), Service Worker/Sync-Polling funktionieren unverändert
+  innerhalb des iFrames (gleicher Origin, keine Drittanbieter-Cookie-
+  Problematik, da first-party).
+- **Verifiziert:** Header per `curl -I` bestätigt. Zusätzlich mit einer
+  lokalen Testseite auf einer NICHT erlaubten Quelle (`http://localhost`)
+  geprüft, dass das Einbetten dort weiterhin blockiert wird (Netzwerk-Log
+  zeigt die geblockte Anfrage, direkter Abruf derselben URL liefert dagegen
+  sauber 200) - die eigentliche Freigabe für `wir4.16schwaben.de` selbst
+  konnte von hier aus nicht getestet werden (kein Zugriff auf dieses
+  System), sollte aber nach demselben Mechanismus funktionieren.
+- **Noch offene, bewusst NICHT automatisch entschiedene Punkte** (Andis
+  Entscheidung, keine Pflicht zur Umsetzung):
+  - **Welche URL genau eingebettet wird.** Das Portal ist pro Nutzer über
+    eigene Tokens personalisiert (`/p/<token>` zeigt Namen/Gruß/eigene
+    Gruppen des jeweiligen Nutzers). Für einen gemeinsamen Küchen-/
+    Esszimmer-Bildschirm bietet sich eher ein bestimmter, bewusst gewählter
+    Token an (z. B. Andis eigener, oder ein eigens dafür angelegter
+    zusätzlicher Nutzer/Grant) statt zufällig irgendeinen personalisierten
+    Link zu verwenden - Andi muss diese URL selbst im Home-Assistant-
+    Dashboard hinterlegen.
+  - **Layout auf einem breiten 24"-Portrait-Bildschirm.** Alle Templates
+    sind mobile-first mit Grid/Flexbox responsiv gebaut (kein einziges
+    `max-width` auf der ganzen Seite), rendern auf einem breiten Bildschirm
+    also technisch fehlerfrei, aber ggf. recht breit/spärlich gefüllt statt
+    optimiert (z. B. die App-Kacheln würden sich in sehr viele Spalten
+    aufteilen). Kein Blocker, aber ein möglicher Folge-Wunsch, falls das
+    optisch stört.
+  - **Push-Banner beim ersten Öffnen:** Falls für den gewählten Token noch
+    kein Push-Abo besteht, erscheint einmalig der "Benachrichtigungen
+    aktivieren"-Banner auf der Startseite - für einen dauerhaft offenen
+    Kiosk-Bildschirm vermutlich unerwünscht, lässt sich aber durch
+    einmaliges Wegtippen oder durch Aktivieren/Ablehnen der Browser-
+    Berechtigung dauerhaft loswerden, keine Code-Änderung nötig.
 
 ## Umgebungsvariablen (.env auf dem Server)
 
