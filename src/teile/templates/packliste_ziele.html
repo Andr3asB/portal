@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set app_slug = "packliste" %}
+{% block title %}Ziele verwalten{% endblock %}
+
+{% block extra_styles %}
+.form-card { background:var(--surface); border-radius:14px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow); }
+.form-row { display:flex; gap:8px; }
+.form-input {
+  flex:1; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.form-input:focus { border-color:var(--farbe); }
+.btn-add { background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:9px 16px; font-size:15px; cursor:pointer; }
+.ziel-item {
+  background:var(--surface); border-radius:12px; padding:12px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  display:flex; align-items:center; gap:12px;
+}
+.ziel-item.inaktiv { opacity:.4; }
+.ziel-name { flex:1; font-size:15px; font-weight:500; }
+.btn-toggle {
+  background:none; border:1.5px solid var(--border); border-radius:8px;
+  padding:6px 10px; font-size:13px; cursor:pointer; color:var(--text-2);
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/packliste/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🎯 Ziele</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  <div class="form-card">
+    <form method="post">
+      <input type="hidden" name="action" value="neu">
+      <div class="form-row">
+        <input class="form-input" type="text" name="name" placeholder="z. B. Sommerurlaub Ostsee" required>
+        <button class="btn-add" type="submit">+ Hinzufügen</button>
+      </div>
+    </form>
+  </div>
+
+  {% for z in ziele %}
+  <div class="ziel-item {% if not z.aktiv %}inaktiv{% endif %}">
+    <span class="ziel-name">{{ z.name }}</span>
+    <form method="post">
+      <input type="hidden" name="action" value="toggle">
+      <input type="hidden" name="id" value="{{ z.id }}">
+      <button class="btn-toggle" type="submit">{% if z.aktiv %}Deaktivieren{% else %}Aktivieren{% endif %}</button>
+    </form>
+  </div>
+  {% endfor %}
+</main>
+{% endblock %}

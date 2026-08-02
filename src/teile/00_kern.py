@@ -107,6 +107,28 @@ CREATE TABLE IF NOT EXISTS einkauf_eintrag_laeden (
   laden_id   INTEGER NOT NULL REFERENCES einkauf_laeden(id) ON DELETE CASCADE,
   PRIMARY KEY (eintrag_id, laden_id)
 );
+CREATE TABLE IF NOT EXISTS packlisten_ziele (
+  id    INTEGER PRIMARY KEY,
+  name  TEXT    NOT NULL UNIQUE,
+  aktiv INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS packlisten_kategorien (
+  id       INTEGER PRIMARY KEY,
+  name     TEXT    NOT NULL UNIQUE,
+  position INTEGER NOT NULL DEFAULT 0,
+  aktiv    INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS packlisten_eintraege (
+  id           INTEGER PRIMARY KEY,
+  name         TEXT    NOT NULL,
+  ziel_id      INTEGER NOT NULL REFERENCES packlisten_ziele(id) ON DELETE CASCADE,
+  kategorie_id INTEGER REFERENCES packlisten_kategorien(id),
+  person_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  gepackt      INTEGER NOT NULL DEFAULT 0,
+  gepackt_am   TEXT,
+  erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
+  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
 CREATE TABLE IF NOT EXISTS home_gruppen (
   id       INTEGER PRIMARY KEY,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -268,6 +290,11 @@ _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller",
 
 _DEFAULT_KATEGORIEN = [
     "Obst & Gemüse", "Kühlregal", "Wurst & Käse", "Trockenvorrat", "TK", "Convenience", "Sonstiges",
+]
+
+_DEFAULT_PACKLISTEN_KATEGORIEN = [
+    "Anreise", "Kleidung", "Bad & Hygiene", "FeWo-Küche",
+    "Reiseapotheke", "Technik", "Freizeit", "Sonstiges",
 ]
 
 _DEFAULT_AUFGABEN = [
@@ -824,6 +851,14 @@ def _init_db(app):
                 db.execute(
                     "INSERT INTO einkauf_kategorien(name, position) VALUES(?,?)", (name, pos)
                 )
+
+        # Packliste (Wunsch #111): Kategorien vorbelegen, analog zu Einkauf.
+        if db.execute("SELECT COUNT(*) FROM packlisten_kategorien").fetchone()[0] == 0:
+            for pos, name in enumerate(_DEFAULT_PACKLISTEN_KATEGORIEN):
+                db.execute(
+                    "INSERT INTO packlisten_kategorien(name, position) VALUES(?,?)", (name, pos)
+                )
+            db.commit()
         for col, definition in [
             ("kategorie_id", "INTEGER REFERENCES einkauf_kategorien(id)"),
         ]:

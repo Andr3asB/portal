@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% set app_slug = "packliste" %}
+{% block title %}Packliste{% endblock %}
+
+{% block extra_styles %}
+.header-title { font-size:22px; font-weight:700; }
+/* Ziel-Auswahl (Wunsch #111): immer genau EIN aktives Ziel gleichzeitig,
+   analog zum Zeitraum-Umschalter der Sportschau. */
+.ziel-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.ziel-btn {
+  flex:1; min-width:100px; text-align:center; border:1.5px solid var(--border); border-radius:12px;
+  padding:9px 10px; font-size:14px; font-weight:600; font-family:inherit;
+  background:var(--surface); color:var(--text); cursor:pointer;
+  text-decoration:none; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ziel-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+/* Eingabe */
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.btn-neu-toggle, .btn-filter-toggle, .btn-packen-start {
+  flex:1; display:block; background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  font-weight:600; cursor:pointer; white-space:nowrap;
+}
+.add-card, .filter-card {
+  background:var(--surface); border-radius:16px; padding:14px 16px;
+  margin-bottom:14px; box-shadow:0 1px 3px var(--shadow);
+  display:none;
+}
+.add-card.open, .filter-card.open { display:block; }
+.btn-los { margin-top:12px; }
+.btn-los:disabled { opacity:.4; cursor:default; }
+/* Packmodus (analog Einkaufsmodus, Wunsch #87 Teil 2) */
+#packmodus-leiste {
+  display:none; position:sticky; top:0; z-index:5; background:var(--farbe); color:#fff;
+  align-items:center; justify-content:space-between; padding:10px 14px;
+  border-radius:12px; margin-bottom:14px; font-weight:600;
+}
+.btn-packmodus-beenden {
+  background:#fff; color:var(--farbe); border:none; border-radius:8px;
+  padding:7px 16px; font-weight:600; cursor:pointer;
+}
+body.packmodus .top-aktionen, body.packmodus .add-card, body.packmodus .ziel-row {
+  display:none !important;
+}
+body.packmodus .item-check { width:32px; height:32px; }
+body.packmodus .item-card { padding:16px 18px; }
+body.packmodus .item-name { font-size:18px; }
+.add-row { display:flex; gap:8px; margin-bottom:8px; }
+.add-input {
+  flex:1; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.add-input:focus { border-color:var(--farbe); }
+.btn-add {
+  background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
+  white-space:nowrap; width:100%; margin-top:4px;
+}
+.btn-add:disabled { opacity:.4; cursor:default; }
+.field-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px;
+  margin:10px 0 6px;
+}
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:9px 14px; font-size:14px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+/* Kategorie-Gruppen */
+.kat-label {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.6px;
+  margin:14px 0 6px;
+}
+/* Items */
+.item-card {
+  background:var(--surface); border-radius:12px; padding:10px 14px;
+  margin-bottom:6px; box-shadow:0 1px 3px var(--shadow);
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+}
+.item-card.gepackt { opacity:.45; }
+.item-check {
+  width:24px; height:24px; flex-shrink:0; cursor:pointer;
+  accent-color:var(--farbe);
+}
+.item-name { flex:1; font-size:15px; font-weight:500; color:var(--text); }
+.item-card.gepackt .item-name { text-decoration:line-through; }
+.badge-person {
+  display:inline-flex; align-items:center; gap:3px;
+  border-radius:8px; padding:2px 8px; font-size:12px; font-weight:600;
+  white-space:nowrap;
+}
+.item-edit-toggle {
+  background:none; border:none; font-size:13px; cursor:pointer;
+  color:var(--text-2); padding:2px 4px; border-radius:6px;
+}
+.item-edit-toggle:hover { background:var(--surface-2); }
+.edit-panel {
+  display:none; flex-direction:column; align-items:stretch; gap:10px;
+  flex:1 0 100%; margin-top:8px; padding-top:10px;
+  border-top:1px solid var(--border);
+}
+.btn-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:7px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
+  align-self:flex-start;
+}
+.btn-loeschen-inline {
+  background:none; border:none; color:#ff3b30; font-size:13px;
+  cursor:pointer; padding:4px 0; align-self:flex-start;
+}
+.gepackt-section { margin-top:20px; }
+.gepackt-label { font-size:12px; color:var(--text-2); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:.6px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🧳 Packliste</div>
+<div class="nav-sub">{% if aktives_ziel_id %}{{ ziele|selectattr("id","equalto",aktives_ziel_id)|map(attribute="name")|first }}{% else %}Kein Ziel{% endif %}</div>
+{% endblock %}
+
+{% macro item_card(item, token, kategorien, personen) %}
+<div class="item-card{% if item.gepackt %} gepackt{% endif %}" id="item-{{ item.id }}"
+     data-kategorie="{{ item.kategorie_id }}" data-person="{{ item.person_id or '' }}">
+  <input class="item-check" type="checkbox"
+         onchange="toggleGepackt({{ item.id }}, this)"
+         {% if item.gepackt %}checked{% endif %}>
+  <span class="item-name">{{ item.name }}</span>
+
+  {% if item.person_id %}
+    <span class="badge-person" style="background:{{ item.person_farbe }}22; color:{{ item.person_farbe }}">{{ item.person_name }}</span>
+  {% endif %}
+
+  <button class="item-edit-toggle" type="button"
+          onclick="toggleEditPanel({{ item.id }})"
+          title="Bearbeiten">✏️</button>
+
+  <div class="edit-panel" id="edit-panel-{{ item.id }}">
+    <form method="post" action="/a/packliste/{{ token }}/bearbeiten/{{ item.id }}" class="edit-form">
+      <div class="field-label">Name</div>
+      <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
+
+      <div class="field-label">Kategorie</div>
+      <div class="btn-row kat-row">
+        {% for k in kategorien %}
+        <button type="button" class="chip-btn{% if k.id == item.kategorie_id %} active{% endif %}" data-value="{{ k.id }}">{{ k.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="kategorie_id" value="{{ item.kategorie_id }}" class="kat-hidden">
+
+      <div class="field-label">Person</div>
+      <div class="btn-row person-row">
+        <button type="button" class="chip-btn{% if not item.person_id %} active{% endif %}" data-value="">🌐 Allgemein</button>
+        {% for p in personen %}
+        <button type="button" class="chip-btn{% if p.id == item.person_id %} active{% endif %}" data-value="{{ p.id }}">{{ p.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="person_id" value="{{ item.person_id or '' }}" class="person-hidden">
+
+      <button type="submit" class="btn-save form-submit-btn">Speichern</button>
+    </form>
+
+    <form method="post" action="/a/packliste/{{ token }}/loeschen/{{ item.id }}"
+          onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+      <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
+    </form>
+  </div>
+</div>
+{% endmacro %}
+
+{% block body %}
+
+<main class="main">
+
+  {% if not ziele %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Noch kein Ziel angelegt 🎯<br>
+    <span style="font-size:13px">
+      {% if user.is_admin %}
+      <a href="/a/packliste/{{ token }}/ziele">Lege zuerst ein Ziel an</a> (z. B. "Sommerurlaub").
+      {% else %}
+      Bitte einen Admin, zuerst ein Ziel anzulegen.
+      {% endif %}
+    </span>
+  </div>
+  {% else %}
+
+  <div class="ziel-row">
+    {% for z in ziele %}
+    <a class="ziel-btn{% if z.id == aktives_ziel_id %} active{% endif %}" href="?ziel={{ z.id }}">{{ z.name }}</a>
+    {% endfor %}
+  </div>
+
+  <div id="packmodus-leiste">
+    <span>🧳 Packen <span id="packmodus-person-name"></span></span>
+    <button type="button" class="btn-packmodus-beenden" id="packmodus-beenden-btn">Beenden</button>
+  </div>
+
+  <div class="top-aktionen">
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
+    <button type="button" class="btn-packen-start" id="packen-start-btn">🧳 Packen starten</button>
+  </div>
+
+  <div class="filter-card" id="packen-person-card">
+    <div class="field-label">Für wen packst du gerade?</div>
+    <div class="btn-row" id="packen-person-row">
+      <button type="button" class="chip-btn" data-value="allgemein">🌐 Allgemein</button>
+      {% for p in personen %}
+      <button type="button" class="chip-btn" data-value="{{ p.id }}">{{ p.name }}</button>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn-add btn-los" id="packen-los-btn" disabled>Los geht's</button>
+  </div>
+
+  <div class="add-card" id="add-form-card">
+    <form method="post" action="/a/packliste/{{ token }}/add" id="add-form">
+      <input type="hidden" name="ziel_id" value="{{ aktives_ziel_id }}">
+      <div class="add-row">
+        <input class="add-input" type="text" name="name" id="add-name"
+               placeholder="Was muss mit?" required autocomplete="off">
+      </div>
+
+      <div class="field-label">Kategorie wählen</div>
+      <div class="btn-row kat-row">
+        {% for k in kategorien %}
+        <button type="button" class="chip-btn" data-value="{{ k.id }}">{{ k.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="kategorie_id" class="kat-hidden">
+
+      <div class="field-label">Für wen?</div>
+      <div class="btn-row person-row">
+        <button type="button" class="chip-btn active" data-value="">🌐 Allgemein</button>
+        {% for p in personen %}
+        <button type="button" class="chip-btn" data-value="{{ p.id }}">{{ p.name }}</button>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="person_id" class="person-hidden" value="">
+
+      <button class="btn-add form-submit-btn" type="submit" disabled>+ Hinzufügen</button>
+    </form>
+  </div>
+
+  {% set has_items = namespace(v=false) %}
+  {% for kat in kategorien %}
+    {% if gruppen[kat.id] %}
+      {% set has_items.v = true %}
+      <div class="kat-label" data-kategorie-label="{{ kat.id }}">{{ kat.name }}</div>
+      {% for item in gruppen[kat.id] %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+    {% endif %}
+  {% endfor %}
+
+  {% if unsortiert %}
+    {% set has_items.v = true %}
+    <div class="kat-label" data-kategorie-label="">Ohne Kategorie</div>
+    {% for item in unsortiert %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+  {% endif %}
+
+  {% if not has_items.v %}
+  <div style="text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+    Nichts auf der Packliste 🎉<br>
+    <span style="font-size:13px">Füge oben etwas hinzu.</span>
+  </div>
+  {% endif %}
+
+  <div id="packmodus-keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">Für diese Auswahl ist nichts auf der Liste 🎉</div>
+
+  {% if gepackte %}
+  <div class="gepackt-section">
+    <div class="gepackt-label">✓ Gepackt</div>
+    {% for item in gepackte %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TOKEN = '{{ token }}';
+
+function toggleGepackt(id, cb) {
+  const zielChecked = cb.checked;
+  const card = document.getElementById('item-' + id);
+  if (card) card.classList.toggle('gepackt', zielChecked);
+
+  fetch(`/a/packliste/${TOKEN}/gepackt/${id}`, {
+    method: 'POST',
+    headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `wert=${zielChecked ? '1' : '0'}`,
+  }).then(r => r.json()).then(d => {
+    if (!d.ok || !card) return;
+    if (d.gepackt && !card.closest('.gepackt-section')) {
+      moveToGepacktTop(card);
+    } else if (!d.gepackt && card.closest('.gepackt-section')) {
+      location.reload();
+    }
+  }).catch(() => { /* keine Warteschlange in Version 1 - Aenderung geht bei Netzwerkfehler verloren */ });
+}
+
+function moveToGepacktTop(card) {
+  const kategorie = card.dataset.kategorie;
+  let section = document.querySelector('.gepackt-section');
+  if (!section) {
+    section = document.createElement('div');
+    section.className = 'gepackt-section';
+    const label = document.createElement('div');
+    label.className = 'gepackt-label';
+    label.textContent = '✓ Gepackt';
+    section.appendChild(label);
+    document.querySelector('main.main').appendChild(section);
+  }
+  section.querySelector('.gepackt-label').insertAdjacentElement('afterend', card);
+
+  const nochOffen = [...document.querySelectorAll('.item-card[data-kategorie]')]
+    .some(el => el.dataset.kategorie === kategorie && !el.closest('.gepackt-section'));
+  if (!nochOffen) {
+    document.querySelector(`.kat-label[data-kategorie-label="${CSS.escape(kategorie)}"]`)?.remove();
+  }
+}
+
+// "+ Neu"-Formular bleibt ueber mehrere Eintraege hinweg offen, wie bei Einkauf.
+const PACKLISTE_OFFEN_KEY = 'packliste_formular_offen';
+
+function setFormularOffen(offen) {
+  const card = document.getElementById('add-form-card');
+  if (!card) return;
+  card.classList.toggle('open', offen);
+  try { sessionStorage.setItem(PACKLISTE_OFFEN_KEY, offen ? '1' : '0'); } catch (e) {}
+}
+
+document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
+  const card = document.getElementById('add-form-card');
+  const nowOpen = !card.classList.contains('open');
+  setFormularOffen(nowOpen);
+  if (nowOpen) document.getElementById('add-name')?.focus();
+});
+
+if (sessionStorage.getItem(PACKLISTE_OFFEN_KEY) === '1') {
+  setFormularOffen(true);
+}
+
+function toggleEditPanel(id) {
+  const p = document.getElementById('edit-panel-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// Gemeinsame Logik fuer Kategorie-/Person-Chips, sowohl Neu-Formular als
+// auch jedes Edit-Panel (gleiches Muster wie Einkaufs wireKategorieAngebotForm).
+function wireKategoriePersonForm(root) {
+  if (!root) return;
+  const katRow       = root.querySelector('.kat-row');
+  const katHidden     = root.querySelector('.kat-hidden');
+  const personRow     = root.querySelector('.person-row');
+  const personHidden  = root.querySelector('.person-hidden');
+  const submitBtn     = root.querySelector('.form-submit-btn');
+
+  function updateSubmit() {
+    if (!submitBtn) return;
+    submitBtn.disabled = !katHidden.value;
+  }
+
+  if (katRow) {
+    katRow.querySelectorAll('.chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        katRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        katHidden.value = btn.dataset.value;
+        updateSubmit();
+      });
+    });
+  }
+
+  if (personRow) {
+    personRow.querySelectorAll('.chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        personRow.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        personHidden.value = btn.dataset.value;
+      });
+    });
+  }
+
+  updateSubmit();
+}
+
+wireKategoriePersonForm(document.getElementById('add-form'));
+document.querySelectorAll('.edit-panel .edit-form').forEach(form => {
+  wireKategoriePersonForm(form);
+});
+
+// Kategorie/Person merken sich die letzte Auswahl ueber mehrere hintereinander
+// hinzugefuegte Eintraege hinweg - gleiches Muster wie Einkaufs Wunsch #58.
+const PACKLISTE_STORAGE_KEY = 'packliste_letzte_auswahl';
+
+function speichereLetzteAuswahl() {
+  const form = document.getElementById('add-form');
+  if (!form) return;
+  const daten = {
+    kategorie_id: form.querySelector('.kat-hidden').value,
+    person_id: form.querySelector('.person-hidden').value,
+  };
+  try { sessionStorage.setItem(PACKLISTE_STORAGE_KEY, JSON.stringify(daten)); } catch (e) {}
+}
+
+function wendeLetzteAuswahlAn() {
+  const form = document.getElementById('add-form');
+  if (!form) return;
+  let daten;
+  try { daten = JSON.parse(sessionStorage.getItem(PACKLISTE_STORAGE_KEY) || 'null'); } catch (e) { daten = null; }
+  if (!daten) return;
+  if (daten.kategorie_id) {
+    form.querySelector(`.kat-row .chip-btn[data-value="${CSS.escape(daten.kategorie_id)}"]`)?.click();
+  }
+  if (daten.person_id) {
+    form.querySelector(`.person-row .chip-btn[data-value="${CSS.escape(daten.person_id)}"]`)?.click();
+  }
+}
+wendeLetzteAuswahlAn();
+
+document.getElementById('add-form')?.addEventListener('submit', () => {
+  speichereLetzteAuswahl();
+});
+
+// Packmodus (analog Einkaufs "Einkauf starten", Wunsch #87 Teil 2): Person
+// waehlen, dann nur noch deren Eintraege + allgemeine zeigen (bzw. NUR die
+// allgemeinen bei "Allgemein"). Groessere Tap-Flaechen per body.packmodus.
+document.getElementById('packen-start-btn')?.addEventListener('click', () => {
+  const card = document.getElementById('packen-person-card');
+  card.classList.toggle('open');
+});
+
+let packmodusPersonWert = null;
+
+document.querySelectorAll('#packen-person-row .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#packen-person-row .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    packmodusPersonWert = btn.dataset.value;
+    document.getElementById('packen-los-btn').disabled = false;
+  });
+});
+
+document.getElementById('packen-los-btn')?.addEventListener('click', () => {
+  if (!packmodusPersonWert) return;
+  const personBtn = document.querySelector(`#packen-person-row .chip-btn[data-value="${CSS.escape(packmodusPersonWert)}"]`);
+  document.getElementById('packen-person-card').classList.remove('open');
+  document.getElementById('packmodus-person-name').textContent = 'für ' + (personBtn?.textContent || '');
+  document.body.classList.add('packmodus');
+  document.getElementById('packmodus-leiste').style.display = 'flex';
+
+  let sichtbareGesamt = 0;
+  document.querySelectorAll('.item-card').forEach(card => {
+    const person = card.dataset.person || '';
+    let sichtbar;
+    if (packmodusPersonWert === 'allgemein') {
+      sichtbar = !person;
+    } else {
+      sichtbar = !person || person === packmodusPersonWert;
+    }
+    card.style.display = sichtbar ? '' : 'none';
+    if (sichtbar) sichtbareGesamt++;
+  });
+  aktualisiereKatLabels();
+  document.getElementById('packmodus-keine-treffer').style.display = sichtbareGesamt === 0 ? 'block' : 'none';
+});
+
+document.getElementById('packmodus-beenden-btn')?.addEventListener('click', () => {
+  document.body.classList.remove('packmodus');
+  document.getElementById('packmodus-leiste').style.display = 'none';
+  document.getElementById('packmodus-keine-treffer').style.display = 'none';
+  document.querySelectorAll('.item-card').forEach(card => { card.style.display = ''; });
+  aktualisiereKatLabels();
+  packmodusPersonWert = null;
+  document.querySelectorAll('#packen-person-row .chip-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('packen-los-btn').disabled = true;
+});
+
+function aktualisiereKatLabels() {
+  document.querySelectorAll('.kat-label').forEach(label => {
+    const kat = label.dataset.kategorieLabel;
+    const hatSichtbare = [...document.querySelectorAll(`.item-card[data-kategorie="${CSS.escape(kat)}"]`)]
+      .some(el => el.style.display !== 'none' && !el.closest('.gepackt-section'));
+    label.style.display = hatSichtbare ? '' : 'none';
+  });
+}
+
+// Vorschlag per Enter bestaetigen und Fokus halten
+const addName = document.getElementById('add-name');
+if (addName) {
+  addName.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.querySelector('#add-form .form-submit-btn')?.click();
+    }
+  });
+}
+</script>
+{% endblock %}

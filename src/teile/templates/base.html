@@ -240,7 +240,8 @@
     {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin and token is defined and token %}
     {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
     {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and token is defined and token %}
-    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items %}
+    {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and user.is_admin and token is defined and token %}
+    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items or zeigt_packliste_items %}
     <div class="menu-divider"></div>
 
     {% if zeigt_geholfen_items %}
@@ -281,6 +282,15 @@
     {% if zeigt_todo_items %}
     <a class="menu-item" href="/a/todo/{{ token }}/serien">
       <span class="menu-emoji">🔁</span>Wiederkehrende Aufgaben
+    </a>
+    {% endif %}
+
+    {% if zeigt_packliste_items %}
+    <a class="menu-item" href="/a/packliste/{{ token }}/ziele">
+      <span class="menu-emoji">🎯</span>Ziele verwalten
+    </a>
+    <a class="menu-item" href="/a/packliste/{{ token }}/kategorien">
+      <span class="menu-emoji">🗂️</span>Kategorien verwalten
     </a>
     {% endif %}
 

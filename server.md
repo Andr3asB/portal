@@ -546,6 +546,36 @@ teile/
                        Sessions. 🔊-Knopf fuer /wort/<vid>/audio auch direkt
                        in der Vokabelliste auf der Hauptseite, nicht nur im
                        Trainer (Wunsch #84)
+  17_packliste.py    – /a/packliste/<token>/ Packlisten fuer Reisen/Ausfluege
+                       (Wunsch #111), bewusst sehr aehnlich zu 10_einkauf.py
+                       aufgebaut, drei Unterschiede (vorab per Rueckfrage mit
+                       Andi geklaert, siehe Docstring am Dateianfang):
+                       (1) Ziele (packlisten_ziele: Reisen/Ausfluege) statt
+                       Maerkte - genau wie Maerkte nur anlegen/deaktivieren,
+                       bewusst OHNE Umbenennen (Andi nannte es explizit "wie
+                       ein Markt", Laeden koennen ebenfalls nicht umbenannt
+                       werden); (2) ein Eintrag gehoert zu GENAU EINEM Ziel
+                       (nicht wie Angebote bei mehreren Maerkten) - die
+                       Uebersicht zeigt deshalb IMMER nur ein aktives Ziel
+                       gleichzeitig (`?ziel=<id>`, Default: erstes aktives
+                       Ziel, `_aktives_ziel()`) - anders als die Einkaufsliste
+                       (eine einzige Dauerliste) ist eine Packliste zeitlich
+                       an eine Reise gebunden; (3) ein Eintrag kann zusaetzlich
+                       einer Person zugeordnet sein (`person_id`, NULL =
+                       "allgemein"). "🧳 Packen starten" (Packmodus, analog zu
+                       Einkaufs "Einkauf starten" Wunsch #87 Teil 2): Person
+                       waehlen, zeigt dann deren Eintraege PLUS alle
+                       allgemeinen; "🌐 Allgemein" zeigt NUR die allgemeinen.
+                       Kategorien (packlisten_kategorien, vorbelegt: Anreise/
+                       Kleidung/Bad & Hygiene/FeWo-Küche/Reiseapotheke/
+                       Technik/Freizeit/Sonstiges) anlegen/umbenennen/
+                       deaktivieren/pos.-sortierbar wie bei Einkauf (identischer
+                       Code, nur Tabellennamen getauscht). Bewusst NICHT Teil
+                       von Version 1 (keine Anforderung, spaeterer Einkaufs-
+                       Wunsch): Offline-Faehigkeit, automatische
+                       Synchronisierung (Wunsch #100), "Filtern"-Knopf
+                       (Wunsch #87 Teil 1) - koennen bei Bedarf per eigenem
+                       Folge-Wunsch nachgezogen werden.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -593,6 +623,22 @@ teile/
                               ✏️-Panel zum Umbenennen, aktivieren/deaktivieren;
                               ⠿-Drag&Drop zum Umsortieren (Wunsch #38, großzügiger
                               Tap-Target seit Wunsch #46)
+    packliste.html          – Packliste (Wunsch #111): Ziel-Umschalter oben
+                              (immer nur ein Ziel aktiv), Kategorie-Gruppen wie
+                              Einkauf, "🧳 Packen starten" (Personenwahl, dann
+                              body.packmodus wie Einkaufs Einkaufsmodus),
+                              Person-Badge je Eintrag (Nutzerfarbe, "22"-Alpha-
+                              Suffix fürs transparente Hintergrund-Hex); letzte
+                              Kategorie/Person-Auswahl bleibt übers Hinzufügen-
+                              Formular hinweg per sessionStorage erhalten
+                              (gleiches Muster wie Einkaufs Wunsch #58)
+    packliste_ziele.html    – Ziel-Verwaltung (Admin) - anlegen/aktivieren/
+                              deaktivieren, bewusst ohne Umbenennen (wie
+                              einkauf_laeden.html)
+    packliste_kategorien.html – Kategorien-Verwaltung (Admin) - Code praktisch
+                              identisch zu einkauf_kategorien.html (anlegen,
+                              ✏️-Panel umbenennen, aktivieren/deaktivieren,
+                              ⠿-Drag&Drop zum Umsortieren)
     rezepte.html            – Rezeptliste + "+ Neues Rezept"-Button (Wunsch #48);
                               Live-Suche über Titel+Zutaten ab 3 Zeichen (Wunsch #49)
                               + Kategorie-Filter-Chips (Wunsch #55), beide Filter
@@ -762,6 +808,9 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `einkauf_laeden` | id, name, aktiv |
 | `einkauf_kategorien` | id, name (UNIQUE), position, aktiv |
 | `einkauf_eintraege` | id, name, kategorie (Alttext, historisch), kategorie_id (FK einkauf_kategorien), angebot, laden_id, erledigt, erledigt_am, erstellt, erstellt_von, geaendert (Wunsch #100: bei jedem INSERT/UPDATE explizit gesetzt, Grundlage für den /stand-Sync-Fingerabdruck) |
+| `packlisten_ziele` | id, name (UNIQUE), aktiv – Wunsch #111, wie einkauf_laeden aber ohne Umbenennen |
+| `packlisten_kategorien` | id, name (UNIQUE), position, aktiv – Wunsch #111, identisch zu einkauf_kategorien |
+| `packlisten_eintraege` | id, name, ziel_id (FK packlisten_ziele, cascade – ein Eintrag gehört zu GENAU EINEM Ziel), kategorie_id (FK packlisten_kategorien), person_id (FK users, SET NULL – NULL = "allgemein"), gepackt, gepackt_am, erstellt, erstellt_von |
 | `rezepte` | id, name, portionen (Freitext, z. B. "4" oder "4-6 Portionen"), kategorie ('kochen'/'backen'/NULL – Wunsch #55), quelle_url (NULL außer bei URL-Import – Wunsch #63), anleitung (totes Altfeld, siehe Bekannte Issues), erstellt_von, erstellt |
 | `rezept_zutaten` | id, rezept_id (FK rezepte, cascade), name, position |
 | `rezept_schritte` | id, rezept_id (FK rezepte, cascade), text, position – ein Zubereitungsschritt pro Zeile, analog zu rezept_zutaten |
@@ -800,6 +849,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `sportschau` | Sportschau | 🏃 | Trainings-Heatmap vom hae-Server (Wunsch #62) | – (nur Andi) |
 | `tierbaukasten` | Tierbaukasten | 🐾 | Eigene Figur (Mensch/Tier) aus Bausteinen, 3-Schritte-Assistent (Wunsch #64+#66+#69) | – (alle vier granted) |
 | `vokabeln` | Vokabeln | 📚 | Vokabeln lernen mit Sprachen, Kapiteln und Trainer (Wunsch #73) | – (Andi, Simone, Friederike granted) |
+| `packliste` | Packliste | 🧳 | Packlisten für Reisen/Ausflüge, je Ziel eine eigene Liste (Wunsch #111) | – (zunächst nur Andi als Urheber) |
 
 ## Hamburger-Menü (verpflichtende Struktur, seit Wunsch #32)
 

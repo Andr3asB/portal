@@ -2,6 +2,88 @@
 
 ---
 
+## 2026-08-02 – portal-v104: Wunsch #111 – Neue App: Packliste
+
+"Wir brauchen eine neue App: Packliste. Sehr ähnlich zur Einkaufsliste.
+Es gibt Ziele (Urlaube, Ausflüge), die wie ein Markt angelegt/deaktiviert
+werden können. Es gibt Kategorien (Anreise, Kleidung, Bad&Hygiene,
+FeWo-Küche, Reiseapotheke, Technik, Freizeit, Sonstiges), die auch
+sortiert werden können sollen. Und es gibt die Einträge, die aber
+jeweils noch an eine Person verknüpft werden können sollen. Dann gibt es
+den 'Packmodus' wie den 'Einkaufs starten', und man kann je Person oder
+allgemein zu packen beginnen. Denke die Oberfläche sorgfältig durch,
+bevor du die App entwickelst!"
+
+### Vorab geklärte Design-Entscheidungen (per Rückfrage, 2026-08-02)
+
+Drei architektonisch wichtige Fragen vor dem Bauen geklärt, da der Wunsch
+selbst mehrdeutig ließ, wie eng die Analogie zur Einkaufsliste gemeint
+war:
+
+1. **Ziel-Scope:** Die Übersicht zeigt immer nur EIN aktives Ziel
+   gleichzeitig (wie ein eigener "Ordner" pro Reise), nicht alle Ziele
+   gemeinsam mit Ziel-Badge wie bei Einkaufs Mehrfach-Märkten - eine
+   Packliste ist anders als die Einkaufsliste zeitlich an eine Reise
+   gebunden, kein Dauer-Zustand.
+2. **Ziel-Zuordnung:** Ein Eintrag gehört zu GENAU EINEM Ziel, nicht
+   mehreren gleichzeitig (anders als Angebote bei mehreren Märkten).
+3. **Personen-Zuordnung:** Ein Eintrag ist entweder einer Person
+   zugeordnet ODER "allgemein" (niemandem) - nicht mehreren Personen
+   gleichzeitig. Packmodus je Person zeigt: deren Einträge + alle
+   allgemeinen; "Allgemein" zeigt NUR die allgemeinen.
+
+### Architektur
+
+Neues Modul `17_packliste.py`, bewusst sehr eng an `10_einkauf.py`
+angelehnt (Code für Kategorien-Verwaltung inkl. Drag&Drop-Reorder ist
+praktisch 1:1 übernommen, nur Tabellennamen getauscht). Drei neue
+Tabellen: `packlisten_ziele` (wie `einkauf_laeden`, aber bewusst OHNE
+Umbenennen - Andi nannte es explizit "wie ein Markt", Läden unterstützen
+ebenfalls kein Umbenennen), `packlisten_kategorien` (identisch zu
+`einkauf_kategorien`, vorbelegt mit Andis acht genannten Kategorien),
+`packlisten_eintraege` (`ziel_id` FK cascade, `kategorie_id` FK,
+`person_id` FK auf `users`, SET NULL = "allgemein").
+
+`?ziel=<id>` in der URL bestimmt das aktive Ziel (`_aktives_ziel()`,
+Default: erstes aktives Ziel), analog zu Sportschaus `?tage=`-Muster.
+"🧳 Packen starten" (Packmodus) übernimmt Einkaufs Wunsch-#87-Teil-2-
+Muster fast unverändert: Person statt Markt wählen, dann body.packmodus
++ reine Client-Filterung über `data-person`-Attribute, kein Server-
+Roundtrip. Kategorie/Person-Auswahl merkt sich die letzte Wahl übers
+Hinzufügen-Formular hinweg (sessionStorage, wie Einkaufs Wunsch #58).
+
+Bewusst NICHT Teil dieser ersten Version (keine Anforderung des
+Wunsches, bei Einkauf jeweils spätere separate Wünsche): Offline-
+Fähigkeit, automatische Synchronisierung (Wunsch #100), ein eigener
+"Filtern"-Knopf (Wunsch #87 Teil 1). Zugriff zunächst nur für Andi als
+Urheber (`grant 1 packliste`) - wie bei jeder neuen App dieser Session,
+Andi kann anderen selbst über den Admin-Bereich Zugriff geben.
+
+### Verifiziert
+
+Vollständiger Durchlauf im Browser (echte Formular-Interaktionen, keine
+direkten SQL-Einträge): Leer-Zustand ohne Ziel zeigt korrekten Hinweis;
+Ziel "Sommerurlaub Ostsee" angelegt, wird automatisch als aktives Ziel
+ausgewählt; Eintrag "T-Shirts" (Kategorie Kleidung, Person Friederike)
+und "Reiseapotheke" (Kategorie Reiseapotheke) angelegt - dabei einen
+eigenen Testfehler gemacht (die "letzte Auswahl merken"-Funktion hatte
+Friederike noch aktiv, per Edit-Panel auf "Allgemein" korrigiert - kein
+App-Bug, sondern derselbe Effekt wie Einkaufs Markt-Erinnerung, die
+sichtbar aktive Auswahl muss vor dem Speichern geprüft werden).
+Packmodus für "Friederike" zeigt korrekt beide Einträge (eigener +
+allgemeiner), Packmodus für "Allgemein" zeigt korrekt NUR den
+allgemeinen Eintrag, T-Shirts bleibt versteckt. Gepackt-Toggle verschiebt
+die Karte korrekt in den "Gepackt"-Abschnitt. Kategorien-Verwaltung:
+Umbenennen und Drag&Drop-Reorder (`/kategorien/reorder`) beide korrekt
+getestet und wieder zurückgesetzt. Alle Testdaten (Einträge, Test-Ziel)
+anschließend bereinigt.
+
+### Auslieferungspaket
+
+`deploy/portal-v104.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v103: Wünsche #108 + #109 + #110 – Sportschau: 0-Linie, Ausrichtung, Wochenansicht
 
 ### Wunsch #108 – Fehlende 0-Linie bei den Schritten
