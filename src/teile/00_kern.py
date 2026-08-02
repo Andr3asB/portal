@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS todo_serien (
   wiederkehr_typ   TEXT    NOT NULL DEFAULT 'intervall',
   intervall_tage   INTEGER,
   fester_wochentag INTEGER,
+  feste_wochentage TEXT,
   aktiv            INTEGER NOT NULL DEFAULT 1,
   erstellt_von     INTEGER REFERENCES users(id) ON DELETE SET NULL,
   erstellt         TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -772,6 +773,22 @@ def _init_db(app):
         # Bestehende Aufgaben hatten noch keinen Status (Wunsch #20) -
         # aus dem alten erledigt-Flag ableiten, alles andere ist "offen".
         db.execute("UPDATE todos SET status='erledigt' WHERE erledigt=1 AND status='offen'")
+        db.commit()
+
+        # Wunsch #112: mehrere Wochentage je Serien-Vorlage moeglich, statt nur
+        # einem - fester_wochentag (einzelner int) bleibt als totes Altfeld
+        # liegen, feste_wochentage (kommagetrennt, z.B. "1,3,5") ist ab jetzt
+        # die tatsaechlich genutzte Spalte. Bestehende Ein-Wochentag-Serien
+        # einmalig in die neue Spalte uebernehmen.
+        try:
+            db.execute("ALTER TABLE todo_serien ADD COLUMN feste_wochentage TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        db.execute("""
+            UPDATE todo_serien SET feste_wochentage = CAST(fester_wochentag AS TEXT)
+            WHERE fester_wochentag IS NOT NULL AND feste_wochentage IS NULL
+        """)
         db.commit()
         db.executemany(
             "INSERT OR IGNORE INTO apps(slug,name,emoji,beschreibung) VALUES(?,?,?,?)",

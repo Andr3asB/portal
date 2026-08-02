@@ -91,7 +91,7 @@
 <div class="nav-sub">{{ ziel.name if ziel else 'Noch niemand angelegt' }}</div>
 {% endblock %}
 
-{% macro tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) %}
+{% macro tag_karte(tag, token, ziel, aufgaben, darf_editieren) %}
 <div class="tag-card {{ tag.status }}{% if tag.gesperrt %} gesperrt{% endif %}">
   <div class="tag-header">
     <span class="tag-name">{{ tag.wochentag_name }}</span>
@@ -151,10 +151,10 @@
     </div>
     <div class="hinweis" style="margin-top:4px">💡 Gilt für jeden {{ tag.wochentag_name }}, nicht nur diesen einen Tag.</div>
 
-    {% if serien_pool %}
+    {% if tag.serien_pool %}
     <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
     <div class="btn-row">
-      {% for s in serien_pool %}
+      {% for s in tag.serien_pool %}
       <form method="post" action="/a/kinderplan/{{ token }}/serie_einsortieren" style="display:contents">
         <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
         <input type="hidden" name="serie_id" value="{{ s.id }}">
@@ -194,13 +194,13 @@
     {% if vergangene_tage %}
     <details class="vergangene-block">
       <summary>{{ vergangene_tage|length }} {{ 'vergangener Tag' if vergangene_tage|length == 1 else 'vergangene Tage' }}</summary>
-      {% for tag in vergangene_tage %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
+      {% for tag in vergangene_tage %}{{ tag_karte(tag, token, ziel, aufgaben, darf_editieren) }}{% endfor %}
     </details>
     {% endif %}
-    {% for tag in aktuelle_rest %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
+    {% for tag in aktuelle_rest %}{{ tag_karte(tag, token, ziel, aufgaben, darf_editieren) }}{% endfor %}
 
     <div class="woche-header naechste">Nächste Woche</div>
-    {% for tag in naechste_woche %}{{ tag_karte(tag, token, ziel, aufgaben, serien_pool, darf_editieren) }}{% endfor %}
+    {% for tag in naechste_woche %}{{ tag_karte(tag, token, ziel, aufgaben, darf_editieren) }}{% endfor %}
   {% endif %}
 
 </main>

@@ -24,14 +24,38 @@ wieder verfügbar, jeweils pro Vorlage gewählt), verwaltet hier unter
 /serien. Die eigentliche Einsortierung in einen Kalendertag passiert NICHT
 hier, sondern in der Aufgabenplanung (kinderplan, seit Wunsch #92 eine
 rollierende 14-Tage-Liste wie der Essensplan) – deshalb sind
-serien_pool_liste()/serie_einsortieren() als Schnittstelle für andere
+serien_pool_fuer_tag()/serie_einsortieren() als Schnittstelle für andere
 Module gedacht (importierbar über den Alias 'teile.todo', siehe
 teile/__init__.py). Eine einsortierte Instanz ist ein ganz normales
 todos-Row mit gesetztem serie_id+plan_tag (ISO-Datum) – nutzt die
 komplette bestehende Todo-Mechanik (Status, Historie, Löschen) mit, kein
 separates Tracking.
+
+Wunsch #112: "wochentag"-Vorlagen können jetzt mehrere Wochentage
+gleichzeitig haben (`feste_wochentage`, kommagetrennt, z.B. "1,3,5" für
+Di+Do+Sa) statt nur einem (`fester_wochentag`, totes Altfeld ab jetzt,
+siehe Migrations-Kommentar in 00_kern.py).
+
+Wunsch #113: die Pool-Verfügbarkeit ist jetzt PRO KALENDERTAG zu
+berechnen statt einmal global, und für "intervall"-Vorlagen periodisch
+statt einmalig-ab-Erreichen-der-Frist: `serie_verfuegbar_am(db, serie,
+tag_iso)` ersetzt das alte `_serie_ist_im_pool()`. Zwei wesentliche
+Verhaltensänderungen gegenüber vorher:
+  1. Der Anker für "intervall" ist jetzt der zuletzt EINGEPLANTE Tag
+     (MAX(plan_tag) über alle Instanzen dieser Serie), nicht mehr der
+     zuletzt ERLEDIGT-Zeitpunkt - dadurch lässt sich eine Serie mehrere
+     Tage im Voraus einplanen, ohne auf das Erledigen der vorherigen
+     Instanz warten zu müssen.
+  2. Verfügbarkeit ist periodisch (Differenz zum Anker muss ein positives
+     Vielfaches von intervall_tage sein), nicht mehr "einmal Schwelle
+     erreicht, für immer verfügbar" - Beispiel (Alle 2 Tage, zuletzt
+     Montag eingeplant): Mittwoch (Differenz 2) und Freitag (Differenz 4)
+     sind verfügbar, Dienstag/Donnerstag/Samstag nicht.
+Eine Serie, die an einem bestimmten Tag schon eine eigene Instanz hat,
+wird für GENAU diesen Tag nicht nochmal angeboten (unabhängig vom
+Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
 
@@ -305,40 +329,64 @@ def loeschen(token, tid):
     return redirect(url_for("todo_app.index", token=token))
 
 
-def _serie_ist_im_pool(db, serie) -> bool:
-    """True, wenn die Vorlage aktuell im Pool verfügbar ist: keine offene
-    (unerledigte) Instanz vorhanden, und - falls schon mal erledigt - die
-    Wiederkehr-Schwelle ist erreicht oder überschritten (Wunsch #90)."""
-    offen = db.execute(
-        "SELECT 1 FROM todos WHERE serie_id=? AND erledigt=0", (serie["id"],)
+def _wochentage_menge(serie):
+    """Parst feste_wochentage ('1,3,5') zu einer Menge von int-Wochentagen
+    (0=Mo..6=So). Fällt auf das alte fester_wochentag zurück, falls eine
+    Serie aus der Zeit vor Wunsch #112 noch nicht migriert wurde (sollte
+    durch die Backfill-Migration in 00_kern.py eigentlich nicht vorkommen,
+    schadet als zusätzliche Absicherung aber nicht)."""
+    roh = serie["feste_wochentage"]
+    if roh is None or roh == "":
+        roh = serie["fester_wochentag"]
+    if roh is None:
+        return set()
+    return {int(w) for w in str(roh).split(",") if str(w).strip() != ""}
+
+
+def serie_verfuegbar_am(db, serie, tag_iso) -> bool:
+    """True, wenn diese Vorlage für GENAU diesen Kalendertag als Pool-
+    Kandidat infrage kommt (Wunsch #113). Zwei Regeln:
+    1. Es existiert noch keine eigene Instanz dieser Serie an GENAU diesem
+       Tag (unabhängig vom Status) - kein Doppel-Eintrag am selben Tag.
+    2. 'wochentag': der Tag muss einer der konfigurierten Wochentage sein
+       (Wunsch #112, mehrere möglich) - kein Abstands-Anker nötig, jede
+       Woche mit passendem Wochentag zählt unabhängig für sich.
+       'intervall': die Differenz zum zuletzt EINGEPLANTEN Tag (nicht mehr
+       zum Erledigt-Zeitpunkt, siehe Docstring am Dateianfang) muss ein
+       positives Vielfaches von intervall_tage sein - periodische
+       Wiederkehr statt "einmal fällig, für immer verfügbar"."""
+    schon_an_diesem_tag = db.execute(
+        "SELECT 1 FROM todos WHERE serie_id=? AND plan_tag=?", (serie["id"], tag_iso)
     ).fetchone()
-    if offen:
+    if schon_an_diesem_tag:
         return False
-    letzte = db.execute(
-        "SELECT erledigt_am FROM todos WHERE serie_id=? AND erledigt=1 "
-        "ORDER BY erledigt_am DESC LIMIT 1", (serie["id"],)
+
+    tag_datum = date.fromisoformat(tag_iso)
+    if serie["wiederkehr_typ"] == "wochentag":
+        return tag_datum.weekday() in _wochentage_menge(serie)
+
+    letzter = db.execute(
+        "SELECT plan_tag FROM todos WHERE serie_id=? AND plan_tag IS NOT NULL "
+        "ORDER BY plan_tag DESC LIMIT 1", (serie["id"],)
     ).fetchone()
-    if not letzte or not letzte["erledigt_am"]:
-        return True  # noch nie erledigt -> sofort im Pool verfuegbar
-    letzter_zeitpunkt = datetime.fromisoformat(letzte["erledigt_am"])
-    if serie["wiederkehr_typ"] == "intervall":
-        schwelle = letzter_zeitpunkt + timedelta(days=serie["intervall_tage"] or 0)
-    else:
-        # 'wochentag': naechste Wiederkehr ist der naechste passende Wochentag
-        # NACH dem Erledigungsdatum, nie derselbe Tag (sonst wuerde eine an
-        # ihrem eigenen Zieltag erledigte Aufgabe sofort wieder auftauchen).
-        tage_bis = (serie["fester_wochentag"] - letzter_zeitpunkt.weekday()) % 7 or 7
-        schwelle = letzter_zeitpunkt + timedelta(days=tage_bis)
-    return datetime.now() >= schwelle
+    if not letzter or not letzter["plan_tag"]:
+        return True  # noch nie eingeplant -> jeder Tag kommt als Start infrage
+    differenz = (tag_datum - date.fromisoformat(letzter["plan_tag"])).days
+    intervall = serie["intervall_tage"] or 1
+    return differenz > 0 and differenz % intervall == 0
 
 
-def serien_pool_liste(db):
-    """Alle aktiven Vorlagen, die gerade im Pool verfügbar sind - Schnittstelle
-    für die Aufgabenplanung (kinderplan), siehe teile/__init__.py."""
-    alle = db.execute(
-        "SELECT * FROM todo_serien WHERE aktiv=1 ORDER BY inhalt COLLATE NOCASE"
-    ).fetchall()
-    return [s for s in alle if _serie_ist_im_pool(db, s)]
+def serien_pool_fuer_tag(db, tag_iso, alle_serien=None):
+    """Alle aktiven Vorlagen, die für GENAU diesen Kalendertag als Pool-
+    Kandidat infrage kommen - Schnittstelle für die Aufgabenplanung
+    (kinderplan), pro sichtbarem Tag separat aufgerufen (Wunsch #113).
+    `alle_serien` optional vorab geladen übergeben, um die Serien-Tabelle
+    nicht 14x (einmal je sichtbarem Tag) neu abzufragen."""
+    if alle_serien is None:
+        alle_serien = db.execute(
+            "SELECT * FROM todo_serien WHERE aktiv=1 ORDER BY inhalt COLLATE NOCASE"
+        ).fetchall()
+    return [s for s in alle_serien if serie_verfuegbar_am(db, s, tag_iso)]
 
 
 def serie_einsortieren(db, serie_id, ziel_user_id, plan_tag, erstellt_von_user_id):
@@ -346,7 +394,7 @@ def serie_einsortieren(db, serie_id, ziel_user_id, plan_tag, erstellt_von_user_i
     Person an einem echten Kalendertag (Wunsch #92: plan_tag ISO-Datum,
     vorher wochentag 0-6) - Schnittstelle für die Aufgabenplanung."""
     serie = db.execute("SELECT * FROM todo_serien WHERE id=? AND aktiv=1", (serie_id,)).fetchone()
-    if not serie or not _serie_ist_im_pool(db, serie):
+    if not serie or not serie_verfuegbar_am(db, serie, plan_tag):
         return False
     db.execute(
         "INSERT INTO todos(inhalt, erstellt_von, zugewiesen_an, serie_id, plan_tag, status) "
@@ -371,15 +419,22 @@ def serien(token):
             inhalt = request.form.get("inhalt", "").strip()
             typ = request.form.get("wiederkehr_typ")
             if inhalt and typ in ("intervall", "wochentag"):
-                intervall_tage    = to_int(request.form.get("intervall_tage")) if typ == "intervall" else None
-                fester_wochentag  = to_int(request.form.get("fester_wochentag")) if typ == "wochentag" else None
+                intervall_tage = to_int(request.form.get("intervall_tage")) if typ == "intervall" else None
+                # Wunsch #112: mehrere Wochentage gleichzeitig moeglich -
+                # kommagetrennte Liste aus dem Hidden-Feld statt eines
+                # einzelnen Werts, serverseitig auf gueltige 0-6-Werte geprueft.
+                wochentage_roh = request.form.get("feste_wochentage", "") if typ == "wochentag" else ""
+                wochentage_liste = sorted({
+                    w for w in (to_int(t) for t in wochentage_roh.split(",")) if w is not None and 0 <= w <= 6
+                })
+                feste_wochentage = ",".join(str(w) for w in wochentage_liste) or None
                 gueltig = (typ == "intervall" and intervall_tage and intervall_tage > 0) or \
-                          (typ == "wochentag" and fester_wochentag is not None and 0 <= fester_wochentag <= 6)
+                          (typ == "wochentag" and feste_wochentage is not None)
                 if gueltig:
                     db.execute(
-                        "INSERT INTO todo_serien(inhalt, wiederkehr_typ, intervall_tage, fester_wochentag, erstellt_von) "
+                        "INSERT INTO todo_serien(inhalt, wiederkehr_typ, intervall_tage, feste_wochentage, erstellt_von) "
                         "VALUES(?,?,?,?,?)",
-                        (inhalt, typ, intervall_tage, fester_wochentag, user["id"]),
+                        (inhalt, typ, intervall_tage, feste_wochentage, user["id"]),
                     )
                     db.commit()
         elif action == "toggle":
@@ -397,10 +452,25 @@ def serien(token):
     alle_serien = db.execute(
         "SELECT * FROM todo_serien ORDER BY aktiv DESC, inhalt COLLATE NOCASE"
     ).fetchall()
-    im_pool = {s["id"] for s in alle_serien if s["aktiv"] and _serie_ist_im_pool(db, s)}
+    # "im Pool"-Badge bezieht sich auf HEUTE als Referenztag (Wunsch #113:
+    # Verfuegbarkeit ist jetzt pro Kalendertag, nicht mehr global) - reine
+    # Anzeige-Vereinfachung fuer diese Verwaltungsseite, die eigentliche
+    # Tag-fuer-Tag-Pruefung passiert in der Aufgabenplanung.
+    heute_iso = date.today().isoformat()
+    im_pool = {s["id"] for s in alle_serien if s["aktiv"] and serie_verfuegbar_am(db, s, heute_iso)}
+    # Wunsch #112: mehrere Wochentage je Serie - Anzeige-String ("Montag,
+    # Mittwoch") hier vorberechnen statt mit verschachtelten Jinja-Filtern
+    # im Template zu basteln.
+    serien_liste = []
+    for s in alle_serien:
+        s_dict = dict(s)
+        if s["wiederkehr_typ"] == "wochentag":
+            indices = sorted(_wochentage_menge(s))
+            s_dict["wochentag_anzeige"] = ", ".join(WOCHENTAGE[i] for i in indices)
+        serien_liste.append(s_dict)
     return render_template("todo_serien.html",
         user=user, token=token, farbe=user["farbe"],
-        serien=alle_serien, im_pool=im_pool, darf_loeschen=_darf_loeschen(user),
+        serien=serien_liste, im_pool=im_pool, darf_loeschen=_darf_loeschen(user),
         wochentage=WOCHENTAGE,
     )
 

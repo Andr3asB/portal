@@ -234,13 +234,28 @@ teile/
                        Wiederkehrende Aufgaben-Vorlagen/Pool (Wunsch #90):
                        /serien (GET+POST, Template todo_serien.html) verwaltet
                        todo_serien (Inhalt + Wiederkehr-Regel: 'intervall' X Tage
-                       nach Erledigung ODER 'wochentag' fest, pro Vorlage gewählt).
-                       serien_pool_liste()/serie_einsortieren() sind fuer andere
-                       Module gedacht (importiert von kinderplan ueber den Alias
-                       teile.todo, siehe teile/__init__.py) - eine eingesetzte
-                       Instanz ist ein normales todos-Row mit serie_id+plan_tag
-                       gesetzt (Wunsch #92, echtes Datum statt Wochentag-Zahl),
-                       taucht mit 🔁-Chip in der normalen Todo-Liste auf.
+                       ODER 'wochentag', mehrere Wochentage gleichzeitig moeglich
+                       seit Wunsch #112 - `feste_wochentage` kommagetrennt statt
+                       des alten `fester_wochentag`, siehe Migrations-Kommentar in
+                       00_kern.py). serien_pool_fuer_tag()/serie_einsortieren()
+                       sind fuer andere Module gedacht (importiert von kinderplan
+                       ueber den Alias teile.todo, siehe teile/__init__.py) - eine
+                       eingesetzte Instanz ist ein normales todos-Row mit
+                       serie_id+plan_tag gesetzt (Wunsch #92, echtes Datum statt
+                       Wochentag-Zahl), taucht mit 🔁-Chip in der normalen
+                       Todo-Liste auf. Seit Wunsch #113 ist die Pool-
+                       Verfuegbarkeit PRO KALENDERTAG zu pruefen
+                       (`serie_verfuegbar_am()`, ersetzt das alte, nur einmal
+                       global auswertbare `_serie_ist_im_pool()`): Anker fuer
+                       'intervall' ist jetzt der zuletzt EINGEPLANTE Tag
+                       (MAX(plan_tag), nicht mehr der Erledigt-Zeitpunkt), und
+                       Verfuegbarkeit ist periodisch (Differenz zum Anker muss
+                       ein positives Vielfaches von intervall_tage sein) statt
+                       "einmal Schwelle erreicht, fuer immer verfuegbar" - eine
+                       Serie laesst sich dadurch mehrere Tage im Voraus einplanen,
+                       auch wenn eine fruehere Instanz noch offen ist. Ein Tag,
+                       der bereits eine eigene Instanz dieser Serie hat, wird nie
+                       nochmal angeboten (unabhaengig vom Intervall/Wochentag).
                        Eingabeformular seit Wunsch #93 hinter "+ Neue Aufgabe"
                        eingeklappt (gleiches Muster wie einkauf.html, Wunsch
                        #85: sessionStorage `todo_formular_offen`). "🔍 Filtern"
@@ -405,7 +420,11 @@ teile/
                        fuer Kinder, Eltern/Admin ausgenommen. Bewusst KEIN
                        Drag & Drop zwischen Tagen (anders als Essensplan) - fuer
                        die wochentag-basierten Geholfen-Regeln ergibt das keinen
-                       Sinn (wuerde die ganze Regel verschieben, nicht nur einen Tag)
+                       Sinn (wuerde die ganze Regel verschieben, nicht nur einen Tag).
+                       Seit Wunsch #113 werden die "🔁 Aus Pool holen"-Kandidaten
+                       PRO TAG einzeln berechnet (`serien_pool_fuer_tag()`, einmal
+                       je sichtbarem Kalendertag statt einmal global) - dadurch
+                       zeigt jeder Tag nur die fuer GENAU ihn gueltigen Serien.
   14_sportschau.py   – /a/sportschau/<token>/ Trainings-Heatmap (Wunsch #62),
                        Zeitraum waehlbar per ?tage=14/30/60/90 (Wunsch #95,
                        `_TAGE_STANDARD`=14 Default + `_TAGE_OPTIONEN`-Liste,
@@ -801,7 +820,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am, umsetzung (Wunsch #101: was genau implementiert wurde, gesetzt über `manage.py wunsch_erledigt <id> "Text"`) |
 | `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92) |
-| `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (0=Mo..6=So), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
+| `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (totes Altfeld seit Wunsch #112, ersetzt durch feste_wochentage), feste_wochentage (kommagetrennt, z. B. "1,3,5", mehrere Wochentage gleichzeitig – Wunsch #112), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
 | `todo_historie` | id, todo_id (FK todos, cascade), alter_inhalt, geaendert_von, geaendert_am |
 | `geholfen_aufgaben` | id, name, emoji, gewichtung, aktiv |
 | `geholfen_eintraege` | id, aufgabe_id, user_id, zeitstempel |
@@ -926,10 +945,11 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   Vortag). `14_sportschau.py` hatte das Problem schon vorher richtig gelöst
   (`_TZ = ZoneInfo("Europe/Berlin")`) - **dieses Muster für jeden neuen
   Zeit-Vergleich wiederverwenden, nie nacktes `datetime.now()` für
-  Uhrzeit-Schwellwerte.** Reine Zeitspannen-/Differenzberechnungen (z. B.
-  `_serie_ist_im_pool()` in `04_todo.py`) sind davon NICHT betroffen, da
-  dort nur UTC-gegen-UTC verglichen wird (sowohl `datetime.now()` als auch
-  SQLites `datetime('now')` liefern konsistent UTC) - nur bei echten
+  Uhrzeit-Schwellwerte.** Reine Zeitspannen-/Differenzberechnungen sind
+  davon NICHT betroffen - z. B. `serie_verfuegbar_am()` in `04_todo.py`
+  (seit Wunsch #113, vorher `_serie_ist_im_pool()`) vergleicht ausschließlich
+  reine Kalendertage (`date.fromisoformat()` auf `plan_tag`-ISO-Daten ohne
+  Uhrzeitanteil), keine Zeitzone im Spiel - nur bei echten
   Wanduhr-Schwellwerten wie "20 Uhr abends" ist die Zeitzone relevant.
 
 - **Service Worker unter `/static/sw.js` registriert hat per Default nur

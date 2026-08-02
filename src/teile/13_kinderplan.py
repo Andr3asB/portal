@@ -39,12 +39,19 @@ Essensplan) - für Geholfen-Aufgaben ergibt das keinen Sinn (eine einzelne
 Karte verschieben würde die GANZE wöchentliche Regel verschieben, nicht
 nur diesen einen Tag), für Todo-Pool-Instanzen wäre es technisch möglich,
 aber für einen ersten Wurf zurückgestellt.
+
+Wunsch #113: die Pool-Kandidaten (welche Serien-Vorlagen "Aus Pool holen"
+anbietet) werden jetzt PRO TAG einzeln berechnet (`serien_pool_fuer_tag()`
+in teile.todo, einmal je sichtbarem Kalendertag statt einmal global) -
+eine Serie kann dadurch mehrere Tage im Voraus eingeplant werden, auch
+wenn eine frühere Instanz noch offen ist, solange der jeweilige Tag
+periodisch zum Intervall passt (siehe Docstring in 04_todo.py).
 """
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant, to_int
-from teile.todo import serien_pool_liste, serie_einsortieren
+from teile.todo import serien_pool_fuer_tag, serie_einsortieren
 
 bp  = Blueprint("kinderplan_app", __name__)
 APP = "kinderplan"
@@ -107,7 +114,12 @@ def index(token):
         "SELECT id, name, emoji FROM geholfen_aufgaben WHERE aktiv=1 ORDER BY id"
     ).fetchall()
 
-    serien_pool = serien_pool_liste(db) if (ziel and darf_editieren) else []
+    # Wunsch #113: Pool-Verfuegbarkeit ist jetzt PRO TAG zu pruefen (nicht
+    # mehr global) - alle_serien einmal laden, serien_pool_fuer_tag() dann
+    # separat je sichtbarem Tag aufrufen (unten in der Tage-Schleife).
+    alle_serien = db.execute(
+        "SELECT * FROM todo_serien WHERE aktiv=1 ORDER BY inhalt COLLATE NOCASE"
+    ).fetchall() if (ziel and darf_editieren) else []
 
     heute  = _heute()
     montag = heute - timedelta(days=heute.weekday())
@@ -171,6 +183,7 @@ def index(token):
                 "status":           status,
                 "eintraege":        eintraege,
                 "serien_eintraege": serien_map.get(iso, []),
+                "serien_pool":      serien_pool_fuer_tag(db, iso, alle_serien) if alle_serien else [],
                 "gesperrt":         (d == gesperrter_tag) and not _darf_verwalten(user),
             })
 
@@ -184,7 +197,7 @@ def index(token):
     return render_template("kinderplan.html",
         user=user, token=token, farbe=user["farbe"],
         kinder=kinder, ziel=ziel, darf_editieren=darf_editieren,
-        aufgaben=aufgaben, serien_pool=serien_pool,
+        aufgaben=aufgaben,
         vergangene_tage=vergangene_tage, aktuelle_rest=aktuelle_rest, naechste_woche=naechste_woche,
     )
 

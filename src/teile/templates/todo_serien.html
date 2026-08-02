@@ -85,13 +85,13 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
       </div>
 
       <div id="wochentag-feld" style="display:none">
-        <div class="form-label">Welcher Wochentag?</div>
+        <div class="form-label">An welchen Wochentagen? (mehrere möglich)</div>
         <div class="btn-row" id="wochentag-chips">
           {% for w in wochentage %}
           <button type="button" class="chip-btn" data-value="{{ loop.index0 }}">{{ w }}</button>
           {% endfor %}
         </div>
-        <input type="hidden" name="fester_wochentag" id="fester-wochentag-hidden">
+        <input type="hidden" name="feste_wochentage" id="feste-wochentage-hidden">
       </div>
 
       <button class="btn-add" type="submit" id="serie-submit-btn" disabled>+ Vorlage anlegen</button>
@@ -114,9 +114,9 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
         </div>
         <div class="serie-regel">
           {% if s.wiederkehr_typ == 'intervall' %}
-            Alle {{ s.intervall_tage }} Tage nach Erledigung
+            Alle {{ s.intervall_tage }} Tage
           {% else %}
-            Jeden {{ wochentage[s.fester_wochentag] }}
+            Jeden {{ s.wochentag_anzeige }}
           {% endif %}
         </div>
       </div>
@@ -144,7 +144,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
 const typHidden = document.getElementById('wiederkehr-typ-hidden');
 const intervallFeld = document.getElementById('intervall-feld');
 const wochentagFeld = document.getElementById('wochentag-feld');
-const wochentagHidden = document.getElementById('fester-wochentag-hidden');
+const wochentageHidden = document.getElementById('feste-wochentage-hidden');
 const submitBtn = document.getElementById('serie-submit-btn');
 const intervallInput = document.querySelector('input[name="intervall_tage"]');
 
@@ -152,7 +152,7 @@ function pruefeAbsendbar() {
   if (typHidden.value === 'intervall') {
     submitBtn.disabled = !intervallInput.value || parseInt(intervallInput.value) < 1;
   } else if (typHidden.value === 'wochentag') {
-    submitBtn.disabled = !wochentagHidden.value;
+    submitBtn.disabled = !wochentageHidden.value;
   } else {
     submitBtn.disabled = true;
   }
@@ -169,11 +169,14 @@ document.querySelectorAll('#serie-form > .btn-row:not(#wochentag-chips) .chip-bt
   });
 });
 
+// Wunsch #112: mehrere Wochentage gleichzeitig waehlbar - jeder Chip
+// togglet unabhaengig, statt sich gegenseitig auszuschliessen (gleiches
+// Muster wie die Markt-Chips bei Einkaufs Angebot-Mehrfachauswahl).
 document.querySelectorAll('#wochentag-chips .chip-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#wochentag-chips .chip-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    wochentagHidden.value = btn.dataset.value;
+    btn.classList.toggle('active');
+    const ausgewaehlt = [...document.querySelectorAll('#wochentag-chips .chip-btn.active')].map(b => b.dataset.value);
+    wochentageHidden.value = ausgewaehlt.join(',');
     pruefeAbsendbar();
   });
 });

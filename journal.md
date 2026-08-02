@@ -2,6 +2,69 @@
 
 ---
 
+## 2026-08-02 – portal-v105: Wünsche #112 + #113 – Serienaufgaben: mehrere Wochentage, periodische Wiederkehr
+
+### Wunsch #112 – Mehrere Wochentage je Serie
+
+"Serienaufgaben sollen auch an mehreren Wochentagen möglich sein." Neue
+Spalte `todo_serien.feste_wochentage` (kommagetrennt, z. B. "1,3,5"),
+ersetzt das alte `fester_wochentag` (Einzelwert, bleibt als totes
+Altfeld liegen, per Migration in die neue Spalte übernommen). Die
+Wochentag-Chips im Anlegen-Formular (`todo_serien.html`) sind jetzt
+Mehrfachauswahl (togglen unabhängig statt sich gegenseitig
+auszuschließen, gleiches Muster wie Einkaufs Markt-Mehrfachauswahl).
+
+### Wunsch #113 – Periodische Wiederkehr statt "einmal fällig, für immer verfügbar"
+
+"Serienaufgaben sollen auch dann zur Planung vorgeschlagen werden, wenn
+die Wiederholungsfrist noch nicht abgelaufen ist. Beispiel: 'Blumen
+gießen' alle 2 Tage - ist am Montag eingeplant, dann wird es am Dienstag
+nicht vorgeschlagen, aber am Mittwoch kann ich es schon auf den Plan
+nehmen, ebenso am Freitag, aber nicht am Donnerstag & Samstag."
+
+Vorab per Rückfrage geklärt, da der Wunsch strukturell zwei
+Verhaltensänderungen brauchte: (a) mehrere gleichzeitig offene Instanzen
+derselben Serie an verschiedenen Tagen (statt einer einzigen, die den
+ganzen Pool blockiert, bis sie erledigt ist), UND (b) eine periodische
+Wiederkehr ab dem letzten EINGEPLANTEN Tag statt ab dem letzten
+ERLEDIGT-Zeitpunkt.
+
+Alte Logik (`_serie_ist_im_pool()`): blockierte den kompletten Pool,
+solange irgendeine offene Instanz existierte; nach Erledigung war die
+Vorlage ab Erreichen der Schwelle (`erledigt_am + intervall_tage`) FÜR
+IMMER verfügbar (`datetime.now() >= schwelle`), nicht nur am
+periodischen Zieltag.
+
+Neue Logik: `serie_verfuegbar_am(db, serie, tag_iso)` prüft PRO
+KALENDERTAG (nicht mehr global), zwei Regeln: (1) für GENAU diesen Tag
+existiert noch keine eigene Instanz - kein Doppel-Eintrag am selben Tag,
+andere Tage bleiben aber frei einplanbar; (2) bei "wochentag" muss der
+Tag zu einem der konfigurierten Wochentage passen (unabhängig von
+irgendeinem Anker); bei "intervall" muss die Differenz zum zuletzt
+EINGEPLANTEN Tag (`MAX(plan_tag)` über alle Instanzen dieser Serie) ein
+POSITIVES VIELFACHES von `intervall_tage` sein - periodisch statt
+monoton. `serien_pool_liste()` (einmal global) wurde zu
+`serien_pool_fuer_tag()` (einmal je sichtbarem Kalendertag in
+kinderplan.py, `alle_serien` einmal vorab geladen und wiederverwendet,
+um nicht 14x dieselbe Tabelle abzufragen).
+
+### Verifiziert
+
+Isolierter Test der reinen Logikfunktionen (ohne Flask-Abhängigkeit,
+gegen eine In-Memory-SQLite-DB) mit genau Andis Beispiel: Serie "alle 2
+Tage" - zuletzt Montag eingeplant → Di `False`, Mi `True`, Do
+`False`, Fr `True`, Sa `False` - exakte Übereinstimmung mit der
+Wunschbeschreibung. Zusätzlich getestet: Wochentag-Serie mit Di+Do
+liefert an beiden Tagen `True`, an allen anderen `False`; ein Tag mit
+bereits existierender eigener Instanz liefert unabhängig von
+Intervall/Wochentag `False` (kein Doppel-Eintrag).
+
+### Auslieferungspaket
+
+`deploy/portal-v105.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v104: Wunsch #111 – Neue App: Packliste
 
 "Wir brauchen eine neue App: Packliste. Sehr ähnlich zur Einkaufsliste.
