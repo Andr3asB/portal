@@ -2,6 +2,67 @@
 
 ---
 
+## 2026-08-03 – portal-v108: Wunsch #119 – App-Icons unter Linux/Chrome unsichtbar
+
+"Die Bilder der Apps werden unter Linux im Chrome nicht dargestellt. Kann
+das an einem Kiosk-Modus des Chrome liegen, oder an etwas anderem. Wäre
+schön, wenn die Bilder dort auch funktionieren."
+
+### Ursache
+
+Die "Bilder der Apps" sind keine echten Bilddateien, sondern rohe
+Unicode-Emoji-Zeichen (`{{ app.emoji }}` in `startseite.html`, ebenso an
+über 300 weiteren Stellen im ganzen Portal). Emoji-Zeichen brauchen eine
+vom Betriebssystem bereitgestellte Color-Emoji-Schriftart, um sichtbar zu
+sein - Windows und macOS bringen das serienmäßig mit, viele minimale
+Linux-Installationen (insbesondere schlanke Kiosk-Images, wie sie für
+Home-Assistant-Wandtablets typisch sind) NICHT. Ohne passende Schriftart
+zeigt der Browser gar nichts oder ein leeres Rechteck an - kein
+Chrome-Kiosk-Modus-Bug im eigentlichen Sinne, sondern ein fehlendes
+System-Font-Paket auf genau dieser Maschine, das das Portal selbst nicht
+beheben kann (kein Zugriff auf fremde Systeme, siehe bauplan.md).
+
+### Lösung
+
+`twemoji.js` (Twitter/Twemoji, MIT-Code + CC-BY-4.0-Grafiken) lokal
+gebündelt statt von einem CDN geladen (Projekt-Konvention) - ersetzt jedes
+im DOM erkannte Emoji-Zeichen durch ein `<img class="emoji">` mit lokal
+gehostetem SVG. Dadurch hängt die Darstellung nicht mehr vom Font-Angebot
+des Betrachter-Systems ab, funktioniert identisch auf jedem Gerät/Browser.
+Nur die im Portal tatsächlich vorkommenden ca. 74 Emoji-Grafiken
+heruntergeladen (kein kompletter Font, ~240 KB statt zig MB) - Liste
+automatisiert aus allen `.py`/`.html`-Dateien extrahiert. `base.html` ruft
+`twemoji.parse()` einmalig nach dem initialen Seitenaufbau auf.
+
+### Stolperstein: `folder: ''` wird von twemoji.js ignoriert
+
+Erster Deploy-Versuch: `twemoji.parse()` lief zwar, erzeugte aber URLs wie
+`/static/twemoji72x72/2705.svg` statt `/static/twemoji/svg/2705.svg` -
+`{folder: ''}` sollte "kein Unterordner" bedeuten, wird intern aber per
+`how.folder || <Standard>` ausgewertet und ein leerer String ist in JS
+falsy, fällt also still auf twemojis PNG-72x72-Standardordner zurück (der
+in dieser Bereitstellung gar nicht existiert - 404, Bild bleibt leer).
+Fix: `folder: 'svg'` (echter, nicht-leerer Ordnername) + eigene SVG-Dateien
+entsprechend nach `src/static/twemoji/svg/` verschoben, neuer Eintrag in
+server.md "Bekannte Issues" mit der allgemeinen Lehre dazu.
+
+### Verifiziert
+
+Live im Browser: nach dem Laden sind alle App-Kachel-Emoji als
+`<img class="emoji" src="/static/twemoji/svg/....svg">` im DOM vorhanden
+statt als reiner Unicode-Text, Größe skaliert korrekt mit der jeweiligen
+`font-size` der Umgebung (Kacheln 40px, Fließtext kleiner). Die eigentliche
+Symptomursache (fehlende Emoji-Schriftart auf einer bestimmten Linux-
+Maschine) lässt sich von hier aus nicht direkt nachstellen/gegentesten -
+das Ergebnis sollte aber unabhängig vom Betrachter-System identisch
+aussehen, da es keine Systemschriftart mehr benötigt.
+
+### Auslieferungspaket
+
+`deploy/portal-v108.tar.gz`
+
+---
+
 ## 2026-08-03 – portal-v107: Wünsche #116 + #117 + #118 – Packliste: zuletzt geöffnetes Ziel merken, Eltern-Rechte
 
 ### Wunsch #116 – Zuletzt geöffnete Packliste merken

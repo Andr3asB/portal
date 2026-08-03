@@ -176,6 +176,36 @@ hängt nur im Bridge-Netz und kann die macvlan-IP des hae-Servers
   `dicebear-styles` und wird einmalig beim Modulimport geladen
   (`_AVATAAARS_STYLE` in `15_tierbaukasten.py`).
 
+## Externe Frontend-Assets (lokal gebündelt, Wunsch #119)
+
+- **`twemoji.min.js`** (`src/static/twemoji.min.js`, Version 14.0.2) +
+  passende SVG-Grafiken (`src/static/twemoji/svg/<codepoint>.svg`, ca. 74
+  Dateien, ~240 KB): ersetzt jedes im DOM erkannte Emoji-Zeichen durch ein
+  `<img class="emoji">` mit lokal gehostetem SVG, unabhängig davon, ob das
+  Betriebssystem des Betrachters eine Color-Emoji-Schriftart mitbringt (auf
+  manchen Linux-Chrome-Installationen, u. a. Kiosk-Aufbauten, fehlt diese -
+  Emoji blieben dort komplett unsichtbar). Aufruf in `base.html`, läuft
+  einmalig nach dem initialen Seitenaufbau (`twemoji.parse(document.body,
+  {base:'/static/twemoji/', folder:'svg', ext:'.svg'})`) - `folder:''`
+  funktioniert NICHT (leerer String ist in JS falsy, twemoji.js faellt
+  dann still auf seinen 72x72-PNG-Standardordner zurueck, live als Bug
+  gefunden - deshalb "svg" als echter Unterordnername, Dateien liegen
+  entsprechend unter .../twemoji/svg/, nicht direkt unter .../twemoji/).
+  Erfasst NUR zu diesem Zeitpunkt bereits im DOM vorhandene Emoji, nicht
+  später per JS neu eingefügten Text (z. B. Toast-Nachrichten) - bewusst
+  so entschieden,
+  deckt die weit überwiegende Mehrheit ab (serverseitig gerenderte
+  Templates), volle Laufzeit-Abdeckung wäre ein deutlich größerer Eingriff
+  gewesen. Nur die Codepoints heruntergeladen, die im Portal tatsächlich
+  vorkommen (kein kompletter Font/keine komplette Twemoji-Sammlung - wäre
+  unnötig groß). Fünf im Portal verwendete Zeichen (★☰✎✓✕) haben keine
+  Twemoji-Grafik, weil Twemoji sie nicht als "Emoji" führt (reine
+  Text-Symbole) - unproblematisch, die rendern schon ohne Emoji-Font
+  überall normal, genau die "sicheren" Zeichen also. Code MIT-lizenziert,
+  Grafiken CC-BY 4.0 (Twitter/Twemoji) - Attribution laut deren eigener
+  README per Erwähnung im Quellcode ausreichend (siehe Kommentar in
+  base.html).
+
 ## Code-Struktur (src/)
 
 ```
@@ -1102,6 +1132,20 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   an der richtigen DOM-Stelle liegende Instanz der Overlay-Gruppe, nicht eine
   gemeinsam wiederverwendete. Gilt für jede künftige SVG-Vorschau mit
   mehreren umschaltbaren Ansichten/Zuständen im selben Dokument.
+
+- **twemoji.js: `folder: ''` wird NICHT als "kein Unterordner" verstanden.**
+  Die Option wird intern per `how.folder || <Standard>` ausgewertet - ein
+  leerer String ist in JavaScript falsy, die Bibliothek fällt dann still
+  (ohne Fehlermeldung) auf ihren `72x72`-PNG-Standardordner zurück. Live
+  bei Wunsch #119 gefunden: erzeugte URLs wie `/static/twemoji72x72/....svg`
+  statt der gewünschten `/static/twemoji/svg/....svg`. Fix: einen echten,
+  nicht-leeren Ordnernamen angeben (`folder: 'svg'`) und die Dateien
+  entsprechend in einen `svg/`-Unterordner legen, statt zu versuchen, den
+  Unterordner ganz wegzulassen. **Generelle Lehre: bei Bibliotheks-Optionen,
+  die per `||`-Fallback ausgewertet werden, ist ein leerer String KEIN
+  gültiger Weg, um "nichts"/"Standardverhalten deaktivieren" auszudrücken -
+  im Zweifel die Bibliotheksquelle prüfen statt der Dokumentation zu
+  vertrauen.**
 
 - **SQLite `ALTER TABLE ADD COLUMN` erlaubt keinen nicht-konstanten Default.**
   `DEFAULT (datetime('now'))` und auch `DEFAULT CURRENT_TIMESTAMP` schlagen mit

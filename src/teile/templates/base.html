@@ -190,6 +190,15 @@
       color: var(--text);
       color-scheme: dark;
     }
+    /* Wunsch #119: twemoji.js ersetzt Emoji-Zeichen durch <img class="emoji">
+       (siehe extra_scripts weiter unten) - Groesse folgt der Schriftgroesse
+       der Umgebung, damit sich jede bestehende font-size-Regel (Kacheln,
+       Fliesstext, große Empty-State-Icons) unveraendert weiter auswirkt. */
+    img.emoji {
+      height: 1em; width: 1em;
+      margin: 0 .05em 0 .1em;
+      vertical-align: -0.1em;
+    }
     {% block extra_styles %}{% endblock %}
   </style>
 </head>
@@ -399,6 +408,26 @@
 {% endif %}
 
 {% block extra_scripts %}{% endblock %}
+<!-- Wunsch #119: App-Emoji werden auf manchen Linux-Chrome-Installationen
+     (u.a. Kiosk-Aufbauten ohne installierte Color-Emoji-Schriftart) leer
+     dargestellt, weil das OS dafuer keine Glyphen mitbringt. twemoji.js
+     ersetzt jedes erkannte Emoji-Zeichen im DOM durch ein lokal gehostetes
+     SVG-Bild (Twitter/Twemoji, MIT-Code + CC-BY-4.0-Grafiken, siehe
+     /static/twemoji/), unabhaengig vom Font-Angebot des Betriebssystems.
+     Lokal gebuendelt statt CDN (Projekt-Konvention). Laeuft NACH
+     extra_scripts, damit auch dort serverseitig gerendertes Markup erfasst
+     wird. -->
+<script src="/static/twemoji.min.js"></script>
+<script>
+if (typeof twemoji !== 'undefined') {
+  // WICHTIG: folder:'' wuerde twemoji.js NICHT als "kein Unterordner"
+  // verstehen - der Wert wird per `how.folder || ...` ausgewertet, ein
+  // leerer String ist in JS falsy und faellt still auf den 72x72-Standard-
+  // Ordner zurueck. Deshalb "svg" als echter (nicht-leerer) Unterordner-
+  // name, Dateien liegen entsprechend unter /static/twemoji/svg/.
+  twemoji.parse(document.body, { base: '/static/twemoji/', folder: 'svg', ext: '.svg' });
+}
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   // scope:'/' noetig, damit der Worker die ganze Seite kontrolliert, nicht
