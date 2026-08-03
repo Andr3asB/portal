@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set app_slug = "tvb" %}
+{% block title %}TVB Stuttgart{% endblock %}
+
+{% block extra_styles %}
+.tvb-section {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-bottom:14px;
+}
+.tvb-section-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
+.tvb-spiel {
+  display:flex; align-items:center; gap:10px; padding:9px 0;
+  border-bottom:1px solid var(--border-subtle); font-size:14px;
+}
+.tvb-spiel:last-child { border-bottom:none; }
+.tvb-spiel-teams { flex:1; min-width:0; }
+.tvb-spiel-team { white-space:normal; word-break:break-word; }
+.tvb-spiel-team.tvb { font-weight:700; }
+.tvb-spiel-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
+.tvb-spiel-ergebnis {
+  font-size:16px; font-weight:700; white-space:nowrap; text-align:right; flex-shrink:0;
+}
+.tvb-spiel-ergebnis.offen { font-size:13px; font-weight:600; color:var(--text-2); }
+.tvb-tabelle { width:100%; border-collapse:collapse; font-size:13px; }
+.tvb-tabelle th, .tvb-tabelle td {
+  padding:7px 4px; text-align:center; border-bottom:1px solid var(--border-subtle);
+}
+.tvb-tabelle th { color:var(--text-2); font-weight:600; font-size:11px; }
+.tvb-tabelle td.tvb-team-name { text-align:left; white-space:normal; word-break:break-word; }
+.tvb-tabelle tr.hervorgehoben td { background:var(--surface-2); font-weight:700; }
+.tvb-tabelle tr:last-child td { border-bottom:none; }
+.empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🤾 TVB Stuttgart</div>
+<div class="nav-sub">Handball-Bundesliga</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="tvb-section">
+    <div class="tvb-section-title">📅 Nächste Spiele</div>
+    {% if fehler_spiele %}
+      <div class="empty">📡 Spielplan gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
+    {% elif not kommende %}
+      <div class="empty">Aktuell keine Spiele terminiert.</div>
+    {% else %}
+      {% for s in kommende %}
+      <div class="tvb-spiel">
+        <div class="tvb-spiel-teams">
+          <div class="tvb-spiel-team{% if s.heim == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.heim }}</div>
+          <div class="tvb-spiel-team{% if s.gast == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.gast }}</div>
+          <div class="tvb-spiel-meta">
+            {{ s.spieltag }}{% if s.spieltag and s.ort %} · {% endif %}{{ s.ort }}
+          </div>
+        </div>
+        <div class="tvb-spiel-ergebnis offen">
+          {{ s.anstoss[:16].replace('T', ' ') }}
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="tvb-section">
+    <div class="tvb-section-title">🏐 Ergebnisse</div>
+    {% if fehler_spiele and not vergangene %}
+      <div class="empty">📡 Ergebnisse gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
+    {% elif not vergangene %}
+      <div class="empty">Noch keine Ergebnisse.</div>
+    {% else %}
+      {% for s in vergangene %}
+      <div class="tvb-spiel">
+        <div class="tvb-spiel-teams">
+          <div class="tvb-spiel-team{% if s.heim == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.heim }}</div>
+          <div class="tvb-spiel-team{% if s.gast == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.gast }}</div>
+          <div class="tvb-spiel-meta">{{ s.spieltag }}</div>
+        </div>
+        <div class="tvb-spiel-ergebnis{% if s.heim_tore is none %} offen{% endif %}">
+          {% if s.heim_tore is not none and s.gast_tore is not none %}
+            {{ s.heim_tore }}:{{ s.gast_tore }}
+          {% else %}
+            {{ s.anstoss[:16].replace('T', ' ') }}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="tvb-section">
+    <div class="tvb-section-title">📊 Tabelle</div>
+    {% if fehler_tabelle %}
+      <div class="empty">📡 Tabelle gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
+    {% else %}
+      <div style="overflow-x:auto">
+      <table class="tvb-tabelle">
+        <thead>
+          <tr>
+            <th>#</th><th style="text-align:left">Team</th><th>Sp</th>
+            <th>S</th><th>U</th><th>N</th><th>Tore</th><th>Diff</th><th>Pkt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in tabelle %}
+          <tr{% if r.hervorgehoben %} class="hervorgehoben"{% endif %}>
+            <td>{{ r.rang }}</td>
+            <td class="tvb-team-name">{{ r.team }}</td>
+            <td>{{ r.spiele }}</td>
+            <td>{{ r.siege }}</td>
+            <td>{{ r.unentschieden }}</td>
+            <td>{{ r.niederlagen }}</td>
+            <td>{{ r.tore }}:{{ r.gegentore }}</td>
+            <td>{{ r.tordifferenz }}</td>
+            <td>{{ r.punkte }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% endif %}
+  </div>
+
+</main>
+{% endblock %}

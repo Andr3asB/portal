@@ -2,6 +2,71 @@
 
 ---
 
+## 2026-08-03 – portal-v109: Wunsch #120 – Neue App "TVB" (Handball-Bundesliga)
+
+"Ich wünsche mir eine neue App 'TVB' im Portal. Die App soll alle Spiele
+und Spielergebnisse des TVB Stuttgart anzeigen und die Tabelle der
+Handball Bundesliga immer aktuell haben."
+
+### Datenquelle
+
+Es gibt keine offizielle, dokumentierte Public API für Handball-Bundesliga-
+Daten (OpenLigaDB hat nur Fußball/Eishockey, kein Handball). Gefunden über
+Analyse von `https://www.handball.net/widgets/embed/v1.js` (dem JS-Loader,
+den auch TVB Stuttgarts eigene Website für ihre "Spielplan"/"Tabelle"-
+Widgets nutzt): ein unauthentifizierter JSON-Endpunkt unter
+`https://www.handball.net/a/sportdata/1/widgets/...`, den handball.net -
+das offizielle Datenportal des Deutschen Handballbunds - selbst für seine
+einbettbaren Vereins-Widgets verwendet. Zwei Endpunkte werden genutzt:
+`tournament/sr.competition.149/table` (komplette, immer aktuelle
+HBL-Tabelle) und `team/sr.competitor.6272-143352/team-schedule` +
+`tournament/.../schedule` (TVB Stuttgarts Spiele).
+
+### Einschränkung: nur ein kleines Zeitfenster
+
+Das Team-Spielplan-Widget liefert laut handball.net-eigener Doku nur die
+nächsten ca. 3 Spiele, keinen kompletten Saisonkalender - und vermutlich
+(zum Zeitpunkt der Umsetzung noch nicht mit echten Spielergebnissen
+testbar, da die Saison 2026/27 gerade erst beginnt) auch keine vergangenen
+Ergebnisse mehr, sobald ein Spieltag aus dem Fenster gerutscht ist. Neue
+Tabelle `tvb_spiele`: jedes TVB-Spiel, das beim Seitenaufruf im Team- oder
+Liga-Spielplan-Widget gesehen wird, wird per UPSERT gespeichert (inkl.
+Tore/Status). So bleiben einmal gesehene Ergebnisse dauerhaft sichtbar,
+auch wenn handball.net sie später aus dem Widget-Fenster herausrollt.
+Bewusst kein Cron-Job dafür eingerichtet (keine Extra-Infrastruktur für den
+Randfall "niemand öffnet die App während genau dieses Spieltags") - für
+eine Familien-App ausreichend, gleiches Muster wie `_hae_workouts()` in
+`14_sportschau.py` (On-the-fly-Abruf mit Timeout, "fehler"-Flag statt
+Crash bei Nichterreichbarkeit).
+
+### Stolperstein: zwei neue Emoji vergessen (Regression zu Wunsch #119)
+
+Erster Deploy: 📅 und 🏐 (neu in `tvb.html`, noch nicht Teil der 74
+Emoji-SVGs aus Wunsch #119) luden mit 404 - live per
+`read_network_requests` im Browser gefunden, nicht per Screenshot (der
+Screenshot-Tool selbst hing in dieser Session unabhängig fest). Fix:
+beide SVGs nachträglich heruntergeladen, erneut deployed, Requests erneut
+geprüft (jetzt alle 200). Lehre: jede neue App mit neuen Emoji muss deren
+SVGs mit ausliefern, sonst wiederholt sich das Wunsch-#119-Problem lokal
+für die neue Seite.
+
+### Verifiziert
+
+Live: `/a/tvb/<token>/` lädt (200), nächste zwei TVB-Spiele korrekt
+angezeigt (TVB Stuttgart fett hervorgehoben, Heim/Auswärts korrekt),
+Tabelle mit allen 18 Teams inkl. Umlauten (Göppingen, Füchse Berlin)
+korrekt gerendert, TVB-Zeile in der Tabelle hervorgehoben. `tvb_spiele`
+in der Produktions-DB bestätigt befüllt (2 Zeilen, korrekte IDs/Termine).
+Leerer "Ergebnisse"-Zustand ("Noch keine Ergebnisse.") korrekt, da die
+Saison 2026/27 noch nicht begonnen hat - Verifikation echter Ergebnis-
+Anzeige erst nach dem ersten gespielten Spieltag möglich.
+
+### Auslieferungspaket
+
+`deploy/portal-v109.tar.gz`
+
+---
+
 ## 2026-08-03 – portal-v108: Wunsch #119 – App-Icons unter Linux/Chrome unsichtbar
 
 "Die Bilder der Apps werden unter Linux im Chrome nicht dargestellt. Kann

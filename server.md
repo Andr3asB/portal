@@ -646,6 +646,34 @@ teile/
                        UND Admin (vorher nur Admin, gleiches Muster wie
                        13_kinderplan.py) - Menuepunkte in base.html
                        entsprechend sichtbar.
+  18_tvb.py           – /a/tvb/<token>/ Naechste Spiele, Ergebnisse und
+                       Handball-Bundesliga-Tabelle des TVB Stuttgart
+                       (Wunsch #120). Reiner Anzeige-Modus (keine
+                       Nutzereingaben). Daten kommen live per On-the-fly-
+                       Abruf (urllib, kein neues pip-Paket, Timeout 8s,
+                       "fehler"-Flag statt Crash - gleiches Muster wie
+                       `_hae_workouts()` in 14_sportschau.py) von
+                       handball.net, dem Datenportal des Deutschen
+                       Handballbunds - es gibt keine dokumentierte Public
+                       API dafuer (OpenLigaDB hat kein Handball), genutzt
+                       wird der unauthentifizierte Endpunkt, den
+                       handball.net selbst fuer seine einbettbaren Vereins-
+                       Widgets aufruft (gefunden per Analyse von
+                       `handball.net/widgets/embed/v1.js`):
+                       `tournament/sr.competition.149/table` (komplette,
+                       immer aktuelle Tabelle) sowie `team/sr.competitor.
+                       6272-143352/team-schedule` sowie `tournament/.../
+                       schedule` (TVB Stuttgarts Spiele). Das Spielplan-
+                       Widget liefert laut Doku nur ein kleines Fenster
+                       (ca. naechste 3 Spiele, vermutlich keine
+                       vergangenen Ergebnisse mehr sobald ein Spieltag aus
+                       dem Fenster faellt) - deshalb neue Tabelle
+                       tvb_spiele: jedes bei einem Seitenaufruf gesehene
+                       TVB-Spiel wird per UPSERT gespeichert, damit einmal
+                       gesehene Ergebnisse dauerhaft sichtbar bleiben.
+                       Bewusst kein Cron-Job dafuer (Randfall "niemand
+                       oeffnet die App an einem Spieltag" fuer eine
+                       Familien-App hinnehmbar, siehe journal.md).
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -709,6 +737,13 @@ teile/
                               identisch zu einkauf_kategorien.html (anlegen,
                               ✏️-Panel umbenennen, aktivieren/deaktivieren,
                               ⠿-Drag&Drop zum Umsortieren)
+    tvb.html                – TVB Stuttgart (Wunsch #120): drei Kacheln
+                              "Nächste Spiele"/"Ergebnisse"/"Tabelle",
+                              TVB Stuttgart per .tvb-Klasse fett bzw. Tabellen-
+                              zeile hervorgehoben (var(--surface-2)); jede
+                              Kachel zeigt bei Abruffehler eine eigene 📡-
+                              Meldung statt die ganze Seite abzubrechen
+                              (gleiches Muster wie sportschau.html)
     rezepte.html            – Rezeptliste + "+ Neues Rezept"-Button (Wunsch #48);
                               Live-Suche über Titel+Zutaten ab 3 Zeichen (Wunsch #49)
                               + Kategorie-Filter-Chips (Wunsch #55), beide Filter
@@ -899,6 +934,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
 | `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
+| `tvb_spiele` | id (PK, handball.net-Spiel-ID), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.
@@ -921,6 +957,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `tierbaukasten` | Tierbaukasten | 🐾 | Eigene Figur (Mensch/Tier) aus Bausteinen, 3-Schritte-Assistent (Wunsch #64+#66+#69) | – (alle vier granted) |
 | `vokabeln` | Vokabeln | 📚 | Vokabeln lernen mit Sprachen, Kapiteln und Trainer (Wunsch #73) | – (Andi, Simone, Friederike granted) |
 | `packliste` | Packliste | 🧳 | Packlisten für Reisen/Ausflüge, je Ziel eine eigene Liste (Wunsch #111) | – (zunächst nur Andi als Urheber) |
+| `tvb` | TVB | 🤾 | Nächste Spiele, Ergebnisse und Handball-Bundesliga-Tabelle des TVB Stuttgart (Wunsch #120) | – (alle vier granted) |
 
 ## Hamburger-Menü (verpflichtende Struktur, seit Wunsch #32)
 

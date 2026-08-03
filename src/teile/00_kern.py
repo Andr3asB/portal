@@ -276,6 +276,18 @@ CREATE TABLE IF NOT EXISTS ki_stimmen (
   modell     TEXT NOT NULL,
   stimme     TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tvb_spiele (
+  id              TEXT PRIMARY KEY,
+  spieltag        TEXT,
+  heim            TEXT    NOT NULL,
+  gast            TEXT    NOT NULL,
+  heim_tore       INTEGER,
+  gast_tore       INTEGER,
+  anstoss         TEXT    NOT NULL,
+  ort             TEXT,
+  status          TEXT    NOT NULL,
+  aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 _DEFAULT_SPRACHEN = ["Englisch", "Latein", "Dänisch", "Italienisch", "Französisch"]
