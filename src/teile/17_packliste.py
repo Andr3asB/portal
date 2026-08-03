@@ -25,6 +25,17 @@ Bewusst NICHT übernommen (kein Teil des Wunsches, spätere separate
 Wünsche bei Einkauf): Offline-Fähigkeit, automatische Synchronisierung
 (Wunsch #100), "Filtern"-Knopf (Wunsch #87). Kann bei Bedarf per eigenem
 Folge-Wunsch nachgezogen werden, analog zur Einkaufsliste.
+
+Wunsch #116: das zuletzt geöffnete Ziel wird pro Nutzer gemerkt
+(packlisten_nutzer_ziel, server-seitig statt sessionStorage - anders als
+z. B. Einkaufs Wunsch #58, weil hier "von einem Benutzer" gemeint ist,
+nicht "in diesem Browser-Tab"). _aktives_ziel_fuer_index() UPSERTet bei
+explizitem ?ziel= die neue Merkung, sonst wird die zuletzt gemerkte
+verwendet (falls noch aktiv), sonst das erste aktive Ziel.
+
+Wunsch #117/#118: Ziele UND Kategorien dürfen jetzt Eltern UND Admin
+verwalten (_darf_verwalten()), nicht mehr nur Admin - Menü-Sichtbarkeit
+in base.html entsprechend angepasst.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant, to_int
@@ -38,6 +49,13 @@ def _user(token):
     if not u:
         abort(403)
     return u
+
+
+def _darf_verwalten(user) -> bool:
+    """Wunsch #117/#118: Ziele und Kategorien duerfen Eltern UND Admin
+    anlegen/aendern/deaktivieren, nicht mehr nur Admin - gleiches Muster
+    wie in 13_kinderplan.py."""
+    return bool(user["is_admin"] or user["rolle"] == "eltern")
 
 
 def _kategorien_aktiv(db):
@@ -65,10 +83,37 @@ def _ziele_aktiv(db):
 
 def _aktives_ziel(db, ziele, ziel_id_roh):
     """Wunsch #111: genau EIN Ziel ist je Aufruf aktiv - aus ?ziel= oder das
-    erste aktive Ziel, falls fehlend/ungültig/deaktiviert."""
+    erste aktive Ziel, falls fehlend/ungültig/deaktiviert. Wird auch von
+    add() aufgerufen (dort ohne Nutzerbezug - deshalb kein Merken hier,
+    siehe _aktives_ziel_fuer_index() für die Index-spezifische Variante
+    mit Wunsch #111 zuletzt-geöffnet-Logik)."""
     ziel_id = to_int(ziel_id_roh)
     if ziel_id is not None and any(z["id"] == ziel_id for z in ziele):
         return ziel_id
+    return ziele[0]["id"] if ziele else None
+
+
+def _aktives_ziel_fuer_index(db, ziele, ziel_id_roh, user_id):
+    """Wunsch #116: ohne explizites ?ziel= wird das zuletzt von DIESEM Nutzer
+    geöffnete Ziel geladen (packlisten_nutzer_ziel), nicht einfach das erste
+    aktive. Ein explizit angeklicktes Ziel (?ziel=) wird als neue Merkung
+    gespeichert (UPSERT)."""
+    ziel_id_explizit = to_int(ziel_id_roh)
+    if ziel_id_explizit is not None and any(z["id"] == ziel_id_explizit for z in ziele):
+        db.execute(
+            "INSERT INTO packlisten_nutzer_ziel(user_id, ziel_id) VALUES(?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET ziel_id=excluded.ziel_id",
+            (user_id, ziel_id_explizit),
+        )
+        db.commit()
+        return ziel_id_explizit
+
+    gemerkt = db.execute(
+        "SELECT ziel_id FROM packlisten_nutzer_ziel WHERE user_id=?", (user_id,)
+    ).fetchone()
+    if gemerkt and any(z["id"] == gemerkt["ziel_id"] for z in ziele):
+        return gemerkt["ziel_id"]
+
     return ziele[0]["id"] if ziele else None
 
 
@@ -83,7 +128,7 @@ def index(token):
     ziele      = _ziele_aktiv(db)
     kategorien = _kategorien_aktiv(db)
     personen   = _personen(db)
-    aktives_ziel_id = _aktives_ziel(db, ziele, request.args.get("ziel"))
+    aktives_ziel_id = _aktives_ziel_fuer_index(db, ziele, request.args.get("ziel"), user["id"])
 
     offene = gepackte = []
     if aktives_ziel_id is not None:
@@ -197,7 +242,7 @@ def bearbeiten(token, eid):
 @bp.route("/a/packliste/<token>/ziele", methods=["GET", "POST"])
 def ziele_verwalten(token):
     user = _user(token)
-    if not user["is_admin"]:
+    if not _darf_verwalten(user):
         abort(403)
     db = get_db()
     if request.method == "POST":
@@ -223,7 +268,7 @@ def ziele_verwalten(token):
 @bp.route("/a/packliste/<token>/kategorien", methods=["GET", "POST"])
 def kategorien_verwalten(token):
     user = _user(token)
-    if not user["is_admin"]:
+    if not _darf_verwalten(user):
         abort(403)
     db = get_db()
     if request.method == "POST":
@@ -263,7 +308,7 @@ def kategorien_verwalten(token):
 @bp.route("/a/packliste/<token>/kategorien/reorder", methods=["POST"])
 def kategorien_reorder(token):
     user = _user(token)
-    if not user["is_admin"]:
+    if not _darf_verwalten(user):
         abort(403)
     data  = request.get_json(silent=True) or {}
     order = data.get("order", [])

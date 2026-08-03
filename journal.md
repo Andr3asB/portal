@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-08-03 – portal-v107: Wünsche #116 + #117 + #118 – Packliste: zuletzt geöffnetes Ziel merken, Eltern-Rechte
+
+### Wunsch #116 – Zuletzt geöffnete Packliste merken
+
+"Die zuletzt von einem Benutzer geöffnete Packliste soll beim Öffnen der
+App geladen werden." Neue Tabelle `packlisten_nutzer_ziel` (user_id PK,
+ziel_id) - bewusst server-seitig statt sessionStorage (wie sonst in
+diesem Portal üblich, z. B. Einkaufs Wunsch #58), weil "von einem
+Benutzer" gemeint ist, nicht "in diesem Browser-Tab" - soll also über
+Geräte/Sitzungen hinweg gelten. `_aktives_ziel_fuer_index()`: ohne
+explizites `?ziel=` wird die Merkung geladen (falls das Ziel noch aktiv
+ist, sonst Fallback aufs erste aktive Ziel); mit explizitem `?ziel=`
+(Ziel-Umschalter angeklickt) wird die Merkung per UPSERT aktualisiert.
+
+### Wunsch #117 + #118 – Eltern dürfen Ziele/Kategorien verwalten
+
+"Nur Eltern sollen neue Packlisten anlegen und deaktivieren können" /
+"Nur Eltern sollen Kategorien anlegen/ändern und deaktivieren können."
+Neue `_darf_verwalten()`-Prüfung (Admin ODER Rolle 'eltern', gleiches
+Muster wie `13_kinderplan.py`) ersetzt die bisherige reine
+Admin-Prüfung in `ziele_verwalten()`, `kategorien_verwalten()` und
+`kategorien_reorder()`. Menü-Sichtbarkeit in `base.html`
+(`zeigt_packliste_items`) entsprechend erweitert, sonst hätten Eltern
+die Verwaltungslinks gar nicht gesehen, obwohl sie jetzt Zugriff haben.
+
+### Verifiziert
+
+UPSERT-Syntax (`ON CONFLICT(user_id) DO UPDATE`) isoliert gegen
+In-Memory-SQLite getestet - zweiter Aufruf für denselben Nutzer
+aktualisiert korrekt statt einen Konflikt zu werfen.
+
+### Auslieferungspaket
+
+`deploy/portal-v107.tar.gz`
+
+---
+
 ## 2026-08-02 – portal-v106: Wünsche #114 + #115 – Pool-Aufgaben zurücklegen, Geholfen-Zuweisungen als Einzeltermine
 
 ### Wunsch #114 – Pool-Aufgaben zurücklegen

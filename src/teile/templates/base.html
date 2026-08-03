@@ -240,7 +240,7 @@
     {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin and token is defined and token %}
     {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
     {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and token is defined and token %}
-    {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and user.is_admin and token is defined and token %}
+    {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and (user.is_admin or user.rolle == 'eltern') and token is defined and token %}
     {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items or zeigt_packliste_items %}
     <div class="menu-divider"></div>
 

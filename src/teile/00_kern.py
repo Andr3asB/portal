@@ -131,6 +131,10 @@ CREATE TABLE IF NOT EXISTS packlisten_eintraege (
   erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
   erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
+CREATE TABLE IF NOT EXISTS packlisten_nutzer_ziel (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  ziel_id INTEGER NOT NULL REFERENCES packlisten_ziele(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS home_gruppen (
   id       INTEGER PRIMARY KEY,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

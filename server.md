@@ -604,7 +604,18 @@ teile/
                        Wunsch): Offline-Faehigkeit, automatische
                        Synchronisierung (Wunsch #100), "Filtern"-Knopf
                        (Wunsch #87 Teil 1) - koennen bei Bedarf per eigenem
-                       Folge-Wunsch nachgezogen werden.
+                       Folge-Wunsch nachgezogen werden. Wunsch #116:
+                       `_aktives_ziel_fuer_index()` merkt das zuletzt
+                       geoeffnete Ziel PRO NUTZER (packlisten_nutzer_ziel,
+                       server-seitig per UPSERT - bewusst nicht sessionStorage
+                       wie sonst ueblich, da "von einem Benutzer" gemeint ist,
+                       nicht "in diesem Browser-Tab"); ohne explizites `?ziel=`
+                       wird die Merkung geladen, mit explizitem `?ziel=` wird
+                       sie aktualisiert. Wunsch #117/#118: `_darf_verwalten()`
+                       erlaubt Ziele/Kategorien-Verwaltung jetzt fuer Eltern
+                       UND Admin (vorher nur Admin, gleiches Muster wie
+                       13_kinderplan.py) - Menuepunkte in base.html
+                       entsprechend sichtbar.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -840,6 +851,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `packlisten_ziele` | id, name (UNIQUE), aktiv – Wunsch #111, wie einkauf_laeden aber ohne Umbenennen |
 | `packlisten_kategorien` | id, name (UNIQUE), position, aktiv – Wunsch #111, identisch zu einkauf_kategorien |
 | `packlisten_eintraege` | id, name, ziel_id (FK packlisten_ziele, cascade – ein Eintrag gehört zu GENAU EINEM Ziel), kategorie_id (FK packlisten_kategorien), person_id (FK users, SET NULL – NULL = "allgemein"), gepackt, gepackt_am, erstellt, erstellt_von |
+| `packlisten_nutzer_ziel` | user_id (PK, FK users, cascade), ziel_id (FK packlisten_ziele, cascade) – Wunsch #116, zuletzt geöffnetes Ziel pro Nutzer, per UPSERT gepflegt |
 | `rezepte` | id, name, portionen (Freitext, z. B. "4" oder "4-6 Portionen"), kategorie ('kochen'/'backen'/NULL – Wunsch #55), quelle_url (NULL außer bei URL-Import – Wunsch #63), anleitung (totes Altfeld, siehe Bekannte Issues), erstellt_von, erstellt |
 | `rezept_zutaten` | id, rezept_id (FK rezepte, cascade), name, position |
 | `rezept_schritte` | id, rezept_id (FK rezepte, cascade), text, position – ein Zubereitungsschritt pro Zeile, analog zu rezept_zutaten |
