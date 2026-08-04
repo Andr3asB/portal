@@ -2,6 +2,91 @@
 
 ---
 
+## 2026-08-04 – portal-v112: Wünsche #123 + #124 + #125 – Kopfzeile, Mannschaftsfilter, Scroll-Hinweis
+
+Drei Nachbesserungen am Mannschafts-Umschalter aus Wunsch #122.
+
+### #123 – Kopfzeile richtet sich nach der Mannschaft
+
+"Der App Header soll Entweder TVB Stuttgart oder TV Bittenfeld zeigen.
+'Handball-Bundesliga' ist auch nur bei der 1. Mannschaft korrekt."
+
+Stimmt – beides war fest verdrahtet und damit bei 17 von 18 Mannschaften
+falsch. Jetzt zeigt der Kopf den Verein der **gewählten** Mannschaft:
+„TVB Stuttgart / Handball-Bundesliga" nur bei den Profis, sonst
+„TV Bittenfeld" plus die ausgeschriebene Liga (ohne den Verbandspräfix,
+also „männliche A-Jugend Oberliga Staffel 1" statt „Baden-
+Württembergischer Handball-Verband - männliche A-Jugend …"). Der
+Browser-Tab-Titel zieht mit.
+
+### #124 – Altersklassen pro Nutzer ausblenden
+
+"DA alle Jugendligen enthalten sind, und das sehr umfangreich ist, soll es
+eine Seite geben, mit der z.B. die C, D, F Jugend ausgeblendet werden kann.
+Das soll jeder Nutzer machen können."
+
+Neue Seite `/a/tvb/<token>/mannschaften` (Menü ☰ → „Mannschaften
+anzeigen"): eine Checkbox je Altersklasse mit der Anzahl Mannschaften
+dahinter, plus „Alle an"/„Alle aus". Bewusst **ohne** Admin-Prüfung – der
+Wunsch sagt ausdrücklich „jeder Nutzer", und es ändert nur die eigene
+Ansicht (`tvb_ausgeblendet` je `user_id`).
+
+Drei Entscheidungen dabei:
+- **Gespeichert wird das Ausgeblendete, nicht das Sichtbare.** Kommt
+  nächste Saison eine neue Altersklasse dazu, ist sie damit automatisch
+  sichtbar statt stillschweigend versteckt.
+- **Die Profis lassen sich nicht abwählen** (Haken fest, „immer sichtbar").
+  Sonst könnte der Umschalter komplett leer werden und die App hätte keinen
+  Einstieg mehr. Blendet jemand alles andere aus, verschwindet die Leiste
+  ganz – es gibt dann ja nichts zu wechseln –, die Profiseite funktioniert
+  weiter und der Weg zurück steht im Menü. Live durchgespielt.
+- **Ein Direktlink auf eine ausgeblendete Mannschaft funktioniert weiter**,
+  sie taucht nur nicht im Umschalter auf. Ein gespeicherter Link soll nicht
+  wegen einer Anzeigeeinstellung ins Leere laufen.
+
+Der Schlüssel je Klasse ist das Kürzel aus `_ALTERSKLASSEN` (mA, gE, …),
+nicht die Liga-Bezeichnung: „gemischte Jugend E" und „gemischte E-Jugend"
+sind zwei Schreibweisen derselben Klasse und müssen auf denselben Haken
+fallen, sonst stünde dieselbe Altersklasse zweimal in der Liste.
+
+### #125 – Sichtbarer Hinweis aufs Weiterscrollen
+
+"Wenn mehr Mannschaftsicons auswählbar sind, als in der App-Seite oben quer
+passen, dann soll ein grafisches Element zeigen, dass man hier links/rechts
+scrollen kann."
+
+Am jeweiligen Rand blendet sich ein weicher Verlauf in die Seitenfarbe mit
+einem ‹ bzw. › ein – aber nur, wenn es dort tatsächlich weitergeht: ganz
+links nur ›, in der Mitte beide, ganz rechts nur ‹, und auf einem breiten
+Bildschirm, auf dem alles passt, gar keiner. `pointer-events:none`, damit
+die Chips darunter antippbar bleiben; der Hinweis zeigt nur an, er ist kein
+Bedienelement. Zusätzlich scrollt die Leiste beim Laden die aktive
+Mannschaft in den sichtbaren Bereich – bei 18 Chips lag sie sonst oft
+außerhalb und man sah nicht, wo man gerade ist.
+
+### Verifiziert
+
+Kopfzeile für vier Mannschaften quer durch die Altersklassen geprüft
+(Verein, Liga und `<title>` jeweils korrekt). Filter: Einstellungsseite
+listet alle 7 Klassen mit richtigen Zahlen (2+1+1+2+3+6+2 = 17); nach dem
+Ausblenden von C/D/E/F-Jugend blieben genau Profis + 2× Herren + mA + mB
+übrig; Grenzfall „alles aus" und Direktlink auf eine ausgeblendete
+Mannschaft ebenfalls geprüft. Scroll-Hinweis an drei Scrollpositionen und
+auf breitem Bildschirm gemessen, Chip-Zentrierung auch für die 18. von 18
+Mannschaften.
+
+**Messfalle dabei:** `getComputedStyle(el).opacity` liefert während eines
+laufenden CSS-Übergangs den *momentanen* Zwischenwert, nicht das Ziel – der
+erste Messversuch zeigte deshalb überall 0 und sah nach einem kaputten
+Feature aus, obwohl die Klassen längst korrekt gesetzt waren. Für solche
+Messungen entweder die Klassen selbst prüfen oder `transition:none` setzen.
+
+### Auslieferungspaket
+
+`deploy/portal-v112.tar.gz`
+
+---
+
 ## 2026-08-04 – portal-v111: Wunsch #122 – Umschalter für alle Mannschaften
 
 "Falls es auch zu den 2. und 3. Mannschaften und der Jugend Spieldaten etc.

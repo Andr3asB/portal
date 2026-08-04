@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set app_slug = "tvb" %}
-{% block title %}TVB Stuttgart{% endblock %}
+{% block title %}{{ kopf_verein }}{% endblock %}
 
 {% block extra_styles %}
 .tvb-section {
@@ -60,22 +60,50 @@
 .team-liga {
   font-size:12px; color:var(--text-2); margin-bottom:12px; line-height:1.4;
 }
+/* Wunsch #125: Sichtbarer Hinweis, dass die Leiste seitwärts weitergeht.
+   Ein weicher Verlauf in die Seitenfarbe plus ein Pfeil, je Seite nur
+   eingeblendet, wenn es dort tatsächlich noch weitergeht (Klassen setzt das
+   JS unten). pointer-events:none, damit die Chips darunter antippbar
+   bleiben - der Hinweis zeigt nur an, er ist kein Bedienelement. */
+.team-leiste-wrap { position:relative; }
+.team-scroll-hinweis {
+  position:absolute; top:0; bottom:8px; width:38px;
+  display:flex; align-items:center;
+  pointer-events:none; opacity:0; transition:opacity .18s;
+  font-size:22px; font-weight:700; color:var(--text-2);
+}
+.team-scroll-hinweis.links {
+  left:0; justify-content:flex-start;
+  background:linear-gradient(to right, var(--bg) 45%, transparent);
+}
+.team-scroll-hinweis.rechts {
+  right:0; justify-content:flex-end;
+  background:linear-gradient(to left, var(--bg) 45%, transparent);
+}
+.team-leiste-wrap.kann-links  .team-scroll-hinweis.links  { opacity:1; }
+.team-leiste-wrap.kann-rechts .team-scroll-hinweis.rechts { opacity:1; }
 {% endblock %}
 
+{# Wunsch #123: Verein und Liga richten sich nach der gewählten Mannschaft -
+   "TVB Stuttgart"/"Handball-Bundesliga" gilt nur für die 1. Mannschaft. #}
 {% block nav_title %}
-<div class="nav-title">🤾 TVB Stuttgart</div>
-<div class="nav-sub">Handball-Bundesliga</div>
+<div class="nav-title">🤾 {{ kopf_verein }}</div>
+<div class="nav-sub">{{ kopf_liga }}</div>
 {% endblock %}
 
 {% block body %}
 <main class="main">
 
   {% if mannschaften|length > 1 %}
-  <div class="team-leiste">
-    {% for m in mannschaften %}
-    <a class="team-chip{% if m.team_id == gewaehlt.team_id %} active{% endif %}"
-       href="?team={{ m.team_id|urlencode }}">{{ m.kurz }}</a>
-    {% endfor %}
+  <div class="team-leiste-wrap" id="team-wrap">
+    <div class="team-leiste" id="team-leiste">
+      {% for m in mannschaften %}
+      <a class="team-chip{% if m.team_id == gewaehlt.team_id %} active{% endif %}"
+         href="?team={{ m.team_id|urlencode }}">{{ m.kurz }}</a>
+      {% endfor %}
+    </div>
+    <span class="team-scroll-hinweis links"  aria-hidden="true">‹</span>
+    <span class="team-scroll-hinweis rechts" aria-hidden="true">›</span>
   </div>
   {% endif %}
 
@@ -178,4 +206,36 @@
   </div>
 
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Wunsch #125: Scroll-Hinweise je nach Position ein-/ausblenden.
+(function () {
+  var wrap = document.getElementById('team-wrap');
+  var leiste = document.getElementById('team-leiste');
+  if (!wrap || !leiste) return;
+
+  function aktualisieren() {
+    // 1px Toleranz: Browser runden scrollLeft bei Zoom/HiDPI, ohne Puffer
+    // würde der rechte Hinweis am Ende der Leiste stehenbleiben.
+    var maxScroll = leiste.scrollWidth - leiste.clientWidth;
+    wrap.classList.toggle('kann-links', leiste.scrollLeft > 1);
+    wrap.classList.toggle('kann-rechts', leiste.scrollLeft < maxScroll - 1);
+  }
+
+  leiste.addEventListener('scroll', aktualisieren, { passive: true });
+  window.addEventListener('resize', aktualisieren);
+  aktualisieren();
+
+  // Die aktive Mannschaft in den sichtbaren Bereich holen - bei 18 Chips
+  // liegt sie sonst oft außerhalb und man sieht nicht, wo man gerade ist.
+  var aktiv = leiste.querySelector('.team-chip.active');
+  if (aktiv) {
+    var ziel = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+    leiste.scrollLeft = Math.max(0, ziel);
+    aktualisieren();
+  }
+})();
+</script>
 {% endblock %}

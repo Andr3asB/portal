@@ -112,7 +112,7 @@ import urllib.request
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request
 from teile.kern import grant as check_grant, get_db
 
 bp  = Blueprint("tvb_app", __name__)
@@ -153,6 +153,30 @@ _LIGA_STUFEN = [
     ("Bezirksklasse", "BK"), ("Bezirksliga", "BZL"), ("Regionalliga", "RL"),
     ("Oberliga", "OL"), ("Landesliga", "LL"), ("Kreisliga", "KL"),
 ]
+
+# Wunsch #123: Die Profis heissen "TVB Stuttgart", alle uebrigen Mannschaften
+# laufen unter dem Stammverein "TV Bittenfeld" - der Kopf der Seite muss das
+# zeigen, "Handball-Bundesliga" stimmt nur fuer die 1. Mannschaft.
+_VEREIN_PROFIS  = "TVB Stuttgart"
+_VEREIN_AMATEUR = "TV Bittenfeld"
+
+# Wunsch #124: Anzeigenamen je Altersklassen-Kuerzel (das Kuerzel aus
+# _ALTERSKLASSEN ist der stabile Schluessel in der DB - "gemischte Jugend E"
+# und "gemischte E-Jugend" sind zwei Schreibweisen derselben Klasse und
+# muessen auf denselben Schluessel fallen, sonst waeren es zwei Haken).
+_PROFI_KLASSE = "Profis"
+_KLASSEN_NAMEN = {
+    _PROFI_KLASSE: "Profis (1. Mannschaft)",
+    "Herren": "Herren",           "Damen": "Damen",
+    "mA": "männliche A-Jugend",   "mB": "männliche B-Jugend",
+    "mC": "männliche C-Jugend",   "mD": "männliche D-Jugend",
+    "mF": "männliche F-Jugend",
+    "wA": "weibliche A-Jugend",   "wB": "weibliche B-Jugend",
+    "wC": "weibliche C-Jugend",   "wD": "weibliche D-Jugend",
+    "gA": "gemischte A-Jugend",   "gB": "gemischte B-Jugend",
+    "gC": "gemischte C-Jugend",   "gD": "gemischte D-Jugend",
+    "gE": "gemischte E-Jugend",   "gF": "gemischte F-Jugend",
+}
 
 # Wunsch #121: HPI-API der HBL (andere Quelle als oben, siehe Docstring).
 # _HPI_TURNIER=1 ist die 1. Bundesliga der Maenner (aus data-tournament="1"
@@ -216,18 +240,33 @@ def _hb_seite_holen(pfad):
         return None
 
 
+def _liga_ohne_verband(liga):
+    """Nur der eigentliche Ligateil - der Verband/Bezirk davor
+    ("Stuttgart-Rems-Murr - …") interessiert weder im Kopf noch auf dem Knopf."""
+    return (liga or "").split(" - ", 1)[-1]
+
+
+def _altersklasse(liga):
+    """Altersklassen-Kuerzel zur Liga ("mB", "gE", "Herren", …) oder None.
+    Wunsch #124: zugleich der Schluessel, unter dem sich eine ganze Klasse
+    ausblenden laesst."""
+    rest = _liga_ohne_verband(liga).lower()
+    for lang, kurz in _ALTERSKLASSEN:
+        if lang.lower() in rest:
+            return kurz
+    return None
+
+
 def _kurzlabel(liga, name):
     """Baut aus der langen Liga-Bezeichnung ein knappes Knopf-Label,
     z. B. "männliche B-Jugend Bezirksoberliga Staffel 2" -> "mB BOL 2"."""
     if not liga:
         return name
-    # Verband/Bezirk vor dem " - " interessiert auf dem Knopf nicht.
-    rest = liga.split(" - ", 1)[-1]
+    rest = _liga_ohne_verband(liga)
     teile = []
-    for lang, kurz in _ALTERSKLASSEN:
-        if lang.lower() in rest.lower():
-            teile.append(kurz)
-            break
+    klasse = _altersklasse(liga)
+    if klasse:
+        teile.append(klasse)
     for lang, kurz in _LIGA_STUFEN:
         if lang.lower() in rest.lower():
             teile.append(kurz)
@@ -286,11 +325,11 @@ def _mannschaften_aktualisieren(db):
 
     db.execute("DELETE FROM tvb_mannschaften")
     db.execute("""
-        INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, turnier_id,
-                                     position, ist_profi, aktualisiert_am)
-        VALUES (?,?,?,?,?,?,1, datetime('now'))
-    """, (_TEAM_ID, "TVB Stuttgart", "DAIKIN HBL (1. Bundesliga)",
-          "Profis", _TOURNAMENT_ID, 0))
+        INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, altersklasse,
+                                     turnier_id, position, ist_profi, aktualisiert_am)
+        VALUES (?,?,?,?,?,?,?,1, datetime('now'))
+    """, (_TEAM_ID, _VEREIN_PROFIS, "Handball-Bundesliga",
+          "Profis", _PROFI_KLASSE, _TOURNAMENT_ID, 0))
 
     labels = {}
     for pos, (team_id, name, liga) in enumerate(gefunden, start=1):
@@ -307,10 +346,10 @@ def _mannschaften_aktualisieren(db):
         # Stueck wuerden den Seitenaufbau desjenigen, der die Aktualisierung
         # ausloest, um etliche Sekunden verzoegern.
         db.execute("""
-            INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, turnier_id,
-                                         position, ist_profi, aktualisiert_am)
-            VALUES (?,?,?,?,NULL,?,0, datetime('now'))
-        """, (team_id, name, liga, kurz, pos))
+            INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, altersklasse,
+                                         turnier_id, position, ist_profi, aktualisiert_am)
+            VALUES (?,?,?,?,?,NULL,?,0, datetime('now'))
+        """, (team_id, name, liga, kurz, _altersklasse(liga), pos))
     db.commit()
 
 
@@ -351,6 +390,44 @@ def _mannschaften_holen(db):
     return [dict(z) for z in db.execute(
         "SELECT * FROM tvb_mannschaften ORDER BY position"
     ).fetchall()]
+
+
+def _ausgeblendete_klassen(db, user_id):
+    """Wunsch #124: Altersklassen, die DIESER Nutzer ausgeblendet hat."""
+    return {z["altersklasse"] for z in db.execute(
+        "SELECT altersklasse FROM tvb_ausgeblendet WHERE user_id=?", (user_id,)
+    ).fetchall()}
+
+
+def _sichtbare_mannschaften(mannschaften, versteckt):
+    """Mannschaften ohne die ausgeblendeten Altersklassen. Die Profis bleiben
+    immer sichtbar - sonst koennte der Umschalter komplett leer werden und
+    die App haette gar keinen Einstieg mehr."""
+    return [
+        m for m in mannschaften
+        if m["ist_profi"] or (m["altersklasse"] not in versteckt)
+    ]
+
+
+def _klassen_uebersicht(mannschaften, versteckt):
+    """Altersklassen fuer die Einstellungsseite: Reihenfolge wie im
+    Umschalter, mit Anzahl Mannschaften und aktuellem Zustand."""
+    klassen = []
+    gesehen = {}
+    for m in mannschaften:
+        if m["ist_profi"]:
+            continue
+        schluessel = m["altersklasse"] or "?"
+        if schluessel not in gesehen:
+            gesehen[schluessel] = {
+                "schluessel": schluessel,
+                "name": _KLASSEN_NAMEN.get(schluessel, schluessel),
+                "anzahl": 0,
+                "sichtbar": schluessel not in versteckt,
+            }
+            klassen.append(gesehen[schluessel])
+        gesehen[schluessel]["anzahl"] += 1
+    return klassen
 
 
 def _spiel_aus_roh(roh, team_id):
@@ -426,23 +503,28 @@ def index(token):
         return render_template("denied.html", reason="invalid"), 403
 
     db = get_db()
-    mannschaften = _mannschaften_holen(db)
+    alle_mannschaften = _mannschaften_holen(db)
+    # Wunsch #124: ausgeblendete Altersklassen dieses Nutzers herausfiltern.
+    mannschaften = _sichtbare_mannschaften(
+        alle_mannschaften, _ausgeblendete_klassen(db, user["id"])
+    )
 
     # Wunsch #122: ?team=<id> waehlt die Mannschaft. Unbekannte oder fehlende
     # Angabe faellt auf die Profis zurueck, damit ein alter Link (oder eine
     # Mannschaft, die es nach dem Saisonwechsel nicht mehr gibt) nie ins Leere
-    # laeuft.
+    # laeuft. Eine ausgeblendete Mannschaft bleibt per Direktlink erreichbar -
+    # sie taucht dann nur nicht im Umschalter auf.
     gewaehlt = None
     gewuenscht = request.args.get("team")
     if gewuenscht:
-        gewaehlt = next((m for m in mannschaften if m["team_id"] == gewuenscht), None)
+        gewaehlt = next((m for m in alle_mannschaften if m["team_id"] == gewuenscht), None)
     if not gewaehlt:
         gewaehlt = next((m for m in mannschaften if m["ist_profi"]), None)
     if not gewaehlt:
         # Vereinsseite noch nie erreichbar gewesen: Profis trotzdem anzeigen.
-        gewaehlt = {"team_id": _TEAM_ID, "name": "TVB Stuttgart", "kurz": "Profis",
-                    "liga": "DAIKIN HBL (1. Bundesliga)", "turnier_id": _TOURNAMENT_ID,
-                    "ist_profi": 1}
+        gewaehlt = {"team_id": _TEAM_ID, "name": _VEREIN_PROFIS, "kurz": "Profis",
+                    "liga": "Handball-Bundesliga", "turnier_id": _TOURNAMENT_ID,
+                    "ist_profi": 1, "altersklasse": _PROFI_KLASSE}
 
     team_id = gewaehlt["team_id"]
 
@@ -474,12 +556,60 @@ def index(token):
         (vergangene if s["status"] == "Ended" or s["anstoss"] < jetzt_iso else kommende).append(dict(s))
     vergangene.reverse()  # neueste zuerst
 
+    # Wunsch #123: Der Kopf nennt den Verein der GEWAEHLTEN Mannschaft -
+    # nur die 1. Mannschaft heisst "TVB Stuttgart" und spielt in der
+    # Handball-Bundesliga, alle uebrigen laufen unter "TV Bittenfeld".
+    if gewaehlt["ist_profi"]:
+        kopf_verein, kopf_liga = _VEREIN_PROFIS, "Handball-Bundesliga"
+    else:
+        kopf_verein = _VEREIN_AMATEUR
+        kopf_liga = _liga_ohne_verband(gewaehlt["liga"]) or gewaehlt["kurz"]
+
     return render_template("tvb.html",
         user=user, token=token, farbe=user["farbe"],
         mannschaften=mannschaften, gewaehlt=gewaehlt,
+        kopf_verein=kopf_verein, kopf_liga=kopf_liga,
         fehler_spiele=fehler_spiele, fehler_tabelle=fehler_tabelle,
         vergangene=vergangene, kommende=kommende,
         tabelle=_tabelle_aufbereiten(tabelle_antwort, gewaehlt["name"]),
+    )
+
+
+@bp.route("/a/tvb/<token>/mannschaften", methods=["GET", "POST"])
+def mannschaften_einstellen(token):
+    """Wunsch #124: Jeder Nutzer blendet fuer sich Altersklassen aus - der
+    Umschalter mit allen Jugendklassen ist sonst sehr lang. Bewusst ohne
+    Admin-Pruefung: der Wunsch sagt ausdruecklich "das soll jeder Nutzer
+    machen koennen", und es aendert nur die eigene Ansicht."""
+    user = check_grant(token, APP)
+    if not user:
+        return render_template("denied.html", reason="invalid"), 403
+
+    db = get_db()
+    alle = _mannschaften_holen(db)
+
+    if request.method == "POST":
+        # Angehakt = sichtbar. Alles, was nicht angehakt ist, kommt in
+        # tvb_ausgeblendet - so wirkt sich eine neu dazugekommene Klasse
+        # (naechste Saison) automatisch als "sichtbar" aus.
+        sichtbar = set(request.form.getlist("sichtbar"))
+        db.execute("DELETE FROM tvb_ausgeblendet WHERE user_id=?", (user["id"],))
+        for klasse in {m["altersklasse"] for m in alle
+                       if not m["ist_profi"] and m["altersklasse"]}:
+            if klasse not in sichtbar:
+                db.execute(
+                    "INSERT INTO tvb_ausgeblendet(user_id, altersklasse) VALUES(?,?)",
+                    (user["id"], klasse),
+                )
+        db.commit()
+        return redirect(f"/a/tvb/{token}/mannschaften?gespeichert=1")
+
+    versteckt = _ausgeblendete_klassen(db, user["id"])
+    return render_template("tvb_mannschaften.html",
+        user=user, token=token, farbe=user["farbe"],
+        klassen=_klassen_uebersicht(alle, versteckt),
+        profi_anzahl=sum(1 for m in alle if m["ist_profi"]),
+        gespeichert=request.args.get("gespeichert") == "1",
     )
 
 

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set app_slug = "tvb" %}
+{% block title %}Mannschaften anzeigen{% endblock %}
+
+{% block extra_styles %}
+.hinweis {
+  font-size:13px; color:var(--text-2); line-height:1.5;
+  margin-bottom:14px;
+}
+.klassen-karte {
+  background:var(--surface); border-radius:14px; padding:6px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-bottom:14px;
+}
+.klassen-zeile {
+  display:flex; align-items:center; gap:12px; padding:12px 0;
+  border-bottom:1px solid var(--border-subtle);
+}
+.klassen-zeile:last-child { border-bottom:none; }
+.klassen-zeile input[type=checkbox] {
+  width:22px; height:22px; flex-shrink:0; accent-color:var(--farbe);
+}
+.klassen-text { flex:1; min-width:0; }
+.klassen-name { font-size:15px; word-break:break-word; }
+.klassen-anzahl { font-size:12px; color:var(--text-2); margin-top:1px; }
+.klassen-fest { font-size:12px; color:var(--text-2); flex-shrink:0; }
+.speichern-btn {
+  display:block; width:100%; border:none; border-radius:12px;
+  padding:13px 0; font-size:15px; font-weight:600; font-family:inherit;
+  background:var(--farbe); color:#fff; cursor:pointer;
+}
+.alle-zeile { display:flex; gap:8px; margin-bottom:12px; }
+.alle-btn {
+  flex:1; text-align:center; border:1.5px solid var(--border);
+  border-radius:12px; padding:9px 0; font-size:13px; font-weight:600;
+  font-family:inherit; background:var(--surface); color:var(--text);
+  cursor:pointer;
+}
+.gespeichert {
+  background:#34c759; color:#fff; border-radius:12px;
+  padding:11px 14px; font-size:14px; font-weight:600; margin-bottom:14px;
+}
+.empty { text-align:center; padding:40px 16px; color:var(--text-2); font-size:15px; line-height:1.5; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/tvb/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🗂️ Mannschaften</div>
+<div class="nav-sub">Was im Umschalter erscheint</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if gespeichert %}
+  <div class="gespeichert">✅ Gespeichert.</div>
+  {% endif %}
+
+  {% if not klassen %}
+    <div class="empty">
+      <div style="font-size:48px;margin-bottom:12px">📡</div>
+      Die Mannschaftsliste konnte noch nicht geladen werden.<br>Versuch's später nochmal.
+    </div>
+  {% else %}
+    <div class="hinweis">
+      Häkchen weg = diese Altersklasse verschwindet aus der Knopfleiste in der
+      App. Das gilt nur für dich – alle anderen sehen weiterhin ihre eigene
+      Auswahl.
+    </div>
+
+    <form method="post" action="/a/tvb/{{ token }}/mannschaften">
+      <div class="alle-zeile">
+        <button class="alle-btn" type="button" onclick="alleSetzen(true)">Alle an</button>
+        <button class="alle-btn" type="button" onclick="alleSetzen(false)">Alle aus</button>
+      </div>
+
+      <div class="klassen-karte">
+        {# Die Profis stehen bewusst fest drin: wäre auch die 1. Mannschaft
+           abwählbar, könnte der Umschalter komplett leer werden. #}
+        <div class="klassen-zeile">
+          <input type="checkbox" checked disabled>
+          <div class="klassen-text">
+            <div class="klassen-name">Profis (1. Mannschaft)</div>
+            <div class="klassen-anzahl">{{ profi_anzahl }} Mannschaft</div>
+          </div>
+          <div class="klassen-fest">immer sichtbar</div>
+        </div>
+
+        {% for k in klassen %}
+        <label class="klassen-zeile">
+          <input type="checkbox" name="sichtbar" value="{{ k.schluessel }}"
+                 {% if k.sichtbar %}checked{% endif %}>
+          <div class="klassen-text">
+            <div class="klassen-name">{{ k.name }}</div>
+            <div class="klassen-anzahl">
+              {{ k.anzahl }} Mannschaft{% if k.anzahl != 1 %}en{% endif %}
+            </div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <button class="speichern-btn" type="submit">Speichern</button>
+    </form>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function alleSetzen(an) {
+  document.querySelectorAll('input[name="sichtbar"]').forEach(function (c) {
+    c.checked = an;
+  });
+}
+</script>
+{% endblock %}

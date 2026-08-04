@@ -293,10 +293,16 @@ CREATE TABLE IF NOT EXISTS tvb_mannschaften (
   name            TEXT    NOT NULL,
   liga            TEXT,
   kurz            TEXT    NOT NULL,
+  altersklasse    TEXT,
   turnier_id      TEXT,
   position        INTEGER NOT NULL DEFAULT 0,
   ist_profi       INTEGER NOT NULL DEFAULT 0,
   aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS tvb_ausgeblendet (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  altersklasse TEXT    NOT NULL,
+  PRIMARY KEY (user_id, altersklasse)
 );
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
@@ -831,6 +837,19 @@ def _init_db(app):
             ("sr.competitor.6272-143352",),
         )
         db.commit()
+
+        # Wunsch #124: Altersklasse je Mannschaft, damit sich Jugendklassen
+        # pro Nutzer ausblenden lassen. tvb_mannschaften ist ein reiner Cache
+        # der Vereinsseite - statt die Spalte muehsam nachzufuellen, wird der
+        # Cache einmalig verworfen und beim naechsten Seitenaufruf komplett
+        # neu aufgebaut (dann mit Altersklasse).
+        try:
+            db.execute("ALTER TABLE tvb_mannschaften ADD COLUMN altersklasse TEXT")
+            db.commit()
+            db.execute("DELETE FROM tvb_mannschaften")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
 
         # Wunsch #112: mehrere Wochentage je Serien-Vorlage moeglich, statt nur
         # einem - fester_wochentag (einzelner int) bleibt als totes Altfeld

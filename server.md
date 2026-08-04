@@ -761,6 +761,31 @@ teile/
                        immer auf die Profis zurueck. Der Kader-Knopf
                        erscheint NUR bei den Profis (HPI ist eine reine
                        Bundesliga-Kennzahl).
+                       Wunsch #123: Kopfzeile richtet sich nach der
+                       gewaehlten Mannschaft (kopf_verein/kopf_liga) - nur
+                       die 1. Mannschaft heisst "TVB Stuttgart" und spielt
+                       in der "Handball-Bundesliga", alle uebrigen laufen
+                       unter "TV Bittenfeld" mit ihrer eigenen Liga
+                       (_liga_ohne_verband, also ohne den Praefix
+                       "Baden-Wuerttembergischer Handball-Verband - ").
+                       Wunsch #124: /mannschaften blendet Altersklassen
+                       PRO NUTZER aus (tvb_ausgeblendet, bewusst ohne
+                       Admin-Pruefung - der Wunsch sagt ausdruecklich
+                       "jeder Nutzer", und es aendert nur die eigene
+                       Ansicht). Gespeichert wird das AUSGEBLENDETE, nicht
+                       das Sichtbare: eine naechste Saison neu
+                       dazukommende Klasse ist damit automatisch sichtbar
+                       statt stillschweigend versteckt. Die Profis sind
+                       nicht abwaehlbar (_sichtbare_mannschaften), sonst
+                       koennte der Umschalter leer werden. Ein Direktlink
+                       auf eine ausgeblendete Mannschaft funktioniert
+                       weiter - sie taucht nur nicht im Umschalter auf.
+                       Schluessel je Klasse ist das Kuerzel aus
+                       _ALTERSKLASSEN (mA, gE, ...), NICHT die
+                       Liga-Bezeichnung: "gemischte Jugend E" und
+                       "gemischte E-Jugend" sind dieselbe Klasse in zwei
+                       Schreibweisen und muessen auf denselben Haken
+                       fallen.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -846,7 +871,23 @@ teile/
                               ausgeschriebener Liga der gewaehlten
                               Mannschaft. Die Hervorhebung der eigenen
                               Mannschaft vergleicht gegen `gewaehlt.name`
-                              statt fest gegen "TVB Stuttgart"
+                              statt fest gegen "TVB Stuttgart".
+                              Wunsch #125: .team-scroll-hinweis links/rechts
+                              im .team-leiste-wrap - weicher Verlauf in
+                              var(--bg) plus ‹/›, je Seite nur eingeblendet,
+                              wenn dort wirklich noch etwas kommt (JS setzt
+                              .kann-links/.kann-rechts am Wrap beim Scrollen
+                              und beim Resize). pointer-events:none, damit
+                              die Chips darunter antippbar bleiben - der
+                              Hinweis zeigt nur an, er ist kein Bedienelement.
+                              Dasselbe Skript scrollt beim Laden die aktive
+                              Mannschaft in den sichtbaren Bereich
+    tvb_mannschaften.html   – Altersklassen aus-/einblenden (Wunsch #124):
+                              je Klasse eine Checkbox mit Anzahl Mannschaften,
+                              "Alle an"/"Alle aus", Profis fest angehakt und
+                              disabled ("immer sichtbar"). Eigener
+                              ←-Zurueck-Link, POST/Redirect/GET mit
+                              ?gespeichert=1 als Bestaetigung
     tvb_kader.html          – Kader mit Spielerwerten (Wunsch #121): nach
                               Position gruppiert (Tor → Kreisläufer, deutsche
                               Labels aus _POSITIONEN), je Spieler HPI-Schnitt,
@@ -1047,7 +1088,8 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 | `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
-| `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
+| `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
+| `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
