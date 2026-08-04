@@ -288,6 +288,16 @@ CREATE TABLE IF NOT EXISTS tvb_spiele (
   status          TEXT    NOT NULL,
   aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS tvb_mannschaften (
+  team_id         TEXT PRIMARY KEY,
+  name            TEXT    NOT NULL,
+  liga            TEXT,
+  kurz            TEXT    NOT NULL,
+  turnier_id      TEXT,
+  position        INTEGER NOT NULL DEFAULT 0,
+  ist_profi       INTEGER NOT NULL DEFAULT 0,
+  aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
   vorname         TEXT    NOT NULL,
@@ -805,6 +815,21 @@ def _init_db(app):
         # Bestehende Aufgaben hatten noch keinen Status (Wunsch #20) -
         # aus dem alten erledigt-Flag ableiten, alles andere ist "offen".
         db.execute("UPDATE todos SET status='erledigt' WHERE erledigt=1 AND status='offen'")
+        db.commit()
+
+        # Wunsch #122: tvb_spiele speicherte bisher nur Spiele der Profis, jetzt
+        # auch die aller anderen Mannschaften - ohne team_id wuerden sie sich
+        # vermischen. Bestehende Zeilen sind per Definition Profi-Spiele (vorher
+        # gab es nichts anderes), deshalb einmalig auf die Profi-Team-ID setzen.
+        try:
+            db.execute("ALTER TABLE tvb_spiele ADD COLUMN team_id TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        db.execute(
+            "UPDATE tvb_spiele SET team_id=? WHERE team_id IS NULL",
+            ("sr.competitor.6272-143352",),
+        )
         db.commit()
 
         # Wunsch #112: mehrere Wochentage je Serien-Vorlage moeglich, statt nur

@@ -39,6 +39,27 @@
   font-size:15px; font-weight:600;
   background:var(--farbe); color:#fff;
 }
+/* Wunsch #122: Mannschafts-Umschalter. Bei 18 Mannschaften passen die
+   Knoepfe nicht in eine Zeile - deshalb eine horizontal scrollbare Leiste
+   (Chips) statt Umbruch ueber viele Zeilen, damit der eigentliche Inhalt
+   nicht nach unten geschoben wird. */
+.team-leiste {
+  display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.team-leiste::-webkit-scrollbar { display:none; }
+.team-chip {
+  flex:0 0 auto; text-decoration:none; white-space:nowrap;
+  border:1.5px solid var(--border); border-radius:999px;
+  /* 11px senkrecht ergibt ~40px Gesamthöhe - dieselbe Antippfläche wie die
+     Zeitraum-Knöpfe der Sportschau, 7px waren als Touch-Ziel zu knapp. */
+  padding:11px 14px; font-size:13px; font-weight:600;
+  background:var(--surface); color:var(--text);
+}
+.team-chip.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.team-liga {
+  font-size:12px; color:var(--text-2); margin-bottom:12px; line-height:1.4;
+}
 {% endblock %}
 
 {% block nav_title %}
@@ -49,7 +70,25 @@
 {% block body %}
 <main class="main">
 
+  {% if mannschaften|length > 1 %}
+  <div class="team-leiste">
+    {% for m in mannschaften %}
+    <a class="team-chip{% if m.team_id == gewaehlt.team_id %} active{% endif %}"
+       href="?team={{ m.team_id|urlencode }}">{{ m.kurz }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if gewaehlt.liga %}
+  <div class="team-liga">{{ gewaehlt.name }} · {{ gewaehlt.liga }}</div>
+  {% endif %}
+
+  {# Der Kader (Wunsch #121) kommt aus der HPI-Statistik der Bundesliga -
+     die gibt es fuer Amateur-/Jugendmannschaften nicht, deshalb erscheint
+     der Knopf nur bei den Profis. #}
+  {% if gewaehlt.ist_profi %}
   <a class="kader-btn" href="/a/tvb/{{ token }}/kader">👥 Kader &amp; Spielerwerte</a>
+  {% endif %}
 
   <div class="tvb-section">
     <div class="tvb-section-title">📅 Nächste Spiele</div>
@@ -61,8 +100,8 @@
       {% for s in kommende %}
       <div class="tvb-spiel">
         <div class="tvb-spiel-teams">
-          <div class="tvb-spiel-team{% if s.heim == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.heim }}</div>
-          <div class="tvb-spiel-team{% if s.gast == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.gast }}</div>
+          <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
+          <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
           <div class="tvb-spiel-meta">
             {{ s.spieltag }}{% if s.spieltag and s.ort %} · {% endif %}{{ s.ort }}
           </div>
@@ -85,8 +124,8 @@
       {% for s in vergangene %}
       <div class="tvb-spiel">
         <div class="tvb-spiel-teams">
-          <div class="tvb-spiel-team{% if s.heim == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.heim }}</div>
-          <div class="tvb-spiel-team{% if s.gast == 'TVB Stuttgart' %} tvb{% endif %}">{{ s.gast }}</div>
+          <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
+          <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
           <div class="tvb-spiel-meta">{{ s.spieltag }}</div>
         </div>
         <div class="tvb-spiel-ergebnis{% if s.heim_tore is none %} offen{% endif %}">
@@ -105,6 +144,10 @@
     <div class="tvb-section-title">📊 Tabelle</div>
     {% if fehler_tabelle %}
       <div class="empty">📡 Tabelle gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
+    {% elif not tabelle %}
+      {# Amateur- und Jugendligen veroeffentlichen ihre Tabelle erst mit dem
+         Saisonstart - bis dahin liefert die Quelle `null` statt Zeilen. #}
+      <div class="empty">Für diese Liga gibt es noch keine Tabelle.</div>
     {% else %}
       <div style="overflow-x:auto">
       <table class="tvb-tabelle">

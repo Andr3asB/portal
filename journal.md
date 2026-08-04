@@ -2,6 +2,87 @@
 
 ---
 
+## 2026-08-04 – portal-v111: Wunsch #122 – Umschalter für alle Mannschaften
+
+"Falls es auch zu den 2. und 3. Mannschaften und der Jugend Spieldaten etc.
+im Internet gibt, dann sollen oben in der App Button Umschalter für jede
+Mannschaft erscheinen und je nach Auswahl soll man die Informationen der
+jeweiligen Mannschaft sehen. Die Seiten der Mannschaften sollen darüber
+hinaus immer gleich aufgebaut sein."
+
+### Ja, die Daten gibt es – aber unter einem zweiten Verein
+
+Der Wunsch war ausdrücklich konditional formuliert. Ergebnis der Recherche:
+Die Daten existieren, liegen auf handball.net aber unter einem **anderen
+Vereinsobjekt** als die Profis. `sr.competitor.6272` ("TVB Stuttgart")
+kennt nur zwei Teams – die Bundesligamannschaft und dieselbe Mannschaft im
+DHB-Pokal. Der komplette Unterbau hängt an
+`handball4all.wuerttemberg.131` ("TV Bittenfeld"): 17 Mannschaften, also
+2./3./4. Herren plus die gesamte Jugend von der A- bis zur F-Jugend. Der
+Umschalter führt beides zu 18 Einträgen zusammen.
+
+### Die Mannschaftsliste gibt es nicht als API
+
+`club/<id>/teams` und `.../mannschaften` liefern 404; es existiert nur
+`club/<id>/schedule`, und das zeigt lediglich Mannschaften mit Spielen in
+den nächsten 14 Tagen – in der Sommerpause also gar keine. Deshalb wird
+die Vereinsseite geparst (Team-ID, Name und Liga stehen dort im HTML) und
+das Ergebnis in `tvb_mannschaften` abgelegt, erneuert nur alle 24 h. Schlägt
+das Parsen fehl, bleibt der letzte Stand stehen, statt dass der Umschalter
+verschwindet.
+
+Für die Tabelle braucht es zusätzlich die Liga-ID. Normalerweise kommt die
+gratis mit den Spieldaten (`tournament.id`) – die sind aber gerade leer.
+Fallback ist die /tabelle-Seite der Mannschaft; die eigene Liga ist dort
+immer die `handball4all.*` (die `sportradar.dhbdata.*` sind die überall
+gleichen Navigationslinks zu den Bundesligen), an fünf Mannschaften quer
+durch alle Altersklassen gegengeprüft. Dieser Abruf passiert **faul**:
+erst wenn eine Mannschaft tatsächlich geöffnet wird, dann dauerhaft
+gemerkt. Alle 17 auf einmal zu holen hätte denjenigen, der zufällig die
+24-h-Aktualisierung auslöst, rund 17 Sekunden warten lassen; so bleibt der
+Seitenaufbau bei 0,1–0,5 s.
+
+### Zwei bewusste Abweichungen von "immer gleich aufgebaut"
+
+- Der Kader-Knopf (Wunsch #121) erscheint nur bei den Profis. Der HPI ist
+  eine reine Bundesliga-Kennzahl; für Amateur- und Jugendmannschaften gibt
+  es ihn nicht, ein Knopf auf eine garantiert leere Seite wäre schlechter
+  als keiner.
+- `tvb_spiele` hat eine `team_id` bekommen, sonst hätten sich die Spiele
+  aller Mannschaften vermischt. Bestehende Zeilen sind per Definition
+  Profispiele und wurden einmalig entsprechend gesetzt.
+
+### Wichtig: Sommerpause
+
+Die Amateur- und Jugendligen veröffentlichen Spielplan und Tabelle erst
+kurz vor dem Saisonstart im September (die Profis starten am 28.08.).
+Aktuell liefern deshalb **alle 17** Mannschaften null Spiele, und die
+Tabellen-Antwort ist `table: null` – nicht etwa eine leere Liste. Das hätte
+den bestehenden Code zum Absturz gebracht (`tabelle_antwort["table"]["rows"]`
+auf `None`); jetzt abgefangen und als „Für diese Liga gibt es noch keine
+Tabelle" angezeigt. Heißt aber auch: gegen echte Spiel- und Tabellendaten
+einer Amateurmannschaft ist die Anzeige erst ab September prüfbar. Die
+Logik selbst wurde gegen die echte HBL-Tabelle (18 Zeilen, Hervorhebung
+korrekt) sowie gegen `null`/leer/fehlend getestet.
+
+### Nebenbefund: zwei kaputte Icons aus Wunsch #119 repariert
+
+Beim systematischen Gegenprüfen aller Templates gegen die lokalen
+Twemoji-Grafiken fielen die Drehknöpfe ◀ ▶ im Tierbaukasten auf: anders als
+★ ☰ ✎ ✓ ✕ führt Twemoji diese beiden sehr wohl als Emoji, wandelt sie also
+in `<img>` um – die zugehörigen SVGs fehlten aber, Ergebnis waren zwei
+404er und zwei leere Knöpfe. Live bestätigt und behoben. Bei der
+Gelegenheit alle 38 Templates geprüft: 👩 ↔ ↩ ⏳ fehlten ebenfalls, die
+übrigen 15 Zeichen (← ↑ → ⋮ ⌂ ▲ ▸ ▼ ○ ★ ☰ ✎ ✓ ✕ ⠿) sind einzeln
+gegengeprüft reine Textzeichen ohne Twemoji-Grafik und damit korrekt so.
+Jetzt 84 statt 78 SVG-Dateien.
+
+### Auslieferungspaket
+
+`deploy/portal-v111.tar.gz`
+
+---
+
 ## 2026-08-04 – portal-v110: Wunsch #121 – TVB-Kader mit Spielerwerten
 
 "es soll ein Button geben, über den eine Unterseite aufgerufen wird, auf

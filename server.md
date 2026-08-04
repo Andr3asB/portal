@@ -179,8 +179,8 @@ hängt nur im Bridge-Netz und kann die macvlan-IP des hae-Servers
 ## Externe Frontend-Assets (lokal gebündelt, Wunsch #119)
 
 - **`twemoji.min.js`** (`src/static/twemoji.min.js`, Version 14.0.2) +
-  passende SVG-Grafiken (`src/static/twemoji/svg/<codepoint>.svg`, ca. 74
-  Dateien, ~240 KB): ersetzt jedes im DOM erkannte Emoji-Zeichen durch ein
+  passende SVG-Grafiken (`src/static/twemoji/svg/<codepoint>.svg`, 84
+  Dateien, ~250 KB): ersetzt jedes im DOM erkannte Emoji-Zeichen durch ein
   `<img class="emoji">` mit lokal gehostetem SVG, unabhängig davon, ob das
   Betriebssystem des Betrachters eine Color-Emoji-Schriftart mitbringt (auf
   manchen Linux-Chrome-Installationen, u. a. Kiosk-Aufbauten, fehlt diese -
@@ -198,10 +198,19 @@ hängt nur im Bridge-Netz und kann die macvlan-IP des hae-Servers
   Templates), volle Laufzeit-Abdeckung wäre ein deutlich größerer Eingriff
   gewesen. Nur die Codepoints heruntergeladen, die im Portal tatsächlich
   vorkommen (kein kompletter Font/keine komplette Twemoji-Sammlung - wäre
-  unnötig groß). Fünf im Portal verwendete Zeichen (★☰✎✓✕) haben keine
-  Twemoji-Grafik, weil Twemoji sie nicht als "Emoji" führt (reine
-  Text-Symbole) - unproblematisch, die rendern schon ohne Emoji-Font
-  überall normal, genau die "sicheren" Zeichen also. Code MIT-lizenziert,
+  unnötig groß). 15 im Portal verwendete Zeichen (← ↑ → ⋮ ⌂ ▲ ▸ ▼ ○ ★ ☰ ✎
+  ✓ ✕ ⠿) haben keine Twemoji-Grafik, weil Twemoji sie nicht als "Emoji"
+  führt (reine Text-Symbole) - unproblematisch, die rendern schon ohne
+  Emoji-Font überall normal, genau die "sicheren" Zeichen also.
+  **Achtung, Stolperfalle (Wunsch #122):** ob ein Zeichen "reines
+  Textsymbol" oder "Emoji" ist, lässt sich NICHT am Aussehen ablesen. ◀ ▶
+  (U+25C0/U+25B6) sehen aus wie ▲ ▼, werden von Twemoji aber sehr wohl
+  umgewandelt - die fehlenden SVGs ergaben zwei 404er und zwei leere
+  Drehknöpfe im Tierbaukasten (erst bei Wunsch #122 aufgefallen, seit
+  Wunsch #119 vorhanden). **Bei jedem neuen Zeichen deshalb prüfen, ob
+  `raw.githubusercontent.com/twitter/twemoji/master/assets/svg/<cp>.svg`
+  existiert (HTTP 200), und die Seite anschließend live auf 404er
+  kontrollieren** - der reine Blick ins Template genügt nicht. Code MIT-lizenziert,
   Grafiken CC-BY 4.0 (Twitter/Twemoji) - Attribution laut deren eigener
   README per Erwähnung im Quellcode ausreichend (siehe Kommentar in
   base.html).
@@ -724,6 +733,34 @@ teile/
                        laedt nichts von fremden Hosts (siehe Wunsch #119)
                        und jedes Foto wuerde die IPs der Familie an einen
                        Dritt-Server melden.
+                       Wunsch #122: `?team=<id>` schaltet zwischen ALLEN
+                       Mannschaften um (Umschalter-Chips oben, jede Seite
+                       gleich aufgebaut). Profis und Unterbau sind auf
+                       handball.net ZWEI Vereinsobjekte:
+                       sr.competitor.6272 (nur Profis) und
+                       handball4all.wuerttemberg.131 (17 Mannschaften: 2./
+                       3./4. Herren + Jugend A bis F) - _AMATEUR_VEREIN_ID.
+                       Die Mannschaftsliste gibt es NICHT als API
+                       (club/<id>/teams -> 404, club/<id>/schedule zeigt nur
+                       Teams mit Spielen in 14 Tagen), deshalb wird die
+                       Vereinsseite geparst (_mannschaften_von_handball_net)
+                       und in tvb_mannschaften gespeichert, erneuert alle
+                       _MANNSCHAFTEN_MAX_ALTER_STUNDEN (24) - schlaegt das
+                       Parsen fehl, bleibt der alte Stand stehen statt der
+                       Umschalter zu verschwinden. `_kurzlabel()` baut aus
+                       der langen Liga-Bezeichnung das Chip-Label
+                       ("maennliche B-Jugend Bezirksoberliga Staffel 2" ->
+                       "mB BOL 2"), Doppelungen werden durchnummeriert.
+                       `_turnier_id_sichern()` holt die Liga-ID FAUL - erst
+                       wenn eine Mannschaft geoeffnet wird, dann dauerhaft
+                       gemerkt: bevorzugt aus den Spieldaten (kostenlos
+                       mitgeliefert), sonst von der /tabelle-Seite. Alle 17
+                       auf einmal zu holen haette den Seitenaufbau
+                       desjenigen, der die 24h-Aktualisierung ausloest, um
+                       ~17 s verzoegert. Unbekanntes/fehlendes ?team faellt
+                       immer auf die Profis zurueck. Der Kader-Knopf
+                       erscheint NUR bei den Profis (HPI ist eine reine
+                       Bundesliga-Kennzahl).
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -796,7 +833,20 @@ teile/
                               (gleiches Muster wie sportschau.html).
                               Wunsch #121: .kader-btn ganz oben verlinkt die
                               Kader-Unterseite (zusaetzlich als Menuepunkt in
-                              base.html, zeigt_tvb_items)
+                              base.html, zeigt_tvb_items).
+                              Wunsch #122: .team-leiste ganz oben ist der
+                              Mannschafts-Umschalter - eine EINZEILIGE,
+                              horizontal scrollbare Chip-Leiste
+                              (overflow-x:auto, Scrollbalken ausgeblendet),
+                              kein Umbruch: 18 Chips wuerden sonst vier
+                              Zeilen fuellen und den Inhalt nach unten
+                              schieben. Chips sind 40px hoch (dieselbe
+                              Antippflaeche wie die Zeitraum-Knoepfe der
+                              Sportschau). Darunter .team-liga mit Name +
+                              ausgeschriebener Liga der gewaehlten
+                              Mannschaft. Die Hervorhebung der eigenen
+                              Mannschaft vergleicht gegen `gewaehlt.name`
+                              statt fest gegen "TVB Stuttgart"
     tvb_kader.html          – Kader mit Spielerwerten (Wunsch #121): nach
                               Position gruppiert (Tor → Kreisläufer, deutsche
                               Labels aus _POSITIONEN), je Spieler HPI-Schnitt,
@@ -996,7 +1046,8 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
 | `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
-| `tvb_spiele` | id (PK, handball.net-Spiel-ID), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
+| `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
+| `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.

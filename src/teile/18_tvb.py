@@ -67,14 +67,52 @@ Drei bewusste Entscheidungen dabei:
   eingebunden: das Portal laedt grundsaetzlich nichts von fremden Hosts
   (siehe CLAUDE.md und Wunsch #119), und jedes Foto wuerde die IP-Adressen
   der Familie an einen Dritt-Server melden.
+
+Wunsch #122: Umschalter fuer ALLE Mannschaften des Vereins, jede Seite
+gleich aufgebaut. Wichtig: die Profis und der Amateur-/Jugendbereich sind
+auf handball.net ZWEI VERSCHIEDENE Vereinsobjekte -
+`sr.competitor.6272` ("TVB Stuttgart", nur Profis, 2 Teams: HBL + DHB-Pokal)
+und `handball4all.wuerttemberg.131` ("TV Bittenfeld", 17 Teams: 2./3./4.
+Herren plus die komplette Jugend von der A- bis zur F-Jugend). Der
+Umschalter fuehrt beide zusammen; die Profis stehen fest verdrahtet an
+Position 0, der Rest kommt dynamisch dazu.
+
+Die Team-Liste selbst gibt es NICHT als API - `club/<id>/teams` und
+`.../mannschaften` liefern 404, nur `club/<id>/schedule` existiert und
+zeigt lediglich Teams mit Spielen in den naechsten 14 Tagen (in der
+Sommerpause also gar keine). Deshalb wird die Vereinsseite geparst
+(Team-ID, Name, Liga-Bezeichnung stehen dort als HTML) und das Ergebnis in
+`tvb_mannschaften` gespeichert - erneuert nur alle
+_MANNSCHAFTEN_MAX_ALTER_STUNDEN Stunden, weil sich ein Mannschaftsbestand
+allenfalls zum Saisonwechsel aendert. Faellt das Parsen aus (Seite
+umgebaut, Netz weg), bleibt der zuletzt gespeicherte Stand stehen, statt
+dass der Umschalter verschwindet.
+
+Fuer die Tabelle braucht es zusaetzlich die Liga-ID. Die steht in den
+Spieldaten (`tournament.id`), die in der Sommerpause aber leer sind -
+deshalb zusaetzlich `_liga_id_der_mannschaft()`, das sie von der
+/tabelle-Seite der Mannschaft holt. Dort stehen mehrere `/ligen/<id>`;
+die eigene ist immer die `handball4all.*` (die `sportradar.dhbdata.*`
+sind die immer gleichen Navigationslinks zu den Bundesligen) - an fuenf
+Mannschaften quer durch alle Altersklassen gegengeprueft.
+
+Zwei Abweichungen vom "immer gleich aufgebaut":
+- Der Kader-Knopf erscheint nur bei den Profis. Der HPI (Wunsch #121) ist
+  eine reine Bundesliga-Kennzahl, fuer Amateur-/Jugendmannschaften gibt es
+  ihn schlicht nicht - ein Knopf auf eine garantiert leere Seite waere
+  schlechter als keiner.
+- Amateur- und Jugendligen veroeffentlichen ihre Tabelle erst, wenn die
+  Saison laeuft; `table` ist bis dahin `null` (nicht etwa eine leere
+  Liste). Das wird abgefangen und als "noch keine Tabelle" angezeigt.
 """
 import json
+import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from teile.kern import grant as check_grant, get_db
 
 bp  = Blueprint("tvb_app", __name__)
@@ -89,6 +127,32 @@ _TZ = ZoneInfo("Europe/Berlin")
 _TEAM_ID       = "sr.competitor.6272-143352"
 _TOURNAMENT_ID = "sr.competition.149"
 _API_BASE      = "https://www.handball.net/a/sportdata/1/widgets"
+_HB_BASE       = "https://www.handball.net"
+
+# Wunsch #122: Verein der Amateur-/Jugendmannschaften (anderes Vereinsobjekt
+# als die Profis, siehe Docstring).
+_AMATEUR_VEREIN_ID = "handball4all.wuerttemberg.131"
+_MANNSCHAFTEN_MAX_ALTER_STUNDEN = 24
+
+# Kurzlabels fuer den Umschalter aus der langen Liga-Bezeichnung bauen -
+# "Stuttgart-Rems-Murr - maennliche B-Jugend Bezirksoberliga Staffel 2"
+# wuerde als Knopfbeschriftung sonst die halbe Seite fuellen.
+_ALTERSKLASSEN = [
+    ("männliche A-Jugend", "mA"), ("männliche B-Jugend", "mB"),
+    ("männliche C-Jugend", "mC"), ("männliche D-Jugend", "mD"),
+    ("weibliche A-Jugend", "wA"),  ("weibliche B-Jugend", "wB"),
+    ("weibliche C-Jugend", "wC"),  ("weibliche D-Jugend", "wD"),
+    ("gemischte A-Jugend", "gA"),  ("gemischte B-Jugend", "gB"),
+    ("gemischte C-Jugend", "gC"),  ("gemischte D-Jugend", "gD"),
+    ("gemischte Jugend E", "gE"),  ("gemischte E-Jugend", "gE"),
+    ("gemischte F-Jugend", "gF"),  ("männliche F-Jugend", "mF"),
+    ("Männer", "Herren"),          ("Frauen", "Damen"),
+]
+_LIGA_STUFEN = [
+    ("Bundesliga", "BL"), ("Verbandsliga", "VL"), ("Bezirksoberliga", "BOL"),
+    ("Bezirksklasse", "BK"), ("Bezirksliga", "BZL"), ("Regionalliga", "RL"),
+    ("Oberliga", "OL"), ("Landesliga", "LL"), ("Kreisliga", "KL"),
+]
 
 # Wunsch #121: HPI-API der HBL (andere Quelle als oben, siehe Docstring).
 # _HPI_TURNIER=1 ist die 1. Bundesliga der Maenner (aus data-tournament="1"
@@ -139,16 +203,165 @@ def _hpi_get(pfad):
         return None
 
 
-def _spiel_aus_roh(roh):
+def _hb_seite_holen(pfad):
+    """Laedt eine handball.net-HTML-Seite (kein JSON-Endpunkt vorhanden,
+    siehe Docstring). None bei Fehler/Timeout."""
+    req = urllib.request.Request(
+        f"{_HB_BASE}/{pfad}", headers={"User-Agent": "Mozilla/5.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except Exception:
+        return None
+
+
+def _kurzlabel(liga, name):
+    """Baut aus der langen Liga-Bezeichnung ein knappes Knopf-Label,
+    z. B. "männliche B-Jugend Bezirksoberliga Staffel 2" -> "mB BOL 2"."""
+    if not liga:
+        return name
+    # Verband/Bezirk vor dem " - " interessiert auf dem Knopf nicht.
+    rest = liga.split(" - ", 1)[-1]
+    teile = []
+    for lang, kurz in _ALTERSKLASSEN:
+        if lang.lower() in rest.lower():
+            teile.append(kurz)
+            break
+    for lang, kurz in _LIGA_STUFEN:
+        if lang.lower() in rest.lower():
+            teile.append(kurz)
+            break
+    staffel = re.search(r"Staffel\s+(\d+)", rest)
+    if staffel:
+        teile.append(staffel.group(1))
+    return " ".join(teile) if teile else rest[:24]
+
+
+def _mannschaften_von_handball_net():
+    """Parst die Vereinsseite und gibt [(team_id, name, liga)] zurueck.
+    Leere Liste, wenn die Seite nicht erreichbar/nicht parsebar ist."""
+    html = _hb_seite_holen(f"vereine/{_AMATEUR_VEREIN_ID}")
+    if not html:
+        return []
+    muster = re.compile(
+        r'href="/mannschaften/([A-Za-z0-9._-]+)/spielplan".*?'
+        r'list-item-title">(.*?)</div>.*?'
+        r'list-item-text">(.*?)</div>',
+        re.S,
+    )
+    gefunden = []
+    gesehen = set()
+    for team_id, name, liga in muster.findall(html):
+        if team_id in gesehen:
+            continue
+        gesehen.add(team_id)
+        gefunden.append((
+            team_id,
+            re.sub(r"\s+", " ", name).strip(),
+            re.sub(r"\s+", " ", liga).strip(),
+        ))
+    return gefunden
+
+
+def _liga_id_der_mannschaft(team_id):
+    """Liga-ID fuer die Tabelle. In der Sommerpause stehen keine Spiele zur
+    Verfuegung, aus denen sie ableitbar waere - deshalb von der /tabelle-Seite
+    der Mannschaft lesen. Die eigene Liga ist immer die `handball4all.*`
+    (die `sportradar.dhbdata.*` sind die immer gleichen Navigationslinks)."""
+    html = _hb_seite_holen(f"mannschaften/{team_id}/tabelle")
+    if not html:
+        return None
+    treffer = re.findall(r"/ligen/(handball4all\.[A-Za-z0-9._-]+)", html)
+    return treffer[0] if treffer else None
+
+
+def _mannschaften_aktualisieren(db):
+    """Baut die Mannschaftsliste neu auf (Profis fest, Rest von handball.net).
+    Laesst den bestehenden Stand unangetastet, wenn nichts geladen werden
+    konnte - besser ein veralteter Umschalter als gar keiner."""
+    gefunden = _mannschaften_von_handball_net()
+    if not gefunden:
+        return
+
+    db.execute("DELETE FROM tvb_mannschaften")
+    db.execute("""
+        INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, turnier_id,
+                                     position, ist_profi, aktualisiert_am)
+        VALUES (?,?,?,?,?,?,1, datetime('now'))
+    """, (_TEAM_ID, "TVB Stuttgart", "DAIKIN HBL (1. Bundesliga)",
+          "Profis", _TOURNAMENT_ID, 0))
+
+    labels = {}
+    for pos, (team_id, name, liga) in enumerate(gefunden, start=1):
+        kurz = _kurzlabel(liga, name)
+        # Mehrere Mannschaften koennen in derselben Liga/Staffel spielen
+        # (z. B. zwei E-Jugend-Turniermannschaften) - dann durchnummerieren,
+        # sonst waeren zwei Knoepfe nicht unterscheidbar.
+        labels[kurz] = labels.get(kurz, 0) + 1
+        if labels[kurz] > 1:
+            kurz = f"{kurz} ({labels[kurz]})"
+        # turnier_id bleibt hier absichtlich leer und wird erst geholt, wenn
+        # die Mannschaft auch wirklich angesehen wird (_turnier_id_sichern):
+        # sie kostet je Mannschaft einen eigenen Seitenabruf, 17 Stueck am
+        # Stueck wuerden den Seitenaufbau desjenigen, der die Aktualisierung
+        # ausloest, um etliche Sekunden verzoegern.
+        db.execute("""
+            INSERT INTO tvb_mannschaften(team_id, name, liga, kurz, turnier_id,
+                                         position, ist_profi, aktualisiert_am)
+            VALUES (?,?,?,?,NULL,?,0, datetime('now'))
+        """, (team_id, name, liga, kurz, pos))
+    db.commit()
+
+
+def _turnier_id_sichern(db, mannschaft, spiel_antworten):
+    """Liefert die Liga-ID der Mannschaft und merkt sie sich dauerhaft.
+
+    Bevorzugt aus den Spieldaten (kostenlos mitgeliefert), sonst einmalig
+    von der /tabelle-Seite. Profis haben sie fest hinterlegt."""
+    if mannschaft.get("turnier_id"):
+        return mannschaft["turnier_id"]
+
+    turnier_id = None
+    for antwort in spiel_antworten:
+        for roh in ((antwort or {}).get("schedule") or {}).get("data") or []:
+            turnier_id = (roh.get("tournament") or {}).get("id")
+            if turnier_id:
+                break
+        if turnier_id:
+            break
+    if not turnier_id:
+        turnier_id = _liga_id_der_mannschaft(mannschaft["team_id"])
+    if turnier_id:
+        db.execute("UPDATE tvb_mannschaften SET turnier_id=? WHERE team_id=?",
+                   (turnier_id, mannschaft["team_id"]))
+        db.commit()
+        mannschaft["turnier_id"] = turnier_id
+    return turnier_id
+
+
+def _mannschaften_holen(db):
+    """Mannschaftsliste, bei Bedarf vorher aktualisiert."""
+    frisch = db.execute("""
+        SELECT 1 FROM tvb_mannschaften
+        WHERE aktualisiert_am > datetime('now', ?) LIMIT 1
+    """, (f"-{_MANNSCHAFTEN_MAX_ALTER_STUNDEN} hours",)).fetchone()
+    if not frisch:
+        _mannschaften_aktualisieren(db)
+    return [dict(z) for z in db.execute(
+        "SELECT * FROM tvb_mannschaften ORDER BY position"
+    ).fetchall()]
+
+
+def _spiel_aus_roh(roh, team_id):
     """Wandelt ein rohes handball.net-Spiel-JSON in unser Anzeigeformat um."""
     anstoss_utc = datetime.fromtimestamp(roh["startsAt"] / 1000, tz=timezone.utc)
     return {
         "id":        roh["id"],
+        "team_id":   team_id,
         "spieltag":  (roh.get("round") or {}).get("name"),
         "heim":      roh["homeTeam"]["name"],
         "gast":      roh["awayTeam"]["name"],
-        "heim_ist_tvb": roh["homeTeam"]["id"] == _TEAM_ID,
-        "gast_ist_tvb": roh["awayTeam"]["id"] == _TEAM_ID,
         "heim_tore": roh.get("homeGoals"),
         "gast_tore": roh.get("awayGoals"),
         "anstoss":   anstoss_utc.astimezone(_TZ).isoformat(),
@@ -157,22 +370,53 @@ def _spiel_aus_roh(roh):
     }
 
 
-def _ist_tvb_spiel(roh):
-    return roh["homeTeam"]["id"] == _TEAM_ID or roh["awayTeam"]["id"] == _TEAM_ID
+def _ist_eigenes_spiel(roh, team_id):
+    return roh["homeTeam"]["id"] == team_id or roh["awayTeam"]["id"] == team_id
 
 
 def _tvb_spiele_aktualisieren(db, spiele):
-    """UPSERT gesehener TVB-Spiele nach tvb_spiele - siehe Docstring oben."""
+    """UPSERT gesehener Spiele nach tvb_spiele - siehe Docstring oben."""
     for s in spiele:
         db.execute("""
-            INSERT INTO tvb_spiele(id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, aktualisiert_am)
-            VALUES (?,?,?,?,?,?,?,?,?, datetime('now'))
+            INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, aktualisiert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
                 spieltag=excluded.spieltag, heim_tore=excluded.heim_tore, gast_tore=excluded.gast_tore,
                 status=excluded.status, aktualisiert_am=excluded.aktualisiert_am
-        """, (s["id"], s["spieltag"], s["heim"], s["gast"], s["heim_tore"], s["gast_tore"],
-              s["anstoss"], s["ort"], s["status"]))
+        """, (s["id"], s["team_id"], s["spieltag"], s["heim"], s["gast"],
+              s["heim_tore"], s["gast_tore"], s["anstoss"], s["ort"], s["status"]))
     db.commit()
+
+
+def _tabelle_aufbereiten(tabelle_antwort, team_name):
+    """Tabellenzeilen fuers Template. `table` ist `null`, solange eine Liga
+    ihre Tabelle noch nicht veroeffentlicht hat (Amateur-/Jugendligen vor
+    Saisonstart) - das ist kein Fehler, sondern "noch nichts da"."""
+    if not tabelle_antwort:
+        return None
+    tabelle = tabelle_antwort.get("table")
+    if not tabelle or not tabelle.get("rows"):
+        return []
+    return [
+        {
+            "rang": r["rank"],
+            "team": r["team"]["name"],
+            # Der Vereinsname ist in Amateurligen der zuverlaessigere
+            # Anhaltspunkt als die Team-ID (die Tabelle nennt die Mannschaft
+            # genauso wie die Vereinsseite, waehrend die IDs je nach Liga aus
+            # verschiedenen Namensraeumen stammen).
+            "hervorgehoben": r["team"]["name"] == team_name,
+            "spiele": r["games"],
+            "siege": r["wins"],
+            "unentschieden": r["draws"],
+            "niederlagen": r["losses"],
+            "tore": r["goals"],
+            "gegentore": r["goalsAgainst"],
+            "tordifferenz": r["goalDifference"],
+            "punkte": r["points"],
+        }
+        for r in tabelle["rows"]
+    ]
 
 
 @bp.route("/a/tvb/<token>/")
@@ -182,26 +426,47 @@ def index(token):
         return render_template("denied.html", reason="invalid"), 403
 
     db = get_db()
+    mannschaften = _mannschaften_holen(db)
 
-    team_antwort = _handball_net_get(f"team/{_TEAM_ID}/team-schedule")
-    liga_antwort = _handball_net_get(f"tournament/{_TOURNAMENT_ID}/schedule")
-    tabelle_antwort = _handball_net_get(f"tournament/{_TOURNAMENT_ID}/table")
+    # Wunsch #122: ?team=<id> waehlt die Mannschaft. Unbekannte oder fehlende
+    # Angabe faellt auf die Profis zurueck, damit ein alter Link (oder eine
+    # Mannschaft, die es nach dem Saisonwechsel nicht mehr gibt) nie ins Leere
+    # laeuft.
+    gewaehlt = None
+    gewuenscht = request.args.get("team")
+    if gewuenscht:
+        gewaehlt = next((m for m in mannschaften if m["team_id"] == gewuenscht), None)
+    if not gewaehlt:
+        gewaehlt = next((m for m in mannschaften if m["ist_profi"]), None)
+    if not gewaehlt:
+        # Vereinsseite noch nie erreichbar gewesen: Profis trotzdem anzeigen.
+        gewaehlt = {"team_id": _TEAM_ID, "name": "TVB Stuttgart", "kurz": "Profis",
+                    "liga": "DAIKIN HBL (1. Bundesliga)", "turnier_id": _TOURNAMENT_ID,
+                    "ist_profi": 1}
 
-    fehler_spiele = team_antwort is None and liga_antwort is None
-    fehler_tabelle = tabelle_antwort is None
+    team_id = gewaehlt["team_id"]
 
-    gesehene_tvb_spiele = []
+    team_antwort = _handball_net_get(f"team/{team_id}/team-schedule")
+    turnier_id   = _turnier_id_sichern(db, gewaehlt, [team_antwort])
+
+    liga_antwort = _handball_net_get(f"tournament/{turnier_id}/schedule") if turnier_id else None
+    tabelle_antwort = _handball_net_get(f"tournament/{turnier_id}/table") if turnier_id else None
+
+    fehler_spiele  = team_antwort is None and liga_antwort is None
+    fehler_tabelle = turnier_id is not None and tabelle_antwort is None
+
+    gesehene_spiele = []
     for antwort in (team_antwort, liga_antwort):
         if not antwort:
             continue
         for roh in antwort["schedule"]["data"]:
-            if _ist_tvb_spiel(roh):
-                gesehene_tvb_spiele.append(_spiel_aus_roh(roh))
-    if gesehene_tvb_spiele:
-        _tvb_spiele_aktualisieren(db, gesehene_tvb_spiele)
+            if _ist_eigenes_spiel(roh, team_id):
+                gesehene_spiele.append(_spiel_aus_roh(roh, team_id))
+    if gesehene_spiele:
+        _tvb_spiele_aktualisieren(db, gesehene_spiele)
 
     gespeicherte = db.execute(
-        "SELECT * FROM tvb_spiele ORDER BY anstoss ASC"
+        "SELECT * FROM tvb_spiele WHERE team_id=? ORDER BY anstoss ASC", (team_id,)
     ).fetchall()
     jetzt_iso = datetime.now(_TZ).isoformat()
     vergangene, kommende = [], []
@@ -209,29 +474,12 @@ def index(token):
         (vergangene if s["status"] == "Ended" or s["anstoss"] < jetzt_iso else kommende).append(dict(s))
     vergangene.reverse()  # neueste zuerst
 
-    tabelle = None
-    if tabelle_antwort:
-        tabelle = [
-            {
-                "rang": r["rank"],
-                "team": r["team"]["name"],
-                "hervorgehoben": r["team"]["id"].startswith("sr.competitor.6272"),
-                "spiele": r["games"],
-                "siege": r["wins"],
-                "unentschieden": r["draws"],
-                "niederlagen": r["losses"],
-                "tore": r["goals"],
-                "gegentore": r["goalsAgainst"],
-                "tordifferenz": r["goalDifference"],
-                "punkte": r["points"],
-            }
-            for r in tabelle_antwort["table"]["rows"]
-        ]
-
     return render_template("tvb.html",
         user=user, token=token, farbe=user["farbe"],
+        mannschaften=mannschaften, gewaehlt=gewaehlt,
         fehler_spiele=fehler_spiele, fehler_tabelle=fehler_tabelle,
-        vergangene=vergangene, kommende=kommende, tabelle=tabelle,
+        vergangene=vergangene, kommende=kommende,
+        tabelle=_tabelle_aufbereiten(tabelle_antwort, gewaehlt["name"]),
     )
 
 
