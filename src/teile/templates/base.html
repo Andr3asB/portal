@@ -250,7 +250,8 @@
     {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
     {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and token is defined and token %}
     {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and (user.is_admin or user.rolle == 'eltern') and token is defined and token %}
-    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items or zeigt_packliste_items %}
+    {% set zeigt_tvb_items      = app_slug is defined and app_slug == 'tvb' and token is defined and token %}
+    {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items or zeigt_packliste_items or zeigt_tvb_items %}
     <div class="menu-divider"></div>
 
     {% if zeigt_geholfen_items %}
@@ -300,6 +301,12 @@
     </a>
     <a class="menu-item" href="/a/packliste/{{ token }}/kategorien">
       <span class="menu-emoji">🗂️</span>Kategorien verwalten
+    </a>
+    {% endif %}
+
+    {% if zeigt_tvb_items %}
+    <a class="menu-item" href="/a/tvb/{{ token }}/kader">
+      <span class="menu-emoji">👥</span>Kader &amp; Spielerwerte
     </a>
     {% endif %}
 

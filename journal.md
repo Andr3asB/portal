@@ -2,6 +2,81 @@
 
 ---
 
+## 2026-08-04 – portal-v110: Wunsch #121 – TVB-Kader mit Spielerwerten
+
+"es soll ein Button geben, über den eine Unterseite aufgerufen wird, auf
+der der Kader des TVB Stuttgart mit statistischen Werten zu jedem Spieler
+dargestellt wird."
+
+### Datenquelle: HPI statt handball.net
+
+handball.net (die Quelle für Spiele/Tabelle aus Wunsch #120) hat dafür
+**keinen** Endpunkt – alle Widget-Typen durchprobiert, es existieren nur
+`table`, `schedule` und `team-schedule`; `kader`/`squad`/`roster`/
+`players`/`statistics` liefern alle 404, und die Kaderseite auf
+handball.net selbst enthält im HTML keine Spielerdaten.
+
+Stattdessen: die **HPI-API der Handball-Bundesliga**
+(`hpi.handball-bundesliga.de/api/…`, ebenfalls unauthentifiziert). Der
+Handball Performance Index ist die offizielle Leistungskennzahl der HBL.
+Gefunden über das Statistik-Dashboard auf opel-hbl.de, das den HPI per
+`hpi.handball-bundesliga.de/js/widget.js` mit `data-tournament="1"`
+einbindet. Zwei Aufrufe: `/api/tournament/1` → Saisonliste,
+`/api/index/season/<id>` → alle ~390 Liga-Spieler mit HPI-Werten. TVB wird
+über `team.sportradar_id == 6272` gefiltert – dieselbe Sportradar-ID, die
+schon in `_TEAM_ID` steckt, also kein zweites Vereins-Mapping.
+
+### Drei Entwurfsentscheidungen
+
+**Saisonwahl.** Die HPI-Liste enthält nur Spieler, die auch gespielt
+haben – eine frisch begonnene Saison ist schlicht leer (26/27 hat aktuell
+0 Einträge, Saisonstart ist der 28.08.). `_kader_saison_waehlen()` nimmt
+deshalb die *neueste Saison, die überhaupt TVB-Spieler liefert*, aktuell
+also noch 25/26. Der Saisonname steht sichtbar über der Tabelle, damit nie
+unklar ist, worauf sich die Werte beziehen. Die Kehrseite ist ehrlich
+dokumentiert (auch in der Hilfe): Neuzugänge fehlen bis zu ihrem ersten
+Spiel, Abgänge stehen noch drin. Ohne echte Kaderquelle nicht besser
+lösbar – ein reiner Kader ohne Statistik wäre für diesen Wunsch aber
+nutzlos gewesen.
+
+**Cache.** `/api/index/season/<id>` liefert ~400 KB für alle Liga-Spieler,
+von denen 22 gebraucht werden. Anders als bei den Spielen (Wunsch #120,
+5–10 KB pro Abruf) wäre das pro Seitenaufruf verschwenderisch. Neue
+Tabelle `tvb_kader`, Neuladen nur, wenn älter als 6 Stunden. Beim Neuladen
+wird die Tabelle geleert und neu gefüllt – ein Kader ist eine
+Momentaufnahme, wer weg ist soll verschwinden (kein UPSERT wie bei
+`tvb_spiele`, wo alte Zeilen ja gerade erhalten bleiben sollen).
+Messung live: erster Aufruf 2,15 s, jeder weitere 0,04 s.
+
+**Keine Spielerfotos.** Die API liefert Foto-URLs mit, die aber auf ein
+fremdes CDN zeigen (`images.dc.prod.cloud.atriumsports.com`). Bewusst
+nicht eingebunden: das Portal lädt grundsätzlich nichts von fremden Hosts
+(siehe Wunsch #119), und jedes Foto würde die IP-Adressen der Familie an
+einen Dritt-Server melden. Live gegengeprüft – die Kaderseite macht
+0 Requests an externe Hosts.
+
+### Verifiziert
+
+Logik **vor** dem Deploy isoliert gegen die echte API getestet
+(Saison-Fallback 26/27 → 25/26, Gruppierung verliert keinen Spieler,
+Frische-Prüfung greift bei 6 h/7 h korrekt). Danach live: Kaderseite 200,
+22 Spieler in 7 Positionsgruppen (Tor → Kreisläufer), Umlaute korrekt
+(Rückraum, Linksaußen, Häfner, Pribetić, Röthlisberger), Trendpfeile
+eingefärbt (10 ▲ / 12 ▼ = 22), `tvb_kader` in der Produktions-DB mit 22
+Zeilen befüllt. Zugriffsschutz: ungültiger Token und Token einer anderen
+App liefern beide 403. Layout per `getBoundingClientRect()` geprüft (der
+Screenshot-Dienst fiel in dieser Sitzung erneut aus): bis hinunter zu
+320 px Breite keine Überlappung von Name und Werten und kein
+Horizontal-Overflow, erst bei 280 px bricht die Zeile sauber um. Alle 22
+Netzwerk-Requests der Seite mit Status 200, kein 404 – diesmal vorab
+geprüft, ob jedes neue Emoji (👥) auch als lokale Twemoji-SVG vorliegt.
+
+### Auslieferungspaket
+
+`deploy/portal-v110.tar.gz`
+
+---
+
 ## 2026-08-03 – portal-v109: Wunsch #120 – Neue App "TVB" (Handball-Bundesliga)
 
 "Ich wünsche mir eine neue App 'TVB' im Portal. Die App soll alle Spiele

@@ -206,6 +206,23 @@ hängt nur im Bridge-Netz und kann die macvlan-IP des hae-Servers
   README per Erwähnung im Quellcode ausreichend (siehe Kommentar in
   base.html).
 
+## Externe Datenquellen zur Laufzeit (APIs)
+
+Alle drei werden zur Laufzeit per `urllib` abgefragt (kein zusätzliches
+pip-Paket) und sind so gebaut, dass ein Ausfall nur ein „gerade nicht
+abrufbar"-Kästchen erzeugt statt eines Fehlers.
+
+| Quelle | Genutzt von | Auth | Abruf | Anmerkung |
+|--------|-------------|------|-------|-----------|
+| hae-Server (`HAE_API_URL`, über Caddy-Relay `:2021`) | `14_sportschau.py` | `api-key`-Header aus `.env` | live je Seitenaufruf | Eigener Server im Haus, siehe „hae-Server-Relay" oben |
+| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | Inoffiziell: das ist der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufruft. Nur `table`, `schedule`, `team-schedule` existieren – **kein** Kader/Spieler-Endpunkt |
+| HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net |
+
+Gemeinsam gilt: Bilder/Assets dieser Quellen werden **nicht** eingebunden
+(z. B. Spielerfotos vom CDN `images.dc.prod.cloud.atriumsports.com`) – das
+Portal lädt im Frontend nichts von fremden Hosts, siehe Wunsch #119 und
+die Privacy-Überlegung dazu in `18_tvb.py`.
+
 ## Code-Struktur (src/)
 
 ```
@@ -674,6 +691,39 @@ teile/
                        Bewusst kein Cron-Job dafuer (Randfall "niemand
                        oeffnet die App an einem Spieltag" fuer eine
                        Familien-App hinnehmbar, siehe journal.md).
+                       Wunsch #121: Unterseite /kader zeigt den Kader mit
+                       statistischen Werten. handball.net hat dafuer KEINEN
+                       Endpunkt (kader/squad/roster/players/statistics alle
+                       404) - Quelle ist deshalb die HPI-API der HBL
+                       (hpi.handball-bundesliga.de/api, ebenfalls
+                       unauthentifiziert, gefunden ueber das Statistik-
+                       Dashboard auf opel-hbl.de): /api/tournament/1 ->
+                       Saisonliste, /api/index/season/<id> -> alle ~390
+                       Liga-Spieler mit HPI-Werten, TVB gefiltert ueber
+                       team.sportradar_id == 6272 (dieselbe ID wie in
+                       _TEAM_ID, kein zweites Vereins-Mapping).
+                       `_kader_saison_waehlen()` nimmt die NEUESTE Saison,
+                       die ueberhaupt TVB-Spieler liefert - die HPI-Liste
+                       enthaelt nur Spieler, die auch gespielt haben, eine
+                       frisch begonnene Saison ist also leer und es wird
+                       auf die Vorsaison zurueckgefallen (Saisonname steht
+                       deshalb sichtbar ueber der Tabelle; Neuzugaenge
+                       fehlen dann bis zum ersten Spiel, Abgaenge stehen
+                       noch drin - ohne echte Kaderquelle nicht loesbar).
+                       Anders als bei den Spielen wird der Kader in
+                       tvb_kader ZWISCHENGESPEICHERT (_KADER_MAX_ALTER_
+                       STUNDEN = 6), weil die Antwort ~400 KB gross ist,
+                       wovon nur 22 Spieler gebraucht werden - beim
+                       Neuladen wird die Tabelle geleert und neu gefuellt
+                       (Kader = Momentaufnahme, Abgaenge sollen
+                       verschwinden - bewusst KEIN UPSERT wie bei
+                       tvb_spiele, wo alte Zeilen gerade erhalten bleiben
+                       sollen). Spielerfotos liefert die API zwar mit
+                       (externes CDN images.dc.prod.cloud.atriumsports.com),
+                       werden aber bewusst NICHT eingebunden: das Portal
+                       laedt nichts von fremden Hosts (siehe Wunsch #119)
+                       und jedes Foto wuerde die IPs der Familie an einen
+                       Dritt-Server melden.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -743,7 +793,19 @@ teile/
                               zeile hervorgehoben (var(--surface-2)); jede
                               Kachel zeigt bei Abruffehler eine eigene 📡-
                               Meldung statt die ganze Seite abzubrechen
-                              (gleiches Muster wie sportschau.html)
+                              (gleiches Muster wie sportschau.html).
+                              Wunsch #121: .kader-btn ganz oben verlinkt die
+                              Kader-Unterseite (zusaetzlich als Menuepunkt in
+                              base.html, zeigt_tvb_items)
+    tvb_kader.html          – Kader mit Spielerwerten (Wunsch #121): nach
+                              Position gruppiert (Tor → Kreisläufer, deutsche
+                              Labels aus _POSITIONEN), je Spieler HPI-Schnitt,
+                              letzter Wert mit ▲/▼-Trend (gruen/rot) sowie
+                              Spieltage/Aktionen; Saisonname ueber der Liste,
+                              Legende unten erklaert den HPI. Eigener
+                              ←-Zurueck-Link (nav_left) zur TVB-Hauptseite.
+                              ▲/▼ sind normale Unicode-Zeichen, keine Emoji -
+                              brauchen also (wie ★☰✎✓✕) keine Twemoji-SVG
     rezepte.html            – Rezeptliste + "+ Neues Rezept"-Button (Wunsch #48);
                               Live-Suche über Titel+Zutaten ab 3 Zeichen (Wunsch #49)
                               + Kategorie-Filter-Chips (Wunsch #55), beide Filter
@@ -935,6 +997,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 | `tvb_spiele` | id (PK, handball.net-Spiel-ID), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
+| `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.

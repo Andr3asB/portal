@@ -30,6 +30,15 @@
 .tvb-tabelle tr.hervorgehoben td { background:var(--surface-2); font-weight:700; }
 .tvb-tabelle tr:last-child td { border-bottom:none; }
 .empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
+/* Wunsch #121: Knopf zur Kader-Unterseite, optisch wie die Zeitraum-Knoepfe
+   in sportschau.html (gleiche Radius-/Rahmenwerte), aber volle Breite. */
+.kader-btn {
+  display:block; text-align:center; text-decoration:none;
+  border:1.5px solid var(--farbe); border-radius:12px;
+  padding:11px 0; margin-bottom:14px;
+  font-size:15px; font-weight:600;
+  background:var(--farbe); color:#fff;
+}
 {% endblock %}
 
 {% block nav_title %}
@@ -39,6 +48,8 @@
 
 {% block body %}
 <main class="main">
+
+  <a class="kader-btn" href="/a/tvb/{{ token }}/kader">👥 Kader &amp; Spielerwerte</a>
 
   <div class="tvb-section">
     <div class="tvb-section-title">📅 Nächste Spiele</div>

@@ -288,6 +288,20 @@ CREATE TABLE IF NOT EXISTS tvb_spiele (
   status          TEXT    NOT NULL,
   aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS tvb_kader (
+  spieler_id      INTEGER PRIMARY KEY,
+  vorname         TEXT    NOT NULL,
+  nachname        TEXT    NOT NULL,
+  position        TEXT,
+  hpi_schnitt     REAL,
+  hpi_bestwert    REAL,
+  hpi_letzter     REAL,
+  hpi_trend       INTEGER,
+  spieltage       INTEGER,
+  aktionen        INTEGER,
+  saison_name     TEXT    NOT NULL,
+  aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 _DEFAULT_SPRACHEN = ["Englisch", "Latein", "Dänisch", "Italienisch", "Französisch"]

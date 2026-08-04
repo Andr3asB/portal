@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% set app_slug = "tvb" %}
+{% block title %}Kader TVB Stuttgart{% endblock %}
+
+{% block extra_styles %}
+.kader-saison {
+  font-size:13px; color:var(--text-2); text-align:center;
+  margin:2px 0 14px; line-height:1.5;
+}
+.kader-gruppe {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-bottom:12px;
+}
+.kader-gruppe-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
+.kader-spieler {
+  display:flex; align-items:center; gap:10px; padding:9px 0;
+  border-bottom:1px solid var(--border-subtle);
+}
+.kader-spieler:last-child { border-bottom:none; }
+.kader-name { flex:1; min-width:0; font-size:15px; word-break:break-word; }
+.kader-vorname { color:var(--text-2); font-weight:400; }
+.kader-werte { display:flex; gap:14px; flex-shrink:0; text-align:right; }
+.kader-wert-label { font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.kader-wert { font-size:15px; font-weight:700; white-space:nowrap; }
+.kader-wert.klein { font-size:13px; font-weight:600; color:var(--text-2); }
+.kader-trend-hoch { color:#34c759; }
+.kader-trend-runter { color:#ff3b30; }
+.kader-details { font-size:12px; color:var(--text-2); margin-top:2px; }
+.empty { text-align:center; padding:40px 16px; color:var(--text-2); font-size:15px; line-height:1.5; }
+.kader-legende {
+  background:var(--surface-2); border-radius:10px; padding:10px 12px;
+  font-size:12px; color:var(--text-2); line-height:1.5; margin-top:2px;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/tvb/{{ token }}/" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">👥 Kader</div>
+<div class="nav-sub">TVB Stuttgart</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if not gruppen %}
+    <div class="empty">
+      <div style="font-size:48px;margin-bottom:12px">📡</div>
+      Kaderdaten gerade nicht abrufbar.<br>Versuch's später nochmal.
+    </div>
+  {% else %}
+    <div class="kader-saison">
+      {{ anzahl }} Spieler · Werte aus der Saison {{ saison_name }}
+    </div>
+
+    {% for gruppe in gruppen %}
+    <div class="kader-gruppe">
+      <div class="kader-gruppe-title">{{ gruppe.name }}</div>
+      {% for s in gruppe.spieler %}
+      <div class="kader-spieler">
+        <div class="kader-name">
+          <span class="kader-vorname">{{ s.vorname }}</span> <strong>{{ s.nachname }}</strong>
+          <div class="kader-details">
+            {{ s.spieltage }} Spieltage · {{ s.aktionen }} Aktionen
+          </div>
+        </div>
+        <div class="kader-werte">
+          <div>
+            <div class="kader-wert-label">HPI</div>
+            <div class="kader-wert">
+              {{ '%.1f'|format(s.hpi_schnitt) if s.hpi_schnitt is not none else '–' }}
+            </div>
+          </div>
+          <div>
+            <div class="kader-wert-label">Zuletzt</div>
+            <div class="kader-wert klein">
+              {% if s.hpi_letzter is not none %}
+                {{ '%.0f'|format(s.hpi_letzter) }}<span
+                  class="{% if s.hpi_trend and s.hpi_trend > 0 %}kader-trend-hoch{% elif s.hpi_trend and s.hpi_trend < 0 %}kader-trend-runter{% endif %}"
+                >{% if s.hpi_trend and s.hpi_trend > 0 %} ▲{% elif s.hpi_trend and s.hpi_trend < 0 %} ▼{% endif %}</span>
+              {% else %}–{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="kader-legende">
+      💡 Der <strong>HPI</strong> (Handball Performance Index) ist die offizielle
+      Leistungskennzahl der Handball-Bundesliga – je höher, desto besser.
+      „HPI" ist der Saisonschnitt, „Zuletzt" der Wert vom letzten Spieltag mit
+      Pfeil für den Trend. Werte verschiedener Positionen lassen sich nur
+      bedingt vergleichen, deshalb die Gruppierung nach Position.
+    </div>
+  {% endif %}
+
+</main>
+{% endblock %}
