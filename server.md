@@ -1054,7 +1054,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `users` | id, name, farbe, is_admin, ki_key (ungenutzt), dark_mode, rolle ('eltern'/'kind'/'gast'), ki_token_limit (Monats-Kontingent für ki_anfrage(), Default 100000, im Admin editierbar) |
 | `ki_nutzung` | id, user_id, feature (z. B. "rezepte_import"), tokens, erstellt – Verbrauchs-Log für ki_anfrage(), gemeinsames Kontingent über alle KI-Features |
 | `apps` | id, slug, name, emoji, beschreibung |
-| `grants` | id, user_id, app_id, token (UNIQUE), position (sort), gruppe_id (FK home_gruppen) |
+| `grants` | id, user_id, app_id, **token_lookup** (UNIQUE, HMAC-SHA256 des Tokens – nur zum Finden der Zeile), **token_enc** (AES-GCM des Tokens, base64(Nonce+CT) – zum Zurückgewinnen für Links/QR), position (sort), gruppe_id (FK home_gruppen) – Wunsch #129: der Klartext-Token steht NICHT mehr in der DB |
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am, umsetzung (Wunsch #101: was genau implementiert wurde, gesetzt über `manage.py wunsch_erledigt <id> "Text"`) |
@@ -1138,6 +1138,20 @@ anhängen.
 - **DOM**: `textContent` / `createElement` statt `innerHTML` für Nutzerdaten in JS
 - **Logs**: Gunicorn RedactingLogger scrubbt Tokens aus Access-Logs
 - **Headers**: Caddy setzt Security-Headers auf alle Antworten
+- **Zugangstokens** (Wunsch #129): In der DB steht **nie** der Klartext.
+  Gesucht wird über `token_lookup(token)` (HMAC), zurückgewonnen über
+  `token_entschluesseln(row["token_enc"])` – beides aus `teile.kern`. Neue
+  Grants immer über `grant_werte(new_token())`, das liefert das Paar. Wer
+  eine neue Stelle mit Grants baut: `WHERE g.token = ?` gibt es nicht mehr.
+- **`TOKEN_KEY` aus der `.env` ist betriebskritisch**: ohne ihn ist kein
+  Zugang möglich, und das `/data`-Backup enthält ihn absichtlich nicht.
+  Zweitkopie im Passwortmanager. Bei einem Restore auf neuer Hardware
+  zuerst die `.env` zurückspielen, dann `/data`.
+- **Neue Wege nach außen** (Wunsch #127): Jeder Abruf einer vom Nutzer
+  gelieferten URL muss durch `_ist_oeffentliche_url()` UND darf
+  Weiterleitungen nur mit erneuter Prüfung je Station folgen; die geprüfte
+  IP wird für die Verbindung festgenagelt (Muster in `11_rezepte.py`).
+  Ein blankes `urllib.request.urlopen(nutzer_url)` ist ein SSRF-Loch.
 - **Löschen-Sicherheitsabfrage** (app-übergreifend verpflichtend, seit Wunsch
   „Einkauf löschen"): jedes echte (nicht reversible) Löschen fragt nach –
   `onsubmit="return confirm({{ ('„' ~ text|truncate(40) ~ '“ löschen?')|tojson|forceescape }})"`
@@ -1443,6 +1457,10 @@ scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
 # Auf Server entpacken + Container neu bauen + starten
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf portal-vN.tar.gz"
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d --build"
+
+# Caddyfile geaendert? Dann zusaetzlich (bind-gemountete Einzeldatei,
+# siehe Bekannte Issues - ein reload/restart greift NICHT):
+ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d --force-recreate caddy"
 
 # Testen (von lokalem Rechner, NICHT vom Host)
 curl -s https://portal.16schwaben.de/health

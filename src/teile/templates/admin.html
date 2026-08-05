@@ -51,6 +51,13 @@
   font-size:13px; padding:6px 12px; border-radius:8px;
   background:var(--surface-2); color:var(--text); border:none; cursor:pointer;
 }
+/* Wunsch #131: Notfallknopf - rot abgesetzt, weil er alle bisherigen Links
+   dieses Nutzers sofort ungültig macht. */
+.btn-neue-tokens {
+  font-size:13px; padding:6px 12px; border-radius:8px;
+  background:var(--surface-2); color:#ff3b30; border:none; cursor:pointer;
+  font-family:inherit;
+}
 .grants-label { font-size:12px; color:var(--text-2); margin-bottom:6px; font-weight:500; }
 .grants-row   { display:flex; flex-wrap:wrap; gap:6px; }
 .grant-chip {
@@ -114,6 +121,15 @@
       {% if home_tok %}
       <button class="btn-qr" onclick="showQR('{{ u.id }}','{{ u.name }}','{{ home_tok }}')">📱 QR-Code</button>
       {% endif %}
+      {# Wunsch #131: Notfallknopf. Macht in einem Schritt ALLE Adressen dieses
+         Nutzers ungültig - für "Handy weg" oder "Link aus Versehen
+         weitergegeben". Sicherheitsabfrage, weil danach kein alter Link mehr
+         funktioniert (Projekt-Konvention: |tojson|forceescape im Attribut). #}
+      <form method="post" action="/a/admin/{{ token }}/user/{{ u.id }}/neue_tokens"
+            style="margin:0"
+            onsubmit="return confirm({{ ('Alle Zugänge von ' ~ u.name ~ ' neu erzeugen? Sämtliche bisherigen Links und QR-Codes werden damit sofort ungültig.')|tojson|forceescape }})">
+        <button type="submit" class="btn-neue-tokens">🔄 Zugänge neu</button>
+      </form>
     </div>
 
     <div class="grants-label">App-Zugang</div>

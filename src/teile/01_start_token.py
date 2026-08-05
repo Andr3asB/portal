@@ -1,23 +1,33 @@
 from flask import Blueprint, render_template, abort, request, jsonify
-from teile.kern import get_db, to_int
+from teile.kern import get_db, to_int, token_lookup, token_entschluesseln
 
 bp = Blueprint("start", __name__)
 
 
 def _home_user(token):
-    """Gibt User-Row für gültigen Home-Token zurück, sonst None."""
+    """Gibt User-Daten für gültigen Home-Token zurück, sonst None.
+
+    Wunsch #129: Suche über token_lookup, die beiden Token-Felder kommen
+    verschlüsselt aus der DB und werden hier entschlüsselt (dict statt Row,
+    wie bei grant() in 00_kern.py)."""
     db = get_db()
-    return db.execute("""
+    row = db.execute("""
         SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-               g.token AS home_token,
-               (SELECT g2.token FROM grants g2
+               g.token_enc AS home_enc,
+               (SELECT g2.token_enc FROM grants g2
                 JOIN apps a2 ON a2.id = g2.app_id
-                WHERE g2.user_id = u.id AND a2.slug = 'hilfe') AS hilfe_token
+                WHERE g2.user_id = u.id AND a2.slug = 'hilfe') AS hilfe_enc
         FROM   grants g
         JOIN   users u ON u.id = g.user_id
         JOIN   apps  a ON a.id = g.app_id
-        WHERE  g.token = ? AND a.slug = 'home'
-    """, (token,)).fetchone()
+        WHERE  g.token_lookup = ? AND a.slug = 'home'
+    """, (token_lookup(token),)).fetchone()
+    if not row:
+        return None
+    daten = dict(row)
+    daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
+    daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
+    return daten
 
 
 @bp.route("/")
@@ -39,7 +49,7 @@ def startseite(token):
     """, (row["id"],)).fetchall()
 
     apps_rows = db.execute("""
-        SELECT a.slug, a.name, a.emoji, a.offline_faehig, g.token AS app_token,
+        SELECT a.slug, a.name, a.emoji, a.offline_faehig, g.token_enc AS app_enc,
                g.id AS grant_id, g.gruppe_id, g.position,
                COALESCE(hg.position, 9999) AS gruppe_pos
         FROM   grants g
@@ -51,12 +61,15 @@ def startseite(token):
 
     gruppen_map = {g["id"]: {"info": dict(g), "apps": []} for g in gruppen_rows}
     allgemein   = []
-    for app in apps_rows:
+    for app_row in apps_rows:
+        # Wunsch #129: Kachel-Links brauchen den Klartext-Token
+        app = dict(app_row)
+        app["app_token"] = token_entschluesseln(app.pop("app_enc"))
         gid = app["gruppe_id"]
         if gid is not None and gid in gruppen_map:
-            gruppen_map[gid]["apps"].append(dict(app))
+            gruppen_map[gid]["apps"].append(app)
         else:
-            allgemein.append(dict(app))
+            allgemein.append(app)
     gruppen_list = [gruppen_map[g["id"]] for g in gruppen_rows]
 
     return render_template(

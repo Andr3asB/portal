@@ -79,6 +79,31 @@
 }
 .detail-value { font-size:14px; color:var(--text); white-space:pre-wrap; line-height:1.5; }
 .detail-value.muted { color:var(--text-2); font-style:italic; }
+/* Wunsch #141: Filter - Maße und Verhalten bewusst identisch zur
+   Aufgaben-App (todo.html), damit sich beides gleich anfühlt. */
+.top-aktionen { display:flex; gap:8px; margin-bottom:12px; }
+.btn-filter-toggle {
+  flex:1; display:block; background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap;
+}
+.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.filter-card {
+  background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow); display:none;
+}
+.filter-card.open { display:block; }
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:8px 14px; font-size:13px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.filter-reset {
+  background:none; border:none; color:var(--farbe);
+  font-size:13px; font-family:inherit; cursor:pointer; padding:4px 0;
+}
 {% endblock %}
 
 {% block nav_title %}
@@ -124,10 +149,61 @@
   </div>
 {% endif %}
 
+{# Wunsch #141: Filter. Aufbau bewusst wie in der Aufgaben-App (Knopf blendet
+   eine Karte mit Chip-Reihen ein, Auswahl bleibt per sessionStorage erhalten),
+   damit man sich nicht zwei Bedienlogiken merken muss. #}
+{% if offen or erledigt %}
+<div class="top-aktionen">
+  <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+</div>
+
+<div class="filter-card" id="filter-card">
+  <div class="section-label" style="margin:0 0 8px">Priorität</div>
+  <div class="btn-row" id="filter-prio-row">
+    {% for p in prios_vorhanden %}
+    <button type="button" class="chip-btn" data-value="{{ p }}">{{ prio_labels[p] }}</button>
+    {% endfor %}
+  </div>
+
+  <div class="section-label">Status</div>
+  <div class="btn-row" id="filter-status-row">
+    <button type="button" class="chip-btn" data-value="offen">Offen</button>
+    <button type="button" class="chip-btn" data-value="erledigt">Erledigt</button>
+  </div>
+
+  {% if apps_vorhanden %}
+  <div class="section-label">App</div>
+  <div class="btn-row" id="filter-app-row">
+    {% for a in apps_vorhanden %}
+    <button type="button" class="chip-btn" data-value="{{ a }}">{{ a }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if urheber_vorhanden %}
+  <div class="section-label">Von</div>
+  <div class="btn-row" id="filter-urheber-row">
+    {% for n in urheber_vorhanden %}
+    <button type="button" class="chip-btn" data-value="{{ n }}">{{ n }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <button type="button" class="filter-reset" id="filter-zuruecksetzen-btn"
+          style="display:none; margin-top:10px">Filter zurücksetzen</button>
+</div>
+
+<div id="keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">
+  Kein Wunsch passt zum Filter 🔍
+</div>
+{% endif %}
+
 {% if offen %}
-<div class="section-label">Offen</div>
+<div class="section-label" data-abschnitt="offen">Offen</div>
 {% for w in offen %}
-<div class="wunsch-card">
+{# Wunsch #141: Die data-Attribute sind das, wonach das Skript unten filtert. #}
+<div class="wunsch-card" data-prio="{{ w.prioritaet or '' }}" data-status="offen"
+     data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
@@ -178,9 +254,10 @@
 {% endif %}
 
 {% if erledigt %}
-<div class="section-label">Erledigt</div>
+<div class="section-label" data-abschnitt="erledigt">Erledigt</div>
 {% for w in erledigt %}
-<div class="wunsch-card done">
+<div class="wunsch-card done" data-prio="{{ w.prioritaet or '' }}" data-status="erledigt"
+     data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
@@ -227,5 +304,92 @@
 function toggleWunschDetail(id) {
   document.getElementById('wunsch-detail-' + id)?.classList.toggle('open');
 }
+
+// --- Wunsch #141: Filter -------------------------------------------------
+// Gefiltert wird im Browser über die data-Attribute der Karten (kein
+// Server-Roundtrip), Auswahl bleibt pro Tab per sessionStorage erhalten -
+// gleiches Muster wie in der Aufgaben-App.
+(function () {
+  var karte = document.getElementById('filter-card');
+  if (!karte) return;                       // keine Wünsche -> kein Filter
+  var SPEICHER = 'werkstatt_filter';
+  var REIHEN = {
+    prio:    'filter-prio-row',
+    status:  'filter-status-row',
+    app:     'filter-app-row',
+    urheber: 'filter-urheber-row',
+  };
+
+  function gewaehlt(reihenId) {
+    var r = document.getElementById(reihenId);
+    if (!r) return [];
+    return [].slice.call(r.querySelectorAll('.chip-btn.active'))
+             .map(function (b) { return b.dataset.value; });
+  }
+
+  function anwenden() {
+    var f = {};
+    Object.keys(REIHEN).forEach(function (k) { f[k] = gewaehlt(REIHEN[k]); });
+    try { sessionStorage.setItem(SPEICHER, JSON.stringify(f)); } catch (e) {}
+
+    var aktiv = Object.keys(f).some(function (k) { return f[k].length > 0; });
+    var sichtbar = 0;
+    var proAbschnitt = { offen: 0, erledigt: 0 };
+
+    [].forEach.call(document.querySelectorAll('.wunsch-card'), function (c) {
+      // Leere Auswahl in einer Reihe = dieses Kriterium schränkt nicht ein.
+      var passt = Object.keys(REIHEN).every(function (k) {
+        return f[k].length === 0 || f[k].indexOf(c.dataset[k] || '') !== -1;
+      });
+      c.style.display = passt ? '' : 'none';
+      if (passt) { sichtbar++; proAbschnitt[c.dataset.status]++; }
+    });
+
+    // Überschrift ausblenden, wenn ihr Abschnitt leer gefiltert ist - sonst
+    // stünde "Erledigt" ohne einen einzigen Eintrag darunter.
+    [].forEach.call(document.querySelectorAll('[data-abschnitt]'), function (u) {
+      u.style.display = proAbschnitt[u.dataset.abschnitt] > 0 ? '' : 'none';
+    });
+
+    document.getElementById('filter-toggle-btn').classList.toggle('aktiv', aktiv);
+    document.getElementById('filter-zuruecksetzen-btn').style.display = aktiv ? 'inline-block' : 'none';
+    document.getElementById('keine-treffer').style.display = (aktiv && sichtbar === 0) ? 'block' : 'none';
+  }
+
+  // Gespeicherte Auswahl wiederherstellen
+  try {
+    var gesichert = JSON.parse(sessionStorage.getItem(SPEICHER) || '{}');
+    Object.keys(REIHEN).forEach(function (k) {
+      var r = document.getElementById(REIHEN[k]);
+      if (!r || !gesichert[k]) return;
+      [].forEach.call(r.querySelectorAll('.chip-btn'), function (b) {
+        if (gesichert[k].indexOf(b.dataset.value) !== -1) b.classList.add('active');
+      });
+    });
+  } catch (e) {}
+
+  Object.keys(REIHEN).forEach(function (k) {
+    var r = document.getElementById(REIHEN[k]);
+    if (!r) return;
+    r.addEventListener('click', function (e) {
+      var b = e.target.closest('.chip-btn');
+      if (!b) return;
+      b.classList.toggle('active');
+      anwenden();
+    });
+  });
+
+  document.getElementById('filter-toggle-btn').addEventListener('click', function () {
+    karte.classList.toggle('open');
+  });
+  document.getElementById('filter-zuruecksetzen-btn').addEventListener('click', function () {
+    [].forEach.call(karte.querySelectorAll('.chip-btn.active'), function (b) {
+      b.classList.remove('active');
+    });
+    anwenden();
+  });
+
+  anwenden();
+})();
 </script>
 {% endblock %}

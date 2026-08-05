@@ -57,7 +57,7 @@ Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
 from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
+from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int, token_entschluesseln
 
 bp  = Blueprint("todo_app", __name__)
 APP = "todo"
@@ -91,10 +91,10 @@ def _darf_erledigen(user, row) -> bool:
 
 def _todo_url(db, user_id: int) -> str:
     row = db.execute("""
-        SELECT g.token FROM grants g JOIN apps a ON a.id=g.app_id
+        SELECT g.token_enc FROM grants g JOIN apps a ON a.id=g.app_id
         WHERE g.user_id=? AND a.slug='todo'
     """, (user_id,)).fetchone()
-    return f"https://portal.16schwaben.de/a/todo/{row['token']}/" if row else ""
+    return f"https://portal.16schwaben.de/a/todo/{token_entschluesseln(row['token_enc'])}/" if row else ""
 
 
 def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,

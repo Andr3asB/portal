@@ -1,7 +1,14 @@
-flask>=3.0
-gunicorn>=21.0
-pywebpush>=2.0
-segno>=1.6
-tzdata>=2024.1
-dicebear-core>=10.3
-dicebear-styles>=10.2
+# Wunsch #135: exakte Versionen statt ">=". Mit ">=" zog jedes
+# "docker compose up --build" potenziell neue Versionen - ein kompromittiertes
+# Paket-Release waere ungefragt in der Produktion gelandet, und zwei Builds
+# vom selben Stand waren nicht zwangslaeufig identisch (schlecht beim
+# Fehlersuchen). Stand entspricht dem, was am 2026-08-05 im Container lief.
+# Aktualisieren heisst ab jetzt: Version hier bewusst hochsetzen, neu bauen,
+# testen, im journal.md vermerken.
+Flask==3.1.3
+gunicorn==26.0.0
+pywebpush==2.3.0
+segno==1.6.6
+tzdata==2026.3
+dicebear-core==10.3.2
+dicebear-styles==10.2.0

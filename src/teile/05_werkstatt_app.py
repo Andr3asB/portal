@@ -25,6 +25,17 @@ APP = "werkstatt"
 
 _PRIORITAETEN = ("niedrig", "mittel", "hoch", "sehr_hoch", "zurueckgestellt")
 
+# Wunsch #141: lesbare Beschriftung für die Filter-Chips. "" = Wunsch ohne
+# gesetzte Priorität (kommt bei frisch eingereichten Wünschen vor).
+_PRIO_LABELS = {
+    "sehr_hoch":       "Sehr hoch",
+    "hoch":            "Hoch",
+    "mittel":          "Mittel",
+    "niedrig":         "Niedrig",
+    "zurueckgestellt": "Zurückgestellt",
+    "":                "Ohne Priorität",
+}
+
 _PRIO_ORDER = """
     CASE w.prioritaet
         WHEN 'sehr_hoch'       THEN 1
@@ -66,9 +77,25 @@ def index(token):
     erledigt = db.execute(
         _SELECT + " WHERE w.erledigt = 1 ORDER BY COALESCE(w.erledigt_am, w.erstellt) DESC"
     ).fetchall()
+
+    # Wunsch #141: Filterkriterien. Bewusst NUR aus den tatsächlich
+    # vorkommenden Werten gebaut statt aus festen Listen - eine App oder ein
+    # Urheber ohne Wünsche liefert sonst einen Knopf, der nie etwas trifft.
+    # Gefiltert wird dann im Browser (gleiches Muster wie die Aufgaben-App),
+    # deshalb reichen hier die Auswahlwerte.
+    alle = list(offen) + list(erledigt)
+    prios_vorhanden = [p for p in _PRIORITAETEN
+                       if any((w["prioritaet"] or "") == p for w in alle)]
+    if any(not w["prioritaet"] for w in alle):
+        prios_vorhanden.append("")          # "ohne Priorität"
+    apps_vorhanden = sorted({w["app_slug"] for w in alle if w["app_slug"]})
+    urheber_vorhanden = sorted({w["urheber_name"] for w in alle if w["urheber_name"]})
+
     return render_template("werkstatt_app.html",
         user=user, token=token, farbe=user["farbe"],
         offen=offen, erledigt=erledigt,
+        prios_vorhanden=prios_vorhanden, prio_labels=_PRIO_LABELS,
+        apps_vorhanden=apps_vorhanden, urheber_vorhanden=urheber_vorhanden,
     )
 
 

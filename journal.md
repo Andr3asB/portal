@@ -2,6 +2,155 @@
 
 ---
 
+## 2026-08-05 – portal-v113/114/115: Sicherheitspaket (Wünsche #126–#135, #141)
+
+Umsetzung der priorisierten Punkte aus der Sicherheitsanalyse. Die sieben mit
+`zurueckgestellt` markierten Wünsche (#130, #136–#140, #51) blieben
+unangetastet. In drei Stufen ausgeliefert, damit ein Fehler nicht alles auf
+einmal umwirft: v113 Infrastruktur + SSRF, v114 Token-Verschlüsselung,
+v115 CSP + Werkstatt-Filter.
+
+### #128 – Dateirechte (sehr hoch)
+
+`.env` und `portal.db` lagen mit 0644 auf der Platte, also für jeden lokalen
+Benutzer von home02 lesbar – und in der DB standen alle 50 Zugangstokens im
+Klartext. Jetzt 0600 für beide, 0700 für `data/` und die Snapshots, und in
+beiden Containern `umask 077`, damit neu erzeugte Snapshots/Backups nicht
+wieder mit 0644 entstehen. Der `umask`-Teil musste als `sh -c "umask 077 &&
+exec …"` ins CMD, weil `umask` ein Shell-Builtin ist und eine reine
+CMD-Liste gar keine Shell startet.
+
+### #126 – Caddy-Admin-API abgeschaltet (sehr hoch)
+
+War auf 172.30.0.10:2019 erreichbar, ohne Authentifizierung, aus demselben
+Bridge-Netz wie der portal-Container – live nachgewiesen. Jetzt `admin off`.
+Der Healthcheck hing genau an dieser API; Ersatz ist ein Klartext-Listener
+auf `127.0.0.1:2020` **innerhalb** des caddy-Containers.
+
+**Stolperstein:** Der erste Ersatz war ein Pfad `/caddy-up` in der
+öffentlichen Site, abgefragt per `wget --header="Host: …" https://127.0.0.1/`.
+Das scheitert – busybox-wget setzt kein SNI, und ohne SNI kann Caddy die Site
+nicht zuordnen: `tlsv1 alert internal error`, Container dauerhaft
+"unhealthy". Der eigene Loopback-Listener ohne TLS umgeht das und ist
+nebenbei von außen gar nicht erreichbar.
+
+### #127 – SSRF beim Rezept-Import (sehr hoch)
+
+Zwei Lücken in `_ist_oeffentliche_url`, beide geschlossen:
+
+1. **Weiterleitungen** wurden von urllib automatisch verfolgt, ohne das Ziel
+   erneut zu prüfen – eine öffentliche URL mit 302 auf die Caddy-Admin-API
+   landete direkt dort. Jetzt folgt `_seite_abrufen()` selbst, prüft **jede**
+   Station erneut und bricht bei Schleifen bzw. nach 5 Sprüngen ab.
+   Weiterleitungen ganz zu verbieten wäre einfacher gewesen, hätte den Import
+   aber für die halbe Welt kaputtgemacht (http→https, www, Trailing-Slash).
+2. **DNS-Rebinding**: zwischen Prüfung und Abruf wurde der Name ein zweites
+   Mal aufgelöst. Jetzt wird einmal aufgelöst, geprüft und genau diese IP
+   verbunden – Hostname bleibt für Host-Header, SNI und Zertifikatsprüfung
+   erhalten.
+
+Nebenbei deckt `_ip_ist_oeffentlich()` jetzt über `is_global` auch
+100.64.0.0/10 und 0.0.0.0/8 ab, die die alte Aufzählung durchgelassen hatte.
+
+**Stolperstein:** Ein `HTTPRedirectHandler`, dessen `redirect_request` `None`
+zurückgibt, bringt keine 3xx-Antwort zurück – urllib wertet das als „nicht
+behandelt" und lässt den Standard-Fehlerhandler einen `HTTPError` werfen.
+Richtig ist ein eigener `HTTPErrorProcessor`, der Antworten roh durchreicht.
+Danach muss man Fehlerstatus allerdings selbst prüfen, sonst wird eine
+404-Seite als Rezept interpretiert.
+
+### #129 – Tokens nicht mehr im Klartext (sehr hoch)
+
+Der Wunsch verlangte wörtlich einen **Hash**. Das geht hier nicht: `base.html`
+baut auf *jeder* Seite den ⌂-Knopf aus `home_token` und den Hilfe-Link aus
+`hilfe_token`, und die Startseite erzeugt jede Kachel aus dem Token des
+jeweiligen Grants. Ein Einweg-Hash ließe sich nicht zurücklesen – die
+komplette Navigation wäre tot. (Mit dem Cookie-Modell aus #140 wäre echtes
+Hashing möglich; das ist zurückgestellt.)
+
+Umgesetzt ist deshalb das, worum es dem Wunsch inhaltlich ging – „ein
+geleaktes Backup darf keinen Vollzugriff geben": die Tokens liegen
+**verschlüsselt** in der DB (AES-GCM), gesucht wird über einen HMAC-Suchwert.
+Der Schlüssel steht in der `.env`, und das tägliche Backup sichert nur
+`/data` – die `.env` liegt eine Ebene darüber und ist damit **nicht** im
+Backup. Genau das macht ein abhandengekommenes Backup wertlos.
+
+Migration auf einer Kopie der Produktions-DB vorab durchgespielt: 50 von 50
+übernommen, alle Tokens exakt wiederherstellbar, kein Klartext mehr in den
+Rohbytes. Dabei aufgefallen: ohne `VACUUM` bleiben die alten Werte in
+freigegebenen Seiten stehen – `strings portal.db` hätte sie weiterhin
+gefunden und das nächste Backup mitgenommen. Steht jetzt in der Migration.
+
+**Betriebshinweis, wichtig:** Ohne `TOKEN_KEY` kommt niemand mehr rein. Die
+`.env` gehört an einen zweiten sicheren Ort (Passwortmanager) – ein
+wiederhergestelltes `/data`-Backup allein reicht nicht mehr. Sicherungen
+liegen als `.env.vor-129` und `portal.db.vor-129` auf home02.
+
+### #131 – Notfallknopf „Zugänge neu" (hoch)
+
+Pro Mitglied ein Knopf in der Verwaltung, der alle Grants dieses Nutzers in
+einem Schritt neu vergibt. Durch #129 ist das keine Bequemlichkeit mehr,
+sondern notwendig: einen verlorenen Zugang kann man nicht mehr nachschlagen,
+man erzeugt ihn neu. Sonderfall mitgetestet: erneuert der Admin seine
+**eigenen** Zugänge, wird der Token in der Adresszeile mit erneuert – die
+Weiterleitung zeigt deshalb auf die neue Admin-Adresse, sonst liefe sie in
+ein 403.
+
+### #132 – CSP gehärtet (hoch)
+
+Statt nur `frame-ancestors` jetzt `default-src 'self'` plus
+`connect-src`/`img-src`/`form-action` auf `'self'`, `object-src 'none'`,
+`base-uri 'self'`. Damit sind die üblichen Abflusswege für einen erbeuteten
+Token abgeschnitten (fetch/XHR, Bild-Beacon, Formular-POST) und externe
+Skripte lassen sich nicht nachladen.
+
+**Bewusst nicht umgesetzt:** `'unsafe-inline'` bleibt bei `script-src`
+stehen. Die Templates enthalten 59 Inline-Handler in 27 Dateien, 30
+Inline-`<script>`-Blöcke und 199 `style="…"`-Attribute – ein echtes Nonce
+würde all das auf einen Schlag lahmlegen. Der Umbau auf `addEventListener`
+ist als eigener Wunsch erfasst. Ebenfalls offen bleibt Abfluss per
+Navigation (`location.href = …`); dafür gibt es in CSP kein Mittel mehr,
+seit `navigate-to` aus dem Standard gefallen ist.
+
+### #133 / #134 / #135 (hoch bzw. mittel)
+
+- **#133**: `MAX_CONTENT_LENGTH` = 10 MB in Flask, `request_body max_size`
+  = 12 MB in Caddy. Vorher wurde die Datei erst komplett in den Speicher
+  gelesen und *danach* auf 8 MB geprüft – bei 256 MB Container-Limit ein
+  offenes Scheunentor. Beide Schichten live gegengeprüft (11 MB → 413 von
+  Flask, 15 MB → 413 von Caddy, Container überlebt beides).
+- **#134**: HSTS mit `max-age=31536000`, bewusst **ohne**
+  `includeSubDomains` – das würde für alle `*.16schwaben.de` gelten, auch
+  für Dienste, die hier gar nicht konfiguriert sind.
+- **#135**: `requirements.txt` von `>=` auf `==` mit den Versionen, die
+  tatsächlich liefen.
+
+### #141 – Filter in der Werkstatt (hoch)
+
+Bei 140 Wünschen war die Liste unbenutzbar. Filter nach Priorität, Status,
+App und Urheber; innerhalb einer Zeile „oder", zwischen den Zeilen „und".
+Aufbau und Bedienung bewusst identisch zur Aufgaben-App (Chips,
+sessionStorage), damit man sich nicht zwei Logiken merken muss. Die
+Kriterien werden nur aus tatsächlich vorkommenden Werten gebaut – sonst gäbe
+es Knöpfe, die nie etwas treffen.
+
+### Verifiziert
+
+Nach der Token-Umstellung **jeder einzelne der 50 Grants** über seine echte
+App-URL aufgerufen: 50 × HTTP 200, keine Ausnahme. Zusätzlich: Admin-API aus
+dem portal-Container nicht mehr erreichbar (ConnectionRefused), interner
+Health-Listener weder von außen noch aus dem intern-Netz erreichbar, alle
+Header gesetzt, SSRF-Angriffsfälle abgewiesen und echte Rezepte weiterhin
+importierbar (JSON-LD mit Zutaten und Schritten), Filter über alle Fälle
+inklusive Null-Treffer und Persistenz nach Neuladen, keine CSP-Verstöße in
+der Browser-Konsole.
+
+### Auslieferungspakete
+
+`deploy/portal-v113.tar.gz`, `portal-v114.tar.gz`, `portal-v115.tar.gz`
+
+---
+
 ## 2026-08-04 – portal-v112: Wünsche #123 + #124 + #125 – Kopfzeile, Mannschaftsfilter, Scroll-Hinweis
 
 Drei Nachbesserungen am Mannschafts-Umschalter aus Wunsch #122.

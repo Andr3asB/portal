@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, abort, make_response
-from teile.kern import get_db
+from teile.kern import get_db, token_lookup
 
 bp = Blueprint("settings", __name__)
 
@@ -11,8 +11,8 @@ def manifest_json(token):
         "SELECT u.farbe FROM users u"
         " JOIN grants g ON g.user_id=u.id"
         " JOIN apps   a ON a.id=g.app_id"
-        " WHERE g.token=? AND a.slug='home'",
-        (token,),
+        " WHERE g.token_lookup=? AND a.slug='home'",
+        (token_lookup(token),),
     ).fetchone()
     if not row:
         abort(404)
@@ -41,8 +41,8 @@ def toggle_darkmode():
         abort(400)
     db  = get_db()
     row = db.execute(
-        "SELECT u.id, u.dark_mode FROM users u JOIN grants g ON g.user_id=u.id WHERE g.token=?",
-        (token,),
+        "SELECT u.id, u.dark_mode FROM users u JOIN grants g ON g.user_id=u.id WHERE g.token_lookup=?",
+        (token_lookup(token),),
     ).fetchone()
     if not row:
         abort(403)

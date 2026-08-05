@@ -1,7 +1,15 @@
 {
 	auto_https off
-	# Admin-API nur auf dem internen Bridge-Netz – nie auf 10.0.0.200
-	admin 172.30.0.10:2019
+	# Wunsch #126: Admin-API komplett abgeschaltet. Sie lauschte vorher auf
+	# 172.30.0.10:2019 – also auf dem internen Bridge-Netz, in dem auch der
+	# portal-Container hängt, und ohne jede Authentifizierung. Damit konnte
+	# jeder, der im portal-Container eine ausgehende Anfrage steuern kann
+	# (z. B. über den Rezept-Import, siehe Wunsch #127), die komplette
+	# Caddy-Konfiguration lesen UND per POST/PATCH überschreiben – bis hin
+	# zum Umbiegen von portal.16schwaben.de auf einen fremden Server.
+	# Wir brauchen die API nicht: die Konfiguration kommt aus dieser Datei,
+	# Änderungen gehen über ein Neuaufsetzen des Containers.
+	admin off
 }
 
 portal.16schwaben.de {
@@ -16,10 +24,64 @@ portal.16schwaben.de {
 		# beide gleichzeitig zu setzen waere widerspruechlich, da ein reines
 		# X-Frame-Options DENY das Einbetten weiterhin verbieten wuerde, selbst
 		# wenn CSP es erlaubt.
-		Content-Security-Policy "frame-ancestors https://wir4.16schwaben.de"
+		# Wunsch #132: CSP über frame-ancestors hinaus gehärtet.
+		#
+		# Ziel laut Wunsch: Wenn doch einmal eine XSS-Lücke entsteht, soll der
+		# Zugangstoken nicht an einen fremden Server abfließen können.
+		# `connect-src`, `img-src` und `form-action` auf 'self' schneiden genau
+		# die üblichen Abflusswege ab (fetch/XHR, Bild-Beacon, Formular-POST),
+		# `script-src 'self'` verhindert zusätzlich das Nachladen fremder
+		# Skripte, `object-src 'none'` und `base-uri 'self'` schließen zwei
+		# klassische Umgehungen.
+		#
+		# 'unsafe-inline' bleibt bei script-src und style-src drin, und das ist
+		# eine bewusste Entscheidung, keine Nachlässigkeit: die Templates
+		# enthalten 59 Inline-Handler (onclick/onsubmit) in 27 Dateien,
+		# 30 Inline-<script>-Blöcke und 199 style="..."-Attribute. Ein echtes
+		# Nonce würde all das auf einen Schlag lahmlegen. Der Umbau auf
+		# addEventListener ist als eigener Wunsch erfasst – erst danach kann
+		# 'unsafe-inline' bei script-src raus. Was hier steht, wirkt trotzdem
+		# sofort: eingeschleuster Code kann zwar laufen, aber den Token nicht
+		# mehr ohne Weiteres nach außen schicken.
+		#
+		# Nicht abgedeckt bleibt der Abfluss per Navigation
+		# (location.href = 'https://fremd/?t=...') – dafür gibt es in CSP
+		# schlicht kein Mittel mehr, seit `navigate-to` aus dem Standard
+		# gefallen ist.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors https://wir4.16schwaben.de"
+		# Wunsch #134: HSTS. Das Portal hört nur auf 443, gerade deshalb ist
+		# Port 80 auf 10.0.0.200 unbesetzt – ein Gerät im LAN könnte die IP
+		# per ARP-Spoofing übernehmen, dort antworten und den Zugangstoken
+		# im Klartext abgreifen, sobald jemand die Adresse ohne https eintippt
+		# oder einem alten http-Lesezeichen folgt. Bewusst OHNE
+		# includeSubDomains: das würde für alle *.16schwaben.de gelten, auch
+		# für Dienste, die hier gar nicht konfiguriert sind.
+		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
+	# Wunsch #133: Anfragen mit übergroßem Body gar nicht erst durchreichen.
+	# Der portal-Container hat 256 MB RAM-Limit; ohne diese Grenze könnten
+	# parallele Riesen-Uploads ihn ins OOM schicken. 12 MB lässt genug Luft
+	# über dem 10-MB-Limit in Flask (MAX_CONTENT_LENGTH), damit die
+	# freundliche Fehlermeldung der App greift und nicht Caddy stumm abbricht.
+	request_body {
+		max_size 12MB
+	}
 	reverse_proxy portal:8000
+}
+
+# Wunsch #126: Ersatz für den bisherigen Healthcheck, der die abgeschaltete
+# Admin-API abfragte. Bewusst ein eigener Klartext-Listener auf dem Loopback
+# des caddy-Containers statt eines Pfads in der öffentlichen Site:
+#   - er ist von außen und aus dem intern-Netz gar nicht erreichbar,
+#   - und busybox-wget (im caddy-Image) kann kein SNI setzen; ein TLS-Aufruf
+#     auf 127.0.0.1 scheitert deshalb am Handshake, weil Caddy die Site ohne
+#     SNI nicht zuordnen kann ("tlsv1 alert internal error" – live gesehen).
+# Caddy beantwortet das selbst, der Check bleibt also grün, während der
+# portal-Container neu startet.
+:2020 {
+	bind 127.0.0.1
+	respond "ok" 200
 }
 
 # Interner Relay für Sportschau-App (Wunsch #62): portal hängt nur im Bridge-

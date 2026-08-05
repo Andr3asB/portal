@@ -44,7 +44,11 @@ services:
     mem_limit: 64m
     cpus: "0.2"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://172.30.0.10:2019/config/"]
+      # Wunsch #126: fragte vorher die Caddy-Admin-API ab (172.30.0.10:2019),
+      # die jetzt abgeschaltet ist. Stattdessen der interne Klartext-Listener
+      # auf 127.0.0.1:2020 aus dem Caddyfile - nur im Container erreichbar,
+      # ohne TLS und damit ohne das SNI-Problem von busybox-wget.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2020/"]
       interval: 60s
       timeout: 10s
       retries: 3

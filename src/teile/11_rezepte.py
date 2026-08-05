@@ -35,13 +35,15 @@ Neuanlegen und Import-Vorschau, unterschieden nur über den bearbeiten-Parameter
 Speichern komplett ersetzt, kein Zeilen-Diffing.
 """
 import base64
+import http.client
 import ipaddress
 import json
 import re
 import socket
+import urllib.error
 import urllib.request
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import (
@@ -50,6 +52,8 @@ from teile.kern import (
 )
 
 MAX_REZEPT_WUENSCHE = 5
+# Wunsch #127: Obergrenze fuer selbst gefolgte Weiterleitungen.
+_MAX_WEITERLEITUNGEN = 5
 
 bp  = Blueprint("rezepte_app", __name__)
 APP = "rezepte"
@@ -116,26 +120,175 @@ def _ist_oeffentliche_url(url: str) -> bool:
         infos = socket.getaddrinfo(parsed.hostname, None)
     except socket.gaierror:
         return False
+    if not infos:
+        return False
     for info in infos:
         try:
             ip = ipaddress.ip_address(info[4][0].split("%")[0])
         except ValueError:
             return False
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if not _ip_ist_oeffentlich(ip):
             return False
     return True
 
 
-def _seite_abrufen(url: str) -> str:
+def _ip_ist_oeffentlich(ip) -> bool:
+    """Alles, was nicht eindeutig im oeffentlichen Internet liegt, ist tabu.
+
+    Wunsch #127: `is_global` statt einer Aufzaehlung einzelner Kategorien -
+    die alte Liste (private/loopback/link_local/reserved/multicast) liess
+    z. B. 100.64.0.0/10 (Carrier-Grade-NAT) und 0.0.0.0/8 durch."""
+    return bool(ip.is_global) and not ip.is_multicast
+
+
+class _RohantwortDurchreichen(urllib.request.HTTPErrorProcessor):
+    """Wunsch #127: urllib folgte Weiterleitungen automatisch und OHNE das
+    Ziel erneut zu pruefen - eine harmlos aussehende, oeffentliche URL mit
+    einem 302 auf http://172.30.0.10:2019/ landete damit direkt bei der
+    Caddy-Admin-API.
+
+    Wir wollen die 3xx-Antwort selbst in der Hand haben, um jede
+    Zwischenstation erneut durch _ist_oeffentliche_url zu schicken.
+    Weiterleitungen ganz zu verbieten waere einfacher, wuerde den Import aber
+    fuer die halbe Welt kaputtmachen: Rezeptseiten leiten staendig um
+    (http->https, ohne->mit www, Trailing-Slash).
+
+    Achtung, Stolperstein: Es genuegt NICHT, in einem HTTPRedirectHandler
+    `redirect_request` None zurueckgeben zu lassen. urllib wertet das als
+    "nicht behandelt" und laesst dann den Standard-Fehlerhandler einen
+    HTTPError werfen - die Weiterleitung kaeme nie bei uns an. Stattdessen
+    wird hier der HTTPErrorProcessor ersetzt, der sonst jede Antwort ausser
+    2xx in einen HTTPError verwandelt; so bekommen wir die Antwort roh."""
+
+    def http_response(self, request, response):
+        return response
+
+    https_response = http_response
+
+
+# Wunsch #127, zweite Luecke: DNS-Rebinding. Zwischen der Pruefung in
+# _ist_oeffentliche_url und dem eigentlichen Abruf loeste urllib den Hostnamen
+# ein zweites Mal auf. Ein Angreifer-DNS mit sehr kurzer TTL konnte beim ersten
+# Mal eine oeffentliche und beim zweiten Mal eine interne Adresse liefern - die
+# Pruefung lief dann ins Leere. Die beiden Klassen unten verbinden deshalb
+# genau zu der IP, die geprueft wurde. Wichtig: der HOSTNAME bleibt in
+# self.host stehen, damit Host-Header, SNI und die Zertifikatspruefung
+# weiterhin auf den echten Namen laufen - nur das Verbindungsziel ist gepinnt.
+class _GepinnteHTTPVerbindung(http.client.HTTPConnection):
+    def __init__(self, host, ziel_ip=None, **kw):
+        super().__init__(host, **kw)
+        self._ziel_ip = ziel_ip
+
+    def connect(self):
+        self.sock = socket.create_connection(
+            (self._ziel_ip, self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self._tunnel()
+
+
+class _GepinnteHTTPSVerbindung(http.client.HTTPSConnection):
+    def __init__(self, host, ziel_ip=None, **kw):
+        super().__init__(host, **kw)
+        self._ziel_ip = ziel_ip
+
+    def connect(self):
+        sock = socket.create_connection(
+            (self._ziel_ip, self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self.sock = sock
+            self._tunnel()
+            sock = self.sock
+        # server_hostname = echter Name -> Zertifikat wird korrekt geprueft
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _GepinnterHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, ziel_ip):
+        super().__init__()
+        self._ziel_ip = ziel_ip
+
+    def http_open(self, req):
+        return self.do_open(
+            lambda host, **kw: _GepinnteHTTPVerbindung(host, ziel_ip=self._ziel_ip, **kw), req)
+
+
+class _GepinnterHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, ziel_ip):
+        super().__init__()
+        self._ziel_ip = ziel_ip
+
+    def https_open(self, req):
+        return self.do_open(
+            lambda host, **kw: _GepinnteHTTPSVerbindung(host, ziel_ip=self._ziel_ip, **kw), req)
+
+
+def _oeffentliche_ip_zu(hostname: str) -> str:
+    """Loest auf und gibt die erste oeffentliche Adresse zurueck.
+    ValueError, wenn keine gefunden wird."""
+    for info in socket.getaddrinfo(hostname, None):
+        kandidat = info[4][0].split("%")[0]
+        try:
+            if _ip_ist_oeffentlich(ipaddress.ip_address(kandidat)):
+                return kandidat
+        except ValueError:
+            continue
+    raise ValueError("Zieladresse ist nicht öffentlich erreichbar")
+
+
+def _einmal_abrufen(url: str):
+    """Ein einzelner Sprung: aufloesen, pruefen, zur gepinnten IP verbinden.
+    Folgt KEINER Weiterleitung - die wertet _seite_abrufen selbst aus."""
+    parsed = urlparse(url)
+    ziel_ip = _oeffentliche_ip_zu(parsed.hostname)
+    opener = urllib.request.build_opener(
+        _RohantwortDurchreichen,
+        _GepinnterHTTPHandler(ziel_ip),
+        _GepinnterHTTPSHandler(ziel_ip),
+    )
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (compatible; FamilienportalRezeptImport/1.0)",
     })
-    with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-        raw = resp.read(_MAX_FETCH_BYTES + 1)
-        if len(raw) > _MAX_FETCH_BYTES:
-            raise ValueError("Seite zu groß")
-        charset = resp.headers.get_content_charset() or "utf-8"
-        return raw.decode(charset, errors="replace")
+    return opener.open(req, timeout=_FETCH_TIMEOUT)
+
+
+def _seite_abrufen(url: str) -> str:
+    """Laedt eine Rezeptseite und folgt dabei Weiterleitungen selbst, damit
+    JEDE Station erneut geprueft wird (Wunsch #127). Setzt voraus, dass die
+    erste URL bereits durch _ist_oeffentliche_url gelaufen ist."""
+    gesehen = set()
+    for _ in range(_MAX_WEITERLEITUNGEN + 1):
+        if url in gesehen:
+            raise ValueError("Weiterleitungsschleife")
+        gesehen.add(url)
+
+        resp = _einmal_abrufen(url)
+        with resp:
+            if resp.status in (301, 302, 303, 307, 308):
+                ziel = resp.headers.get("Location")
+                if not ziel:
+                    raise ValueError("Weiterleitung ohne Ziel")
+                # Relative Ziele ("/rezept/123") gegen die aktuelle URL aufloesen
+                url = urljoin(url, ziel)
+                # Das ist der entscheidende Punkt: die neue Adresse wird
+                # genauso streng geprueft wie die erste. Eine Weiterleitung
+                # auf 172.30.0.10 oder 127.0.0.1 endet hier.
+                if not _ist_oeffentliche_url(url):
+                    raise ValueError("Weiterleitung zeigt auf eine interne Adresse")
+                continue
+
+            # Seit _RohantwortDurchreichen wirft urllib bei Fehlerstatus nicht
+            # mehr von selbst - hier explizit abbrechen, sonst wuerde eine
+            # 404-Fehlerseite als Rezept interpretiert.
+            if resp.status != 200:
+                raise ValueError(f"Seite nicht abrufbar (HTTP {resp.status})")
+
+            raw = resp.read(_MAX_FETCH_BYTES + 1)
+            if len(raw) > _MAX_FETCH_BYTES:
+                raise ValueError("Seite zu groß")
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return raw.decode(charset, errors="replace")
+
+    raise ValueError("Zu viele Weiterleitungen")
 
 
 def _jsonld_kandidaten(data):

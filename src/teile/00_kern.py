@@ -1,4 +1,4 @@
-import sqlite3, secrets, logging
+import sqlite3, secrets, logging, base64, hashlib, hmac
 from contextlib import contextmanager
 from datetime import date, timedelta
 from flask import g, current_app, jsonify, request
@@ -24,10 +24,11 @@ CREATE TABLE IF NOT EXISTS apps (
   offline_faehig INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS grants (
-  id      INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-  app_id  INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
-  token   TEXT    UNIQUE NOT NULL,
+  id           INTEGER PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+  app_id       INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
+  token_lookup TEXT    UNIQUE NOT NULL,
+  token_enc    TEXT    NOT NULL,
   UNIQUE(user_id, app_id)
 );
 CREATE TABLE IF NOT EXISTS push_abos (
@@ -393,25 +394,115 @@ def new_db():
 
 
 def grant(token: str, app_slug: str):
-    """Gibt Row(id, name, farbe, is_admin, home_token, hilfe_token) zurück wenn Token gültig, sonst None."""
+    """Gibt dict(id, name, farbe, is_admin, home_token, hilfe_token, ...) zurück
+    wenn Token gültig, sonst None.
+
+    Wunsch #129: Gesucht wird über token_lookup (HMAC), home_token/hilfe_token
+    kommen verschlüsselt aus der DB und werden hier entschlüsselt - Templates
+    und Aufrufer sehen unverändert den Klartext. Rückgabe ist bewusst ein dict
+    statt einer sqlite3.Row, weil die beiden Token-Felder nachbearbeitet
+    werden müssen; für Aufrufer verhält sich beides gleich (user["id"] wie
+    user.home_token in Jinja)."""
     db = get_db()
-    return db.execute("""
+    row = db.execute("""
         SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-               (SELECT g2.token FROM grants g2
+               (SELECT g2.token_enc FROM grants g2
                 JOIN apps a2 ON a2.id = g2.app_id
-                WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_token,
-               (SELECT g3.token FROM grants g3
+                WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_enc,
+               (SELECT g3.token_enc FROM grants g3
                 JOIN apps a3 ON a3.id = g3.app_id
-                WHERE g3.user_id = u.id AND a3.slug = 'hilfe') AS hilfe_token
+                WHERE g3.user_id = u.id AND a3.slug = 'hilfe') AS hilfe_enc
         FROM   grants g
         JOIN   users u ON u.id = g.user_id
         JOIN   apps  a ON a.id = g.app_id
-        WHERE  g.token = ? AND a.slug = ?
-    """, (token, app_slug)).fetchone()
+        WHERE  g.token_lookup = ? AND a.slug = ?
+    """, (token_lookup(token), app_slug)).fetchone()
+    if not row:
+        return None
+    daten = dict(row)
+    daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
+    daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
+    return daten
+
+
+def grant_werte(token: str):
+    """(token_lookup, token_enc) für ein neues Token - zum Einfügen in grants."""
+    return token_lookup(token), token_verschluesseln(token)
 
 
 def new_token() -> str:
     return secrets.token_urlsafe(18)
+
+
+# ---------------------------------------------------------------------------
+# Wunsch #129: Zugangstokens nicht mehr im Klartext in der Datenbank.
+#
+# Der Wunsch verlangte woertlich einen HASH. Das geht hier NICHT: die
+# Navigation braucht die Tokens im Klartext zurueck. base.html baut auf JEDER
+# Seite den ⌂-Knopf aus `home_token` und den Hilfe-Link aus `hilfe_token`, und
+# die Startseite erzeugt jede App-Kachel aus dem Token des jeweiligen Grants.
+# Ein Einweg-Hash liesse sich nicht zuruecklesen - die komplette Navigation
+# waere tot. (Mit dem Cookie-Modell aus Wunsch #140 waere echtes Hashing
+# moeglich; das ist zurueckgestellt.)
+#
+# Umgesetzt ist deshalb das, worum es dem Wunsch inhaltlich ging - "ein
+# geleaktes Backup darf keinen Vollzugriff geben": die Tokens liegen
+# VERSCHLUESSELT in der DB, der Schluessel steht in der .env. Das taegliche
+# NAS-Backup sichert nur /data, die .env liegt darueber in
+# /srv/familienportal und ist deshalb NICHT im Backup enthalten - ein
+# abhandengekommenes Backup ist damit wertlos.
+#
+# Zwei Spalten je Grant, weil Suchen und Zurueckgewinnen verschiedene Dinge
+# sind:
+#   token_lookup - HMAC-SHA256(Schluessel, Token), deterministisch. Nur dafuer
+#                  da, die Zeile zu FINDEN (WHERE token_lookup = ?). Ohne den
+#                  Schluessel nicht nachrechenbar, also auch kein Abgleich
+#                  gegen eine Liste geratener Tokens.
+#   token_enc    - AES-GCM(Token), zufaelliges Nonce. Nur dafuer da, den
+#                  Klartext fuer Links und QR-Codes zurueckzubekommen.
+#
+# WICHTIG FUER DEN BETRIEB: Ohne TOKEN_KEY aus der .env kommt niemand mehr
+# rein. Die .env gehoert deshalb an einen zweiten sicheren Ort (Passwort-
+# manager) - ein wiederhergestelltes /data-Backup allein reicht NICHT.
+# ---------------------------------------------------------------------------
+
+def _token_key() -> bytes:
+    key_b64 = current_app.config.get("TOKEN_KEY", "")
+    if not key_b64:
+        raise RuntimeError(
+            "TOKEN_KEY fehlt in der .env - ohne den Schluessel sind die "
+            "Zugangstokens nicht lesbar. Siehe .env.example.")
+    return base64.urlsafe_b64decode(key_b64)
+
+
+def token_lookup(token: str, key: bytes = None) -> str:
+    """Deterministischer Suchwert zu einem Token (HMAC, nicht umkehrbar)."""
+    key = key if key is not None else _token_key()
+    return hmac.new(key, token.encode(), hashlib.sha256).hexdigest()
+
+
+def token_verschluesseln(token: str, key: bytes = None) -> str:
+    """Token -> base64(Nonce + Geheimtext), AES-GCM."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    key = key if key is not None else _token_key()
+    nonce = secrets.token_bytes(12)
+    ct = AESGCM(key).encrypt(nonce, token.encode(), None)
+    return base64.urlsafe_b64encode(nonce + ct).decode()
+
+
+def token_entschluesseln(blob: str, key: bytes = None) -> str:
+    """Umkehrung von token_verschluesseln. Leerer String bei kaputtem Wert,
+    damit ein einzelner defekter Grant nicht die ganze Seite zerlegt."""
+    if not blob:
+        return ""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    key = key if key is not None else _token_key()
+    try:
+        raw = base64.urlsafe_b64decode(blob)
+        return AESGCM(key).decrypt(raw[:12], raw[12:], None).decode()
+    except Exception:
+        log.error("Token konnte nicht entschluesselt werden - falscher TOKEN_KEY?")
+        return ""
 
 
 def to_int(value, default=None):
@@ -691,8 +782,10 @@ def _auto_grant_all(db, slug):
         (app_row[0],),
     ).fetchall()
     for row in missing:
-        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
-                   (row[0], app_row[0], secrets.token_urlsafe(18)))
+        lookup, enc = grant_werte(new_token())
+        db.execute(
+            "INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
+            (row[0], app_row[0], lookup, enc))
 
 
 def _init_db(app):
@@ -759,6 +852,70 @@ def _init_db(app):
             db.execute("DROP TABLE vokabeln_alt_v67")
             db.execute("DROP TABLE vokabellisten_alt_v67")
             db.commit()
+        # Wunsch #129: Klartext-Tokens in grants durch token_lookup (HMAC) +
+        # token_enc (AES-GCM) ersetzen. Tabellen-Neubau statt ALTER, weil
+        # `token` UNIQUE ist und SQLite eine indizierte Spalte nicht per DROP
+        # COLUMN entfernen kann (gleiches Muster wie bei kinderplan_eintraege,
+        # Wunsch #115). Der Zwischenzustand mit grants_alt_v129 ist das
+        # Wiederaufsetz-Signal: bricht der Lauf mittendrin ab, wird beim
+        # naechsten Start dort weitergemacht, statt die Migration zu
+        # ueberspringen - genau die Falle aus Wunsch #115.
+        grant_cols = [r[1] for r in db.execute("PRAGMA table_info(grants)").fetchall()]
+        alt_tabelle_da = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='grants_alt_v129'"
+        ).fetchone()
+        if "token" in grant_cols or alt_tabelle_da:
+            key_b64 = app.config.get("TOKEN_KEY", "")
+            if not key_b64:
+                raise RuntimeError(
+                    "TOKEN_KEY fehlt in der .env - er wird gebraucht, um die "
+                    "bestehenden Zugangstokens zu verschluesseln (Wunsch #129). "
+                    "Erzeugen mit: python3 -c \"import base64,os; "
+                    "print(base64.urlsafe_b64encode(os.urandom(32)).decode())\"")
+            key = base64.urlsafe_b64decode(key_b64)
+
+            if not alt_tabelle_da:
+                db.execute("ALTER TABLE grants RENAME TO grants_alt_v129")
+                db.commit()
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS grants (
+                  id           INTEGER PRIMARY KEY,
+                  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  app_id       INTEGER NOT NULL REFERENCES apps(id)  ON DELETE CASCADE,
+                  token_lookup TEXT    UNIQUE NOT NULL,
+                  token_enc    TEXT    NOT NULL,
+                  UNIQUE(user_id, app_id)
+                )
+            """)
+            db.commit()
+            # Positionszugriff statt row["..."]: _init_db arbeitet auf einer
+            # rohen Verbindung OHNE row_factory (Wunsch #115, Stolperstein).
+            for gid, user_id, app_id, klartext in db.execute(
+                "SELECT id, user_id, app_id, token FROM grants_alt_v129"
+            ).fetchall():
+                db.execute(
+                    "INSERT OR IGNORE INTO grants(id, user_id, app_id, token_lookup, token_enc) "
+                    "VALUES(?,?,?,?,?)",
+                    (gid, user_id, app_id,
+                     token_lookup(klartext, key), token_verschluesseln(klartext, key)),
+                )
+            db.commit()
+            anzahl_alt = db.execute("SELECT COUNT(*) FROM grants_alt_v129").fetchone()[0]
+            anzahl_neu = db.execute("SELECT COUNT(*) FROM grants").fetchone()[0]
+            if anzahl_neu != anzahl_alt:
+                raise RuntimeError(
+                    f"Token-Migration unvollstaendig: {anzahl_neu} von {anzahl_alt} "
+                    "uebernommen - grants_alt_v129 bleibt zur Rettung stehen.")
+            db.execute("DROP TABLE grants_alt_v129")
+            db.commit()
+            # Ohne VACUUM blieben die Klartext-Tokens in freigegebenen Seiten
+            # der Datei stehen - die Datenbank waere zwar logisch sauber, ein
+            # `strings portal.db` haette sie aber weiterhin gefunden (und das
+            # naechste Backup mitgenommen). Live gegengeprueft.
+            db.execute("VACUUM")
+            db.commit()
+            log.warning("Wunsch #129: %d Zugangstokens verschluesselt abgelegt.", anzahl_neu)
+
         for col, definition in [
             ("dark_mode", "INTEGER NOT NULL DEFAULT 0"),
             ("rolle",     "TEXT    NOT NULL DEFAULT 'gast'"),

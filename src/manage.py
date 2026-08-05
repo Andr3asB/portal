@@ -13,10 +13,43 @@ Aufruf im Container:
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
 """
-import os, sys, sqlite3, secrets
+import os, sys, sqlite3, secrets, base64, hashlib, hmac
 from pathlib import Path
 
 DB = Path(os.environ.get("DB_PATH", "/data/portal.db"))
+
+
+# Wunsch #129: manage.py laeuft ohne Flask-Kontext, holt den Schluessel also
+# direkt aus der Umgebung (kommt per env_file aus derselben .env wie fuer die
+# App). Gleiche Verfahren wie in teile/00_kern.py - bewusst dupliziert, weil
+# manage.py absichtlich ohne die App-Module auskommt.
+def _key() -> bytes:
+    k = os.environ.get("TOKEN_KEY", "")
+    if not k:
+        sys.exit("TOKEN_KEY fehlt in der Umgebung (.env) - ohne Schluessel "
+                 "sind die Zugangstokens nicht lesbar.")
+    return base64.urlsafe_b64decode(k)
+
+
+def _lookup(token: str) -> str:
+    return hmac.new(_key(), token.encode(), hashlib.sha256).hexdigest()
+
+
+def _enc(token: str) -> str:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    nonce = secrets.token_bytes(12)
+    return base64.urlsafe_b64encode(nonce + AESGCM(_key()).encrypt(nonce, token.encode(), None)).decode()
+
+
+def _dec(blob: str) -> str:
+    if not blob:
+        return ""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    try:
+        raw = base64.urlsafe_b64decode(blob)
+        return AESGCM(_key()).decrypt(raw[:12], raw[12:], None).decode()
+    except Exception:
+        return "(nicht entschluesselbar)"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -34,10 +67,11 @@ CREATE TABLE IF NOT EXISTS apps (
   beschreibung TEXT
 );
 CREATE TABLE IF NOT EXISTS grants (
-  id      INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-  app_id  INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
-  token   TEXT    UNIQUE NOT NULL,
+  id           INTEGER PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+  app_id       INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
+  token_lookup TEXT    UNIQUE NOT NULL,
+  token_enc    TEXT    NOT NULL,
   UNIQUE(user_id, app_id)
 );
 CREATE TABLE IF NOT EXISTS push_abos (
@@ -78,13 +112,15 @@ def _ensure_home_app(db):
 def _make_grant(db, user_id, app_id):
     token = secrets.token_urlsafe(18)
     db.execute(
-        "INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
-        (user_id, app_id, token),
+        "INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
+        (user_id, app_id, _lookup(token), _enc(token)),
     )
     db.commit()
-    return db.execute(
-        "SELECT token FROM grants WHERE user_id=? AND app_id=?", (user_id, app_id)
-    ).fetchone()["token"]
+    # Bei OR IGNORE (Grant existierte schon) gilt der gespeicherte, nicht der
+    # eben erzeugte Token - deshalb immer aus der DB zurueckentschluesseln.
+    return _dec(db.execute(
+        "SELECT token_enc FROM grants WHERE user_id=? AND app_id=?", (user_id, app_id)
+    ).fetchone()["token_enc"])
 
 
 def cmd_createadmin(args):
@@ -159,7 +195,7 @@ def cmd_listusers(_):
     db = connect()
     rows = db.execute("""
         SELECT u.id, u.name, u.farbe, u.is_admin,
-               g.token, a.slug
+               g.token_enc, a.slug
         FROM   users u
         LEFT   JOIN grants g ON g.user_id = u.id
         LEFT   JOIN apps   a ON a.id = g.app_id AND a.slug = 'home'
@@ -167,7 +203,7 @@ def cmd_listusers(_):
     db.close()
     for r in rows:
         admin = " [Admin]" if r["is_admin"] else ""
-        token = r["token"] or "(kein Token)"
+        token = _dec(r["token_enc"]) if r["token_enc"] else "(kein Token)"
         print(f"  ID {r['id']:3}  {r['name']}{admin}  {r['farbe']}  → /p/{token}")
 
 

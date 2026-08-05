@@ -11,7 +11,7 @@ POST /wunsch  { text, app, token, pfad }
 """
 import re
 from flask import Blueprint, request, jsonify
-from teile.kern import get_db
+from teile.kern import get_db, token_lookup
 
 bp = Blueprint("werkstatt", __name__)
 
@@ -46,8 +46,8 @@ def wunsch():
     if token:
         row = db.execute("""
             SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-            WHERE g.token = ?
-        """, (token,)).fetchone()
+            WHERE g.token_lookup = ?
+        """, (token_lookup(token),)).fetchone()
         if row:
             user_id = row["id"]
 

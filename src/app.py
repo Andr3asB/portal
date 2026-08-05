@@ -15,7 +15,19 @@ app.config["VAPID_SUBJECT"]     = os.environ.get("VAPID_SUBJECT", "mailto:portal
 app.config["OPENROUTER_API_KEY"] = os.environ.get("OPENROUTER_API_KEY", "")
 app.config["HAE_API_URL"]       = os.environ.get("HAE_API_URL", "")
 app.config["HAE_API_KEY"]       = os.environ.get("HAE_API_KEY", "")
+# Wunsch #129: Schluessel, mit dem die Zugangstokens in der DB
+# verschluesselt sind. Ohne ihn kommt niemand mehr rein - siehe .env.example.
+app.config["TOKEN_KEY"]         = os.environ.get("TOKEN_KEY", "")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+
+# Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,
+# Vokabeln) lasen die Datei bisher erst komplett per .read() in den Speicher
+# und prüften DANACH auf 8 MB - bei 256 MB RAM-Limit reichen ein paar
+# parallele Riesen-Uploads, um den Container ins OOM zu schicken. Mit
+# MAX_CONTENT_LENGTH bricht Flask schon beim Empfangen mit 413 ab, bevor
+# etwas im Speicher landet. 10 MB liegt bewusst über dem 8-MB-Limit der
+# Foto-Importe, damit deren eigene, freundlichere Meldung weiterhin greift.
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 # Nummerierte Module in teile/ der Reihe nach laden
 _here = Path(__file__).parent / "teile"

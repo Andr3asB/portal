@@ -6,7 +6,7 @@ import io
 import re
 import segno
 from flask import Blueprint, render_template, request, redirect, url_for, abort, Response
-from teile.kern import get_db, grant as check_grant, new_token, to_int
+from teile.kern import get_db, grant as check_grant, new_token, to_int, grant_werte, token_entschluesseln
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -32,10 +32,14 @@ def _admin(token):
 
 
 def _grants_by_user(db):
-    """Gibt {user_id: {app_id: token}} zurück."""
+    """Gibt {user_id: {app_id: token}} zurück.
+
+    Wunsch #129: In der DB steht nur noch der verschlüsselte Token; für die
+    Anzeige von Link und QR-Code wird er hier zurückgewonnen."""
     result = {}
-    for row in db.execute("SELECT user_id, app_id, token FROM grants"):
-        result.setdefault(row["user_id"], {})[row["app_id"]] = row["token"]
+    for row in db.execute("SELECT user_id, app_id, token_enc FROM grants"):
+        result.setdefault(row["user_id"], {})[row["app_id"]] = \
+            token_entschluesseln(row["token_enc"])
     return result
 
 
@@ -82,8 +86,9 @@ def user_neu(token):
             (name, farbe, is_admin, rolle, ki_token_limit),
         ).fetchone()["id"]
         home_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
-        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
-                   (uid, home_id, new_token()))
+        lookup, enc = grant_werte(new_token())
+        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
+                   (uid, home_id, lookup, enc))
         db.commit()
         return redirect(url_for("admin_app.index", token=token))
     return render_template("admin_user_form.html",
@@ -121,8 +126,9 @@ def grant_app(token, uid, app_slug):
     db  = get_db()
     app = db.execute("SELECT id FROM apps WHERE slug=?", (app_slug,)).fetchone()
     if app:
-        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token) VALUES(?,?,?)",
-                   (uid, app["id"], new_token()))
+        lookup, enc = grant_werte(new_token())
+        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
+                   (uid, app["id"], lookup, enc))
         db.commit()
     return redirect(url_for("admin_app.index", token=token))
 
@@ -142,18 +148,53 @@ def revoke_app(token, uid, app_slug):
     return redirect(url_for("admin_app.index", token=token))
 
 
+@bp.route("/a/admin/<token>/user/<int:uid>/neue_tokens", methods=["POST"])
+def neue_tokens(token, uid):
+    """Wunsch #131: Alle Zugänge eines Nutzers in einem Rutsch neu erzeugen.
+
+    Der Notfallknopf für "Handy weg" oder "Link versehentlich weitergegeben".
+    Vorher musste man je App einzeln entziehen und neu vergeben - bei zehn
+    Apps zehn Klickpaare, und man übersah leicht eine. Alle alten Adressen
+    dieses Nutzers sind danach sofort ungültig; er braucht einen neuen Link
+    bzw. QR-Code.
+
+    Bewusst NUR für die Grants dieses einen Nutzers - andere Familien-
+    mitglieder behalten ihre Zugänge."""
+    admin = _admin(token)
+    db = get_db()
+
+    grants = db.execute("SELECT id FROM grants WHERE user_id=?", (uid,)).fetchall()
+    for g in grants:
+        lookup, enc = grant_werte(new_token())
+        db.execute("UPDATE grants SET token_lookup=?, token_enc=? WHERE id=?",
+                   (lookup, enc, g["id"]))
+    db.commit()
+
+    # Erneuert der Admin seine EIGENEN Zugänge, ist der Token in der aktuellen
+    # Adresszeile mit erneuert worden - eine Weiterleitung dorthin liefe ins
+    # Leere (403). Deshalb auf die neue Admin-Adresse umleiten.
+    if uid == admin["id"]:
+        neuer_admin_token = token_entschluesseln(db.execute("""
+            SELECT g.token_enc FROM grants g JOIN apps a ON a.id = g.app_id
+            WHERE g.user_id=? AND a.slug='admin'
+        """, (uid,)).fetchone()["token_enc"])
+        return redirect(url_for("admin_app.index", token=neuer_admin_token))
+
+    return redirect(url_for("admin_app.index", token=token) + f"#user-{uid}")
+
+
 @bp.route("/a/admin/<token>/user/<int:uid>/qr.svg")
 def qr_svg(token, uid):
     _admin(token)
     db = get_db()
     row = db.execute("""
-        SELECT g.token FROM grants g
+        SELECT g.token_enc FROM grants g
         JOIN apps a ON a.id = g.app_id
         WHERE g.user_id=? AND a.slug='home'
     """, (uid,)).fetchone()
     if not row:
         abort(404)
-    url = f"https://portal.16schwaben.de/p/{row['token']}"
+    url = f"https://portal.16schwaben.de/p/{token_entschluesseln(row['token_enc'])}"
     qr  = segno.make(url, error="M")
     buf = io.BytesIO()
     qr.save(buf, kind="svg", omitsize=True, border=2,

@@ -6,7 +6,7 @@ POST /push/subscribe         → {"subscription":{...}, "token":"...", "geraet":
 POST /push/unsubscribe       → {"endpoint":"...", "token":"..."}
 """
 from flask import Blueprint, jsonify, request, current_app, abort
-from teile.kern import get_db, grant as check_grant
+from teile.kern import get_db, grant as check_grant, token_lookup
 
 bp = Blueprint("push", __name__)
 
@@ -37,8 +37,8 @@ def subscribe():
     db = get_db()
     row = db.execute("""
         SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-        WHERE g.token = ?
-    """, (token,)).fetchone()
+        WHERE g.token_lookup = ?
+    """, (token_lookup(token),)).fetchone()
     if not row:
         abort(403)
     user_id = row["id"]
@@ -65,8 +65,8 @@ def unsubscribe():
     db = get_db()
     row = db.execute("""
         SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-        WHERE g.token = ?
-    """, (token,)).fetchone()
+        WHERE g.token_lookup = ?
+    """, (token_lookup(token),)).fetchone()
     if not row:
         abort(403)
 
