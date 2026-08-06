@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-08-06 – portal-v118: Offline-Warteschlange der Einkaufsliste hing dauerhaft fest
+
+Beim Prüfen von Stufe 2 (Testfall S2-03) gefunden: Nach dem Wiederverbinden
+blieben abgehakte Artikel dauerhaft auf „⏳ wartet". **Kein Zusammenhang mit
+dem Sitzungs-/CSRF-Umbau** – der Riegel stand auf `beobachten` und hat
+nachweislich keinen einzigen Verdachtsfall protokolliert. Der Fehler war
+vorher schon da und wäre ohne diesen Testfall weiter unentdeckt geblieben.
+
+### Ursache
+
+Im Log fiel auf: `POST /a/einkauf/<token>/erledigt/23` antwortete immer wieder
+mit **404**, während andere Artikel sauber 200 lieferten. Artikel 23 gab es
+nicht mehr – gelöscht, während das Häkchen noch in der Warteschlange lag.
+
+`synchronisiereWarteschlange()` konnte „keine Verbindung" nicht von „der
+Server sagt endgültig nein" unterscheiden. Ein 404 landete über den
+`resp.json()`-Aufruf im `catch`, galt damit als Netzfehler, und die Schleife
+brach mit `break` ab. Der tote Eintrag blieb vorn in der Schlange liegen und
+**blockierte alles dahinter dauerhaft** – jeder weitere Sync scheiterte
+wieder an derselben Leiche.
+
+### Behebung
+
+Die Antwort wird jetzt ausgewertet statt pauschal als Fehlschlag behandelt:
+
+- **400 / 404 / 410** – wird auch beim hundertsten Versuch nicht klappen:
+  Eintrag verwerfen und mit dem Rest **weitermachen** statt abzubrechen.
+- **403 und 5xx** – bleiben bewusst liegen: ein erneuerter Zugang oder ein
+  kurzer Serverfehler kann sich wieder einrenken.
+- **Netzfehler** – wie bisher liegen lassen.
+- `resp.json()` darf nicht mehr werfen dürfen, sonst gilt eine gültige
+  Antwort fälschlich als Netzfehler.
+
+Verworfene Änderungen werden nicht stillschweigend geschluckt, sondern
+gemeldet. **Stolperstein dabei:** Ein Toast direkt nach dem Verwerfen ist
+unsichtbar, weil unmittelbar danach `location.reload()` folgt, sobald auch
+nur eine Aktion erfolgreich war. Der Hinweis wird deshalb in `sessionStorage`
+gemerkt und nach dem Neuladen gezeigt; lief gar nichts erfolgreich durch (kein
+Reload), erscheint er sofort.
+
+### Verifiziert
+
+Beide Fälle im Browser mit künstlich gesetzter Warteschlange nachgestellt:
+**A** – toter Eintrag vor gültigem: Schlange geleert, gültige Aktion
+durchgelaufen, Hinweis hat das Neuladen überlebt. **B** – nur ein toter
+Eintrag: kein Neuladen, Hinweis erscheint sofort. Danach gegengeprüft, dass
+an der echten Einkaufsliste nichts verändert wurde (52 Artikel, Artikel 19
+unverändert offen) und die Testreste aus dem Browser entfernt.
+
+### Auslieferungspaket
+
+`deploy/portal-v118.tar.gz`
+
+---
+
 ## 2026-08-06 – portal-v117: Wunsch #140, Stufe 2 – CSRF-Riegel (Beobachtungsmodus)
 
 Zweite von sechs Stufen. Neues Modul `src/teile/20_csrf.py`, ausgeliefert mit

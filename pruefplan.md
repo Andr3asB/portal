@@ -95,11 +95,11 @@ die decken S2-01 bis S2-04 ab.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S2-01 | Normales Formular: in der Verwaltung oder bei Rezepten etwas speichern | je Browser-Typ | Speichert normal | | |
-| S2-02 | Antippen ohne Formular: Einkaufsartikel abhaken, Dark Mode umschalten | je Browser-Typ | Reagiert sofort wie bisher | | |
-| S2-03 | **Flugmodus an**, 2 Artikel abhaken, Flugmodus aus, kurz warten | A-Handy | Beide Häkchen sind nach dem Wiederverbinden auch auf einem anderen Gerät zu sehen | | |
-| S2-04 | **Vokabeltrainer eine Runde bis zum Ende** durchspielen | A-Handy oder Kind | Ergebnis erscheint in der Auswertung | | |
-| S2-05 | Am Esszimmer-Bildschirm etwas antippen (z. B. Geholfen) | Kiosk | Wird gezählt wie bisher | | |
+| S2-01 | Normales Formular: in der Verwaltung oder bei Rezepten etwas speichern | je Browser-Typ | Speichert normal | ok | |
+| S2-02 | Antippen ohne Formular: Einkaufsartikel abhaken, Dark Mode umschalten | je Browser-Typ | Reagiert sofort wie bisher | ok | |
+| S2-03 | **Flugmodus an**, 2 Artikel abhaken, Flugmodus aus, kurz warten | A-Handy | Beide Häkchen sind nach dem Wiederverbinden auch auf einem anderen Gerät zu sehen | **FEHLER → behoben, bitte wiederholen** | Häkchen blieben auf „wartet". Ursache war ein vorbestehender Fehler, **nicht** der Umbau: ein Häkchen für einen inzwischen gelöschten Artikel (Antwort 404) blockierte die ganze Warteschlange dauerhaft. Behoben in portal-v118. |
+| S2-04 | **Vokabeltrainer eine Runde bis zum Ende** durchspielen | A-Handy oder Kind | Ergebnis erscheint in der Auswertung | ok | |
+| S2-05 | Am Esszimmer-Bildschirm etwas antippen (z. B. Geholfen) | Kiosk | Wird gezählt wie bisher | ok | |
 
 Danach melde ich dir, ob im Protokoll etwas aufgetaucht ist.
 
