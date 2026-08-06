@@ -41,11 +41,11 @@ import secrets
 
 from flask import current_app, g, request
 
-from teile.kern import get_db, token_lookup
+from teile.kern import get_db, token_lookup, SITZUNG_COOKIE
 
-COOKIE_NAME = "portal_sitzung"
-# Bewusst nicht "session": Flasks eigenes Cookie heisst so und wird spaeter
-# fuer den OAuth-state gebraucht.
+# Der Name liegt im Kern, weil grant() das Cookie ab Stufe 3 selbst liest -
+# ein Import in die andere Richtung waere ein Ringschluss.
+COOKIE_NAME = SITZUNG_COOKIE
 _MAX_AGE = 365 * 24 * 3600
 _GERAET_MAX = 80
 
@@ -90,8 +90,11 @@ def init_app(app):
         if user_id is None or not _schalter_an():
             return antwort
 
-        # Fehlerantworten und Weiterleitungen bekommen kein Cookie – sonst
-        # entstünde bei jedem Redirect eine neue Sitzungszeile.
+        # Fehlerantworten bekommen kein Cookie. Weiterleitungen dagegen schon –
+        # der erste Kontakt nach einem POST ist oft ein 302, und dort schon
+        # auszustellen spart einen Umlauf. (Der Kommentar behauptete früher
+        # das Gegenteil, der Code tat es nie – beim Prüfen von Stufe 3
+        # aufgefallen.)
         if antwort.status_code >= 400:
             return antwort
 

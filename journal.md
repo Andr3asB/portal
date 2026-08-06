@@ -2,6 +2,65 @@
 
 ---
 
+## 2026-08-06 – portal-v119: Wunsch #140, Stufe 3 – das Sitzungs-Cookie gilt
+
+Dritte von sechs Stufen, und die erste, bei der ein Fehler jemanden aussperren
+könnte. Neue Route `/start`: derselbe Einstieg wie `/p/<token>`, nur ohne
+Token in der Adresse – der Nutzer kommt dann aus dem Cookie.
+
+### Die Reihenfolge in `grant()` ist die Sicherheitszusage
+
+1. **Pfad-Token, immer zuerst.** Solange er gilt, kann kein Fehler in der
+   Cookie-Logik jemanden aussperren. Auf einem geteilten Gerät gewinnt damit
+   der Link, den man gerade geöffnet hat, gegen das Cookie des zuletzt
+   Angemeldeten.
+2. Ein **angegebener, aber ungültiger** Token fällt bewusst **nicht** aufs
+   Cookie zurück – sonst funktionierte ein widerrufener Zugang stillschweigend
+   weiter, solange das Cookie noch lebt.
+3. Nur wenn **gar kein** Token in der Adresse steht, zählt das Cookie. Auch
+   dann muss der Nutzer einen Grant für die App haben: das Cookie ersetzt den
+   Nachweis, es weitet keine Rechte aus.
+
+`_home_user()` in `01_start_token.py` bekam dieselbe Logik. Die 41
+`check_grant()`-Aufrufe und alle 91 Routen blieben unverändert.
+
+**Ringschluss vermieden:** Das Lesen des Cookies (`sitzung_nutzer_id()`) liegt
+jetzt im Kern, nicht im Sitzungsmodul – `grant()` braucht es, und ein Import
+in die andere Richtung wäre zirkulär. Das Sitzungsmodul holt sich den
+Cookie-Namen umgekehrt von dort.
+
+### Ein Test, der erst falsch war
+
+`test_widerruf_macht_cookie_ungueltig` schlug zunächst fehl. Ursache war der
+Test, nicht der Code: Er ließ **einen** Client gleichzeitig Admin und Kind
+sein. Beim Widerrufs-Request löst `grant()` den Admin auf, die Route löscht
+die Sitzungen des Kindes, und das `after_request` stellt danach für denselben
+Browser eine frische Admin-Sitzung aus – der Test prüfte also einen Fall, den
+es im Betrieb nicht gibt. Jetzt mit zwei getrennten Clients, wie es zwei
+Geräte auch sind. Dazu eine Gegenprobe, dass sich der auslösende Admin nicht
+selbst aussperrt – sonst wäre der Notfallknopf im Notfall unbenutzbar.
+
+**Nebenbei aufgefallen:** In `19_sitzung.py` behauptete ein Kommentar,
+Weiterleitungen bekämen kein Cookie; der Code prüfte aber nur auf
+Fehlerantworten. Kommentar an den Code angeglichen (Weiterleitungen bekommen
+eines, das spart nach einem POST einen Umlauf).
+
+### Verifiziert
+
+Erst mit Schalter aus ausgeliefert: `/start` liefert 403, `/p/<token>` 200.
+Dann eingeschaltet: `/start` mit Cookie 200, ohne Cookie 403. **Vorrangtest**
+live – Andis Cookie plus Friederikes Link zeigt Friederike. **Ungültiger
+Token** mit gültigem Cookie: 403. `/start` rendert vollständig (14 Kacheln,
+Heim-Knopf, Hilfe-Link, `const TOKEN`). Gegengeprüft, dass es nirgends einen
+automatischen Redirect auf eine Anmeldeseite gibt – die Kiosk-Zusage.
+63 Tests grün, Regression 50 × HTTP 200.
+
+### Auslieferungspaket
+
+`deploy/portal-v119.tar.gz`
+
+---
+
 ## 2026-08-06 – Wunsch #140, Stufe 2: CSRF-Riegel scharf geschaltet
 
 Nach der Beobachtungsphase auf `CSRF_MODUS=scharf` umgestellt. Reine

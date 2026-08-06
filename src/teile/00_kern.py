@@ -403,37 +403,103 @@ def new_db():
         db.close()
 
 
-def grant(token: str, app_slug: str):
-    """Gibt dict(id, name, farbe, is_admin, home_token, hilfe_token, ...) zurück
-    wenn Token gültig, sonst None.
+# Wunsch #140: Basis-Abfrage für die Nutzerdaten. home_enc/hilfe_enc liefern
+# die Navigations-Tokens, die base.html auf jeder Seite braucht.
+_NUTZER_SELECT = """
+    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
+           (SELECT g2.token_enc FROM grants g2
+            JOIN apps a2 ON a2.id = g2.app_id
+            WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_enc,
+           (SELECT g3.token_enc FROM grants g3
+            JOIN apps a3 ON a3.id = g3.app_id
+            WHERE g3.user_id = u.id AND a3.slug = 'hilfe') AS hilfe_enc
+    FROM   users u
+"""
 
-    Wunsch #129: Gesucht wird über token_lookup (HMAC), home_token/hilfe_token
-    kommen verschlüsselt aus der DB und werden hier entschlüsselt - Templates
-    und Aufrufer sehen unverändert den Klartext. Rückgabe ist bewusst ein dict
-    statt einer sqlite3.Row, weil die beiden Token-Felder nachbearbeitet
-    werden müssen; für Aufrufer verhält sich beides gleich (user["id"] wie
-    user.home_token in Jinja)."""
-    db = get_db()
-    row = db.execute("""
-        SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-               (SELECT g2.token_enc FROM grants g2
-                JOIN apps a2 ON a2.id = g2.app_id
-                WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_enc,
-               (SELECT g3.token_enc FROM grants g3
-                JOIN apps a3 ON a3.id = g3.app_id
-                WHERE g3.user_id = u.id AND a3.slug = 'hilfe') AS hilfe_enc
-        FROM   grants g
-        JOIN   users u ON u.id = g.user_id
-        JOIN   apps  a ON a.id = g.app_id
-        WHERE  g.token_lookup = ? AND a.slug = ?
-    """, (token_lookup(token), app_slug)).fetchone()
-    if not row:
-        return None
+SITZUNG_COOKIE = "portal_sitzung"
+# Bewusst nicht "session": Flasks eigenes Cookie heisst so.
+
+
+def _nutzer_aufbereiten(row):
+    """DB-Zeile -> dict mit entschlüsselten Navigations-Tokens."""
     daten = dict(row)
     daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
     daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
-    sitzung_vormerken(daten["id"])
     return daten
+
+
+def sitzung_nutzer_id(db=None):
+    """Wunsch #140: Nutzer-ID zur mitgesendeten Sitzung, sonst None.
+
+    Liegt hier und nicht im Sitzungsmodul, weil `grant()` sie braucht - und
+    ein Import in die andere Richtung wäre ein Ringschluss. Das Sitzungsmodul
+    holt sich diese Funktion umgekehrt von hier."""
+    from flask import request
+    wert = request.cookies.get(SITZUNG_COOKIE)
+    if not wert:
+        return None
+    db = db or get_db()
+    zeile = db.execute("""
+        SELECT user_id FROM sitzungen
+        WHERE kennung_lookup = ?
+          AND (ablauf IS NULL OR ablauf > datetime('now'))
+    """, (token_lookup(wert),)).fetchone()
+    return zeile["user_id"] if zeile else None
+
+
+def grant(token: str, app_slug: str):
+    """Gibt dict(id, name, farbe, is_admin, home_token, hilfe_token, ...) zurück
+    wenn der Zugriff erlaubt ist, sonst None.
+
+    Zwei Wege, in dieser Reihenfolge:
+
+    1. **Pfad-Token** (wie bisher). Er hat IMMER Vorrang - das ist die
+       Sicherheitszusage des ganzen Umbaus: solange der Token gilt, kann kein
+       Fehler in der Cookie-Logik jemanden aussperren, und auf einem geteilten
+       Gerät gewinnt der Link, den man gerade geöffnet hat, gegen das Cookie
+       des zuletzt Angemeldeten.
+       Ein ANGEGEBENER, aber ungültiger Token fällt bewusst NICHT aufs Cookie
+       zurück - sonst würde ein widerrufener Zugang stillschweigend weiter
+       funktionieren, solange das Cookie noch lebt.
+    2. **Sitzungs-Cookie** (Wunsch #140, Stufe 3), nur wenn gar kein Token in
+       der Adresse steht und der Schalter SITZUNG_KONSUMIEREN an ist. Der
+       Nutzer muss auch dann einen Grant für diese App haben - das Cookie
+       weitet die Berechtigungen nicht aus, es ersetzt nur den Nachweis.
+
+    Wunsch #129: Gesucht wird über token_lookup (HMAC), die Navigations-Tokens
+    kommen verschlüsselt aus der DB. Rückgabe ist ein dict statt einer
+    sqlite3.Row, weil diese Felder nachbearbeitet werden; für Aufrufer
+    verhält sich beides gleich (user["id"] wie user.home_token in Jinja)."""
+    db = get_db()
+
+    if token:
+        row = db.execute(_NUTZER_SELECT + """
+            JOIN   grants g ON g.user_id = u.id
+            JOIN   apps   a ON a.id = g.app_id
+            WHERE  g.token_lookup = ? AND a.slug = ?
+        """, (token_lookup(token), app_slug)).fetchone()
+        if not row:
+            return None
+        daten = _nutzer_aufbereiten(row)
+        sitzung_vormerken(daten["id"])
+        return daten
+
+    if not sitzung_konsumieren_an():
+        return None
+    user_id = sitzung_nutzer_id(db)
+    if user_id is None:
+        return None
+    row = db.execute(_NUTZER_SELECT + """
+        WHERE  u.id = ?
+          AND  EXISTS (SELECT 1 FROM grants g JOIN apps a ON a.id = g.app_id
+                       WHERE g.user_id = u.id AND a.slug = ?)
+    """, (user_id, app_slug)).fetchone()
+    return _nutzer_aufbereiten(row) if row else None
+
+
+def sitzung_konsumieren_an() -> bool:
+    """Schalter für Stufe 3. Aus = das Cookie autorisiert nicht."""
+    return str(current_app.config.get("SITZUNG_KONSUMIEREN", "")).strip() in ("1", "true", "ja")
 
 
 def sitzung_vormerken(user_id: int):

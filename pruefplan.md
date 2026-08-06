@@ -107,10 +107,15 @@ Danach melde ich dir, ob im Protokoll etwas aufgetaucht ist.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S2-06 | Je ein Formular abschicken | je Browser-Typ | Speichert normal | | |
-| S2-07 | Einkaufsliste abhaken | je Browser-Typ | Reagiert normal | | |
-| S2-08 | Am Esszimmer-Bildschirm etwas antippen | Kiosk | Funktioniert | | |
-| S2-09 | Nochmal Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | | |
+| S2-06 | Je ein Formular abschicken | je Browser-Typ | Speichert normal | ok | |
+| S2-07 | Einkaufsliste abhaken | je Browser-Typ | Reagiert normal | ok | |
+| S2-08 | Am Esszimmer-Bildschirm etwas antippen | Kiosk | Funktioniert | ok | |
+| S2-09 | Nochmal Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | ok | |
+
+**Ergebnis Stufe 2 (2026-08-06): bestanden.** Der Riegel steht auf `scharf`.
+Null Verdachtsfälle bei echten Geräten während der Beobachtungsphase; nach dem
+Scharfschalten geprüft: eigene Seite 200, fremde Seite 403, Home-Assistant-Seite
+(same-site) 403, lesende Zugriffe unberührt.
 
 ---
 

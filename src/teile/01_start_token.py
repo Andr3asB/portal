@@ -1,36 +1,57 @@
 from flask import Blueprint, render_template, abort, request, jsonify
 from teile.kern import (
     get_db, to_int, token_lookup, token_entschluesseln, sitzung_vormerken,
+    sitzung_nutzer_id, sitzung_konsumieren_an, _nutzer_aufbereiten,
 )
 
 bp = Blueprint("start", __name__)
 
 
+_HOME_SELECT = """
+    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
+           (SELECT g1.token_enc FROM grants g1
+            JOIN apps a1 ON a1.id = g1.app_id
+            WHERE g1.user_id = u.id AND a1.slug = 'home') AS home_enc,
+           (SELECT g2.token_enc FROM grants g2
+            JOIN apps a2 ON a2.id = g2.app_id
+            WHERE g2.user_id = u.id AND a2.slug = 'hilfe') AS hilfe_enc
+    FROM   users u
+"""
+
+
 def _home_user(token):
     """Gibt User-Daten für gültigen Home-Token zurück, sonst None.
 
-    Wunsch #129: Suche über token_lookup, die beiden Token-Felder kommen
-    verschlüsselt aus der DB und werden hier entschlüsselt (dict statt Row,
-    wie bei grant() in 00_kern.py)."""
+    Wunsch #129: Suche über token_lookup, die Token-Felder kommen
+    verschlüsselt aus der DB. Wunsch #140 Stufe 3: ohne Token in der Adresse
+    zählt ersatzweise das Sitzungs-Cookie – dieselbe Reihenfolge und dieselbe
+    Begründung wie in grant() (Pfad-Token hat immer Vorrang, ein angegebener
+    aber ungültiger Token fällt NICHT aufs Cookie zurück)."""
     db = get_db()
-    row = db.execute("""
-        SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-               g.token_enc AS home_enc,
-               (SELECT g2.token_enc FROM grants g2
-                JOIN apps a2 ON a2.id = g2.app_id
-                WHERE g2.user_id = u.id AND a2.slug = 'hilfe') AS hilfe_enc
-        FROM   grants g
-        JOIN   users u ON u.id = g.user_id
-        JOIN   apps  a ON a.id = g.app_id
-        WHERE  g.token_lookup = ? AND a.slug = 'home'
-    """, (token_lookup(token),)).fetchone()
-    if not row:
+
+    if token:
+        row = db.execute(_HOME_SELECT + """
+            JOIN   grants g ON g.user_id = u.id
+            JOIN   apps  a ON a.id = g.app_id
+            WHERE  g.token_lookup = ? AND a.slug = 'home'
+        """, (token_lookup(token),)).fetchone()
+        if not row:
+            return None
+        daten = _nutzer_aufbereiten(row)
+        sitzung_vormerken(daten["id"])   # Wunsch #140, Stufe 1
+        return daten
+
+    if not sitzung_konsumieren_an():
         return None
-    daten = dict(row)
-    daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
-    daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
-    sitzung_vormerken(daten["id"])   # Wunsch #140, Stufe 1
-    return daten
+    user_id = sitzung_nutzer_id(db)
+    if user_id is None:
+        return None
+    row = db.execute(_HOME_SELECT + """
+        WHERE  u.id = ?
+          AND  EXISTS (SELECT 1 FROM grants g JOIN apps a ON a.id = g.app_id
+                       WHERE g.user_id = u.id AND a.slug = 'home')
+    """, (user_id,)).fetchone()
+    return _nutzer_aufbereiten(row) if row else None
 
 
 @bp.route("/")
@@ -39,6 +60,13 @@ def index():
     return render_template("denied.html", reason="landing"), 200
 
 
+# Wunsch #140, Stufe 3: `/start` ist derselbe Einstieg ohne Token in der
+# Adresse - der Nutzer kommt dann aus dem Sitzungs-Cookie. `/p/<token>` bleibt
+# unverändert gültig und hat Vorrang; er ist der Ersteinstieg (QR-Code) und
+# die Rückfallebene. Bewusst KEIN automatischer Redirect von `/p/<token>` auf
+# `/start` in dieser Stufe: das kommt erst in Stufe 4, wenn alle Links
+# umgestellt sind.
+@bp.route("/start", defaults={"token": None})
 @bp.route("/p/<token>")
 def startseite(token):
     db  = get_db()
@@ -80,7 +108,13 @@ def startseite(token):
         user=row,
         gruppen=gruppen_list,
         allgemein=allgemein,
-        token=token,
+        # Wunsch #140, Stufe 3: Beim Aufruf über `/start` steht kein Token in
+        # der Adresse. Die Vorlagen brauchen aber einen (Hamburger-Menü,
+        # Sortier-Endpunkte, `const TOKEN` für die fetch-Aufrufe), sonst
+        # verschwände das halbe Menü. Der Home-Token des Nutzers ist ohnehin
+        # schon entschlüsselt vorhanden - bis Stufe 4 die Links umstellt, ist
+        # das die richtige Brücke.
+        token=token or row["home_token"],
         farbe=row["farbe"],
         greeting="Hallo",
     )

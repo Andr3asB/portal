@@ -29,6 +29,9 @@ app.config["CSRF_MODUS"]        = os.environ.get("CSRF_MODUS", "aus")
 # Erwartete eigene Herkunft fuer die CSRF-Pruefung. Leer = aus der Anfrage
 # ableiten (die geht durch Caddy, das nur diese eine Site bedient).
 app.config["PORTAL_ORIGIN"]     = os.environ.get("PORTAL_ORIGIN", "")
+# Wunsch #140, Stufe 3: Darf das Sitzungs-Cookie als Nachweis gelten?
+# 0 = nein, nur der Token in der Adresse zaehlt (Zustand der Stufen 1-2).
+app.config["SITZUNG_KONSUMIEREN"] = os.environ.get("SITZUNG_KONSUMIEREN", "0")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

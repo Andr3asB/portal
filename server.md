@@ -825,6 +825,11 @@ teile/
                        HA-iFrame, weil wir4 und portal Subdomains derselben
                        Domain sind (same-site). Gespeichert wird nur
                        token_lookup(wert), nie der Klartext.
+  01_start_token.py  – ... zusaetzlich `/start` (Wunsch #140, Stufe 3):
+                       derselbe Einstieg ohne Token in der Adresse, Nutzer
+                       kommt aus dem Sitzungs-Cookie. `/p/<token>` bleibt
+                       gueltig und hat Vorrang. KEIN automatischer Redirect
+                       von /p/<token> auf /start - das kommt erst in Stufe 4.
   20_csrf.py         – CSRF-Riegel (Wunsch #140, Stufe 2). Ein
                        before_request, null Template-Aenderungen. Prueft
                        `Sec-Fetch-Site` (primaer, weil
@@ -1194,6 +1199,20 @@ anhängen.
 - **DOM**: `textContent` / `createElement` statt `innerHTML` für Nutzerdaten in JS
 - **Logs**: Gunicorn RedactingLogger scrubbt Tokens aus Access-Logs
 - **Headers**: Caddy setzt Security-Headers auf alle Antworten
+- **Zugriffsreihenfolge in `grant()`** (Wunsch #140, Stufe 3), verbindlich:
+  1. Pfad-Token zuerst - solange er gilt, kann kein Cookie-Fehler jemanden
+     aussperren, und auf geteilten Geraeten gewinnt der gerade geoeffnete Link.
+  2. Ein angegebener, aber unguelltiger Token faellt **nicht** aufs Cookie
+     zurueck - sonst liefe ein widerrufener Zugang stillschweigend weiter.
+  3. Nur ohne Token in der Adresse zaehlt das Cookie, und auch dann muss ein
+     Grant fuer die App existieren. Das Cookie ersetzt den Nachweis, es weitet
+     keine Rechte aus.
+  `sitzung_nutzer_id()` liegt im Kern, nicht im Sitzungsmodul - sonst
+  Ringschluss, weil `grant()` es braucht.
+- **Niemals automatisch auf eine Anmeldeseite umleiten.** Fehlende
+  Autorisierung fuehrt zu `denied.html` bzw. `abort(403)`. Der
+  Esszimmer-Bildschirm laeuft im `--kiosk`-Modus ohne Adresszeile; ein
+  Anmeldebildschirm waere dort nicht bedienbar.
 - **Zugangstokens** (Wunsch #129): In der DB steht **nie** der Klartext.
   Gesucht wird über `token_lookup(token)` (HMAC), zurückgewonnen über
   `token_entschluesseln(row["token_enc"])` – beides aus `teile.kern`. Neue
