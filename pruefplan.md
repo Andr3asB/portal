@@ -196,9 +196,9 @@ und ist der wichtigste Test dieser Stufe.
 | S4-07 | Esszimmer-Bildschirm ansehen | Kiosk | Läuft unverändert | | |
 | S4-08 | Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | | |
 | S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | | |
-| S4-10 | **Geteiltes Gerät:** Auf einem Gerät, auf dem zuletzt *du* drin warst, den Link eines Kindes öffnen. Dann auf eine Kachel tippen. | ein Gerät, das zwei Leute benutzen (iPad/Kiosk) | Es bleibt beim Kind – auch nach dem Tippen. Nirgends deine Daten. Danach mit deinem Link zurückwechseln: es bleibt bei dir. | | |
-| S4-11 | Nach S4-10 auf demselben Gerät **im Flugmodus** eine schon besuchte Seite öffnen | dasselbe Gerät | Die Seite des *aktuellen* Nutzers oder die Offline-Meldung – niemals die des Vorgängers | | |
-| S4-12 | **Nachtest zum Offline-Fehler (v123).** Erst online einmal die Startseite und die Einkaufsliste öffnen. Dann Flugmodus. Dann: (a) die Portal-App vom Homescreen starten, (b) ein altes Lesezeichen mit Token öffnen, (c) die Einkaufsliste öffnen. | A-Handy + A-PWA | (a) und (b) zeigen die Startseite statt „noch nie geladen"; (c) zeigt die Einkaufsliste | | |
+| S4-10 | **Geteiltes Gerät:** Auf einem Gerät, auf dem zuletzt *du* drin warst, den Link eines Kindes öffnen. Dann auf eine Kachel tippen. | ein Gerät, das zwei Leute benutzen (iPad/Kiosk) | Es bleibt beim Kind – auch nach dem Tippen. Nirgends deine Daten. Danach mit deinem Link zurückwechseln: es bleibt bei dir. | ok | |
+| S4-11 | Nach S4-10 auf demselben Gerät **im Flugmodus** eine schon besuchte Seite öffnen | dasselbe Gerät | Die Seite des *aktuellen* Nutzers oder die Offline-Meldung – niemals die des Vorgängers | ok | |
+| S4-12 | **Nachtest zum Offline-Fehler (v123).** Erst online einmal die Startseite und die Einkaufsliste öffnen. Dann Flugmodus. Dann: (a) die Portal-App vom Homescreen starten, (b) ein altes Lesezeichen mit Token öffnen, (c) die Einkaufsliste öffnen. | A-Handy + A-PWA | (a) und (b) zeigen die Startseite statt „noch nie geladen"; (c) zeigt die Einkaufsliste | ok | Bestätigt 2026-08-06: „jetzt kommt keine Fehlermeldung mehr". |
 
 ---
 
