@@ -494,20 +494,27 @@ async function synchronisiereWarteschlange() {
   let queue = holeWarteschlange();
   let etwasErledigt = false;
 
+  let verworfen = 0;
+
   while (queue.length) {
     const aktion = queue[0];
     let erfolgreich = false;
+    // Unterscheidung, die vorher fehlte: "keine Verbindung" (später erneut
+    // versuchen) gegen "der Server sagt endgültig nein" (verwerfen). Ohne sie
+    // blockierte ein Häkchen für einen inzwischen gelöschten Artikel die
+    // ganze Warteschlange dauerhaft - der 404 wurde wie ein Netzfehler
+    // behandelt, der Eintrag blieb vorn liegen und alles dahinter kam nie an.
+    let endgueltigAbgelehnt = false;
     try {
+      let resp;
       if (aktion.type === 'toggle') {
-        const resp = await fetch(`/a/einkauf/${TOKEN}/erledigt/${aktion.id}`, {
+        resp = await fetch(`/a/einkauf/${TOKEN}/erledigt/${aktion.id}`, {
           method: 'POST',
           headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded'},
           body: `ziel=${aktion.ziel ? '1' : '0'}`,
         });
-        const d = await resp.json();
-        erfolgreich = !!d.ok;
       } else if (aktion.type === 'add') {
-        const resp = await fetch(`/a/einkauf/${TOKEN}/add`, {
+        resp = await fetch(`/a/einkauf/${TOKEN}/add`, {
           method: 'POST',
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
           body: new URLSearchParams({
@@ -517,10 +524,32 @@ async function synchronisiereWarteschlange() {
             laden_ids: aktion.laden_ids || '',
           }),
         });
-        erfolgreich = resp.ok;
+      }
+      if (resp && resp.ok) {
+        if (aktion.type === 'toggle') {
+          // .json() darf nicht werfen dürfen - sonst landet eine gültige
+          // Antwort im catch und gilt fälschlich als Netzfehler.
+          const d = await resp.json().catch(() => ({}));
+          erfolgreich = !!d.ok;
+        } else {
+          erfolgreich = true;
+        }
+      } else if (resp && [400, 404, 410].includes(resp.status)) {
+        // Artikel gelöscht oder Anfrage nicht mehr gültig - das wird auch
+        // beim hundertsten Versuch nicht klappen. 403 und 5xx bleiben
+        // bewusst liegen: ein erneuerter Zugang oder ein kurzer Serverfehler
+        // kann sich wieder einrenken.
+        endgueltigAbgelehnt = true;
       }
     } catch (e) {
-      erfolgreich = false;
+      erfolgreich = false;   // kein Netz
+    }
+
+    if (endgueltigAbgelehnt) {
+      queue.shift();
+      speichereWarteschlange(queue);
+      verworfen++;
+      continue;              // mit dem Rest weitermachen, nicht abbrechen
     }
     if (!erfolgreich) break; // weiterhin offline - Rest bleibt liegen, später erneut versuchen
     queue.shift();
@@ -528,14 +557,43 @@ async function synchronisiereWarteschlange() {
     etwasErledigt = true;
   }
 
+  if (verworfen) {
+    // Nicht stillschweigend schlucken - der Nutzer hat das Häkchen gesetzt
+    // und soll erfahren, dass daraus nichts wurde. Der Hinweis wird
+    // zwischengespeichert statt sofort angezeigt, weil unten gleich ein
+    // location.reload() folgt, sobald auch nur eine Aktion erfolgreich war -
+    // ein sofortiger Toast wäre nach Sekundenbruchteilen wieder weg.
+    try {
+      sessionStorage.setItem('einkauf_verworfen', String(verworfen));
+    } catch (e) {}
+  }
+
   wirdSynchronisiert = false;
   // Holt den echten Serverstand und ersetzt jeden Platzhalter durch den
   // echten, gespeicherten Artikel - einfacher und robuster als die
   // Platzhalter-Karten manuell gegen echte IDs auszutauschen.
-  if (etwasErledigt) location.reload();
+  if (etwasErledigt) {
+    location.reload();        // der gemerkte Hinweis erscheint nach dem Laden
+  } else if (verworfen) {
+    // Nichts hat geklappt, also kein Neuladen - dann den Hinweis gleich hier
+    // zeigen, sonst käme er erst beim nächsten Öffnen der Seite.
+    zeigeVerworfenHinweis();
+  }
+}
+
+function zeigeVerworfenHinweis() {
+  let anzahl = 0;
+  try {
+    anzahl = parseInt(sessionStorage.getItem('einkauf_verworfen') || '0', 10);
+    sessionStorage.removeItem('einkauf_verworfen');
+  } catch (e) {}
+  if (anzahl > 0) {
+    zeigeToast(`⚠️ ${anzahl} Änderung${anzahl > 1 ? 'en' : ''} verworfen – Artikel gibt es nicht mehr`);
+  }
 }
 
 wendeWarteschlangeAufUiAn();
+zeigeVerworfenHinweis();          // aus einem vorangegangenen Durchlauf
 synchronisiereWarteschlange();
 window.addEventListener('online', synchronisiereWarteschlange);
 
