@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set app_slug = "kassenbuch" %}
+{% block title %}Kassenbuch{% endblock %}
+
+{% block extra_styles %}
+.kb-hinweis {
+  background:var(--surface); border-radius:14px; padding:16px;
+  box-shadow:0 1px 3px var(--shadow); color:var(--text-2); font-size:14px;
+}
+.kb-kind-card {
+  display:flex; align-items:center; gap:14px;
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:10px; box-shadow:0 1px 3px var(--shadow);
+  text-decoration:none; color:var(--text);
+  border-left:6px solid var(--kind-farbe, var(--farbe));
+}
+.kb-kind-name { flex:1; font-size:17px; font-weight:600; }
+.kb-kind-saldo { font-size:17px; font-weight:700; color:var(--farbe); }
+.kb-kind-saldo-leer { font-size:13px; font-weight:500; color:var(--text-2); }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🐷 Kassenbuch</div>
+<div class="nav-sub">Übersicht aller Kinder</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  {% if not kinder %}
+  <div class="kb-hinweis">Es sind noch keine Nutzer mit der Rolle „Kind“ angelegt – ein Kassenbuch gehört immer zu einem Kind.</div>
+  {% endif %}
+  {% for eintrag in kinder %}
+  <a class="kb-kind-card" href="/a/kassenbuch{{ tp }}kind/{{ eintrag.kind.id }}"
+     style="--kind-farbe: {{ eintrag.kind.farbe }}">
+    <span class="kb-kind-name">{{ eintrag.kind.name }}</span>
+    {% if eintrag.hat_start %}
+    <span class="kb-kind-saldo">{{ eintrag.saldo_text }}</span>
+    {% else %}
+    <span class="kb-kind-saldo kb-kind-saldo-leer">noch nicht eingerichtet</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</main>
+{% endblock %}

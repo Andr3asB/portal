@@ -892,6 +892,26 @@ teile/
                        style-src behaelt bewusst 'unsafe-inline' (rund 200
                        style-Attribute; Style-Injektion ist ungleich harmloser
                        als Script-Injektion).
+  22_kassenbuch.py   – /a/kassenbuch/<token>/ Taschengeld-Kassenbuch je Kind
+                       (Wunsch #144). Buchhaltungsprinzip statt CRUD: ein
+                       Eintrag ist nach dem Speichern UNVERAENDERLICH,
+                       "Loeschen" heisst Stornieren (storniert=1, Zeile
+                       bleibt fuer immer stehen, zaehlt aber nicht mehr zum
+                       Kontostand) - keine separate Aenderungs-Historie noetig,
+                       weil erstellt_von/erstellt und storniert_von/
+                       storniert_am direkt auf der Zeile stehen. Der
+                       Startbetrag ist selbst ein Eintrag (art='start'), nie
+                       stornierbar. EIN Feld `person` statt getrennter
+                       Empfaenger/Absender-Felder - die Formular-Beschriftung
+                       wechselt clientseitig zwischen "Von wem?"/"An wen?" je
+                       nach gewaehlter Art (kbArtGewaehlt() in kassenbuch.html).
+                       Zugriff: Kinder sehen NUR ihr eigenes Buch
+                       (kind_buch() lehnt fremde kid_id mit 403 ab), Eltern/
+                       Admin (Auto-Grant wie hilfe/einkauf) sehen ueber
+                       index() eine Uebersicht aller Kinder und koennen jedes
+                       Buch READ-ONLY oeffnen, aber nichts eintragen/
+                       stornieren (eigene_buch-Pruefung serverseitig, nicht
+                       nur im Template versteckt).
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1003,6 +1023,19 @@ teile/
                               ←-Zurueck-Link (nav_left) zur TVB-Hauptseite.
                               ▲/▼ sind normale Unicode-Zeichen, keine Emoji -
                               brauchen also (wie ★☰✎✓✕) keine Twemoji-SVG
+    kassenbuch_uebersicht.html – Nur fuer Eltern/Admin (Wunsch #144): Kachel
+                              je Kind mit Namen + Kontostand, Link zur
+                              Detailansicht. Kind ohne Startbetrag zeigt
+                              "noch nicht eingerichtet" statt eines Betrags
+    kassenbuch.html         – Kassenbuch-Detailansicht, dient sowohl dem
+                              Kind selbst (eigenes_buch=True, mit Formularen)
+                              als auch Eltern/Admin (eigenes_buch=False,
+                              read-only) - dieselbe Vorlage, `eigenes_buch`
+                              blendet Eintrags-/Storno-Formulare aus. Vor dem
+                              ersten Startbetrag nur das Setup-Formular, kein
+                              Kontostand. Art-Wahl (Einnahme/Ausgabe) aendert
+                              per kbArtGewaehlt() live die Beschriftung des
+                              Personen-Felds ("Von wem?"/"An wen?")
     rezepte.html            – Rezeptliste + "+ Neues Rezept"-Button (Wunsch #48);
                               Live-Suche über Titel+Zutaten ab 3 Zeichen (Wunsch #49)
                               + Kategorie-Filter-Chips (Wunsch #55), beide Filter
@@ -1264,6 +1297,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
+| `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.
@@ -1287,6 +1321,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `vokabeln` | Vokabeln | 📚 | Vokabeln lernen mit Sprachen, Kapiteln und Trainer (Wunsch #73) | – (Andi, Simone, Friederike granted) |
 | `packliste` | Packliste | 🧳 | Packlisten für Reisen/Ausflüge, je Ziel eine eigene Liste (Wunsch #111) | – (zunächst nur Andi als Urheber) |
 | `tvb` | TVB | 🤾 | Nächste Spiele, Ergebnisse und Handball-Bundesliga-Tabelle des TVB Stuttgart (Wunsch #120) | – (alle vier granted) |
+| `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 
 ## Hamburger-Menü (verpflichtende Struktur, seit Wunsch #32)
 

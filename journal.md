@@ -2,6 +2,81 @@
 
 ---
 
+## 2026-08-06 – portal-v129: Wunsch #144 – neue App „Kassenbuch"
+
+Dritter der drei nicht zurückgestellten Wünsche aus diesem Durchgang. Neue
+App: Taschengeld-Buchführung je Kind, Slug `kassenbuch`, Modul
+`22_kassenbuch.py`.
+
+### Buchhaltungsprinzip statt CRUD
+
+Der Wunsch verlangte wörtlich "ein bisschen wie bei einem Buchhaltungssystem"
+- ein Eintrag ist nach dem Speichern UNVERÄNDERLICH, keine Editier-Funktion.
+"Löschen" heißt Stornieren: `kassenbuch_eintraege.storniert=1`, die Zeile
+bleibt für immer stehen, zählt aber nicht mehr zum Kontostand. Damit sind
+"wer hat's angelegt" und "wer hat's storniert" bereits auf der Zeile selbst
+protokolliert (`erstellt_von`/`erstellt`, `storniert_von`/`storniert_am`) -
+bewusst KEINE separate Änderungs-Historien-Tabelle, die bräuchte es erst,
+wenn Einträge auch bearbeitbar wären, was hier nicht verlangt ist.
+
+Der Startbetrag ("beim ersten Starten einen Startbetrag eintragen") ist
+selbst ein Eintrag mit `art='start'`, kein Sonderfeld - genau EINER pro Kind,
+niemals stornierbar (sonst wäre der gesamte folgende Kontostand rückwirkend
+bedeutungslos). Ein zweiter Versuch wird serverseitig ignoriert.
+
+### "Empfänger/Absender (finde da bessere Begriffe)"
+
+Der Wunsch bat wörtlich um einen besseren Begriff. Lösung: EIN Feld `person`
+statt zwei Fachbegriffen - die Formular-Beschriftung wechselt clientseitig
+zwischen "Von wem?" (Einnahme) und "An wen?" (Ausgabe), abhängig von der
+gewählten Art (`kbArtGewaehlt()`).
+
+### Zugriff: Kinder nur ihr eigenes, Eltern/Admin alle - read-only
+
+Jedes Kind sieht ausschließlich sein eigenes Buch; `kind_buch()` lehnt eine
+fremde `kid_id` mit 403 ab, geprüft direkt im SQL-`WHERE` (nicht nur in der
+Oberfläche versteckt). Eltern/Admin bekommen den App-Grant automatisch (wie
+`hilfe`/`einkauf`, über `_auto_grant_all`) und sehen über die Startseite eine
+Übersicht aller Kinder mit Kontostand - der Wunsch verlangt ausdrücklich
+"auditiert", das setzt eine Aufsichtsmöglichkeit voraus. Sie können jedes Buch
+öffnen, aber NICHTS eintragen oder stornieren; live verifiziert: Andi bekommt
+403, wenn er versucht, für Friederike zu buchen.
+
+### Live gegen den echten Server verifiziert (Friederikes echtes Konto)
+
+1. Erster Aufruf → nur das Setup-Formular, kein Kontostand
+2. Start 15,00 € → Kontostand 15,00 €
+3. Einnahme 5,00 € (Oma) + Ausgabe 3,00 € (Eis) → 17,00 €
+4. Ausgabe storniert → zurück auf 20,00 €, der Eintrag bleibt sichtbar
+   (Badge „storniert"), zählt aber nicht mehr
+5. Andi sieht in der Übersicht sofort 20,00 € bei Friederike
+6. Andi kann keinen Eintrag für Friederike anlegen (403)
+7. Johannes (noch kein Startbetrag) zeigt „noch nicht eingerichtet"
+
+### Testnetz: 100 → 117
+
+17 neue Tests (`test_kassenbuch.py`): Zugriffskontrolle in beide Richtungen,
+Start-einmalig-Regel, Saldo-Berechnung, negative/kaputte Beträge werden
+verworfen (kein Absturz), Komma UND Punkt als Dezimaltrennzeichen, kein
+Nachtragen in die Zukunft, Storno nimmt den Betrag aus dem Saldo, der
+stornierte Eintrag bleibt in der Datenbank stehen, der Start-Eintrag ist
+NICHT stornierbar, ein Kind kann keinen fremden Eintrag stornieren (auch das
+im SQL geprüft, nicht nur clientseitig).
+
+Die bestehenden Wächter-Tests aus den vorigen Stufen liefen ohne Anpassung
+mit: der Routen-Zwilling-Test bestätigt, dass jede neue Route ihre
+token-freie Form hat, der CSP-Test bestätigt, dass `kbArtGewaehlt` eine
+echte Funktion ist und keine Inline-Handler eingeschlichen sind.
+
+Regression: 50/50 alte Token-Links, 0 CSRF-/CSP-Auffälligkeiten im Log.
+
+**Offen für Andi:** Kassenbuch einmal selbst ausprobieren - ist unter dem
+Menüpunkt in der App-Übersicht zu finden, kein eigener Prüfplan-Eintrag
+nötig (kein Sicherheitswunsch, aber gerne kurz gegenprüfen, ob die
+Beschriftungen für die Kinder verständlich sind).
+
+---
+
 ## 2026-08-06 – portal-v126/v127: Wünsche #136, #137 und ein CSRF-Fund aus Stufe 2
 
 „Implementiere die Wünsche" – drei offene, nicht zurückgestellte Wünsche

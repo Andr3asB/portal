@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% set app_slug = "kassenbuch" %}
+{% block title %}Kassenbuch{% if not eigenes_buch %} · {{ kind.name }}{% endif %}{% endblock %}
+
+{% block extra_styles %}
+.kb-saldo-card {
+  background:var(--farbe); color:#fff; border-radius:18px;
+  padding:22px 20px; margin-bottom:16px; text-align:center;
+}
+.kb-saldo-label { font-size:13px; opacity:.85; }
+.kb-saldo-betrag { font-size:34px; font-weight:700; margin-top:4px; }
+.kb-setup-card {
+  background:var(--surface); border-radius:16px; padding:20px;
+  box-shadow:0 1px 3px var(--shadow);
+}
+.kb-setup-card p { font-size:15px; margin-bottom:14px; }
+.kb-hinweis {
+  background:var(--surface); border-radius:14px; padding:16px;
+  box-shadow:0 1px 3px var(--shadow); color:var(--text-2); font-size:14px;
+}
+.kb-form-card {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.kb-art-wahl { display:flex; gap:8px; margin-bottom:12px; }
+.kb-art-btn {
+  flex:1; text-align:center; border:1.5px solid var(--border); border-radius:12px;
+  padding:10px; font-size:14px; font-weight:600; cursor:pointer;
+  background:var(--surface); color:var(--text);
+}
+.kb-art-btn input { position:absolute; opacity:0; pointer-events:none; }
+.kb-art-btn.kb-art-aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.kb-feld { margin-bottom:10px; }
+.kb-feld label {
+  display:block; font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;
+}
+.kb-input {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:10px 12px; font-size:16px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.kb-input:focus { border-color:var(--farbe); }
+.kb-submit {
+  width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:12px; font-size:16px; font-weight:600; cursor:pointer;
+}
+.kb-eintrag {
+  display:flex; align-items:center; gap:12px;
+  background:var(--surface); border-radius:14px; padding:12px 14px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.kb-eintrag.kb-storniert { opacity:.45; }
+.kb-eintrag-icon { font-size:22px; flex-shrink:0; width:28px; text-align:center; }
+.kb-eintrag-mitte { flex:1; min-width:0; }
+.kb-eintrag-zweck { font-size:15px; font-weight:500; }
+.kb-eintrag-zweck.kb-leer { color:var(--text-2); font-weight:400; font-style:italic; }
+.kb-eintrag-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
+.kb-eintrag-betrag { font-size:16px; font-weight:700; white-space:nowrap; }
+.kb-eintrag-betrag.kb-plus { color:#34c759; }
+.kb-eintrag-betrag.kb-minus { color:#ff3b30; }
+.kb-storno-btn {
+  background:none; border:none; color:var(--text-2); font-size:19px;
+  cursor:pointer; padding:2px 4px; flex-shrink:0;
+}
+.kb-badge-storniert {
+  font-size:11px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.kb-leerzustand { text-align:center; color:var(--text-2); font-size:14px; padding:24px 0; }
+{% endblock %}
+
+{% block nav_left %}
+{% if not eigenes_buch %}
+<a class="nav-btn" href="/a/kassenbuch{{ tp }}" title="Zurück zur Übersicht">←</a>
+{% endif %}
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🐷 {{ "Kassenbuch" if eigenes_buch else kind.name }}</div>
+{% if not eigenes_buch %}<div class="nav-sub">Nur zum Ansehen – Einträge kann nur {{ kind.name }} selbst anlegen</div>{% endif %}
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  {% if not hat_start %}
+    {% if eigenes_buch %}
+    <div class="kb-setup-card">
+      <p>Wie viel Geld hast du gerade in deinem Sparschwein? Trag den Betrag einmal ein, dann startet dein Kassenbuch damit.</p>
+      <form method="post" action="/a/kassenbuch{{ tp }}start">
+        <div class="kb-feld">
+          <label for="kb-start-betrag">Startbetrag</label>
+          <input class="kb-input" id="kb-start-betrag" type="text" inputmode="decimal"
+                 name="betrag" placeholder="z. B. 12,50" required>
+        </div>
+        <button class="kb-submit" type="submit">Kassenbuch starten</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="kb-hinweis">{{ kind.name }} hat sein Kassenbuch noch nicht eingerichtet – es gibt noch keinen Startbetrag.</div>
+    {% endif %}
+
+  {% else %}
+    <div class="kb-saldo-card">
+      <div class="kb-saldo-label">Im Sparschwein</div>
+      <div class="kb-saldo-betrag">{{ saldo_text }}</div>
+    </div>
+
+    {% if eigenes_buch %}
+    <div class="kb-form-card">
+      <form method="post" action="/a/kassenbuch{{ tp }}eintrag" id="kb-eintrag-form">
+        <div class="kb-art-wahl">
+          <label class="kb-art-btn kb-art-aktiv" id="kb-art-label-einnahme">
+            <input type="radio" name="art" value="einnahme" checked data-aendern="kbArtGewaehlt">➕ Einnahme
+          </label>
+          <label class="kb-art-btn" id="kb-art-label-ausgabe">
+            <input type="radio" name="art" value="ausgabe" data-aendern="kbArtGewaehlt">➖ Ausgabe
+          </label>
+        </div>
+        <div class="kb-feld">
+          <label for="kb-betrag">Betrag</label>
+          <input class="kb-input" id="kb-betrag" type="text" inputmode="decimal"
+                 name="betrag" placeholder="z. B. 5,00" required>
+        </div>
+        <div class="kb-feld">
+          <label for="kb-person" id="kb-person-label">Von wem?</label>
+          <input class="kb-input" id="kb-person" type="text" name="person"
+                 placeholder="z. B. Oma" maxlength="80">
+        </div>
+        <div class="kb-feld">
+          <label for="kb-zweck">Wofür? (optional)</label>
+          <input class="kb-input" id="kb-zweck" type="text" name="zweck"
+                 placeholder="z. B. Geburtstag" maxlength="200">
+        </div>
+        <div class="kb-feld">
+          <label for="kb-datum">Datum</label>
+          <input class="kb-input" id="kb-datum" type="date" name="datum"
+                 value="{{ heute }}" max="{{ heute }}">
+        </div>
+        <button class="kb-submit" type="submit">Eintragen</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if not eintraege %}
+    <div class="kb-leerzustand">Noch keine Einträge.</div>
+    {% endif %}
+
+    {% for e in eintraege %}
+    <div class="kb-eintrag {% if e.storniert %}kb-storniert{% endif %}">
+      <span class="kb-eintrag-icon">{{ "🏁" if e.art == "start" else ("➕" if e.art == "einnahme" else "➖") }}</span>
+      <div class="kb-eintrag-mitte">
+        <div class="kb-eintrag-zweck {% if not e.zweck and not e.person %}kb-leer{% endif %}">
+          {{ e.zweck or e.person or "ohne Angabe" }}
+        </div>
+        <div class="kb-eintrag-meta">
+          {{ e.datum }}{% if e.person and e.zweck %} · {{ e.person }}{% endif %}
+          {% if e.storniert %} · <span class="kb-badge-storniert">storniert</span>{% endif %}
+        </div>
+      </div>
+      <span class="kb-eintrag-betrag {{ 'kb-minus' if e.art == 'ausgabe' else 'kb-plus' }}">
+        {{ "−" if e.art == "ausgabe" else "+" }}{{ "%.2f"|format(e.betrag_cent / 100) | replace(".", ",") }} €
+      </span>
+      {% if eigenes_buch and not e.storniert and e.art != "start" %}
+      <form method="post" action="/a/kassenbuch{{ tp }}eintrag/{{ e.id }}/stornieren"
+            data-bestaetigen="{{ ('„' ~ (e.zweck or e.person or (e.art|capitalize)) ~ '“ stornieren? Zählt danach nicht mehr zum Kontostand, bleibt aber im Kassenbuch sichtbar.') }}">
+        <button class="kb-storno-btn" type="submit" title="Stornieren">×</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+function kbArtGewaehlt(radio) {
+  const einnahme = document.getElementById('kb-art-label-einnahme');
+  const ausgabe  = document.getElementById('kb-art-label-ausgabe');
+  const istEinnahme = radio.value === 'einnahme';
+  einnahme.classList.toggle('kb-art-aktiv', istEinnahme);
+  ausgabe.classList.toggle('kb-art-aktiv', !istEinnahme);
+  document.getElementById('kb-person-label').textContent = istEinnahme ? 'Von wem?' : 'An wen?';
+}
+</script>
+{% endblock %}

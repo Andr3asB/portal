@@ -341,6 +341,32 @@ CREATE TABLE IF NOT EXISTS tvb_kader (
   saison_name     TEXT    NOT NULL,
   aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+-- Wunsch #144: Kassenbuch je Kind. EIN Ledger pro Nutzer, betrag_cent immer
+-- POSITIV (das Vorzeichen kommt aus `art`), damit Rundungsfehler durch
+-- Euro-Fliesskommazahlen gar nicht erst entstehen koennen.
+--
+-- Bewusst KEIN Bearbeiten nach dem Anlegen und KEINE separate Audit-Tabelle:
+-- "wie bei einem Buchhaltungssystem" heisst hier, ein Eintrag ist nach dem
+-- Speichern unveraendlich. "Loeschen" heisst Stornieren (storniert=1) - die
+-- Zeile bleibt stehen, zaehlt aber nicht mehr zum Kontostand. Damit sind
+-- "wer hat's angelegt" (erstellt_von/erstellt) und "wer hat's storniert"
+-- (storniert_von/storniert_am) bereits auf der Zeile selbst protokolliert -
+-- eine eigene Aenderungs-Historie braeuchte es erst, wenn Eintraege auch
+-- BEARBEITET werden duerften, was hier nicht verlangt ist.
+CREATE TABLE IF NOT EXISTS kassenbuch_eintraege (
+  id             INTEGER PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  art            TEXT    NOT NULL,  -- 'start' | 'einnahme' | 'ausgabe'
+  betrag_cent    INTEGER NOT NULL,
+  person         TEXT,              -- "Von wem?" (Einnahme) / "An wen?" (Ausgabe)
+  zweck          TEXT,
+  datum          TEXT    NOT NULL,  -- YYYY-MM-DD, vom Kind waehlbar (Nachtragen)
+  erstellt_von   INTEGER NOT NULL REFERENCES users(id),
+  erstellt       TEXT    NOT NULL DEFAULT (datetime('now')),
+  storniert      INTEGER NOT NULL DEFAULT 0,
+  storniert_von  INTEGER REFERENCES users(id),
+  storniert_am   TEXT
+);
 """
 
 _DEFAULT_SPRACHEN = ["Englisch", "Latein", "Dänisch", "Italienisch", "Französisch"]
@@ -369,6 +395,7 @@ _CORE_APPS = [
     ("vokabeln",      "Vokabeln",      "📚", None),
     ("packliste",     "Packliste",     "🧳", None),
     ("tvb",           "TVB",           "🤾", None),
+    ("kassenbuch",    "Kassenbuch",    "🐷", "Taschengeld verwalten"),
 ]
 
 _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller", "Penny"]
@@ -1537,6 +1564,10 @@ def _init_db(app):
 
         _auto_grant_all(db, "hilfe")
         _auto_grant_all(db, "einkauf")
+        # Wunsch #144: ALLE Nutzer bekommen den Grant (wie hilfe/einkauf) -
+        # Kinder sehen darüber ihr eigenes Kassenbuch, Eltern/Admin die
+        # Übersicht aller Kinder (Aufsicht war Teil des Wunsches: "auditiert").
+        _auto_grant_all(db, "kassenbuch")
         db.commit()
         db.close()
 
