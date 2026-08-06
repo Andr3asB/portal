@@ -18,6 +18,10 @@ app.config["HAE_API_KEY"]       = os.environ.get("HAE_API_KEY", "")
 # Wunsch #129: Schluessel, mit dem die Zugangstokens in der DB
 # verschluesselt sind. Ohne ihn kommt niemand mehr rein - siehe .env.example.
 app.config["TOKEN_KEY"]         = os.environ.get("TOKEN_KEY", "")
+# Wunsch #140, Stufe 1: Schalter fuer das Ausstellen von Sitzungs-Cookies.
+# 0 = aus. Zuruecknehmen der Stufe ist damit eine Zeile in der .env und ein
+# "docker compose up -d portal" - kein Rebuild, kein Paket.
+app.config["SITZUNG_AUSSTELLEN"] = os.environ.get("SITZUNG_AUSSTELLEN", "0")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

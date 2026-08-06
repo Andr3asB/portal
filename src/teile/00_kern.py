@@ -31,6 +31,16 @@ CREATE TABLE IF NOT EXISTS grants (
   token_enc    TEXT    NOT NULL,
   UNIQUE(user_id, app_id)
 );
+CREATE TABLE IF NOT EXISTS sitzungen (
+  id             INTEGER PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kennung_lookup TEXT    UNIQUE NOT NULL,
+  erstellt       TEXT    NOT NULL DEFAULT (datetime('now')),
+  gesehen        TEXT,
+  ablauf         TEXT,
+  quelle         TEXT,
+  geraet         TEXT
+);
 CREATE TABLE IF NOT EXISTS push_abos (
   id       INTEGER PRIMARY KEY,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -422,7 +432,25 @@ def grant(token: str, app_slug: str):
     daten = dict(row)
     daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
     daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
+    sitzung_vormerken(daten["id"])
     return daten
+
+
+def sitzung_vormerken(user_id: int):
+    """Wunsch #140, Stufe 1: Merkt an, dass in diesem Request ein Pfad-Token
+    erfolgreich aufgelöst wurde. `19_sitzung.py` stellt daraufhin am Ende des
+    Requests ein Sitzungs-Cookie aus - aber nur, wenn der Schalter an ist und
+    noch keines mitkam.
+
+    Bewusst hier und nicht im Sitzungsmodul: `grant()` und `_home_user()` sind
+    die einzigen beiden Stellen, an denen ein Pfad-Token zu einer Identität
+    wird. Wer eine dritte baut, muss diese Zeile mitnehmen."""
+    try:
+        g.sitzung_fuer = user_id
+    except RuntimeError:
+        # Kein Request-Kontext (z. B. Aufruf aus manage.py) - dann gibt es
+        # auch keine Antwort, an die sich ein Cookie hängen liesse.
+        pass
 
 
 def grant_werte(token: str):

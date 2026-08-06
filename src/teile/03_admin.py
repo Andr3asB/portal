@@ -168,6 +168,11 @@ def neue_tokens(token, uid):
         lookup, enc = grant_werte(new_token())
         db.execute("UPDATE grants SET token_lookup=?, token_enc=? WHERE id=?",
                    (lookup, enc, g["id"]))
+    # Wunsch #140: Ohne diese Zeile wäre der Widerruf ab Stufe 3 wirkungslos -
+    # das alte Gerät käme über sein Sitzungs-Cookie weiter rein, obwohl der
+    # Token erneuert wurde. Steht hier schon ab Stufe 1, damit es nicht
+    # vergessen wird, wenn es zählt.
+    db.execute("DELETE FROM sitzungen WHERE user_id=?", (uid,))
     db.commit()
 
     # Erneuert der Admin seine EIGENEN Zugänge, ist der Token in der aktuellen

@@ -2,6 +2,86 @@
 
 ---
 
+## 2026-08-06 – portal-v116: Wunsch #140, Stufe 1 – Sitzungs-Cookie wird ausgestellt
+
+Erste von sechs Stufen auf dem Weg, den Zugangstoken aus der Adresszeile zu
+bekommen. Der vollständige Stufenplan steht in
+`~/.claude/plans/quiet-enchanting-shore.md`, die Handprüfung in `pruefplan.md`.
+
+### Was diese Stufe tut – und vor allem, was nicht
+
+Das Portal legt beim Auflösen eines Pfad-Tokens zusätzlich eine Sitzung an und
+gibt ein Cookie mit. **Ausgewertet wird es von nichts.** Die Anmeldung läuft
+weiterhin ausschließlich über den Token in der Adresse. Damit kann diese Stufe
+per Definition niemanden aussperren, und der Mechanismus lässt sich im echten
+Betrieb beobachten, bevor in Stufe 3 etwas davon abhängt.
+
+Zwei Tests halten genau das fest: `test_cookie_allein_authentifiziert_noch_nicht`
+und `test_cookie_oeffnet_keine_fremde_app`. Werden sie später rot, ist
+versehentlich Stufe 3 aktiv.
+
+### Entscheidungen
+
+**Eigene Tabelle statt Flasks signiertem Cookie.** Ein signiertes Cookie ist
+nicht widerrufbar – „Zugänge neu erzeugen" (#131) wäre wirkungslos, und das
+fiele erst auf, wenn ein Gerät verloren ist. Mit `sitzungen` lässt sich jede
+Sitzung einzeln beenden, und man sieht, welche Geräte angemeldet sind.
+
+**Der Cookie-Wert steht nicht im Klartext in der DB**, gespeichert wird
+`token_lookup(wert)` – derselbe HMAC wie bei den Zugangstokens seit #129. Ein
+`_enc`-Gegenstück ist unnötig, weil der Wert nie zurückgelesen werden muss.
+Das ist nebenbei genau das echte Hashing, das bei #129 an der Navigation
+gescheitert war.
+
+**`SameSite=Lax`, kein `Domain`.** `wir4` und `portal` sind Subdomains von
+`16schwaben.de`, also same-site – das Cookie geht damit auch im
+Home-Assistant-iFrame auf dem Esszimmerbildschirm mit. `Strict` würde beim
+Aufruf über einen Link von außen cookielos ankommen. Ein `Domain`-Attribut
+würde das Cookie an Home Assistant mitschicken; das soll es nie.
+
+**Max-Age ein Jahr.** Der heutige Link läuft nie ab; eine kurze Sitzung wäre
+ein Komfortrückschritt ohne Sicherheitsgewinn.
+
+**`DELETE FROM sitzungen` bei „Zugänge neu erzeugen"** ist schon jetzt drin,
+obwohl es erst ab Stufe 3 wirkt – genau so eine Zeile vergisst man sonst bis
+zu dem Moment, in dem sie zählt.
+
+### Testnetz zuerst
+
+`tests/` war leer. Vor der ersten Änderung angelegt: `conftest.py` (Wegwerf-DB
+je Test, Testfamilie aus Admin/Kind/Eltern), `test_grant.py` (19 Tests gegen
+den **Ist-Zustand** – Auflösung, Rollen, Navigations-Token, Verschlüsselung),
+`test_routen_inventar.py` (verlangt für jede ändernde Route entweder
+`<token>` oder einen begründeten Eintrag in einer Ausnahmeliste – fängt
+künftige ungeschützte Routen automatisch ab). Dazu `test_sitzung.py` für diese
+Stufe. **36 Tests, alle grün.**
+
+`pytest` liegt in `requirements-dev.txt`, nicht in `src/requirements.txt` –
+die beschreibt die Laufzeit und ist seit #135 exakt gepinnt. Testumgebung ist
+ein lokales `.venv` (bereits in `.gitignore`).
+
+**Stolperstein:** `sys.path` auf `src/` muss beim Laden von `conftest.py`
+gesetzt werden, nicht erst im Fixture – sonst scheitern Testmodule, die
+`from teile.kern import …` auf Modulebene schreiben, schon beim Einsammeln.
+
+### Verifiziert
+
+Erst mit Schalter **aus** ausgeliefert: keine `Set-Cookie`-Kopfzeile, Tabelle
+angelegt, Verhalten unverändert. Dann eingeschaltet: Cookie mit allen
+erwarteten Attributen und ohne `Domain`, zweiter Aufruf mit Cookie erzeugt
+**kein** zweites, Zeile in der DB mit HMAC statt Klartext. Regression über
+alle 50 Grants: 50 × HTTP 200. Testzeilen danach wieder entfernt, damit Andis
+Geräteprüfung auf einer leeren Tabelle beginnt.
+
+Offen und nur von Andis Geräten prüfbar: ob das Cookie im
+Home-Assistant-iFrame ankommt (`pruefplan.md`, S1-04). Davon hängt Stufe 3 ab.
+
+### Auslieferungspaket
+
+`deploy/portal-v116.tar.gz`
+
+---
+
 ## 2026-08-05 – portal-v113/114/115: Sicherheitspaket (Wünsche #126–#135, #141)
 
 Umsetzung der priorisierten Punkte aus der Sicherheitsanalyse. Die sieben mit

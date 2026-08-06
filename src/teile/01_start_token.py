@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, abort, request, jsonify
-from teile.kern import get_db, to_int, token_lookup, token_entschluesseln
+from teile.kern import (
+    get_db, to_int, token_lookup, token_entschluesseln, sitzung_vormerken,
+)
 
 bp = Blueprint("start", __name__)
 
@@ -27,6 +29,7 @@ def _home_user(token):
     daten = dict(row)
     daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
     daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
+    sitzung_vormerken(daten["id"])   # Wunsch #140, Stufe 1
     return daten
 
 

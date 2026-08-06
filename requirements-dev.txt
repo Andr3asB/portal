@@ -1,0 +1,13 @@
+# Nur für die Testumgebung auf dem Entwicklungsrechner – geht NIE ins
+# Container-Image. src/requirements.txt beschreibt die Laufzeit und ist seit
+# Wunsch #135 exakt gepinnt; hier kommt nur das Werkzeug dazu.
+#
+# Einrichten:
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements-dev.txt     (Windows)
+#   .venv/bin/pip install -r requirements-dev.txt         (Linux/macOS)
+#
+# Ausführen:
+#   .venv/Scripts/python -m pytest tests/ -q
+-r src/requirements.txt
+pytest==8.4.2

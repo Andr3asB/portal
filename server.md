@@ -786,6 +786,17 @@ teile/
                        "gemischte E-Jugend" sind dieselbe Klasse in zwei
                        Schreibweisen und muessen auf denselben Haken
                        fallen.
+  19_sitzung.py      – Sitzungs-Cookies (Wunsch #140, Stufe 1). Stellt beim
+                       Aufloesen eines Pfad-Tokens zusaetzlich ein Cookie aus,
+                       das (in Stufe 1) von NICHTS ausgewertet wird - die
+                       Anmeldung laeuft weiter ueber den Token in der Adresse.
+                       Schalter SITZUNG_AUSSTELLEN in der .env, Notausstieg
+                       ohne Rebuild. Cookie: Secure, HttpOnly, SameSite=Lax,
+                       Path=/, KEIN Domain (sonst ginge es an Home Assistant
+                       mit), Max-Age 1 Jahr. SameSite=Lax traegt im
+                       HA-iFrame, weil wir4 und portal Subdomains derselben
+                       Domain sind (same-site). Gespeichert wird nur
+                       token_lookup(wert), nie der Klartext.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1056,6 +1067,7 @@ Löschen prüft VOR dem `confirm()`-Dialog).
 | `apps` | id, slug, name, emoji, beschreibung |
 | `grants` | id, user_id, app_id, **token_lookup** (UNIQUE, HMAC-SHA256 des Tokens – nur zum Finden der Zeile), **token_enc** (AES-GCM des Tokens, base64(Nonce+CT) – zum Zurückgewinnen für Links/QR), position (sort), gruppe_id (FK home_gruppen) – Wunsch #129: der Klartext-Token steht NICHT mehr in der DB |
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
+| `sitzungen` | id, user_id (FK users, cascade), kennung_lookup (UNIQUE, HMAC des Cookie-Werts – der Klartext steht NIE in der DB), erstellt, gesehen, ablauf (NULL = läuft nie ab, z. B. Kiosk), quelle ('token'/'ha'), geraet (User-Agent, gekürzt) – Wunsch #140 Stufe 1: Sitzungs-Cookies. Eigene Tabelle statt signiertem Cookie, weil nur so ein Widerruf je Gerät möglich ist |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am, umsetzung (Wunsch #101: was genau implementiert wurde, gesetzt über `manage.py wunsch_erledigt <id> "Text"`) |
 | `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92) |
@@ -1439,6 +1451,40 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
   bind-gemounteten Einzeldatei den betroffenen Service mit
   `docker compose up -d --force-recreate <service>` neu aufsetzen**, ein
   reines `restart` oder `reload` genügt nicht.
+
+## Tests
+
+`tests/` enthaelt seit Wunsch #140 eine kleine pytest-Suite. Sie laeuft auf
+dem Entwicklungsrechner, nicht im Container.
+
+```bash
+python -m venv .venv                                   # einmalig
+.venv/Scripts/pip install -r requirements-dev.txt      # Windows
+.venv/Scripts/python -m pytest tests/ -q
+```
+
+- `conftest.py` – Wegwerf-Datenbank je Test (DB_PATH/TOKEN_KEY kommen aus der
+  Umgebung), Testfamilie aus Admin/Kind/Eltern. **`sys.path` auf `src/` wird
+  beim Laden von conftest gesetzt, nicht erst im Fixture** – sonst scheitern
+  Testmodule mit `from teile.kern import …` auf Modulebene schon beim
+  Einsammeln.
+- `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
+  Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
+  wieder gruen sein.
+- `test_routen_inventar.py` – verlangt fuer jede aendernde Route entweder
+  `<token>` im Pfad oder einen begruendeten Eintrag in `BEKANNTE_AUSNAHMEN`.
+  Faengt neue ungeschuetzte Routen automatisch ab.
+- `test_sitzung.py` – Stufe 1 von #140, inklusive der Negativtests, die
+  belegen, dass das Cookie noch KEINE Wirkung hat.
+
+`pytest` steht bewusst in `requirements-dev.txt`, nicht in
+`src/requirements.txt` – die beschreibt die Laufzeit und ist seit Wunsch #135
+exakt gepinnt.
+
+Ergaenzend die Handpruefung durch Andi: `pruefplan.md` im Projektwurzel-
+verzeichnis, je Umbaustufe eine Tabelle mit nummerierten Testfaellen. Deckt
+ab, was ein Skript nicht sehen kann: echtes Geraet, echter Browser, echter
+iFrame, installierte PWA.
 
 ## Deployment-Ablauf
 
