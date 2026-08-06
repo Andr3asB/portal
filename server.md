@@ -127,6 +127,34 @@ Linux/Chrome, KEINE Android-Kiosk-App) einbetten.
     einmaliges Wegtippen oder durch Aktivieren/Ablehnen der Browser-
     Berechtigung dauerhaft loswerden, keine Code-Änderung nötig.
 
+### Wie der Esszimmer-Bildschirm startet (Stand 2026-08-06)
+
+```
+/usr/lib/chromium/chromium \
+  --kiosk --noerrdialogs --disable-translate \
+  --disable-gpu --disable-software-rasterizer \
+  --disable-features=TranslateUI \
+  https://wir4.16schwaben.de/
+```
+
+Meldet sich als `Mozilla/5.0 (X11; CrOS x86_64 …)`. Drei Eigenschaften, die
+für den Sitzungsumbau (Wunsch #140) zählen:
+
+- **Kein `--user-data-dir`, kein `--incognito`** → Standardprofil, bleibt über
+  Neustarts erhalten. Deshalb überlebt dort ein Sitzungs-Cookie (live
+  gemessen: 134 Anfragen, **eine** Sitzung).
+- **Geladen wird Home Assistant, nicht das Portal.** Das Portal hängt als
+  iFrame im HA-Dashboard, und diese iFrame-Adresse trägt weiterhin den Token.
+  **Der Kiosk hängt damit nie am Cookie** – selbst nach einem Profilverlust
+  oder Neuaufsetzen holt er sich beim nächsten Start über den Token eine neue
+  Sitzung. Das ist die Rückfallebene, die den Bildschirm unabhängig von allem
+  Neuen macht.
+- **`--kiosk` heißt: keine Adresszeile, keine Bedienung.** Erschiene dort je
+  ein Anmeldebildschirm, könnte niemand etwas dagegen tun. Die Regel
+  „**niemals automatisch auf eine Anmeldeseite umleiten**" ist deshalb
+  verbindlich und nicht bloß Vorsicht: fehlende Autorisierung führt weiterhin
+  zu `denied.html` bzw. `abort(403)`.
+
 ## Umgebungsvariablen (.env auf dem Server)
 
 Datei: `/srv/familienportal/.env` (nicht im Repo, nicht in Git)
@@ -797,6 +825,22 @@ teile/
                        HA-iFrame, weil wir4 und portal Subdomains derselben
                        Domain sind (same-site). Gespeichert wird nur
                        token_lookup(wert), nie der Klartext.
+  20_csrf.py         – CSRF-Riegel (Wunsch #140, Stufe 2). Ein
+                       before_request, null Template-Aenderungen. Prueft
+                       `Sec-Fetch-Site` (primaer, weil
+                       `Referrer-Policy: no-referrer` den `Origin`-Header auf
+                       `null` setzen kann) und faellt sonst auf `Origin`
+                       zurueck. **`same-site` wird ABGELEHNT** - Home
+                       Assistant laeuft unter derselben Domain, ein POST von
+                       dort waere same-site aber nicht same-origin; der Kiosk
+                       ist nicht betroffen, weil die Seite IM iFrame
+                       Portal-Origin hat. Schalter CSRF_MODUS:
+                       aus | beobachten | scharf. Im Beobachtungsmodus wird
+                       nur protokolliert (grep-Wort "CSRF-Verdacht"), nichts
+                       blockiert. Der Riegel geht bewusst scharf, BEVOR ab
+                       Stufe 3 ein Cookie autorisiert - solange jede Anfrage
+                       noch ihren Pfad-Token traegt, kann er nichts
+                       kaputtmachen.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;

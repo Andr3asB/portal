@@ -22,6 +22,13 @@ app.config["TOKEN_KEY"]         = os.environ.get("TOKEN_KEY", "")
 # 0 = aus. Zuruecknehmen der Stufe ist damit eine Zeile in der .env und ein
 # "docker compose up -d portal" - kein Rebuild, kein Paket.
 app.config["SITZUNG_AUSSTELLEN"] = os.environ.get("SITZUNG_AUSSTELLEN", "0")
+# Wunsch #140, Stufe 2: CSRF-Riegel. "aus" | "beobachten" | "scharf".
+# "beobachten" protokolliert nur und blockiert nichts - so laesst sich vor
+# dem Scharfschalten pruefen, ob echte Anfragen faelschlich auffallen.
+app.config["CSRF_MODUS"]        = os.environ.get("CSRF_MODUS", "aus")
+# Erwartete eigene Herkunft fuer die CSRF-Pruefung. Leer = aus der Anfrage
+# ableiten (die geht durch Caddy, das nur diese eine Site bedient).
+app.config["PORTAL_ORIGIN"]     = os.environ.get("PORTAL_ORIGIN", "")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

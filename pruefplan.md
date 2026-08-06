@@ -50,18 +50,29 @@ den Token in der Adresse.
 Cookie. Der einzige wirklich wichtige Test ist S1-04 (Kiosk), weil davon
 Stufe 3 abhängt.
 
+**Merke für alle Stufen:** „Sieht unverändert aus" ist kein Testergebnis,
+wenn die Frage lautet, ob etwas ankommt. Ein Kiosk zeigt eine Seite oft
+stundenlang, ohne sie neu zu holen – hinsehen erzeugt keinen Zugriff. Wenn
+ein Test etwas messen soll, muss er eine Aktion auslösen.
+
 **Notausstieg:** `SITZUNG_AUSSTELLEN=0`
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S1-01 | Deinen normalen Portal-Link öffnen | A-Handy | Startseite wie immer, nichts sieht anders aus | | |
-| S1-02 | Dieselbe Seite neu laden, ein paar Apps öffnen | A-Handy | Alles wie gewohnt, keine Fehlermeldung | | |
-| S1-03 | Etwas eintragen (z. B. Artikel auf die Einkaufsliste) | A-Handy | Wird gespeichert wie bisher | | |
-| S1-04 | **Esszimmer-Bildschirm ansehen** | Kiosk | Portal läuft unverändert weiter, kein Anmeldebildschirm, keine leere Seite | | |
-| S1-05 | Portal als App vom Homescreen starten | A-PWA | Startet wie gewohnt | | |
-| S1-06 | Ein Gerät eines Kindes kurz öffnen | Kind | Unverändert | | |
+| S1-01 | Deinen normalen Portal-Link öffnen | A-Handy | Startseite wie immer, nichts sieht anders aus | ok | |
+| S1-02 | Dieselbe Seite neu laden, ein paar Apps öffnen | A-Handy | Alles wie gewohnt, keine Fehlermeldung | ok | |
+| S1-03 | Etwas eintragen (z. B. Artikel auf die Einkaufsliste) | A-Handy | Wird gespeichert wie bisher | ok | |
+| S1-04 | **Esszimmer-Bildschirm: Seite zweimal neu laden** (nicht nur ansehen!) | Kiosk | Portal läuft weiter, kein Anmeldebildschirm. Ich messe danach serverseitig: zwei Neuladungen dürfen **zusammen nur eine** Sitzung erzeugen – sonst wird das Cookie im iFrame verworfen | ok | Gemessen: 134 Anfragen vom Kiosk → **1** Sitzung. Cookie überlebt im HA-iFrame. Damit ist die Grundannahme für Stufe 3 bestätigt. |
+| S1-05 | Portal als App vom Homescreen starten | A-PWA | Startet wie gewohnt | ok | |
+| S1-06 | Ein Gerät eines Kindes kurz öffnen | Kind | Unverändert | ok | |
 
 ---
+
+**Ergebnis Stufe 1 (2026-08-06): bestanden.** Gemessen wurde zusätzlich das
+Verhältnis Anfragen zu Sitzungen – würde ein Cookie verworfen, entstünde je
+Anfrage eine neue Sitzung: iPhone 622→3, ChromeOS/Kiosk 134→1, Windows 107→1.
+Das Cookie wird also auf allen Plattformen gespeichert und zurückgeschickt,
+**auch im Home-Assistant-iFrame**.
 
 ## Stufe 2 – CSRF-Riegel
 

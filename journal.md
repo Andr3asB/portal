@@ -2,6 +2,65 @@
 
 ---
 
+## 2026-08-06 – portal-v117: Wunsch #140, Stufe 2 – CSRF-Riegel (Beobachtungsmodus)
+
+Zweite von sechs Stufen. Neues Modul `src/teile/20_csrf.py`, ausgeliefert mit
+`CSRF_MODUS=beobachten` – es wird protokolliert, aber **nichts blockiert**.
+
+### Warum das Portal bisher keinen CSRF-Schutz brauchte
+
+Das war kein Versäumnis: Jede ändernde Anfrage muss den Zugangstoken
+mittragen (im Pfad oder im JSON-Body). Ein fremder Server kennt ihn nicht und
+kann die Anfrage gar nicht bilden – das ist exakt das
+Synchronizer-Token-Muster, nur im Pfad statt im Formularfeld. Erst wenn ab
+Stufe 3 ein Cookie autorisiert, entsteht „ambient authority", und ab dann ist
+der Schutz Pflicht.
+
+**Reihenfolge mit Absicht:** Der Riegel geht scharf, BEVOR das Cookie
+autorisiert. In diesem Moment kann er nichts kaputtmachen, was nicht ohnehin
+kaputt wäre – jede Anfrage trägt noch ihren Pfad-Token. Falsch-Positive
+fallen dadurch im Protokoll auf und nicht später im Betrieb.
+
+### Header-Prüfung statt verstecktem Formularfeld
+
+Ein Synchronizer-Token müsste in 57 Formulare und 27 `fetch()`-Aufrufe
+eingebaut werden; jedes vergessene bricht still. Der Header-Riegel ist eine
+einzige Funktion und braucht null Template-Änderungen. Dazu käme ein zweites
+Problem: die Offline-Warteschlange der Einkaufsliste hebt POSTs stundenlang
+auf und spielt sie später nach – ein rotierendes Token wäre dann abgelaufen.
+
+Zwei Fallen bestimmen den Aufbau:
+
+1. **`Referrer-Policy: no-referrer` kann `Origin` auf `null` setzen.** Wer nur
+   `Origin` prüft, lehnt womöglich alles ab. Deshalb steht `Sec-Fetch-Site`
+   an erster Stelle – der Header ist von der Referrer-Policy unberührt.
+2. **`Sec-Fetch-Site: same-site` muss abgelehnt werden.** Home Assistant läuft
+   unter derselben Domain; ein POST von dort wäre same-site, aber nicht
+   same-origin. Der Kiosk ist nicht betroffen: die Seite IM iFrame hat
+   Portal-Origin, ihre Formulare sind same-origin. Dafür gibt es einen
+   eigenen Test.
+
+Passende `Origin` rettet eine als cross-site markierte Anfrage bewusst NICHT –
+sonst käme man über einen gefälschten Origin-Header durch.
+
+### Verifiziert
+
+15 neue Tests (52 gesamt, alle grün), darunter die Negativfälle same-site,
+cross-site, `none` und „gar keine Kopfzeile". Live: cross-site-POST → 200 mit
+Protokolleintrag `CSRF-Verdacht`, same-origin-POST → 200, echtes
+Einkaufs-Formular über HTTPS → 302 (Testartikel danach entfernt). Regression
+über alle 50 Grants: 50 × HTTP 200.
+
+Offen bis zur Rückmeldung von Andi: ob echte Geräte im Beobachtungsmodus
+auffallen. Erst bei null Treffern wird auf `scharf` gestellt (`pruefplan.md`,
+S2-01 bis S2-05).
+
+### Auslieferungspaket
+
+`deploy/portal-v117.tar.gz`
+
+---
+
 ## 2026-08-06 – portal-v116: Wunsch #140, Stufe 1 – Sitzungs-Cookie wird ausgestellt
 
 Erste von sechs Stufen auf dem Weg, den Zugangstoken aus der Adresszeile zu
