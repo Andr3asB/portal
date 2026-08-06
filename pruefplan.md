@@ -187,18 +187,31 @@ und ist der wichtigste Test dieser Stufe.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S4-01 | Portal öffnen und durch **alle** deine Apps klicken | A-Handy | Alles erreichbar, Adresse enthält keinen langen Zeichensalat mehr | | |
-| S4-02 | Dasselbe | Kind | Alle seine Apps erreichbar | | |
-| S4-03 | Dasselbe | Simone | Alle ihre Apps erreichbar | | |
-| S4-04 | **Alter Link mit Token** (aus deinem Lesezeichen) öffnen | A-Handy | Funktioniert weiterhin und leitet auf die neue Adresse | | |
+| S4-01 | Portal öffnen und durch **alle** deine Apps klicken | A-Handy | Alles erreichbar, Adresse enthält keinen langen Zeichensalat mehr | ok | |
+| S4-02 | Dasselbe | Kind | Alle seine Apps erreichbar | ok | |
+| S4-03 | Dasselbe | Simone | Alle ihre Apps erreichbar | ok | |
+| S4-04 | **Alter Link mit Token** (aus deinem Lesezeichen) öffnen | A-Handy | Funktioniert weiterhin und leitet auf die neue Adresse | ok | |
 | S4-05 | **Portal-App vom Homescreen starten** | A-PWA | Startet und zeigt die Startseite – nicht „Zugang verweigert" | ok | |
 | S4-06 | Portal neu als App installieren (zum Homescreen hinzufügen) | A-Handy | Installiert sich, startet korrekt | ok | Bestätigt 2026-08-06. Damit ist der im Plan als „am schlechtesten schätzbar" markierte Posten (PWA-Manifest ohne Token, `crossorigin="use-credentials"`) auf einem echten Gerät belegt. |
-| S4-07 | Esszimmer-Bildschirm ansehen | Kiosk | Läuft unverändert | | |
-| S4-08 | Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | | |
-| S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | | |
+| S4-07 | Esszimmer-Bildschirm ansehen | Kiosk | Läuft unverändert | ok | |
+| S4-08 | Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | ok | |
+| S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | ok | |
 | S4-10 | **Geteiltes Gerät:** Auf einem Gerät, auf dem zuletzt *du* drin warst, den Link eines Kindes öffnen. Dann auf eine Kachel tippen. | ein Gerät, das zwei Leute benutzen (iPad/Kiosk) | Es bleibt beim Kind – auch nach dem Tippen. Nirgends deine Daten. Danach mit deinem Link zurückwechseln: es bleibt bei dir. | ok | |
 | S4-11 | Nach S4-10 auf demselben Gerät **im Flugmodus** eine schon besuchte Seite öffnen | dasselbe Gerät | Die Seite des *aktuellen* Nutzers oder die Offline-Meldung – niemals die des Vorgängers | ok | |
 | S4-12 | **Nachtest zum Offline-Fehler (v123).** Erst online einmal die Startseite und die Einkaufsliste öffnen. Dann Flugmodus. Dann: (a) die Portal-App vom Homescreen starten, (b) ein altes Lesezeichen mit Token öffnen, (c) die Einkaufsliste öffnen. | A-Handy + A-PWA | (a) und (b) zeigen die Startseite statt „noch nie geladen"; (c) zeigt die Einkaufsliste | ok | Bestätigt 2026-08-06: „jetzt kommt keine Fehlermeldung mehr". |
+
+**Ergebnis Stufe 4 (2026-08-06): bestanden.** Alle Testfälle von Andi auf
+echten Geräten geprüft, einschliesslich der beiden Fälle, die diese Stufe
+gefährlich machten (geteiltes Gerät S4-10, Offline-Einstieg S4-12) und der
+frischen PWA-Installation (S4-06) – dem Posten, den der Plan als am
+schlechtesten schätzbar markiert hatte.
+
+Zwei Fehler wurden dabei gefunden und behoben: der Vorrang des Pfad-Tokens
+hielt nur eine Seite lang (v121), und der Offline-Einstieg über PWA oder altes
+Lesezeichen lief dauerhaft in eine Sackgasse, weil eine Weiterleitung nie
+cachebar wird (v123). Beide waren von hier aus nicht auffindbar – der erste
+zeigte sich erst im End-to-End-Lauf gegen den echten Server, der zweite erst
+auf einem echten Gerät.
 
 ---
 
