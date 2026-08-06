@@ -176,7 +176,7 @@
       Erstellt: {{ t.erstellt[:10] }}{% if t.erledigt and t.erledigt_am %} · Erledigt: {{ t.erledigt_am[:10] }}{% endif %}
     </div>
 
-    <form method="post" action="/a/todo/{{ token }}/status/{{ t.id }}" class="status-picker">
+    <form method="post" action="/a/todo{{ tp }}status/{{ t.id }}" class="status-picker">
       {% for s in status_order %}
       <button type="submit" name="status" value="{{ s }}"
               class="status-chip{% if s == t.status %} active{% endif %}"
@@ -186,7 +186,7 @@
 
     {% if ich_darf_erledigen %}
     <div class="todo-edit-panel" id="todo-edit-{{ t.id }}">
-      <form method="post" action="/a/todo/{{ token }}/bearbeiten/{{ t.id }}">
+      <form method="post" action="/a/todo{{ tp }}bearbeiten/{{ t.id }}">
         <div class="todo-edit-form">
           <input class="todo-edit-input" type="text" name="inhalt" value="{{ t.inhalt }}" required>
           <button type="submit" class="todo-edit-save">Speichern</button>
@@ -213,7 +213,7 @@
   {% endif %}
 
   {% if darf_loeschen %}
-  <form method="post" action="/a/todo/{{ token }}/loeschen/{{ t.id }}"
+  <form method="post" action="/a/todo{{ tp }}loeschen/{{ t.id }}"
         onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
     <button class="todo-del" type="submit">×</button>
   </form>
@@ -254,7 +254,7 @@
 
   <!-- Neue Aufgabe -->
   <div class="new-todo-card" id="new-todo-card">
-    <form method="post" action="/a/todo/{{ token }}/neu">
+    <form method="post" action="/a/todo{{ tp }}neu">
       <div class="new-todo-row">
         <input class="new-todo-input" type="text" name="inhalt"
                placeholder="Neue Aufgabe…" required autocomplete="off">

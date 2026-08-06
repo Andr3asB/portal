@@ -184,6 +184,7 @@ def _mensch_svg_rendern(optionen):
     return avatar.to_string()
 
 
+@bp.route("/a/tierbaukasten/vorschau-mensch", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/tierbaukasten/<token>/vorschau-mensch", methods=["POST"])
 def vorschau_mensch(token):
     user = check_grant(token, APP)
@@ -193,6 +194,7 @@ def vorschau_mensch(token):
     return jsonify(ok=True, svg=_mensch_svg_rendern(optionen))
 
 
+@bp.route("/a/tierbaukasten/", defaults={"token": None})
 @bp.route("/a/tierbaukasten/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -218,6 +220,7 @@ def index(token):
     )
 
 
+@bp.route("/a/tierbaukasten/speichern", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/tierbaukasten/<token>/speichern", methods=["POST"])
 def speichern(token):
     user = check_grant(token, APP)
@@ -261,6 +264,7 @@ def speichern(token):
     return redirect(url_for("tierbaukasten_app.index", token=token))
 
 
+@bp.route("/a/tierbaukasten/loeschen/<int:kid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/tierbaukasten/<token>/loeschen/<int:kid>", methods=["POST"])
 def loeschen(token, kid):
     user = check_grant(token, APP)

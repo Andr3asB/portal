@@ -188,6 +188,7 @@ def _historie_map(db, todo_ids):
     return historie
 
 
+@bp.route("/a/todo/", defaults={"token": None})
 @bp.route("/a/todo/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -208,6 +209,7 @@ def index(token):
     )
 
 
+@bp.route("/a/todo/neu", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/todo/<token>/neu", methods=["POST"])
 def neu(token):
     """Wunsch #39: Ziel ist entweder eine Person (wie bisher, inkl. Leerwert
@@ -242,6 +244,7 @@ def neu(token):
     return redirect(url_for("todo_app.index", token=token))
 
 
+@bp.route("/a/todo/status/<int:tid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/todo/<token>/status/<int:tid>", methods=["POST"])
 def set_status(token, tid):
     """Wunsch #20: 4 Status-Stufen statt einfachem Abhaken-Toggle."""
@@ -267,6 +270,7 @@ def set_status(token, tid):
     return redirect(url_for("todo_app.index", token=token))
 
 
+@bp.route("/a/todo/bearbeiten/<int:tid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/todo/<token>/bearbeiten/<int:tid>", methods=["POST"])
 def bearbeiten(token, tid):
     """Wunsch #43: alle Felder bearbeitbar, gleiche UX (Person/Rolle(n)/Alle,
@@ -316,6 +320,7 @@ def bearbeiten(token, tid):
     return redirect(url_for("todo_app.index", token=token))
 
 
+@bp.route("/a/todo/loeschen/<int:tid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/todo/<token>/loeschen/<int:tid>", methods=["POST"])
 def loeschen(token, tid):
     user = check_grant(token, APP)
@@ -405,6 +410,7 @@ def serie_einsortieren(db, serie_id, ziel_user_id, plan_tag, erstellt_von_user_i
     return True
 
 
+@bp.route("/a/todo/serien", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/todo/<token>/serien", methods=["GET", "POST"])
 def serien(token):
     """Verwaltung der wiederkehrenden Aufgaben-Vorlagen (Wunsch #90) - die

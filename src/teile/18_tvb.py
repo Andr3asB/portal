@@ -496,6 +496,7 @@ def _tabelle_aufbereiten(tabelle_antwort, team_name):
     ]
 
 
+@bp.route("/a/tvb/", defaults={"token": None})
 @bp.route("/a/tvb/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -575,6 +576,7 @@ def index(token):
     )
 
 
+@bp.route("/a/tvb/mannschaften", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/tvb/<token>/mannschaften", methods=["GET", "POST"])
 def mannschaften_einstellen(token):
     """Wunsch #124: Jeder Nutzer blendet fuer sich Altersklassen aus - der
@@ -685,6 +687,7 @@ def _kader_gruppiert(db):
     return gruppen
 
 
+@bp.route("/a/tvb/kader", defaults={"token": None})
 @bp.route("/a/tvb/<token>/kader")
 def kader(token):
     user = check_grant(token, APP)

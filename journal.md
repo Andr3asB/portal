@@ -2,6 +2,154 @@
 
 ---
 
+## 2026-08-06 – portal-v120/v121: Wunsch #140, Stufe 4 – der Token ist aus der Adresse verschwunden
+
+Vierte von sechs Stufen und die grösste: 90 Routen, 87 Vorlagen-Links, 26
+JS-Pfade. Seit dieser Auslieferung steht in keiner ausgelieferten Seite mehr
+ein Zugangstoken – weder in der Adresszeile noch in einem Link.
+
+**Die Zusage bleibt:** Jeder alte Link mit Token funktioniert unverändert.
+Nachgemessen, nicht behauptet: alle 50 Zugänge über ihre echte App-Adresse,
+50 × HTTP 200.
+
+### Wie es gebaut ist
+
+Jede Route hat jetzt zwei Regeln – die alte mit `<token>` und eine
+token-freie Zwillingsregel über `defaults={"token": None}`. Beide landen in
+derselben View-Funktion; `grant()` entscheidet wie seit Stufe 3, ob der Pfad-
+Token oder das Cookie zählt. **Keine einzige View-Funktion musste angefasst
+werden.**
+
+Die Adressen bauen die Vorlagen aus vier Bausteinen im Kern, und nur daraus:
+
+| Baustein | wofür |
+|---|---|
+| `tp` | das Wegstück in der *gerade offenen* App: `/a/todo{{ tp }}neu` |
+| `app_pfad(slug, token)` | Links in eine *andere* App (Startseite-Kacheln, Hilfe-Knopf) |
+| `start_pfad(home_token)` | der ⌂-Knopf |
+| `manifest_pfad(home_token)` | das PWA-Manifest |
+
+`tp` kommt aus `request.view_args`, **nicht** aus der Template-Variablen
+`token`. Das ist wichtig: Die Links sollen der Adresszeile folgen, und
+`view_args` sagt genau, was dort steht.
+
+Alle vier liefern die alte Form mit Token zurück, sobald `TOKENFREIE_URLS=0`
+steht. Das ist der Notausstieg – und er ist getestet
+(`test_notausstieg_stellt_token_links_wieder_her`), weil ein ungeprüfter
+Schalter keine Rückfallebene ist, sondern ein Versprechen.
+
+### Vier Dinge, die beinahe still kaputtgegangen wären
+
+**1. Das halbe Menü wäre verschwunden.** `base.html` blendete Hamburger-Knopf
+und Menü über `{% if token %}` ein. Token-frei ist `token` leer. Die
+Bedingung meinte nie den Token, sondern „wir wissen, wer da ist" – jetzt
+steht dort `{% if user %}`.
+
+**2. `const TOKEN` wäre wörtlich `'None'` geworden.** Jinja rendert `None` als
+die Zeichenkette „None". Die vier Endpunkte, die den Token im JSON-Body
+erwarten (`/wunsch`, `/push/subscribe`, `/push/unsubscribe`,
+`/settings/darkmode`), hätten „None" als Token bekommen, nicht aufgelöst –
+und weil ein *angegebener* Token bewusst nicht aufs Cookie zurückfällt, wäre
+die Folge ein stilles 403 gewesen. Der Dark-Mode-Schalter hätte einfach
+nichts mehr getan, ohne Fehlermeldung. Diese vier Endpunkte laufen jetzt über
+den neuen Helfer `aktueller_nutzer()`, der wie `grant()` aufs Cookie
+zurückfällt. Der Helfer stand schon im Plan für Stufe 2 und war dort
+untergegangen.
+
+**3. Der Offline-Cache hätte Nutzer vermischt.** Bisher trennten die Token die
+Cache-Schlüssel von selbst. Token-frei ist `/a/einkauf/` für alle dieselbe
+Adresse – auf dem Familien-iPad hätte der nächste Nutzer offline die Liste
+des vorigen gesehen. `sw.js` merkt sich jetzt in einem eigenen Cache-Eintrag,
+wessen Seiten drinliegen, und wirft beim Wechsel alles weg. Jede Seite meldet
+dem Worker nach dem Laden, wer zusieht.
+
+**4. Fünf Apps fehlten in der Seed-Liste.** `_CORE_APPS` endete bei
+`kinderplan` – Sportschau, Tierbaukasten, Vokabeln, Packliste und TVB wurden
+seinerzeit von Hand über `manage.py` angelegt und nie nachgetragen. Auf dem
+laufenden Server unsichtbar, auf einer frischen Datenbank hätten die Module
+Routen registriert, für die es keine App zum Freischalten gibt. Aufgefallen,
+weil der neue Rauchtest eine leere Test-DB aufbaut. Nachgetragen mit exakt
+den Werten der Produktivdatenbank.
+
+### Der Fehler, den erst der echte Server gezeigt hat
+
+Der Vorrang des Pfad-Tokens hielt nur **eine Seite lang**.
+
+Cookie gehört Andi, Simone öffnet auf demselben Gerät ihren Link: Die
+Startseite zeigte korrekt Simone – aber das Cookie blieb Andis, weil das
+Sitzungsmodul nur dann eines ausstellte, wenn *gar keines* mitkam. Bis Stufe 3
+war das harmlos, denn jede Kachel trug Simones Token. Token-frei ist
+`/a/einkauf/` für alle dieselbe Adresse: Simone hätte beim ersten Tippen
+Andis Einkaufsliste gesehen.
+
+Das ist nur im Zusammenspiel von Cookie-Ausstellung und Link-Aufbau sichtbar
+und wäre in keinem der bestehenden Tests aufgefallen – gefunden hat es der
+End-to-End-Durchlauf gegen den echten Server (v120). Behoben in v121: Gehört
+die vorhandene Sitzung einem anderen Nutzer, wird sie gelöscht und durch eine
+neue ersetzt. **Wer seinen Link öffnet, übernimmt das Gerät.** Die alte Zeile
+wird dabei gelöscht und nicht überschrieben, sonst bliebe für jeden Wechsel
+eine verwaiste, gültige Sitzung zurück – und „Zugänge neu erzeugen" räumt nur
+die des eigenen Nutzers weg.
+
+Zwei neue Tests halten das fest (`test_link_oeffnen_uebernimmt_das_geraet`,
+`test_geraetuebernahme_laesst_keine_verwaiste_sitzung_zurueck`).
+
+### Kein Aussperr-Fenster bei der Weiterleitung
+
+`/p/<token>` leitet **nicht** sofort auf `/start` um. Der naheliegende Weg
+hätte eine Falle: Nimmt ein Browser das Cookie nicht an – Privatmodus, voller
+Speicher, strenge Einstellungen –, landet man auf `/start` ohne Sitzung,
+bekommt „Zugang verweigert", und der erneute Scan des QR-Codes führt in
+dieselbe Weiterleitung. Der Link wäre für dieses Gerät dauerhaft tot, obwohl
+der Token gilt.
+
+Deshalb: Beim **ersten** Besuch wird die Seite ganz normal ausgeliefert und
+das Cookie gesetzt. Kommt es beim nächsten Aufruf zurück und zeigt auf
+denselben Nutzer, ist bewiesen, dass Cookies auf diesem Gerät tragen – dann
+erst wird umgeleitet. Ein Gerät ohne funktionierende Cookies behält für immer
+seinen Token-Link.
+
+### PWA-Manifest – der Posten, der im Plan als „am schlechtesten schätzbar" stand
+
+War es nicht. `/manifest/<token>.json` ergibt nach derselben mechanischen
+Regel wie alle anderen Routen exakt `/manifest.json`. Nötig war nur
+`crossorigin="use-credentials"` am `<link>`: Ohne das holt der Browser das
+Manifest ohne Cookies und bekäme 404. `start_url` folgt demselben Schalter wie
+alle anderen Adressen.
+
+### Testnetz
+
+Von 65 auf **72 Tests**. Der Rauchtest ruft jetzt jede der 36 parameterlosen
+Seiten **zweimal** auf – einmal mit Token, einmal token-frei über das Cookie –
+und sucht in jeder ausgelieferten Seite nach *allen* Tokens des Nutzers, nicht
+nur dem der offenen App. Genau die Verwechslung wäre der wahrscheinliche
+Fehler gewesen.
+
+Der Routen-Wächter misst jetzt am **Endpunkt** statt an der einzelnen Regel
+und verlangt zusätzlich, dass jede `<token>`-Route ihren token-freien Zwilling
+hat – eine beim Umbau vergessene Route fällt damit auf, auch wenn sie ein
+POST-Endpunkt ist, den niemand durchklickt.
+
+Nebenbei fiel auf, dass der Rauchtest bisher **still übersprang**, was er
+nicht prüfen konnte: 14 der 36 Seiten liefen gar nicht (siehe Punkt 4 oben).
+Er meldet das jetzt als Fehler. Ein Test, der schweigt, wenn er nichts tut,
+ist schlimmer als keiner.
+
+### Verifikation (von diesem Rechner, über das UniFi-Gateway)
+
+- 50 Zugänge über die alten Token-Adressen → 50 × 200
+- alle vier Nutzer token-frei durch jede ihrer Apps → 46 × 200
+- ohne Cookie: `/start`, `/a/einkauf/` → 403, `/manifest.json` → 404
+- Vorrangtest: Cookie A + Link B → B, und B bleibt auch nach dem Klick
+- `CSRF_MODUS=scharf`: 0 Verdachtsfälle
+- 72 Tests grün
+
+**Offen für Andi:** `pruefplan.md`, Stufe 4 – S4-01 bis S4-11. S4-10
+(geteiltes Gerät) und S4-11 (Offline-Cache nach Nutzerwechsel) sind neu und
+prüfen genau die beiden Fehler oben.
+
+---
+
 ## 2026-08-06 – portal-v119: Wunsch #140, Stufe 3 – das Sitzungs-Cookie gilt
 
 Dritte von sechs Stufen, und die erste, bei der ein Fehler jemanden aussperren

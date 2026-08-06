@@ -52,9 +52,9 @@
 {% block body %}
 <main class="main">
 
-  <a class="btn-neues-rezept" href="/a/rezepte/{{ token }}/neu">+ Neues Rezept</a>
-  <a class="btn-importieren" href="/a/rezepte/{{ token }}/importieren">🔗 Aus URL importieren</a>
-  <a class="btn-importieren" href="/a/rezepte/{{ token }}/importieren-bild">📷 Bild importieren</a>
+  <a class="btn-neues-rezept" href="/a/rezepte{{ tp }}neu">+ Neues Rezept</a>
+  <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren">🔗 Aus URL importieren</a>
+  <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren-bild">📷 Bild importieren</a>
 
   {% if rezepte %}
     <div class="rezept-filter-row" id="rezept-filter-row">
@@ -68,7 +68,7 @@
            placeholder="🔍 Rezept oder Zutat suchen…" autocomplete="off">
 
     {% for r in rezepte %}
-    <a class="rezept-card" href="/a/rezepte/{{ token }}/{{ r.id }}"
+    <a class="rezept-card" href="/a/rezepte{{ tp }}{{ r.id }}"
        data-suche="{{ (r.name ~ ' ' ~ (r.zutaten_text or ''))|lower }}"
        data-kategorie="{{ r.kategorie or '' }}"
        data-gewuenscht="{{ '1' if r.eigener_wunsch else '0' }}">
@@ -103,7 +103,8 @@
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 // Wunsch #65: Rezept als "wünsch ich mir" markieren/entmarkieren, per Fetch
 // statt vollem Reload. Höchstens 5 gleichzeitig pro Nutzer (serverseitig
@@ -112,7 +113,7 @@ function wunschToggle(btn) {
   if (btn.disabled) return;
   btn.disabled = true;
   const rid = btn.dataset.rid;
-  fetch(`/a/rezepte/${TOKEN}/${rid}/wunsch/toggle`, { method: 'POST' })
+  fetch(`/a/rezepte${TP}${rid}/wunsch/toggle`, { method: 'POST' })
     .then(r => r.json())
     .then(d => {
       btn.disabled = false;

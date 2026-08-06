@@ -43,7 +43,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück" onclick="return beendenUndZurueck()">←</a>
+<a class="nav-btn" href="/a/vokabeln{{ tp }}" title="Zurück" onclick="return beendenUndZurueck()">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -67,21 +67,22 @@
   <div class="ende-card">
     <div class="ende-emoji">🤷</div>
     Keine Vokabeln für diese Auswahl gefunden.
-    <div><a class="btn-zurueck" href="/a/vokabeln/{{ token }}/">Zurück</a></div>
+    <div><a class="btn-zurueck" href="/a/vokabeln{{ tp }}">Zurück</a></div>
   </div>
   {% endif %}
 
   <div class="ende-card" id="ende-card" style="display:none">
     <div class="ende-emoji">🎉</div>
     <span id="ende-text">Geschafft!</span>
-    <div><a class="btn-zurueck" href="/a/vokabeln/{{ token }}/">Zurück zur Übersicht</a></div>
+    <div><a class="btn-zurueck" href="/a/vokabeln{{ tp }}">Zurück zur Übersicht</a></div>
   </div>
 </main>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 const SESSION_ID = {{ session_id }};
 let queue = {{ vokabeln|tojson }};
 const gesamt = queue.length;
@@ -140,7 +141,7 @@ function pruefen() {
     queue.push(aktuelle);
   }
 
-  fetch(`/a/vokabeln/${TOKEN}/versuch`, {
+  fetch(`/a/vokabeln${TP}versuch`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({session_id: SESSION_ID, vokabel_id: aktuelle.id, richtig}),
@@ -158,7 +159,7 @@ let anhoerenAudio = null;
 function wortAnhoeren() {
   if (!aktuelle) return;
   if (anhoerenAudio) { anhoerenAudio.pause(); anhoerenAudio = null; }
-  anhoerenAudio = new Audio(`/a/vokabeln/${TOKEN}/wort/${aktuelle.id}/audio`);
+  anhoerenAudio = new Audio(`/a/vokabeln${TP}wort/${aktuelle.id}/audio`);
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
 }
 
@@ -177,7 +178,7 @@ function zeigeEnde() {
 function sitzungBeenden() {
   if (beendet) return;
   beendet = true;
-  const url = `/a/vokabeln/${TOKEN}/session/${SESSION_ID}/beenden`;
+  const url = `/a/vokabeln${TP}session/${SESSION_ID}/beenden`;
   if (navigator.sendBeacon) navigator.sendBeacon(url);
   else fetch(url, {method: 'POST'}).catch(() => {});
 }
@@ -189,7 +190,7 @@ function beendenUndZurueck() {
 
 document.getElementById('beenden-btn')?.addEventListener('click', () => {
   sitzungBeenden();
-  location.href = `/a/vokabeln/${TOKEN}/`;
+  location.href = `/a/vokabeln${TP}`;
 });
 
 // Nur "pagehide" (Navigation weg/Tab schliessen), NICHT "visibilitychange" -

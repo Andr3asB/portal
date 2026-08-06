@@ -105,6 +105,7 @@ def _gesperrter_tag_datum():
     return None
 
 
+@bp.route("/a/kinderplan/", defaults={"token": None})
 @bp.route("/a/kinderplan/<token>/")
 def index(token):
     user = _user(token)
@@ -225,6 +226,7 @@ def index(token):
     )
 
 
+@bp.route("/a/kinderplan/zuweisen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/kinderplan/<token>/zuweisen", methods=["POST"])
 def zuweisen(token):
     """Tippen auf einen Aufgaben-Chip weist zu bzw. entfernt wieder (Toggle).
@@ -271,6 +273,7 @@ def zuweisen(token):
     return redirect(url_for("kinderplan_app.index", token=token, fuer=ziel_id))
 
 
+@bp.route("/a/kinderplan/abhaken", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/kinderplan/<token>/abhaken", methods=["POST"])
 def abhaken(token):
     """Abhaken registriert direkt in geholfen_eintraege - dieselbe Quelle,
@@ -299,6 +302,7 @@ def abhaken(token):
     return jsonify(ok=True, aufgabe=aufg["name"], emoji=aufg["emoji"])
 
 
+@bp.route("/a/kinderplan/serie_einsortieren", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/kinderplan/<token>/serie_einsortieren", methods=["POST"])
 def serie_einsortieren_route(token):
     """Holt eine Pool-Vorlage und legt sie fuer eine Person auf einen
@@ -325,6 +329,7 @@ def serie_einsortieren_route(token):
     return redirect(url_for("kinderplan_app.index", token=token, fuer=ziel_id))
 
 
+@bp.route("/a/kinderplan/serie_zuruecklegen/<int:tid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/kinderplan/<token>/serie_zuruecklegen/<int:tid>", methods=["POST"])
 def serie_zuruecklegen(token, tid):
     """Wunsch #114: eine aus dem Pool eingesetzte Instanz wieder entfernen -
@@ -349,6 +354,7 @@ def serie_zuruecklegen(token, tid):
     return redirect(url_for("kinderplan_app.index", token=token, fuer=row["zugewiesen_an"]))
 
 
+@bp.route("/a/kinderplan/serie_erledigen/<int:tid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/kinderplan/<token>/serie_erledigen/<int:tid>", methods=["POST"])
 def serie_erledigen(token, tid):
     """Abhaken/Zurücknehmen einer aus dem Pool eingesetzten Todo-Instanz

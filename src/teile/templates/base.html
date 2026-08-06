@@ -8,7 +8,7 @@
   <meta name="theme-color" content="{{ farbe | default('#4a90d9') }}">
   <title>{% block title %}Portal{% endblock %} · 16schwaben.de</title>
   {% if user is defined and user and user.home_token %}
-  <link rel="manifest" href="/manifest/{{ user.home_token }}.json">
+  <link rel="manifest" href="{{ manifest_pfad(user.home_token) }}" crossorigin="use-credentials">
   {% else %}
   <link rel="manifest" href="/static/manifest.json">
   {% endif %}
@@ -209,7 +209,7 @@
   <div class="nav-bar">
     {% block nav_left %}
     {% if user is defined and user and user.home_token %}
-    <a class="nav-btn" href="/p/{{ user.home_token }}" title="Startseite">⌂</a>
+    <a class="nav-btn" href="{{ start_pfad(user.home_token) }}" title="Startseite">⌂</a>
     {% else %}
     <span class="nav-ghost"></span>
     {% endif %}
@@ -219,7 +219,7 @@
       {% block nav_title %}{% endblock %}
     </div>
 
-    {% if token is defined and token %}
+    {% if user is defined and user %}
     <button class="nav-btn" id="menu-btn" aria-label="Menü öffnen">☰</button>
     {% else %}
     <span class="nav-ghost"></span>
@@ -231,7 +231,7 @@
 
 {% block body %}{% endblock %}
 
-{% if token is defined and token %}
+{% if user is defined and user %}
 <!-- Hamburger-Menü -->
 <div id="menu-overlay" class="menu-overlay">
   <div id="menu-panel" class="menu-panel">
@@ -240,75 +240,75 @@
     </div>
 
     <!-- 1. Startseite: immer ganz oben (Wunsch #32) -->
-    <a class="menu-item" href="/p/{{ user.home_token if user is defined and user else '#' }}">
+    <a class="menu-item" href="{{ start_pfad(user.home_token) if user is defined and user else '#' }}">
       <span class="menu-emoji">🏠</span>Startseite
     </a>
 
     <!-- 2. Eintraege der gerade geoeffneten App -->
-    {% set zeigt_geholfen_items = app_slug is defined and app_slug == 'geholfen' and token is defined and token %}
-    {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin and token is defined and token %}
-    {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and token is defined and token %}
-    {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and token is defined and token %}
-    {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and (user.is_admin or user.rolle == 'eltern') and token is defined and token %}
-    {% set zeigt_tvb_items      = app_slug is defined and app_slug == 'tvb' and token is defined and token %}
+    {% set zeigt_geholfen_items = app_slug is defined and app_slug == 'geholfen' and user is defined and user %}
+    {% set zeigt_einkauf_items  = app_slug is defined and app_slug == 'einkauf' and user is defined and user and user.is_admin %}
+    {% set zeigt_vokabeln_items = app_slug is defined and app_slug == 'vokabeln' and user is defined and user %}
+    {% set zeigt_todo_items     = app_slug is defined and app_slug == 'todo' and user is defined and user %}
+    {% set zeigt_packliste_items = app_slug is defined and app_slug == 'packliste' and user is defined and user and (user.is_admin or user.rolle == 'eltern') %}
+    {% set zeigt_tvb_items      = app_slug is defined and app_slug == 'tvb' and user is defined and user %}
     {% if zeigt_geholfen_items or zeigt_einkauf_items or zeigt_vokabeln_items or zeigt_todo_items or zeigt_packliste_items or zeigt_tvb_items %}
     <div class="menu-divider"></div>
 
     {% if zeigt_geholfen_items %}
-    <a class="menu-item" href="/a/geholfen/{{ token }}/verlauf">
+    <a class="menu-item" href="/a/geholfen{{ tp }}verlauf">
       <span class="menu-emoji">📜</span>Zuletzt geholfen
     </a>
     {% if user.is_admin %}
-    <a class="menu-item" href="/a/geholfen/{{ token }}/uebersicht">
+    <a class="menu-item" href="/a/geholfen{{ tp }}uebersicht">
       <span class="menu-emoji">📊</span>Statistik
     </a>
     {% endif %}
     {% endif %}
 
     {% if zeigt_einkauf_items %}
-    <a class="menu-item" href="/a/einkauf/{{ token }}/laeden">
+    <a class="menu-item" href="/a/einkauf{{ tp }}laeden">
       <span class="menu-emoji">🏪</span>Märkte verwalten
     </a>
-    <a class="menu-item" href="/a/einkauf/{{ token }}/kategorien">
+    <a class="menu-item" href="/a/einkauf{{ tp }}kategorien">
       <span class="menu-emoji">🗂️</span>Kategorien verwalten
     </a>
     {% endif %}
 
     {% if zeigt_vokabeln_items %}
-    <a class="menu-item" href="/a/vokabeln/{{ token }}/foto-import">
+    <a class="menu-item" href="/a/vokabeln{{ tp }}foto-import">
       <span class="menu-emoji">📷</span>Foto-Import
     </a>
-    <a class="menu-item" href="/a/vokabeln/{{ token }}/auswertung">
+    <a class="menu-item" href="/a/vokabeln{{ tp }}auswertung">
       <span class="menu-emoji">📊</span>Auswertung
     </a>
-    <a class="menu-item" href="/a/vokabeln/{{ token }}/sprachen">
+    <a class="menu-item" href="/a/vokabeln{{ tp }}sprachen">
       <span class="menu-emoji">🌐</span>Sprachen
     </a>
-    <a class="menu-item" href="/a/vokabeln/{{ token }}/kapitel">
+    <a class="menu-item" href="/a/vokabeln{{ tp }}kapitel">
       <span class="menu-emoji">🗂️</span>Kapitel verwalten
     </a>
     {% endif %}
 
     {% if zeigt_todo_items %}
-    <a class="menu-item" href="/a/todo/{{ token }}/serien">
+    <a class="menu-item" href="/a/todo{{ tp }}serien">
       <span class="menu-emoji">🔁</span>Wiederkehrende Aufgaben
     </a>
     {% endif %}
 
     {% if zeigt_packliste_items %}
-    <a class="menu-item" href="/a/packliste/{{ token }}/ziele">
+    <a class="menu-item" href="/a/packliste{{ tp }}ziele">
       <span class="menu-emoji">🎯</span>Ziele verwalten
     </a>
-    <a class="menu-item" href="/a/packliste/{{ token }}/kategorien">
+    <a class="menu-item" href="/a/packliste{{ tp }}kategorien">
       <span class="menu-emoji">🗂️</span>Kategorien verwalten
     </a>
     {% endif %}
 
     {% if zeigt_tvb_items %}
-    <a class="menu-item" href="/a/tvb/{{ token }}/kader">
+    <a class="menu-item" href="/a/tvb{{ tp }}kader">
       <span class="menu-emoji">👥</span>Kader &amp; Spielerwerte
     </a>
-    <a class="menu-item" href="/a/tvb/{{ token }}/mannschaften">
+    <a class="menu-item" href="/a/tvb{{ tp }}mannschaften">
       <span class="menu-emoji">🗂️</span>Mannschaften anzeigen
     </a>
     {% endif %}
@@ -323,7 +323,7 @@
       </button>
 
       {% if user is defined and user and user.hilfe_token %}
-      <a class="menu-icon-btn" href="/a/hilfe/{{ user.hilfe_token }}/" title="Hilfe">❓</a>
+      <a class="menu-icon-btn" href="{{ app_pfad('hilfe', user.hilfe_token) }}" title="Hilfe">❓</a>
       {% endif %}
 
       <button class="menu-icon-btn" id="wunsch-menu-btn" title="Verbesserungsvorschlag">✨</button>
@@ -345,7 +345,8 @@
 
 <script>
 (function(){
-  const TOKEN = '{{ token }}';
+  const TOKEN = {{ (token or '')|tojson }};
+  const TP    = {{ tp|tojson }};
 
   // Menü öffnen/schließen
   const menuBtn     = document.getElementById('menu-btn');
@@ -446,6 +447,18 @@ if ('serviceWorker' in navigator) {
   // 00_kern.py).
   navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
     .catch(e => console.warn('SW:', e));
+
+  // Wunsch #140, Stufe 4: Dem Worker sagen, wer gerade zusieht. Token-freie
+  // Adressen sind fuer alle Nutzer gleich - ohne diese Meldung wuerde auf
+  // einem geteilten Geraet der naechste Nutzer offline die gecachten Seiten
+  // des vorigen sehen. Der Worker wirft den Seiten-Cache weg, sobald sich die
+  // gemeldete Kennung aendert.
+  {% if user is defined and user %}
+  navigator.serviceWorker.ready.then(reg => {
+    const ziel = reg.active || navigator.serviceWorker.controller;
+    if (ziel) ziel.postMessage({ typ: 'nutzer', id: {{ user.id|tojson }} });
+  }).catch(() => {});
+  {% endif %}
 }
 
 // Offline-Banner auf jeder Seite, nicht nur der Startseite - die eigentliche

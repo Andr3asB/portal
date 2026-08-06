@@ -415,6 +415,7 @@ def _rezept_per_ki(user_id: int, html: str, url: str):
     }
 
 
+@bp.route("/a/rezepte/", defaults={"token": None})
 @bp.route("/a/rezepte/<token>/")
 def index(token):
     """Wunsch #49: Suche filtert clientseitig über Titel + Zutaten – dafür
@@ -438,6 +439,7 @@ def index(token):
         user=user, token=token, farbe=user["farbe"], rezepte=rezepte, kategorien=KATEGORIEN)
 
 
+@bp.route("/a/rezepte/neu", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/rezepte/<token>/neu", methods=["GET", "POST"])
 def neu(token):
     """Wunsch #48: eigene Unterseite statt dauerhaft sichtbarer Eingabemaske
@@ -517,6 +519,7 @@ def _rezept_per_ki_bild(user_id: int, mime: str, bild_b64: str):
     }
 
 
+@bp.route("/a/rezepte/importieren-bild", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/rezepte/<token>/importieren-bild", methods=["GET", "POST"])
 def importieren_bild(token):
     """Wunsch #97: Rezept per Foto (Kamera/Mediathek) importieren. Ergebnis
@@ -558,6 +561,7 @@ def importieren_bild(token):
         user=user, token=token, farbe=user["farbe"], vorbelegt=rezept, kategorien=KATEGORIEN)
 
 
+@bp.route("/a/rezepte/importieren", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/rezepte/<token>/importieren", methods=["GET", "POST"])
 def importieren(token):
     """Rezept per URL importieren: JSON-LD zuerst, KI-Extraktion als Fallback.
@@ -600,6 +604,7 @@ def importieren(token):
         user=user, token=token, farbe=user["farbe"], vorbelegt=rezept, kategorien=KATEGORIEN)
 
 
+@bp.route("/a/rezepte/<int:rid>", defaults={"token": None})
 @bp.route("/a/rezepte/<token>/<int:rid>")
 def detail(token, rid):
     user   = _user(token)
@@ -637,6 +642,7 @@ def detail(token, rid):
         wunsch_anzahl=wunsch_anzahl, eigener_wunsch=eigener_wunsch)
 
 
+@bp.route("/a/rezepte/<int:rid>/bearbeiten", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/rezepte/<token>/<int:rid>/bearbeiten", methods=["GET", "POST"])
 def bearbeiten(token, rid):
     """Rezept nachträglich bearbeiten – dasselbe Formular wie /neu (rezept_neu.html),
@@ -693,6 +699,7 @@ def bearbeiten(token, rid):
     return redirect(url_for("rezepte_app.detail", token=token, rid=rid))
 
 
+@bp.route("/a/rezepte/<int:rid>/bewerten", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/rezepte/<token>/<int:rid>/bewerten", methods=["POST"])
 def bewerten(token, rid):
     """Wunsch #52: 1-5 Sterne pro Nutzer und Rezept, editierbar (UPSERT über
@@ -719,6 +726,7 @@ def bewerten(token, rid):
         durchschnitt=round(bewertung["schnitt"], 1), anzahl=bewertung["anzahl"])
 
 
+@bp.route("/a/rezepte/<int:rid>/wunsch/toggle", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/rezepte/<token>/<int:rid>/wunsch/toggle", methods=["POST"])
 def wunsch_toggle(token, rid):
     """Wunsch #65: bis zu 5 Rezepte pro Nutzer gleichzeitig als "wünsch ich
@@ -755,6 +763,7 @@ def wunsch_toggle(token, rid):
     return jsonify(ok=True, markiert=markiert, anzahl=anzahl)
 
 
+@bp.route("/a/rezepte/<int:rid>/loeschen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/rezepte/<token>/<int:rid>/loeschen", methods=["POST"])
 def loeschen(token, rid):
     _user(token)
@@ -764,6 +773,7 @@ def loeschen(token, rid):
     return redirect(url_for("rezepte_app.index", token=token))
 
 
+@bp.route("/a/rezepte/zutat/<int:zid>/einkaufen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/rezepte/<token>/zutat/<int:zid>/einkaufen", methods=["POST"])
 def zutat_einkaufen(token, zid):
     user  = _user(token)

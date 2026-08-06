@@ -132,15 +132,18 @@ geteilten Gerät das falsche Konto sieht.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S3-01 | Portal öffnen, dann in der Adresszeile alles ab `/p/` löschen und nur `portal.16schwaben.de/start` aufrufen | A-PC | Du bist drin, deine Startseite mit deinem Namen | | |
-| S3-02 | Dasselbe auf einem Kind-Gerät | Kind | Kommt rein, sieht **seine** Startseite mit **seinem** Namen | | |
-| S3-03 | Auf dem Kind-Gerät prüfen, welche Apps sichtbar sind | Kind | Nur die freigeschalteten – **keine Verwaltung** | | |
-| S3-04 | Auf dem Kind-Gerät versuchen, einen fremden Eintrag zu löschen (z. B. Aufgabe) | Kind | Geht weiterhin nicht (Löschen ist Eltern/Admin) | | |
-| S3-05 | **Vorrangtest:** Auf deinem Gerät (angemeldet als Andi) den Link eines Kindes öffnen | A-Handy | Es erscheint die Seite **des Kindes**, nicht deine | | |
-| S3-06 | **Widerruf:** In der Verwaltung bei einem Kind „Zugänge neu" klicken. Danach auf dessen Gerät die Seite neu laden | Kind | Kommt **nicht** mehr rein – muss den neuen Link/QR bekommen | | |
-| S3-07 | Nach S3-06 den neuen QR-Code scannen | Kind | Kommt wieder rein | | |
-| S3-08 | **Esszimmer-Bildschirm ansehen** | Kiosk | Läuft unverändert. **Auf keinen Fall ein Anmeldebildschirm** | | |
-| S3-09 | Portal-App vom Homescreen starten | A-PWA | Startet und ist angemeldet | | |
+| S3-01 | Portal öffnen, dann in der Adresszeile alles ab `/p/` löschen und nur `portal.16schwaben.de/start` aufrufen | A-PC | Du bist drin, deine Startseite mit deinem Namen | ok | |
+| S3-02 | Dasselbe auf einem Kind-Gerät | Kind | Kommt rein, sieht **seine** Startseite mit **seinem** Namen | ok | |
+| S3-03 | Auf dem Kind-Gerät prüfen, welche Apps sichtbar sind | Kind | Nur die freigeschalteten – **keine Verwaltung** | ok | |
+| S3-04 | Auf dem Kind-Gerät versuchen, einen fremden Eintrag zu löschen (z. B. Aufgabe) | Kind | Geht weiterhin nicht (Löschen ist Eltern/Admin) | ok | |
+| S3-05 | **Vorrangtest:** Auf deinem Gerät (angemeldet als Andi) den Link eines Kindes öffnen | A-Handy | Es erscheint die Seite **des Kindes**, nicht deine | ok | |
+| S3-06 | **Widerruf:** In der Verwaltung bei einem Kind „Zugänge neu" klicken. Danach auf dessen Gerät die Seite neu laden | Kind | Kommt **nicht** mehr rein – muss den neuen Link/QR bekommen | ok | |
+| S3-07 | Nach S3-06 den neuen QR-Code scannen | Kind | Kommt wieder rein | ok | |
+| S3-08 | **Esszimmer-Bildschirm ansehen** | Kiosk | Läuft unverändert. **Auf keinen Fall ein Anmeldebildschirm** | ok | |
+| S3-09 | Portal-App vom Homescreen starten | A-PWA | Startet und ist angemeldet | ok | |
+
+**Ergebnis Stufe 3 (2026-08-06): bestanden**, auf echten Geräten inklusive
+Vorrangtest, Widerruf und Kiosk.
 
 ---
 
@@ -151,9 +154,25 @@ Token funktioniert weiterhin – er ist ab jetzt der Ersteinstieg und die
 Rückfallebene.
 
 **Was diese Stufe gefährlich macht:** Die Startadresse der installierten App
-ändert sich. Wer das Portal auf dem Homescreen hat, muss hier hinsehen.
+ändert sich. Wer das Portal auf dem Homescreen hat, muss hier hinsehen. Und:
+Auf einem **geteilten Gerät** entscheidet ab jetzt das Cookie, wessen Seiten
+man sieht – nicht mehr der Link, auf den man getippt hat.
 
 **Notausstieg:** `TOKENFREIE_URLS=0`
+
+**Schon von hier aus geprüft** (musst du nicht wiederholen): alle 50 Zugänge
+über ihre alten Token-Adressen → 50 × OK; alle vier Nutzer token-frei durch
+jede ihrer Apps → 46 × OK; ohne Cookie kommt niemand rein (403); in keiner
+ausgelieferten Seite steht noch irgendein Token. Was hier **nicht** prüfbar
+ist und deshalb unten steht: echte Geräte, die installierte PWA, der
+Kiosk-iFrame und der Offline-Cache.
+
+**Beim Testen selbst aufgefallen und schon behoben:** Öffnete jemand seinen
+Link auf einem Gerät, dessen Cookie noch einem anderen gehörte, zeigte die
+Startseite korrekt die richtige Person – ab dem ersten Tippen aber die Seiten
+des Vorgängers. Der Vorrang des Links hielt nur eine Seite lang. Jetzt
+übernimmt der geöffnete Link das Gerät vollständig. **S4-10 prüft genau das**
+und ist der wichtigste Test dieser Stufe.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
@@ -166,6 +185,8 @@ Rückfallebene.
 | S4-07 | Esszimmer-Bildschirm ansehen | Kiosk | Läuft unverändert | | |
 | S4-08 | Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | | |
 | S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | | |
+| S4-10 | **Geteiltes Gerät:** Auf einem Gerät, auf dem zuletzt *du* drin warst, den Link eines Kindes öffnen. Dann auf eine Kachel tippen. | ein Gerät, das zwei Leute benutzen (iPad/Kiosk) | Es bleibt beim Kind – auch nach dem Tippen. Nirgends deine Daten. Danach mit deinem Link zurückwechseln: es bleibt bei dir. | | |
+| S4-11 | Nach S4-10 auf demselben Gerät **im Flugmodus** eine schon besuchte Seite öffnen | dasselbe Gerät | Die Seite des *aktuellen* Nutzers oder die Offline-Meldung – niemals die des Vorgängers | | |
 
 ---
 

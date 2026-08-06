@@ -344,6 +344,19 @@ _CORE_APPS = [
     ("rezepte",     "Rezepte",      "🍲", "Lieblingsrezepte mit Zutaten und Zubereitung"),
     ("essensplan",  "Essensplan",   "🍽️", "Wochenplan fürs Essen"),
     ("kinderplan",  "Aufgabenplan", "🗓️", "Wiederkehrende Aufgaben wochentagsweise planen"),
+    # Die fünf unten fehlten hier bis Wunsch #140, Stufe 4. Auf dem laufenden
+    # Server gibt es sie längst - sie wurden seinerzeit von Hand über
+    # `manage.py addapp` angelegt und nie nachgetragen. Auf einer FRISCHEN
+    # Datenbank hätten die zugehörigen Module deshalb Routen registriert, für
+    # die es gar keine App zum Freischalten gibt. Aufgefallen ist das erst,
+    # als der Rauchtest aus tests/ eine leere Test-DB aufbaute.
+    # `INSERT OR IGNORE` lässt die vorhandenen Zeilen unangetastet; Name und
+    # Emoji sind exakt die der Produktivdatenbank.
+    ("sportschau",    "Sportschau",    "🏃", None),
+    ("tierbaukasten", "Tierbaukasten", "🐾", None),
+    ("vokabeln",      "Vokabeln",      "📚", None),
+    ("packliste",     "Packliste",     "🧳", None),
+    ("tvb",           "TVB",           "🤾", None),
 ]
 
 _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller", "Penny"]
@@ -517,6 +530,99 @@ def sitzung_vormerken(user_id: int):
         # Kein Request-Kontext (z. B. Aufruf aus manage.py) - dann gibt es
         # auch keine Antwort, an die sich ein Cookie hängen liesse.
         pass
+
+
+def aktueller_nutzer(token: str = None):
+    """Nutzer für die vier Endpunkte OHNE <token> im Pfad, sonst None.
+
+    Betrifft `/wunsch`, `/push/subscribe`, `/push/unsubscribe` und
+    `/settings/darkmode`. Die holen ihren Token seit jeher aus dem JSON-Body
+    und prüfen ihn gegen IRGENDEINEN Grant - sie hängen nicht an einer
+    bestimmten App, weil sie von jeder Seite aus aufgerufen werden.
+
+    Wunsch #140, Stufe 4: Auf einer token-freien Seite ist `TOKEN` im
+    Javascript leer, der Body trägt also keinen Token mehr. Ohne diese
+    Zweitchance über das Sitzungs-Cookie wären ausgerechnet Dark Mode,
+    Push-Anmeldung und das Wunsch-Formular die einzigen Dinge, die nach dem
+    Umbau still nicht mehr funktionieren - und "still" ist hier das Problem:
+    ein 403 auf `/settings/darkmode` fällt niemandem auf, bis sich jemand
+    wundert, warum der Schalter nichts tut.
+
+    Reihenfolge und Begründung wie in grant(): Pfad- bzw. Body-Token hat
+    Vorrang, ein angegebener aber ungültiger Token fällt NICHT aufs Cookie
+    zurück."""
+    db = get_db()
+
+    if token:
+        row = db.execute(
+            _NUTZER_SELECT + " JOIN grants g ON g.user_id = u.id"
+                             " WHERE g.token_lookup = ?",
+            (token_lookup(token),)
+        ).fetchone()
+        if not row:
+            return None
+        daten = _nutzer_aufbereiten(row)
+        sitzung_vormerken(daten["id"])
+        return daten
+
+    if not sitzung_konsumieren_an():
+        return None
+    user_id = sitzung_nutzer_id(db)
+    if user_id is None:
+        return None
+    row = db.execute(_NUTZER_SELECT + " WHERE u.id = ?", (user_id,)).fetchone()
+    return _nutzer_aufbereiten(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Wunsch #140, Stufe 4: Adressen ohne Token bauen.
+#
+# Jede Route hat seit Stufe 4 zwei Regeln - mit und ohne `<token>` im Pfad.
+# Welche die Vorlagen verlinken, entscheidet allein der Schalter
+# TOKENFREIE_URLS. Das ist der Notausstieg: steht er auf 0, verlinkt das
+# Portal wieder wie vorher mit Token in der Adresse, ohne Rebuild.
+#
+# Die Helfer unten sind bewusst die EINZIGE Stelle, an der dieser Unterschied
+# gemacht wird. Wer eine Adresse von Hand zusammensetzt, umgeht den Schalter.
+
+def tokenfreie_urls_an() -> bool:
+    """Schalter für Stufe 4. Aus = Adressen tragen den Token wie bisher."""
+    return str(current_app.config.get("TOKENFREIE_URLS", "")).strip() in ("1", "true", "ja")
+
+
+def token_pfad(token) -> str:
+    """Das Wegstück zwischen App-Präfix und Unterseite: '/tok/' oder '/'.
+
+    Damit wird aus `/a/todo/{{ token }}/neu` in den Vorlagen einheitlich
+    `/a/todo{{ tp }}neu` - beide Formen kommen aus derselben Zeile."""
+    if not token or tokenfreie_urls_an():
+        return "/"
+    return f"/{token}/"
+
+
+def app_pfad(slug: str, token=None) -> str:
+    """Einstieg in eine App - für Links über App-Grenzen hinweg.
+
+    Nötig, weil `tp` immer den Token der GERADE offenen App liefert. Die
+    App-Kacheln der Startseite und der Hilfe-Knopf im Menü zeigen aber
+    woandershin und brauchen den Token des jeweils anderen Grants."""
+    return f"/a/{slug}{token_pfad(token)}"
+
+
+def start_pfad(home_token=None) -> str:
+    """Die persönliche Startseite - Ziel des ⌂-Knopfes auf jeder Seite."""
+    if not home_token or tokenfreie_urls_an():
+        return "/start"
+    return f"/p/{home_token}"
+
+
+def manifest_pfad(home_token=None) -> str:
+    """PWA-Manifest. Token-frei hängt es am Sitzungs-Cookie - dafür braucht
+    das <link>-Tag zusätzlich crossorigin="use-credentials", sonst holt der
+    Browser das Manifest ohne Cookies und bekäme 404 (siehe base.html)."""
+    if not home_token or tokenfreie_urls_an():
+        return "/manifest.json"
+    return f"/manifest/{home_token}.json"
 
 
 def grant_werte(token: str):
@@ -1382,6 +1488,23 @@ def init_app(app):
             db.close()
 
     _init_db(app)
+
+    # Wunsch #140, Stufe 4: Adress-Bausteine für jede Vorlage.
+    #
+    # `tp` kommt aus request.view_args und NICHT aus der Template-Variablen
+    # `token`. Grund: `01_start_token.py` reicht auf `/start` ersatzweise den
+    # Home-Token an die Vorlage durch (damit `const TOKEN` gefüllt bleibt).
+    # Käme `tp` von dort, stünde auf `/start` plötzlich wieder ein Token in
+    # allen Links. view_args sagt dagegen genau das, was in der Adresszeile
+    # steht - und die Links sollen der Adresszeile folgen.
+    @app.context_processor
+    def _adress_bausteine():
+        return {
+            "tp":            token_pfad((request.view_args or {}).get("token")),
+            "app_pfad":      app_pfad,
+            "start_pfad":    start_pfad,
+            "manifest_pfad": manifest_pfad,
+        }
 
     @app.route("/health")
     def health():

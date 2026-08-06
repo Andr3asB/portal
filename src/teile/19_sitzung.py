@@ -100,8 +100,29 @@ def init_app(app):
 
         try:
             db = get_db()
-            if sitzung_aus_cookie(db) is not None:
-                return antwort          # es gibt schon eine, nichts tun
+            vorhanden = sitzung_aus_cookie(db)
+            if vorhanden is not None and vorhanden["user_id"] == user_id:
+                return antwort          # passende Sitzung liegt schon vor
+
+            # Wunsch #140, Stufe 4: Gehört die vorhandene Sitzung einem ANDEREN
+            # Nutzer, wird sie ersetzt. Das ist der Fall "geteiltes Gerät":
+            # Simone öffnet auf dem Familien-iPad ihren QR-Link, während das
+            # Cookie noch Andi gehört.
+            #
+            # Bis Stufe 3 war das harmlos - jede Kachel trug Simones Token, die
+            # Navigation folgte also dem Link. Token-frei ist `/a/einkauf/` für
+            # alle dieselbe Adresse: Simone sähe ihre Startseite, und beim
+            # ersten Tippen Andis Einkaufsliste. Der Vorrang des Pfad-Tokens
+            # hielte genau eine Seite lang.
+            #
+            # Deshalb: Wer seinen Link öffnet, übernimmt das Gerät. Die alte
+            # Sitzung wird dabei gelöscht und nicht bloß überschrieben, sonst
+            # bliebe für jeden Wechsel eine verwaiste, gültige Zeile zurück -
+            # und "Zugänge neu erzeugen" räumt nur die des eigenen Nutzers weg.
+            if vorhanden is not None:
+                db.execute("DELETE FROM sitzungen WHERE id = ?", (vorhanden["id"],))
+                db.commit()
+
             wert = _sitzung_anlegen(db, user_id, "token")
             antwort.set_cookie(
                 COOKIE_NAME, wert,

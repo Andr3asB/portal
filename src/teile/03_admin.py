@@ -51,6 +51,7 @@ def _push_counts(db):
     return result
 
 
+@bp.route("/a/admin/", defaults={"token": None})
 @bp.route("/a/admin/<token>/")
 def index(token):
     user = _admin(token)
@@ -67,6 +68,7 @@ def index(token):
     )
 
 
+@bp.route("/a/admin/user/neu", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/admin/<token>/user/neu", methods=["GET", "POST"])
 def user_neu(token):
     user = _admin(token)
@@ -95,6 +97,7 @@ def user_neu(token):
         user=user, token=token, farbe=user["farbe"], edit=None)
 
 
+@bp.route("/a/admin/user/<int:uid>/bearbeiten", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/admin/<token>/user/<int:uid>/bearbeiten", methods=["GET", "POST"])
 def user_bearbeiten(token, uid):
     user = _admin(token)
@@ -120,6 +123,7 @@ def user_bearbeiten(token, uid):
         user=user, token=token, farbe=user["farbe"], edit=edit)
 
 
+@bp.route("/a/admin/user/<int:uid>/grant/<app_slug>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/admin/<token>/user/<int:uid>/grant/<app_slug>", methods=["POST"])
 def grant_app(token, uid, app_slug):
     _admin(token)
@@ -133,6 +137,7 @@ def grant_app(token, uid, app_slug):
     return redirect(url_for("admin_app.index", token=token))
 
 
+@bp.route("/a/admin/user/<int:uid>/revoke/<app_slug>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/admin/<token>/user/<int:uid>/revoke/<app_slug>", methods=["POST"])
 def revoke_app(token, uid, app_slug):
     admin = _admin(token)
@@ -148,6 +153,7 @@ def revoke_app(token, uid, app_slug):
     return redirect(url_for("admin_app.index", token=token))
 
 
+@bp.route("/a/admin/user/<int:uid>/neue_tokens", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/admin/<token>/user/<int:uid>/neue_tokens", methods=["POST"])
 def neue_tokens(token, uid):
     """Wunsch #131: Alle Zugänge eines Nutzers in einem Rutsch neu erzeugen.
@@ -188,6 +194,7 @@ def neue_tokens(token, uid):
     return redirect(url_for("admin_app.index", token=token) + f"#user-{uid}")
 
 
+@bp.route("/a/admin/user/<int:uid>/qr.svg", defaults={"token": None})
 @bp.route("/a/admin/<token>/user/<int:uid>/qr.svg")
 def qr_svg(token, uid):
     _admin(token)

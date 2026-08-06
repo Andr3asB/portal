@@ -1,0 +1,198 @@
+"""Rauchtest über alle Seiten – das Netz für Stufe 4 von Wunsch #140.
+
+Stufe 4 fasst rund 290 Stellen an (91 Routen, 87 Template-Links, 113
+JS-Pfade). Ohne einen Test, der jede Seite tatsächlich aufruft, würde eine
+kaputte App erst auffallen, wenn sie jemand benutzt.
+
+Geprüft werden nur Routen, deren einzige Variable `<token>` ist – also die
+Hauptseite jeder App und ihre parameterlosen Unterseiten. Routen mit
+zusätzlichen IDs (`<int:eid>`) bräuchten Testdaten je App und sind hier
+bewusst außen vor; sie hängen an denselben Vorlagen.
+"""
+import pytest
+
+
+def _seiten_routen(app):
+    """Alle GET-Routen, deren einzige Variable <token> ist."""
+    for regel in app.url_map.iter_rules():
+        if "GET" not in regel.methods:
+            continue
+        if regel.endpoint == "static":
+            continue
+        if regel.arguments - {"token"}:
+            continue                      # braucht weitere Parameter
+        if "<token>" not in str(regel):
+            continue
+        yield regel
+
+
+def test_es_gibt_genug_zu_pruefen(app):
+    """Fängt ab, dass der Filter oben versehentlich alles wegwirft."""
+    assert len(list(_seiten_routen(app))) >= 20
+
+
+def test_alle_seiten_mit_token_erreichbar(app, client, admin, db):
+    """Jede Seite, für die der Admin einen Grant hat, muss 200 liefern.
+
+    Das ist die Messlatte für Stufe 4: Nach dem Umbau muss dasselbe gelten,
+    zusätzlich für die token-freie Form."""
+    # Admin bekommt alle Apps, damit wirklich jede Seite geprüft wird.
+    verbindung = db["verbindung"]
+    from teile.kern import grant_werte, new_token
+    with app.app_context():
+        for (app_id,) in verbindung.execute(
+            "SELECT id FROM apps WHERE id NOT IN "
+            "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
+        ).fetchall():
+            lookup, enc = grant_werte(new_token())
+            verbindung.execute(
+                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
+                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+        verbindung.commit()
+
+    # Für jede Route den passenden App-Token holen.
+    from teile.kern import token_entschluesseln
+    tokens = {}
+    with app.app_context():
+        for slug, enc in verbindung.execute("""
+            SELECT a.slug, g.token_enc FROM grants g
+            JOIN apps a ON a.id = g.app_id WHERE g.user_id = ?
+        """, (admin["id"],)).fetchall():
+            tokens[slug] = token_entschluesseln(enc)
+
+    fehler = []
+    for regel in _seiten_routen(app):
+        pfad = str(regel)
+        # Slug aus dem Pfad ziehen: /a/<slug>/<token>/...  bzw. /p/<token>
+        slug = pfad.split("/")[2] if pfad.startswith("/a/") else "home"
+        token = tokens.get(slug)
+        if not token:
+            # Bewusst KEIN stilles Überspringen: genau das hat verdeckt, dass
+            # fünf Apps gar keine Zeile in `apps` hatten und der Test in
+            # Wahrheit weniger prüfte als er behauptete.
+            fehler.append(f"{pfad} -> kein Grant, App '{slug}' fehlt in apps")
+            continue
+        antwort = client.get(pfad.replace("<token>", token))
+        if antwort.status_code != 200:
+            fehler.append(f"{pfad} -> {antwort.status_code}")
+
+    assert not fehler, "Diese Seiten sind nicht erreichbar:\n  " + "\n  ".join(fehler)
+
+
+@pytest.fixture()
+def stufe4(app):
+    """Alle drei Schalter an – der Zustand nach Stufe 4."""
+    schluessel = ("SITZUNG_AUSSTELLEN", "SITZUNG_KONSUMIEREN", "TOKENFREIE_URLS")
+    vorher = {k: app.config.get(k) for k in schluessel}
+    for k in schluessel:
+        app.config[k] = "1"
+    yield
+    app.config.update(vorher)
+
+
+def test_alle_seiten_auch_ohne_token_erreichbar(app, client, admin, db, stufe4):
+    """Dieselben Seiten, token-frei, allein über das Sitzungs-Cookie.
+
+    Der eigentliche Beweis für Stufe 4: Eine vergessene Route fällt hier auf,
+    weil die token-freie Form dann gar nicht existiert (404) oder niemanden
+    autorisiert (403)."""
+    verbindung = db["verbindung"]
+    from teile.kern import grant_werte, new_token
+    with app.app_context():
+        for (app_id,) in verbindung.execute(
+            "SELECT id FROM apps WHERE id NOT IN "
+            "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
+        ).fetchall():
+            lookup, enc = grant_werte(new_token())
+            verbindung.execute(
+                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
+                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+        verbindung.commit()
+
+    # Einmal mit Token rein – danach trägt das Cookie.
+    client.get(f"/p/{admin['tokens']['home']}")
+
+    fehler = []
+    for regel in _seiten_routen(app):
+        # Die token-freie Zwillingsregel desselben Endpunkts.
+        tokenfrei = [str(r) for r in app.url_map.iter_rules(regel.endpoint)
+                     if "<token>" not in str(r)]
+        if not tokenfrei:
+            fehler.append(f"{regel} -> keine token-freie Regel")
+            continue
+        antwort = client.get(tokenfrei[0])
+        if antwort.status_code != 200:
+            fehler.append(f"{tokenfrei[0]} -> {antwort.status_code}")
+
+    assert not fehler, "Token-frei nicht erreichbar:\n  " + "\n  ".join(fehler)
+
+
+def test_tokenfreie_seite_zeigt_keinen_token_in_links(app, client, admin, stufe4):
+    """Der Sinn der ganzen Stufe: Auf einer token-freien Seite darf in keinem
+    Link mehr ein Token stehen – sonst wandert er über das Menü (⌂, Hilfe,
+    App-Kacheln) doch wieder in Verlauf, Lesezeichen und Screenshots.
+
+    Geprüft wird über ALLE Seiten, für die der Testnutzer einen Grant hat, und
+    gegen ALLE seine Tokens – nicht nur den der gerade offenen App. Genau die
+    Verwechslung wäre der wahrscheinliche Fehler: `tp` stimmt, aber ein
+    App-übergreifender Link baut den Token weiter ein.
+
+    Die Verwaltungsseite ist ausgenommen: Sie ZEIGT die Links absichtlich her,
+    damit man sie weitergeben kann. Dass sie das tut, ist ein eigener Befund
+    aus der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing)."""
+    client.get(f"/p/{admin['tokens']['home']}")
+
+    seiten = ["/start"] + [
+        f"/a/{slug}/" for slug in admin["tokens"] if slug not in ("home", "admin")
+    ]
+    fehler = []
+    for pfad in seiten:
+        antwort = client.get(pfad)
+        assert antwort.status_code == 200, f"{pfad} -> {antwort.status_code}"
+        text = antwort.get_data(as_text=True)
+        for name, wert in admin["tokens"].items():
+            if wert in text:
+                fehler.append(f"{pfad}: Token '{name}' steht noch in der Seite")
+
+    assert not fehler, "\n  ".join([""] + fehler)
+
+
+def test_notausstieg_stellt_token_links_wieder_her(app, client, admin):
+    """TOKENFREIE_URLS=0 muss den Zustand von vorher zurückbringen.
+
+    Der Schalter ist die Rücknahme für Stufe 4 – ohne Rebuild, ohne Paket.
+    Ein Schalter, der nicht nachweislich greift, ist keine Rückfallebene,
+    sondern ein Versprechen. Also: mit `0` müssen die Links wieder Tokens
+    tragen, und `/p/<token>` darf NICHT umleiten."""
+    schluessel = ("SITZUNG_AUSSTELLEN", "SITZUNG_KONSUMIEREN", "TOKENFREIE_URLS")
+    vorher = {k: app.config.get(k) for k in schluessel}
+    app.config["SITZUNG_AUSSTELLEN"] = "1"
+    app.config["SITZUNG_KONSUMIEREN"] = "1"
+    app.config["TOKENFREIE_URLS"] = "0"
+    try:
+        home = admin["tokens"]["home"]
+        antwort = client.get(f"/p/{home}")
+        assert antwort.status_code == 200, "keine Weiterleitung erwartet"
+        # Zweiter Aufruf: jetzt liegt ein Cookie vor – trotzdem kein Redirect.
+        antwort = client.get(f"/p/{home}")
+        assert antwort.status_code == 200, "Schalter aus, aber trotzdem umgeleitet"
+        text = antwort.get_data(as_text=True)
+        assert f"/a/einkauf/{admin['tokens']['einkauf']}/" in text, \
+            "App-Kachel trägt keinen Token mehr, obwohl der Schalter aus ist"
+    finally:
+        app.config.update(vorher)
+
+
+def test_leerer_token_wird_nicht_als_none_gerendert(app, client, admin, stufe4):
+    """Jinja rendert `None` als die Zeichenkette "None".
+
+    `const TOKEN = '{{ token }}'` ergäbe token-frei wörtlich `'None'` – ein
+    truthy Wert, der an `/wunsch`, `/push/*` und `/settings/darkmode` als Token
+    ginge, dort nicht auflöst, und weil ein ANGEGEBENER Token bewusst nicht
+    aufs Cookie zurückfällt, ein stilles 403 erzeugt. Der Schalter im Menü täte
+    dann einfach nichts, ohne Fehlermeldung. Deshalb dieser Test."""
+    client.get(f"/p/{admin['tokens']['home']}")
+    for pfad in ["/start", "/a/einkauf/", "/a/todo/"]:
+        text = client.get(pfad).get_data(as_text=True)
+        assert "'None'" not in text and '"None"' not in text, \
+            f"{pfad}: None als Zeichenkette in der Seite"

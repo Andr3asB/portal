@@ -53,7 +53,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/geholfen/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/geholfen{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -135,7 +135,7 @@
   {% if user.is_admin %}
   <div style="margin-top:16px">
     <a class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;padding:12px"
-       href="/a/geholfen/{{ token }}/aufgaben">⚙️ Aufgaben verwalten</a>
+       href="/a/geholfen{{ tp }}aufgaben">⚙️ Aufgaben verwalten</a>
   </div>
   {% endif %}
 </main>

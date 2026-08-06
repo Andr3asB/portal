@@ -28,6 +28,7 @@ def _user(token):
     return u
 
 
+@bp.route("/a/essensplan/", defaults={"token": None})
 @bp.route("/a/essensplan/<token>/")
 def index(token):
     user  = _user(token)
@@ -80,6 +81,7 @@ def index(token):
     )
 
 
+@bp.route("/a/essensplan/eintrag", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/essensplan/<token>/eintrag", methods=["POST"])
 def eintrag_speichern(token):
     user     = _user(token)
@@ -111,6 +113,7 @@ def eintrag_speichern(token):
     return redirect(url_for("essensplan_app.index", token=token))
 
 
+@bp.route("/a/essensplan/verschieben", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/essensplan/<token>/verschieben", methods=["POST"])
 def verschieben(token):
     """Drag & Drop: Eintrag auf einen beliebigen anderen Mahlzeit-Slot ziehen

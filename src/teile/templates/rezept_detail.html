@@ -61,7 +61,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/rezepte/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/rezepte{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -131,8 +131,8 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
   {% endif %}
 
   <div class="rezept-aktionen">
-    <a class="btn-bearbeiten-rezept" href="/a/rezepte/{{ token }}/{{ rezept.id }}/bearbeiten">✏️ Bearbeiten</a>
-    <form method="post" action="/a/rezepte/{{ token }}/{{ rezept.id }}/loeschen" style="flex:1"
+    <a class="btn-bearbeiten-rezept" href="/a/rezepte{{ tp }}{{ rezept.id }}/bearbeiten">✏️ Bearbeiten</a>
+    <form method="post" action="/a/rezepte{{ tp }}{{ rezept.id }}/loeschen" style="flex:1"
           onsubmit="return confirm({{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button class="btn-loeschen-rezept" type="submit" style="width:100%">🗑️ Löschen</button>
     </form>
@@ -143,12 +143,13 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 function zutatEinkaufen(id, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  fetch(`/a/rezepte/${TOKEN}/zutat/${id}/einkaufen`, { method: 'POST' })
+  fetch(`/a/rezepte${TP}zutat/${id}/einkaufen`, { method: 'POST' })
     .then(r => r.json())
     .then(d => {
       if (d.ok) {
@@ -163,7 +164,7 @@ function zutatEinkaufen(id, btn) {
 
 // Wunsch #52: Sterne-Bewertung, sofort per Fetch statt vollem Reload.
 function bewerten(rid, sterne) {
-  fetch(`/a/rezepte/${TOKEN}/${rid}/bewerten`, {
+  fetch(`/a/rezepte${TP}${rid}/bewerten`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({sterne}),
@@ -185,7 +186,7 @@ let wunschLaeuft = false;
 function wunschToggle(rid) {
   if (wunschLaeuft) return;
   wunschLaeuft = true;
-  fetch(`/a/rezepte/${TOKEN}/${rid}/wunsch/toggle`, { method: 'POST' })
+  fetch(`/a/rezepte${TP}${rid}/wunsch/toggle`, { method: 'POST' })
     .then(r => r.json())
     .then(d => {
       wunschLaeuft = false;

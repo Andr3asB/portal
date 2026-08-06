@@ -89,7 +89,7 @@
 
 {% block header_extra %}
 <div class="nav-extra">
-  <a class="btn-add" href="/a/admin/{{ token }}/user/neu">+ Neues Mitglied</a>
+  <a class="btn-add" href="/a/admin{{ tp }}user/neu">+ Neues Mitglied</a>
 </div>
 {% endblock %}
 
@@ -117,7 +117,7 @@
     </div>
 
     <div class="user-actions">
-      <a class="btn-edit" href="/a/admin/{{ token }}/user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
+      <a class="btn-edit" href="/a/admin{{ tp }}user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
       {% if home_tok %}
       <button class="btn-qr" onclick="showQR('{{ u.id }}','{{ u.name }}','{{ home_tok }}')">📱 QR-Code</button>
       {% endif %}
@@ -125,7 +125,7 @@
          Nutzers ungültig - für "Handy weg" oder "Link aus Versehen
          weitergegeben". Sicherheitsabfrage, weil danach kein alter Link mehr
          funktioniert (Projekt-Konvention: |tojson|forceescape im Attribut). #}
-      <form method="post" action="/a/admin/{{ token }}/user/{{ u.id }}/neue_tokens"
+      <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/neue_tokens"
             style="margin:0"
             onsubmit="return confirm({{ ('Alle Zugänge von ' ~ u.name ~ ' neu erzeugen? Sämtliche bisherigen Links und QR-Codes werden damit sofort ungültig.')|tojson|forceescape }})">
         <button type="submit" class="btn-neue-tokens">🔄 Zugänge neu</button>
@@ -137,11 +137,11 @@
       {% for app in apps %}
         {% set has_grant = app.id in u_grants %}
         {% if has_grant %}
-          <form method="post" action="/a/admin/{{ token }}/user/{{ u.id }}/revoke/{{ app.slug }}" style="margin:0">
+          <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/revoke/{{ app.slug }}" style="margin:0">
             <button type="submit" class="grant-chip active" title="Klicken zum Entziehen">{{ app.emoji }} {{ app.name }}</button>
           </form>
         {% else %}
-          <form method="post" action="/a/admin/{{ token }}/user/{{ u.id }}/grant/{{ app.slug }}" style="margin:0">
+          <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/grant/{{ app.slug }}" style="margin:0">
             <button type="submit" class="grant-chip inactive">{{ app.emoji }} {{ app.name }}</button>
           </form>
         {% endif %}
@@ -167,7 +167,7 @@
 <script>
 function showQR(uid, name, tok) {
   document.getElementById('qr-name').textContent = '📱 ' + name;
-  document.getElementById('qr-img').src = '/a/admin/{{ token }}/user/' + uid + '/qr.svg';
+  document.getElementById('qr-img').src = '/a/admin{{ tp }}user/' + uid + '/qr.svg';
   document.getElementById('qr-url').textContent = 'https://portal.16schwaben.de/p/' + tok;
   document.getElementById('qr-modal').classList.add('open');
 }

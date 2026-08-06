@@ -156,7 +156,7 @@
       </div>
       <div class="grid gruppe-grid">
         {% for app in gruppe.apps %}
-        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
+        <a class="tile" href="{{ app_pfad(app.slug, app.app_token) }}"
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji">{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
@@ -175,7 +175,7 @@
       {% endif %}
       <div class="grid gruppe-grid">
         {% for app in allgemein %}
-        <a class="tile" href="/a/{{ app.slug }}/{{ app.app_token }}/"
+        <a class="tile" href="{{ app_pfad(app.slug, app.app_token) }}"
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji">{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
@@ -231,7 +231,8 @@ aktualisiereOfflineKacheln();
 
 // Push-Opt-in
 (async function(){
-  const TOKEN = '{{ token }}';
+  const TOKEN = {{ (token or '')|tojson }};
+  const TP    = {{ tp|tojson }};
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (Notification.permission === 'denied') return;
 
@@ -274,7 +275,8 @@ aktualisiereOfflineKacheln();
 
 // Apps anpassen – Edit-Modus + Drag & Drop
 (function(){
-  const TOKEN    = '{{ token }}';
+  const TOKEN    = {{ (token or '')|tojson }};
+  const TP    = {{ tp|tojson }};
   let editMode   = false;
   let dragState  = null;
   let gruppeDragState = null;
@@ -424,7 +426,7 @@ aktualisiereOfflineKacheln();
       });
     });
     try {
-      await fetch(`/p/${TOKEN}/reorder`, {
+      await fetch(`/p${TP}reorder`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({order}),
@@ -555,7 +557,7 @@ aktualisiereOfflineKacheln();
     const order = [...document.querySelectorAll('.gruppe-section:not(.allgemein-section)')]
       .map(s => parseInt(s.dataset.gruppeId));
     try {
-      await fetch(`/p/${TOKEN}/gruppe/reorder`, {
+      await fetch(`/p${TP}gruppe/reorder`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({order}),
@@ -568,7 +570,7 @@ aktualisiereOfflineKacheln();
     const name = prompt('Name der neuen Gruppe:');
     if (!name?.trim()) return;
     try {
-      const resp = await fetch(`/p/${TOKEN}/gruppe/neu`, {
+      const resp = await fetch(`/p${TP}gruppe/neu`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: name.trim()}),
@@ -613,7 +615,7 @@ aktualisiereOfflineKacheln();
         const cur = btn.closest('.gruppe-header').querySelector('.gruppe-name').textContent;
         const name = prompt('Neuer Name:', cur);
         if (!name?.trim() || name.trim() === cur) return;
-        const resp = await fetch(`/p/${TOKEN}/gruppe/${id}/umbenennen`, {
+        const resp = await fetch(`/p${TP}gruppe/${id}/umbenennen`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({name: name.trim()}),
         });
@@ -627,7 +629,7 @@ aktualisiereOfflineKacheln();
         const id   = btn.dataset.id;
         const name = btn.closest('.gruppe-header').querySelector('.gruppe-name').textContent;
         if (!confirm(`„${name}“ löschen?\nApps werden nach Allgemein verschoben.`)) return;
-        const resp = await fetch(`/p/${TOKEN}/gruppe/${id}/loeschen`, {method:'POST'});
+        const resp = await fetch(`/p${TP}gruppe/${id}/loeschen`, {method:'POST'});
         const d    = await resp.json();
         if (!d.ok) return;
         const sec     = btn.closest('.gruppe-section');

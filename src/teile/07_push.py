@@ -6,7 +6,7 @@ POST /push/subscribe         → {"subscription":{...}, "token":"...", "geraet":
 POST /push/unsubscribe       → {"endpoint":"...", "token":"..."}
 """
 from flask import Blueprint, jsonify, request, current_app, abort
-from teile.kern import get_db, grant as check_grant, token_lookup
+from teile.kern import get_db, grant as check_grant, token_lookup, aktueller_nutzer
 
 bp = Blueprint("push", __name__)
 
@@ -30,15 +30,14 @@ def subscribe():
     p256dh   = ((sub.get("keys") or {}).get("p256dh") or "").strip()
     auth     = ((sub.get("keys") or {}).get("auth")   or "").strip()
 
-    if not (token and endpoint and p256dh and auth):
+    # Wunsch #140, Stufe 4: Der Token darf fehlen (token-freie Seite), die
+    # Abo-Daten nicht - ohne sie gäbe es nichts zu speichern.
+    if not (endpoint and p256dh and auth):
         return jsonify(ok=False, error="Ungültige Anfrage"), 400
 
-    # Token-Prüfung gegen irgendeine App (Nutzer muss eingeloggt sein)
-    db = get_db()
-    row = db.execute("""
-        SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-        WHERE g.token_lookup = ?
-    """, (token_lookup(token),)).fetchone()
+    # Nutzer über irgendein gültiges Token oder das Sitzungs-Cookie
+    db  = get_db()
+    row = aktueller_nutzer(token)
     if not row:
         abort(403)
     user_id = row["id"]
@@ -59,14 +58,11 @@ def unsubscribe():
     token    = (data.get("token")    or "").strip()
     endpoint = (data.get("endpoint") or "").strip()
 
-    if not (token and endpoint):
+    if not endpoint:
         return jsonify(ok=False), 400
 
-    db = get_db()
-    row = db.execute("""
-        SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-        WHERE g.token_lookup = ?
-    """, (token_lookup(token),)).fetchone()
+    db  = get_db()
+    row = aktueller_nutzer(token)
     if not row:
         abort(403)
 

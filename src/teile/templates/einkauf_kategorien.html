@@ -47,7 +47,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/einkauf/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/einkauf{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -93,7 +93,8 @@
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 function toggleKat(id) {
   const p = document.getElementById('kat-edit-' + id);
@@ -216,7 +217,7 @@ function cancelKatDrag() {
 async function saveKatOrder() {
   const order = [...document.querySelectorAll('.kat-item')].map(el => parseInt(el.dataset.katId));
   try {
-    await fetch(`/a/einkauf/${TOKEN}/kategorien/reorder`, {
+    await fetch(`/a/einkauf${TP}kategorien/reorder`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({order}),

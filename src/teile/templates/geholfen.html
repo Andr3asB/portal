@@ -86,7 +86,7 @@
   {% endif %}
   <div class="aufgaben-grid" id="aufgaben-grid">
     {% for a in aufgaben %}
-    <button class="aufgabe-btn" data-id="{{ a.id }}" data-token="{{ token }}">
+    <button class="aufgabe-btn" data-id="{{ a.id }}">
       <span class="aufgabe-emoji">{{ a.emoji }}</span>
       <span class="aufgabe-name">{{ a.name }}</span>
     </button>
@@ -123,6 +123,7 @@
 {% block extra_scripts %}
 <script>
 (function() {
+  const TP = {{ tp|tojson }};
   let fuerUserId = {{ user.id }};
   let toastTimer;
 
@@ -149,12 +150,11 @@
   document.querySelectorAll('.aufgabe-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
       const id  = this.dataset.id;
-      const tok = this.dataset.token;
       this.classList.add('flash');
       setTimeout(() => this.classList.remove('flash'), 600);
       try {
         const body = JSON.stringify({fuer_user_id: fuerUserId});
-        const r = await fetch(`/a/geholfen/${tok}/tippen/${id}`, {
+        const r = await fetch(`/a/geholfen${TP}tippen/${id}`, {
           method: 'POST',
           headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/json'},
           body,
@@ -168,7 +168,7 @@
       } catch(e) {
         const f = document.createElement('form');
         f.method = 'post';
-        f.action = `/a/geholfen/${tok}/tippen/${id}`;
+        f.action = `/a/geholfen${TP}tippen/${id}`;
         document.body.appendChild(f);
         f.submit();
       }

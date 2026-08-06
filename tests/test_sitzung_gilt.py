@@ -61,6 +61,44 @@ def test_pfad_token_schlaegt_cookie(client, admin, kind, stufe3):
     assert b"TestAdmin" not in antwort.data
 
 
+def test_link_oeffnen_uebernimmt_das_geraet(client, admin, kind, stufe3):
+    """Der Vorrang des Pfad-Tokens muss ÜBER die eine Seite hinaus halten.
+
+    Bis Stufe 3 war das automatisch so: Jede Kachel trug den Token des
+    geöffneten Links, die Navigation folgte ihm. Token-frei (Stufe 4) ist
+    `/a/einkauf/` für alle dieselbe Adresse – ab dem zweiten Klick entscheidet
+    allein das Cookie. Öffnet auf dem Familien-iPad also jemand seinen Link,
+    während das Cookie noch dem Vorgänger gehört, muss die Sitzung mitwechseln.
+    Sonst sähe das Kind seine Startseite und danach die Seiten des Admins.
+
+    Das ist der Fehler, der beim End-to-End-Test auf dem echten Server auffiel:
+    `/p/<kind>` zeigte korrekt das Kind, `/start` danach wieder den Admin."""
+    client.get(f"/p/{admin['tokens']['home']}")      # Cookie = Admin
+    client.get(f"/p/{kind['tokens']['home']}")       # Kind öffnet seinen Link
+
+    antwort = client.get("/start")                   # rein über das Cookie
+    assert antwort.status_code == 200
+    assert b"TestKind" in antwort.data
+    assert b"TestAdmin" not in antwort.data, \
+        "Das Cookie gehört noch dem Vorgänger – geteiltes Gerät kaputt"
+
+
+def test_geraetuebernahme_laesst_keine_verwaiste_sitzung_zurueck(
+        client, admin, kind, db, stufe3):
+    """Beim Wechsel muss die alte Sitzungszeile verschwinden.
+
+    Bliebe sie stehen, sammelte jedes geteilte Gerät gültige Sitzungen an, die
+    niemand mehr kennt – und „Zugänge neu erzeugen" räumt nur die des eigenen
+    Nutzers weg, nicht die eines fremden auf demselben Gerät."""
+    client.get(f"/p/{admin['tokens']['home']}")
+    client.get(f"/p/{kind['tokens']['home']}")
+
+    zeilen = db["verbindung"].execute(
+        "SELECT user_id FROM sitzungen").fetchall()
+    assert [z["user_id"] for z in zeilen] == [kind["id"]], \
+        f"erwartet genau eine Sitzung (Kind), vorhanden: {[dict(z) for z in zeilen]}"
+
+
 def test_ungueltiger_token_faellt_nicht_aufs_cookie_zurueck(client, admin, stufe3):
     """Ein widerrufener Link darf nicht dadurch weiterfunktionieren, dass
     zufällig noch ein gültiges Cookie im Browser liegt."""

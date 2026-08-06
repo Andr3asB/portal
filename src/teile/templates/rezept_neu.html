@@ -36,7 +36,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="{% if bearbeiten %}/a/rezepte/{{ token }}/{{ bearbeiten }}{% else %}/a/rezepte/{{ token }}/{% endif %}" title="Zurück">←</a>
+<a class="nav-btn" href="{% if bearbeiten %}/a/rezepte{{ tp }}{{ bearbeiten }}{% else %}/a/rezepte{{ tp }}{% endif %}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -51,7 +51,7 @@
   {% endif %}
 
   <div class="add-card">
-    <form method="post" action="{% if bearbeiten %}/a/rezepte/{{ token }}/{{ bearbeiten }}/bearbeiten{% else %}/a/rezepte/{{ token }}/neu{% endif %}">
+    <form method="post" action="{% if bearbeiten %}/a/rezepte{{ tp }}{{ bearbeiten }}/bearbeiten{% else %}/a/rezepte{{ tp }}neu{% endif %}">
       <div class="field-label">Name</div>
       <input class="rezept-input" type="text" name="name"
              value="{{ vorbelegt.name if vorbelegt else '' }}"

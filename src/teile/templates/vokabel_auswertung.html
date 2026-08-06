@@ -38,7 +38,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/vokabeln{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -54,7 +54,7 @@
   <div class="pill-row">
     {% for n in alle_nutzer %}
     <a class="pill{% if n.id == ziel.id %} aktiv{% endif %}"
-       href="/a/vokabeln/{{ token }}/auswertung?fuer={{ n.id }}">{{ n.name }}</a>
+       href="/a/vokabeln{{ tp }}auswertung?fuer={{ n.id }}">{{ n.name }}</a>
     {% endfor %}
   </div>
   {% endif %}
@@ -81,7 +81,7 @@
   <div class="pill-row">
     {% for s in sprachen %}
     <a class="pill{% if s.id == sprache_id %} aktiv{% endif %}"
-       href="/a/vokabeln/{{ token }}/auswertung?fuer={{ ziel.id }}&sprache={{ s.id }}">{{ s.name }}</a>
+       href="/a/vokabeln{{ tp }}auswertung?fuer={{ ziel.id }}&sprache={{ s.id }}">{{ s.name }}</a>
     {% endfor %}
   </div>
 

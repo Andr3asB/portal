@@ -65,6 +65,7 @@ def _de_datum(ts):
     return f"{ts[8:10]}.{ts[5:7]}.{ts[0:4]}, {ts[11:16]} Uhr"
 
 
+@bp.route("/a/werkstatt/", defaults={"token": None})
 @bp.route("/a/werkstatt/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -99,6 +100,7 @@ def index(token):
     )
 
 
+@bp.route("/a/werkstatt/erledigt/<int:wid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/werkstatt/<token>/erledigt/<int:wid>", methods=["POST"])
 def toggle_erledigt(token, wid):
     user = check_grant(token, APP)
@@ -118,6 +120,7 @@ def toggle_erledigt(token, wid):
     return redirect(url_for("werkstatt_app.index", token=token))
 
 
+@bp.route("/a/werkstatt/loeschen/<int:wid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/werkstatt/<token>/loeschen/<int:wid>", methods=["POST"])
 def loeschen(token, wid):
     user = check_grant(token, APP)
@@ -129,6 +132,7 @@ def loeschen(token, wid):
     return redirect(url_for("werkstatt_app.index", token=token))
 
 
+@bp.route("/a/werkstatt/prioritaet/<int:wid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/werkstatt/<token>/prioritaet/<int:wid>", methods=["POST"])
 def prioritaet(token, wid):
     user = check_grant(token, APP)
@@ -145,6 +149,7 @@ def prioritaet(token, wid):
     return redirect(url_for("werkstatt_app.index", token=token))
 
 
+@bp.route("/a/werkstatt/titel/<int:wid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/werkstatt/<token>/titel/<int:wid>", methods=["POST"])
 def titel_setzen(token, wid):
     """Endpunkt für Claude: setzt einen KI-generierten Titel (max. 80 Zeichen)."""

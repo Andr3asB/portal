@@ -76,6 +76,7 @@ def _laden_ids_aus_form(form):
     return ids
 
 
+@bp.route("/a/einkauf/", defaults={"token": None})
 @bp.route("/a/einkauf/<token>/")
 def index(token):
     user = _user(token)
@@ -128,6 +129,7 @@ def index(token):
     )
 
 
+@bp.route("/a/einkauf/stand", defaults={"token": None})
 @bp.route("/a/einkauf/<token>/stand")
 def stand(token):
     """Wunsch #100: leichtgewichtiger Sync-Check, den das Frontend regelmäßig
@@ -137,6 +139,7 @@ def stand(token):
     return jsonify(stand=_stand(get_db()))
 
 
+@bp.route("/a/einkauf/add", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/einkauf/<token>/add", methods=["POST"])
 def add(token):
     user = _user(token)
@@ -162,6 +165,7 @@ def add(token):
     return redirect(url_for("einkauf_app.index", token=token))
 
 
+@bp.route("/a/einkauf/erledigt/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/einkauf/<token>/erledigt/<int:eid>", methods=["POST"])
 def toggle_erledigt(token, eid):
     """Wunsch: Einkauf offline-faehig. ziel wird jetzt explizit mitgeschickt
@@ -189,6 +193,7 @@ def toggle_erledigt(token, eid):
     return redirect(url_for("einkauf_app.index", token=token))
 
 
+@bp.route("/a/einkauf/loeschen/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/einkauf/<token>/loeschen/<int:eid>", methods=["POST"])
 def loeschen(token, eid):
     _user(token)
@@ -198,6 +203,7 @@ def loeschen(token, eid):
     return redirect(url_for("einkauf_app.index", token=token))
 
 
+@bp.route("/a/einkauf/bearbeiten/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/einkauf/<token>/bearbeiten/<int:eid>", methods=["POST"])
 def bearbeiten(token, eid):
     _user(token)
@@ -222,6 +228,7 @@ def bearbeiten(token, eid):
     return redirect(url_for("einkauf_app.index", token=token))
 
 
+@bp.route("/a/einkauf/laeden", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/einkauf/<token>/laeden", methods=["GET", "POST"])
 def laeden_verwalten(token):
     user = _user(token)
@@ -248,6 +255,7 @@ def laeden_verwalten(token):
         user=user, token=token, farbe=user["farbe"], laeden=laeden)
 
 
+@bp.route("/a/einkauf/kategorien", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/einkauf/<token>/kategorien", methods=["GET", "POST"])
 def kategorien_verwalten(token):
     """Wunsch #37: Kategorien anlegen, umbenennen, deaktivieren – wie Läden,
@@ -290,6 +298,7 @@ def kategorien_verwalten(token):
         user=user, token=token, farbe=user["farbe"], kategorien=kategorien)
 
 
+@bp.route("/a/einkauf/kategorien/reorder", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/einkauf/<token>/kategorien/reorder", methods=["POST"])
 def kategorien_reorder(token):
     """Wunsch #38: Sortierreihenfolge der Kategorien per Drag & Drop änderbar."""

@@ -170,7 +170,18 @@ VAPID_SUBJECT=mailto:andreas.bosch@gmail.com
 OPENROUTER_API_KEY=<Key von openrouter.ai, mit Ausgabenlimit im OpenRouter-Konto>
 HAE_API_URL=http://caddy:2021/api/workouts
 HAE_API_KEY=<Read-Token vom hae-Server, NICHT der Write-Token der iPhone-Automation>
+TOKEN_KEY=<32 Byte Hex, Schluessel fuer die Token-Verschluesselung (Wunsch #129)>
+SITZUNG_AUSSTELLEN=1     # Wunsch #140, Stufe 1
+CSRF_MODUS=scharf        # Wunsch #140, Stufe 2: aus | beobachten | scharf
+PORTAL_ORIGIN=           # leer = aus der Anfrage ableiten
+SITZUNG_KONSUMIEREN=1    # Wunsch #140, Stufe 3
+TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 ```
+
+Die vier `#140`-Schalter sind die Notausstiege der jeweiligen Umbaustufe: auf
+`0` setzen, `docker compose up -d portal`, fertig - kein Rebuild, kein Paket.
+`TOKENFREIE_URLS=0` stellt die Links mit Token wieder her; die token-freien
+Routen bleiben dabei bestehen, werden aber von nichts mehr verlinkt.
 
 **Wichtig:** VAPID_PRIVATE_KEY darf NICHT geändert werden, solange aktive Push-Abos existieren.
 Ein neuer Private Key macht alle bestehenden Subscriptions ungültig (Nutzer müssen neu opt-in).
@@ -814,10 +825,16 @@ teile/
                        "gemischte E-Jugend" sind dieselbe Klasse in zwei
                        Schreibweisen und muessen auf denselben Haken
                        fallen.
-  19_sitzung.py      – Sitzungs-Cookies (Wunsch #140, Stufe 1). Stellt beim
-                       Aufloesen eines Pfad-Tokens zusaetzlich ein Cookie aus,
-                       das (in Stufe 1) von NICHTS ausgewertet wird - die
-                       Anmeldung laeuft weiter ueber den Token in der Adresse.
+  19_sitzung.py      – Sitzungs-Cookies (Wunsch #140). Stellt beim
+                       Aufloesen eines Pfad-Tokens ein Cookie aus, das seit
+                       Stufe 3 als Nachweis gilt.
+                       **Geraeteuebernahme (Stufe 4):** Gehoert die
+                       vorhandene Sitzung einem ANDEREN Nutzer, wird sie
+                       geloescht und ersetzt - wer seinen Link oeffnet,
+                       uebernimmt das Geraet. Ohne das hielte der Vorrang des
+                       Pfad-Tokens nur eine Seite lang: token-frei ist
+                       /a/einkauf/ fuer alle dieselbe Adresse, ab dem ersten
+                       Klick entscheidet allein das Cookie.
                        Schalter SITZUNG_AUSSTELLEN in der .env, Notausstieg
                        ohne Rebuild. Cookie: Secure, HttpOnly, SameSite=Lax,
                        Path=/, KEIN Domain (sonst ginge es an Home Assistant
@@ -828,8 +845,18 @@ teile/
   01_start_token.py  – ... zusaetzlich `/start` (Wunsch #140, Stufe 3):
                        derselbe Einstieg ohne Token in der Adresse, Nutzer
                        kommt aus dem Sitzungs-Cookie. `/p/<token>` bleibt
-                       gueltig und hat Vorrang. KEIN automatischer Redirect
-                       von /p/<token> auf /start - das kommt erst in Stufe 4.
+                       gueltig und hat Vorrang.
+                       **Weiterleitung (Stufe 4):** /p/<token> leitet auf
+                       /start um - aber ERST, wenn dieses Geraet bewiesen hat,
+                       dass es das Cookie annimmt und zurueckschickt (das
+                       mitgesendete Cookie zeigt auf denselben Nutzer).
+                       Sofortiges Umleiten haette ein Aussperr-Fenster: Nimmt
+                       ein Browser das Cookie nicht an (Privatmodus, voller
+                       Speicher), landet man auf /start ohne Sitzung, bekommt
+                       403, und der erneute QR-Scan fuehrt in dieselbe
+                       Weiterleitung - der Link waere fuer dieses Geraet tot.
+                       So bleibt ein Geraet ohne funktionierende Cookies
+                       dauerhaft beim Token-Link.
   20_csrf.py         – CSRF-Riegel (Wunsch #140, Stufe 2). Ein
                        before_request, null Template-Aenderungen. Prueft
                        `Sec-Fetch-Site` (primaer, weil
@@ -1106,6 +1133,59 @@ weiterhin als normales natives Formular, zeigen aber vor dem Absenden
 einen Toast statt der Browser-eigenen Fehlerseite, wenn `navigator.onLine`
 false ist (`pruefeVerbindungOderZeigeHinweis()`/`pruefeLoeschenOnline()`,
 Löschen prüft VOR dem `confirm()`-Dialog).
+
+## Adressen ohne Token (Wunsch #140, Stufe 4)
+
+Seit v120/v121 steht in keiner ausgelieferten Seite mehr ein Zugangstoken.
+**Alte Links mit Token bleiben unveraendert gueltig** - sie sind der
+Ersteinstieg (QR-Code) und die Rueckfallebene.
+
+Jede Route hat zwei Regeln: die alte mit `<token>` und eine token-freie
+Zwillingsregel. Beide landen in derselben View-Funktion; `grant()` entscheidet
+wie seit Stufe 3, ob Pfad-Token oder Cookie zaehlt:
+
+```python
+@bp.route("/a/tvb/", defaults={"token": None})
+@bp.route("/a/tvb/<token>/")
+def index(token): ...
+```
+
+Adressen werden ausschliesslich aus diesen vier Bausteinen gebaut (alle in
+`00_kern.py`, als Jinja-Globals registriert). **Wer eine Adresse von Hand
+zusammensetzt, umgeht den Notausstieg-Schalter.**
+
+| Baustein | wofuer |
+|---|---|
+| `tp` | Wegstueck in der GERADE offenen App: `/a/todo{{ tp }}neu` |
+| `app_pfad(slug, token)` | Link in eine ANDERE App (Startseite-Kacheln, Hilfe-Knopf) |
+| `start_pfad(home_token)` | der ⌂-Knopf |
+| `manifest_pfad(home_token)` | das PWA-Manifest |
+
+`tp` kommt aus `request.view_args`, NICHT aus der Template-Variablen `token` -
+die Links sollen der Adresszeile folgen, und view_args sagt genau, was dort
+steht.
+
+**Fallstricke, die hier schon einmal zugeschlagen haben:**
+
+- `{{ token }}` rendert bei `None` die Zeichenkette **"None"**. Fuer JS
+  deshalb immer `{{ (token or '')|tojson }}`, nie `'{{ token }}'`.
+- Sichtbarkeits-Bedingungen in Vorlagen pruefen `user`, nie `token` - sonst
+  verschwindet auf token-freien Seiten das halbe Menue.
+- Die vier Endpunkte mit Token im JSON-Body (`/wunsch`, `/push/subscribe`,
+  `/push/unsubscribe`, `/settings/darkmode`) haben keinen Pfad-Token und
+  muessen ueber `aktueller_nutzer()` gehen. Der faellt wie `grant()` aufs
+  Cookie zurueck. Ohne ihn: stilles 403, kein sichtbarer Fehler.
+- `sw.js` cacht token-freie Adressen fuer alle Nutzer gleich. Jede Seite
+  meldet dem Service Worker ueber `postMessage` den aktuellen Nutzer; beim
+  Wechsel wirft er den Seiten-Cache weg. Sonst saehe auf einem geteilten
+  Geraet der naechste Nutzer offline die Seiten des vorigen.
+- Das PWA-Manifest haengt token-frei am Cookie und braucht deshalb
+  `crossorigin="use-credentials"` am `<link>` - sonst holt der Browser es
+  ohne Cookies und bekommt 404.
+
+Die Verwaltungsseite (`admin.html`) zeigt weiterhin absichtlich die vollen
+Links her - dafuer ist sie da. Dass sie das tut, ist ein eigener Befund aus
+der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 
 ## Datenbankschema (SQLite, WAL)
 
@@ -1534,11 +1614,26 @@ python -m venv .venv                                   # einmalig
 - `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
   Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
   wieder gruen sein.
-- `test_routen_inventar.py` – verlangt fuer jede aendernde Route entweder
-  `<token>` im Pfad oder einen begruendeten Eintrag in `BEKANNTE_AUSNAHMEN`.
-  Faengt neue ungeschuetzte Routen automatisch ab.
+- `test_routen_inventar.py` – misst am **Endpunkt**, nicht an der einzelnen
+  Regel: jede aendernde Route braucht `<token>` im Pfad, eine Schwesterregel
+  mit `<token>`, oder einen begruendeten Eintrag in `BEKANNTE_AUSNAHMEN`.
+  Verlangt zusaetzlich, dass jede `<token>`-Route ihren token-freien Zwilling
+  hat - eine beim Umbau vergessene Route faellt damit auf, auch wenn sie ein
+  POST-Endpunkt ist, den niemand durchklickt.
 - `test_sitzung.py` – Stufe 1 von #140, inklusive der Negativtests, die
   belegen, dass das Cookie noch KEINE Wirkung hat.
+- `test_sitzung_gilt.py` – Stufe 3: Vorrang des Pfad-Tokens, Widerruf wirkt,
+  ungueltiger Token faellt NICHT aufs Cookie zurueck. Dazu die
+  Geraeteuebernahme aus Stufe 4 (wer seinen Link oeffnet, uebernimmt das
+  Geraet - und hinterlaesst keine verwaiste Sitzung).
+- `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
+  abgelehnt, die drei Modi.
+- `test_seiten_erreichbar.py` – Rauchtest ueber alle 36 parameterlosen Seiten,
+  **zweimal**: mit Token und token-frei ueber das Cookie. Sucht ausserdem in
+  jeder ausgelieferten Seite nach ALLEN Tokens des Nutzers (nicht nur dem der
+  offenen App) und prueft den Notausstieg `TOKENFREIE_URLS=0`.
+  Ein fehlender Grant ist hier ein FEHLER, kein stilles Ueberspringen - das
+  hatte einmal verdeckt, dass 14 der 36 Seiten gar nicht geprueft wurden.
 
 `pytest` steht bewusst in `requirements-dev.txt`, nicht in
 `src/requirements.txt` – die beschreibt die Laufzeit und ist seit Wunsch #135

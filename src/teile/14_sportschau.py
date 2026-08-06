@@ -223,6 +223,7 @@ def _wochen_ansicht(tage, schritte_balken):
     return wochen, max_wochen_schritte
 
 
+@bp.route("/a/sportschau/", defaults={"token": None})
 @bp.route("/a/sportschau/<token>/")
 def index(token):
     user = check_grant(token, APP)

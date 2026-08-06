@@ -149,7 +149,7 @@
     <div class="btn-row">
       {% for a in aufgaben %}
       {% set zugewiesen = tag.eintraege|selectattr('aufgabe_id','eq',a.id)|list|length > 0 %}
-      <form method="post" action="/a/kinderplan/{{ token }}/zuweisen" style="display:contents">
+      <form method="post" action="/a/kinderplan{{ tp }}zuweisen" style="display:contents">
         <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
         <input type="hidden" name="aufgabe_id" value="{{ a.id }}">
         <input type="hidden" name="tag" value="{{ tag.iso }}">
@@ -162,7 +162,7 @@
     <div class="angebot-form-label" style="margin-top:10px">🔁 Aus Pool holen</div>
     <div class="btn-row">
       {% for s in tag.serien_pool %}
-      <form method="post" action="/a/kinderplan/{{ token }}/serie_einsortieren" style="display:contents">
+      <form method="post" action="/a/kinderplan{{ tp }}serie_einsortieren" style="display:contents">
         <input type="hidden" name="ziel_id" value="{{ ziel.id }}">
         <input type="hidden" name="serie_id" value="{{ s.id }}">
         <input type="hidden" name="tag" value="{{ tag.iso }}">
@@ -215,7 +215,8 @@
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 function togglePlan(iso) {
   const p = document.getElementById('plan-edit-' + iso);
@@ -225,7 +226,7 @@ function togglePlan(iso) {
 function abhaken(zielId, aufgabeId, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  fetch(`/a/kinderplan/${TOKEN}/abhaken`, {
+  fetch(`/a/kinderplan${TP}abhaken`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ziel_id: zielId, aufgabe_id: aufgabeId}),
@@ -242,7 +243,7 @@ function abhaken(zielId, aufgabeId, btn) {
 function serieErledigen(tid, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  fetch(`/a/kinderplan/${TOKEN}/serie_erledigen/${tid}`, {
+  fetch(`/a/kinderplan${TP}serie_erledigen/${tid}`, {
     method: 'POST',
     headers: {'X-Requested-With': 'fetch'},
   }).then(r => r.json()).then(d => {
@@ -260,7 +261,7 @@ function serieErledigen(tid, btn) {
 function serieZuruecklegen(tid, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  fetch(`/a/kinderplan/${TOKEN}/serie_zuruecklegen/${tid}`, {
+  fetch(`/a/kinderplan${TP}serie_zuruecklegen/${tid}`, {
     method: 'POST',
     headers: {'X-Requested-With': 'fetch'},
   }).then(r => r.json()).then(d => {

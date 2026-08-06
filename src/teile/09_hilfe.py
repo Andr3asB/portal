@@ -5,6 +5,7 @@ bp  = Blueprint("hilfe_app", __name__)
 APP = "hilfe"
 
 
+@bp.route("/a/hilfe/", defaults={"token": None})
 @bp.route("/a/hilfe/<token>/")
 def index(token):
     user = check_grant(token, APP)

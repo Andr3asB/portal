@@ -4,9 +4,17 @@ Zweck: Eine neue Route, die Daten ändert, aber niemanden authentifiziert,
 soll hier auffallen – nicht erst im Betrieb. Der Test kennt die vier
 bekannten Ausnahmen; alles Weitere muss bewusst eingetragen werden.
 
-Beim Umbau für Wunsch #140 wird dieser Test angepasst werden müssen (dann
-gilt auch das Sitzungs-Cookie als Authentifizierung). Genau das ist der
-Zweck: die Änderung soll sichtbar sein, nicht stillschweigend passieren.
+Wunsch #140, Stufe 4: Der Maßstab ist jetzt der **Endpunkt**, nicht die
+einzelne Regel. Jede Route hat seit Stufe 4 zwei Regeln – eine mit `<token>`
+im Pfad und eine token-freie Zwillingsregel, die über das Sitzungs-Cookie
+autorisiert. Beide landen in derselben View-Funktion, die als Erstes `grant()`
+bzw. `_home_user()` aufruft; die Autorisierung hängt also am Endpunkt.
+
+Der Test verlangt deshalb: zu jeder ändernden token-freien Regel muss es eine
+Schwesterregel MIT `<token>` am selben Endpunkt geben. Eine neu hinzugefügte
+Route ohne jede Token-Regel fällt weiterhin auf – genau wie vorher. Was den
+Zwilling zusätzlich absichert, ist der CSRF-Riegel aus Stufe 2
+(`20_csrf.py`): ohne ihn wäre eine cookie-autorisierte POST-Route angreifbar.
 """
 
 UNSICHERE_METHODEN = {"POST", "PUT", "PATCH", "DELETE"}
@@ -29,18 +37,44 @@ def _aendernde_regeln(app):
             yield regel
 
 
+def _endpunkte_mit_tokenregel(app):
+    return {r.endpoint for r in app.url_map.iter_rules() if "<token>" in str(r)}
+
+
 def test_jede_aendernde_route_ist_abgesichert(app):
-    """Entweder <token> im Pfad oder ausdrücklich als Ausnahme vermerkt."""
+    """<token> im Pfad, eine Schwesterregel mit <token>, oder Ausnahme."""
+    mit_token = _endpunkte_mit_tokenregel(app)
     ungeschuetzt = [
         str(regel)
         for regel in _aendernde_regeln(app)
-        if "<token>" not in str(regel) and str(regel) not in BEKANNTE_AUSNAHMEN
+        if "<token>" not in str(regel)
+        and regel.endpoint not in mit_token
+        and str(regel) not in BEKANNTE_AUSNAHMEN
     ]
     assert not ungeschuetzt, (
-        "Diese Routen ändern Daten, verlangen aber keinen Token:\n  "
+        "Diese Routen ändern Daten, verlangen aber keinen Token und haben\n"
+        "auch keine Schwesterregel mit <token>:\n  "
         + "\n  ".join(sorted(ungeschuetzt))
         + "\n\nEntweder <token> ergänzen oder – mit Begründung – in "
           "BEKANNTE_AUSNAHMEN aufnehmen."
+    )
+
+
+def test_jede_tokenroute_hat_einen_tokenfreien_zwilling(app):
+    """Wunsch #140, Stufe 4: der Umbau darf keine Route vergessen haben.
+
+    Ohne Zwilling bliebe ein Endpunkt an den Token in der Adresse gekettet –
+    genau das, was Stufe 4 abschaffen soll. Der Test findet vergessene Routen
+    zuverlässiger als Durchklicken, weil er auch die POST-Endpunkte sieht."""
+    ohne_zwilling = []
+    for endpunkt in sorted(_endpunkte_mit_tokenregel(app)):
+        regeln = [str(r) for r in app.url_map.iter_rules(endpunkt)]
+        if not any("<token>" not in r for r in regeln):
+            ohne_zwilling.append(endpunkt)
+    assert not ohne_zwilling, (
+        "Diese Endpunkte gibt es nur mit Token in der Adresse:\n  "
+        + "\n  ".join(ohne_zwilling)
+        + '\n\nFehlt @bp.route("…", defaults={"token": None})?'
     )
 
 

@@ -41,7 +41,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/geholfen/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/geholfen{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -65,7 +65,7 @@
 
       {% if darf_bearbeiten %}
       <div class="verlauf-edit-panel" id="verlauf-edit-{{ e.id }}">
-        <form method="post" action="/a/geholfen/{{ token }}/eintrag/{{ e.id }}/bearbeiten">
+        <form method="post" action="/a/geholfen{{ tp }}eintrag/{{ e.id }}/bearbeiten">
           <div class="verlauf-edit-label">Datum &amp; Uhrzeit</div>
           <input class="verlauf-edit-input" type="datetime-local" name="zeitstempel"
                  value="{{ e.zeitstempel[:16].replace(' ', 'T') }}" required>
@@ -87,7 +87,7 @@
           <button type="submit" class="verlauf-edit-save">Speichern</button>
         </form>
 
-        <form method="post" action="/a/geholfen/{{ token }}/eintrag/{{ e.id }}/loeschen"
+        <form method="post" action="/a/geholfen{{ tp }}eintrag/{{ e.id }}/loeschen"
               onsubmit="return confirm({{ ('„' ~ e.name ~ ': ' ~ e.aufgabe ~ '“ löschen?')|tojson|forceescape }})">
           <button type="submit" class="verlauf-loeschen-btn">🗑️ Eintrag löschen</button>
         </form>

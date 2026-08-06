@@ -32,6 +32,11 @@ app.config["PORTAL_ORIGIN"]     = os.environ.get("PORTAL_ORIGIN", "")
 # Wunsch #140, Stufe 3: Darf das Sitzungs-Cookie als Nachweis gelten?
 # 0 = nein, nur der Token in der Adresse zaehlt (Zustand der Stufen 1-2).
 app.config["SITZUNG_KONSUMIEREN"] = os.environ.get("SITZUNG_KONSUMIEREN", "0")
+# Wunsch #140, Stufe 4: Bauen die Vorlagen Adressen OHNE Token?
+# 0 = nein, jeder Link traegt den Token wie vorher. Die token-freien Routen
+# existieren dann zwar, werden aber von nichts verlinkt - der Schalter nimmt
+# die ganze Stufe zurueck, ohne eine einzige Route zu entfernen.
+app.config["TOKENFREIE_URLS"]    = os.environ.get("TOKENFREIE_URLS", "0")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

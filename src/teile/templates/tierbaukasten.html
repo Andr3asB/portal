@@ -305,7 +305,7 @@ input[type="text"].rezept-input {
 <main class="main">
 
   <div class="section">
-    <form method="post" action="/a/tierbaukasten/{{ token }}/speichern" id="baukasten-form">
+    <form method="post" action="/a/tierbaukasten{{ tp }}speichern" id="baukasten-form">
 
       <!-- Schritt 1: Kategorie -->
       <div class="schritt" id="schritt-1" data-schritt="1">
@@ -558,7 +558,7 @@ input[type="text"].rezept-input {
         </svg>
         {% endif %}
         {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
-        <form method="post" action="/a/tierbaukasten/{{ token }}/loeschen/{{ k.id }}"
+        <form method="post" action="/a/tierbaukasten{{ tp }}loeschen/{{ k.id }}"
               onsubmit="return confirm({{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?')|tojson|forceescape }})">
           <button type="submit" class="btn-loeschen-tier">×</button>
         </form>
@@ -576,7 +576,8 @@ input[type="text"].rezept-input {
 {% block extra_scripts %}
 <script>
 (function() {
-  const TOKEN = '{{ token }}';
+  const TOKEN = {{ (token or '')|tojson }};
+  const TP    = {{ tp|tojson }};
   const svgRoot = document.getElementById('tier-svg');
   const form = document.getElementById('baukasten-form');
 
@@ -747,7 +748,7 @@ input[type="text"].rezept-input {
       const el = document.querySelector(`[name="mensch_${feld}"]`);
       if (el) daten.append('mensch_' + feld, el.value);
     });
-    fetch(`/a/tierbaukasten/${TOKEN}/vorschau-mensch`, { method: 'POST', body: daten })
+    fetch(`/a/tierbaukasten${TP}vorschau-mensch`, { method: 'POST', body: daten })
       .then(r => r.json())
       .then(d => {
         if (d.ok) document.getElementById('mensch-vorschau-svg').innerHTML = d.svg;

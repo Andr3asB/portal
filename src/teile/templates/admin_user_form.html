@@ -28,7 +28,7 @@ input[type=text]:focus { border-color:var(--farbe); }
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/admin/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -95,7 +95,7 @@ input[type=text]:focus { border-color:var(--farbe); }
     </div>
 
     <div class="form-actions">
-      <a class="btn btn-secondary" href="/a/admin/{{ token }}/">Abbrechen</a>
+      <a class="btn btn-secondary" href="/a/admin{{ tp }}">Abbrechen</a>
       <button type="submit" class="btn btn-primary">Speichern</button>
     </div>
   </form>

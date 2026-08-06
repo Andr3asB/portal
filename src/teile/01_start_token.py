@@ -1,7 +1,10 @@
-from flask import Blueprint, render_template, abort, request, jsonify
+from flask import (
+    Blueprint, render_template, abort, request, jsonify, redirect, url_for,
+)
 from teile.kern import (
     get_db, to_int, token_lookup, token_entschluesseln, sitzung_vormerken,
     sitzung_nutzer_id, sitzung_konsumieren_an, _nutzer_aufbereiten,
+    tokenfreie_urls_an,
 )
 
 bp = Blueprint("start", __name__)
@@ -63,9 +66,7 @@ def index():
 # Wunsch #140, Stufe 3: `/start` ist derselbe Einstieg ohne Token in der
 # Adresse - der Nutzer kommt dann aus dem Sitzungs-Cookie. `/p/<token>` bleibt
 # unverändert gültig und hat Vorrang; er ist der Ersteinstieg (QR-Code) und
-# die Rückfallebene. Bewusst KEIN automatischer Redirect von `/p/<token>` auf
-# `/start` in dieser Stufe: das kommt erst in Stufe 4, wenn alle Links
-# umgestellt sind.
+# die Rückfallebene.
 @bp.route("/start", defaults={"token": None})
 @bp.route("/p/<token>")
 def startseite(token):
@@ -73,6 +74,26 @@ def startseite(token):
     row = _home_user(token)
     if not row:
         return render_template("denied.html", reason="invalid"), 403
+
+    # Wunsch #140, Stufe 4: Den Token aus der Adresszeile nehmen - aber erst,
+    # wenn dieses Gerät bewiesen hat, dass es das Cookie annimmt und
+    # zurückschickt.
+    #
+    # Der naheliegende Weg (jeder Aufruf von /p/<token> leitet sofort auf
+    # /start um) hat ein Aussperr-Fenster: Nimmt der Browser das Cookie nicht
+    # an - Privatmodus, aufgebrauchter Speicher, strenge Einstellungen -,
+    # landet man auf /start ohne Sitzung, bekommt denied.html, und der erneute
+    # Scan des QR-Codes führt in dieselbe Weiterleitung. Der Link wäre für
+    # dieses Gerät dauerhaft tot, obwohl der Token gilt.
+    #
+    # Deshalb: Beim ERSTEN Besuch wird die Seite ganz normal ausgeliefert (mit
+    # Token in der Adresse, wie bisher) und das Cookie gesetzt. Kommt es beim
+    # nächsten Aufruf zurück und zeigt auf denselben Nutzer, ist bewiesen, dass
+    # Cookies auf diesem Gerät tragen - dann erst wird umgeleitet. Ein Gerät
+    # ohne funktionierende Cookies behält für immer den Token-Link und
+    # funktioniert unverändert weiter.
+    if token and tokenfreie_urls_an() and sitzung_nutzer_id(db) == row["id"]:
+        return redirect(url_for("start.startseite"))
 
     gruppen_rows = db.execute("""
         SELECT id, name, position FROM home_gruppen
@@ -108,18 +129,21 @@ def startseite(token):
         user=row,
         gruppen=gruppen_list,
         allgemein=allgemein,
-        # Wunsch #140, Stufe 3: Beim Aufruf über `/start` steht kein Token in
-        # der Adresse. Die Vorlagen brauchen aber einen (Hamburger-Menü,
-        # Sortier-Endpunkte, `const TOKEN` für die fetch-Aufrufe), sonst
-        # verschwände das halbe Menü. Der Home-Token des Nutzers ist ohnehin
-        # schon entschlüsselt vorhanden - bis Stufe 4 die Links umstellt, ist
-        # das die richtige Brücke.
-        token=token or row["home_token"],
+        # Wunsch #140, Stufe 4: Hier stand bis Stufe 3 `token or
+        # row["home_token"]` - eine Brücke, damit Menü und fetch-Aufrufe auf
+        # `/start` nicht ohne Token dastehen. Die ist jetzt weg und muss weg
+        # sein: Sie hätte den Home-Token in `const TOKEN` und damit in jede
+        # ausgelieferte Seite geschrieben, obwohl er in keiner Adresse mehr
+        # vorkommt. Die Links kommen inzwischen aus `tp`/`app_pfad()`, die
+        # Menü-Sichtbarkeit hängt an `user`, und die vier Endpunkte mit Token
+        # im Body fallen über `aktueller_nutzer()` aufs Sitzungs-Cookie zurück.
+        token=token,
         farbe=row["farbe"],
         greeting="Hallo",
     )
 
 
+@bp.route("/p/reorder", defaults={"token": None}, methods=["POST"])
 @bp.route("/p/<token>/reorder", methods=["POST"])
 def reorder(token):
     row = _home_user(token)
@@ -156,6 +180,7 @@ def reorder(token):
     return jsonify(ok=True)
 
 
+@bp.route("/p/gruppe/reorder", defaults={"token": None}, methods=["POST"])
 @bp.route("/p/<token>/gruppe/reorder", methods=["POST"])
 def gruppe_reorder(token):
     """Wunsch #21: die Gruppen selbst umsortieren (nicht nur Apps innerhalb)."""
@@ -179,6 +204,7 @@ def gruppe_reorder(token):
     return jsonify(ok=True)
 
 
+@bp.route("/p/gruppe/neu", defaults={"token": None}, methods=["POST"])
 @bp.route("/p/<token>/gruppe/neu", methods=["POST"])
 def gruppe_neu(token):
     row = _home_user(token)
@@ -201,6 +227,7 @@ def gruppe_neu(token):
     return jsonify(ok=True, id=result["id"], name=name)
 
 
+@bp.route("/p/gruppe/<int:gid>/umbenennen", defaults={"token": None}, methods=["POST"])
 @bp.route("/p/<token>/gruppe/<int:gid>/umbenennen", methods=["POST"])
 def gruppe_umbenennen(token, gid):
     row = _home_user(token)
@@ -219,6 +246,7 @@ def gruppe_umbenennen(token, gid):
     return jsonify(ok=True)
 
 
+@bp.route("/p/gruppe/<int:gid>/loeschen", defaults={"token": None}, methods=["POST"])
 @bp.route("/p/<token>/gruppe/<int:gid>/loeschen", methods=["POST"])
 def gruppe_loeschen(token, gid):
     row = _home_user(token)

@@ -121,6 +121,7 @@ def _personen(db):
     return db.execute("SELECT id, name, farbe FROM users ORDER BY name COLLATE NOCASE").fetchall()
 
 
+@bp.route("/a/packliste/", defaults={"token": None})
 @bp.route("/a/packliste/<token>/")
 def index(token):
     user = _user(token)
@@ -165,6 +166,7 @@ def index(token):
     )
 
 
+@bp.route("/a/packliste/add", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/packliste/<token>/add", methods=["POST"])
 def add(token):
     user = _user(token)
@@ -188,6 +190,7 @@ def add(token):
     return redirect(url_for("packliste_app.index", token=token, ziel=ziel_id))
 
 
+@bp.route("/a/packliste/gepackt/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/packliste/<token>/gepackt/<int:eid>", methods=["POST"])
 def toggle_gepackt(token, eid):
     """Idempotent per explizitem `wert` (0/1) - gleiches Muster wie Einkaufs
@@ -211,6 +214,7 @@ def toggle_gepackt(token, eid):
     return redirect(url_for("packliste_app.index", token=token))
 
 
+@bp.route("/a/packliste/loeschen/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/packliste/<token>/loeschen/<int:eid>", methods=["POST"])
 def loeschen(token, eid):
     _user(token)
@@ -220,6 +224,7 @@ def loeschen(token, eid):
     return redirect(url_for("packliste_app.index", token=token))
 
 
+@bp.route("/a/packliste/bearbeiten/<int:eid>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/packliste/<token>/bearbeiten/<int:eid>", methods=["POST"])
 def bearbeiten(token, eid):
     _user(token)
@@ -239,6 +244,7 @@ def bearbeiten(token, eid):
     return redirect(url_for("packliste_app.index", token=token))
 
 
+@bp.route("/a/packliste/ziele", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/packliste/<token>/ziele", methods=["GET", "POST"])
 def ziele_verwalten(token):
     user = _user(token)
@@ -265,6 +271,7 @@ def ziele_verwalten(token):
         user=user, token=token, farbe=user["farbe"], ziele=ziele)
 
 
+@bp.route("/a/packliste/kategorien", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/packliste/<token>/kategorien", methods=["GET", "POST"])
 def kategorien_verwalten(token):
     user = _user(token)
@@ -305,6 +312,7 @@ def kategorien_verwalten(token):
         user=user, token=token, farbe=user["farbe"], kategorien=kategorien)
 
 
+@bp.route("/a/packliste/kategorien/reorder", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/packliste/<token>/kategorien/reorder", methods=["POST"])
 def kategorien_reorder(token):
     user = _user(token)

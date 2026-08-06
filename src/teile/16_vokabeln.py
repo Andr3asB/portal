@@ -174,6 +174,7 @@ def _vokabeln_per_ki(user_id, sprache_name, mime, bild_b64):
     return paare
 
 
+@bp.route("/a/vokabeln/", defaults={"token": None})
 @bp.route("/a/vokabeln/<token>/")
 def index(token):
     user = _user(token)
@@ -198,6 +199,7 @@ def index(token):
         sprachen=sprachen, kapitel=kapitel, vokabeln=vokabeln)
 
 
+@bp.route("/a/vokabeln/neu", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/neu", methods=["POST"])
 def neu(token):
     user = _user(token)
@@ -217,6 +219,7 @@ def neu(token):
     return redirect(url_for("vokabeln_app.index", token=token))
 
 
+@bp.route("/a/vokabeln/<int:vid>/bearbeiten", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/<int:vid>/bearbeiten", methods=["POST"])
 def bearbeiten(token, vid):
     user = _user(token)
@@ -241,6 +244,7 @@ def bearbeiten(token, vid):
     return redirect(url_for("vokabeln_app.index", token=token))
 
 
+@bp.route("/a/vokabeln/<int:vid>/loeschen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/<int:vid>/loeschen", methods=["POST"])
 def loeschen(token, vid):
     user = _user(token)
@@ -250,6 +254,7 @@ def loeschen(token, vid):
     return redirect(url_for("vokabeln_app.index", token=token))
 
 
+@bp.route("/a/vokabeln/sprachen", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/vokabeln/<token>/sprachen", methods=["GET", "POST"])
 def sprachen_verwalten(token):
     user = _user(token)
@@ -283,6 +288,7 @@ def sprachen_verwalten(token):
         sprachen=alle_sprachen, aktive_ids=aktive_ids)
 
 
+@bp.route("/a/vokabeln/kapitel", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/vokabeln/<token>/kapitel", methods=["GET", "POST"])
 def kapitel_verwalten(token):
     user = _user(token)
@@ -320,6 +326,7 @@ def kapitel_verwalten(token):
         user=user, token=token, farbe=user["farbe"], kapitel=kapitel)
 
 
+@bp.route("/a/vokabeln/lernen", defaults={"token": None})
 @bp.route("/a/vokabeln/<token>/lernen")
 def lernen(token):
     user = _user(token)
@@ -330,6 +337,7 @@ def lernen(token):
         user=user, token=token, farbe=user["farbe"], sprachen=sprachen, kapitel=kapitel)
 
 
+@bp.route("/a/vokabeln/lernen/start", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/lernen/start", methods=["POST"])
 def lernen_start(token):
     user = _user(token)
@@ -396,6 +404,7 @@ def lernen_start(token):
         session_id=session_id, vokabeln=aufgaben)
 
 
+@bp.route("/a/vokabeln/versuch", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/versuch", methods=["POST"])
 def versuch(token):
     user = _user(token)
@@ -423,6 +432,7 @@ def versuch(token):
     return jsonify(ok=True)
 
 
+@bp.route("/a/vokabeln/session/<int:sid>/beenden", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/session/<int:sid>/beenden", methods=["POST"])
 def session_beenden(token, sid):
     user = _user(token)
@@ -435,6 +445,7 @@ def session_beenden(token, sid):
     return jsonify(ok=True)
 
 
+@bp.route("/a/vokabeln/auswertung", defaults={"token": None})
 @bp.route("/a/vokabeln/<token>/auswertung")
 def auswertung(token):
     """Wunsch #79: Trainingszeit je Sprache + richtig/falsch-Auswertung
@@ -541,6 +552,7 @@ def auswertung(token):
     )
 
 
+@bp.route("/a/vokabeln/foto-import", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/vokabeln/<token>/foto-import", methods=["GET", "POST"])
 def foto_import(token):
     """Wunsch #80: Vokabelpaare per Foto + KI-OCR erfassen. Ergebnis landet
@@ -593,6 +605,7 @@ def foto_import(token):
         sprache=sprache, kapitel=kapitel, paare=paare)
 
 
+@bp.route("/a/vokabeln/foto-import/speichern", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/vokabeln/<token>/foto-import/speichern", methods=["POST"])
 def foto_import_speichern(token):
     user = _user(token)
@@ -621,6 +634,7 @@ def foto_import_speichern(token):
     return redirect(url_for("vokabeln_app.index", token=token))
 
 
+@bp.route("/a/vokabeln/wort/<int:vid>/audio", defaults={"token": None})
 @bp.route("/a/vokabeln/<token>/wort/<int:vid>/audio")
 def wort_audio(token, vid):
     """Wunsch #81: liest das fremdsprachige Wort per KI-TTS vor, einmalig

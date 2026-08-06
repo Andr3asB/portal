@@ -11,7 +11,7 @@ POST /wunsch  { text, app, token, pfad }
 """
 import re
 from flask import Blueprint, request, jsonify
-from teile.kern import get_db, token_lookup
+from teile.kern import get_db, token_lookup, aktueller_nutzer
 
 bp = Blueprint("werkstatt", __name__)
 
@@ -41,15 +41,12 @@ def wunsch():
 
     db = get_db()
 
-    # Nutzer über beliebiges gültiges Token ermitteln
-    user_id = None
-    if token:
-        row = db.execute("""
-            SELECT u.id FROM grants g JOIN users u ON u.id = g.user_id
-            WHERE g.token_lookup = ?
-        """, (token_lookup(token),)).fetchone()
-        if row:
-            user_id = row["id"]
+    # Nutzer über beliebiges gültiges Token ermitteln - oder, auf token-freien
+    # Seiten (Wunsch #140, Stufe 4), über das Sitzungs-Cookie. Ohne Nutzer wird
+    # der Wunsch bewusst trotzdem gespeichert, nur ohne Urheber: ein anonymer
+    # Wunsch ist besser als ein verlorener.
+    row = aktueller_nutzer(token)
+    user_id = row["id"] if row else None
 
     db.execute(
         "INSERT INTO wuensche(text, user_id, app_slug, ansicht) VALUES(?,?,?,?)",

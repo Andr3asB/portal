@@ -139,7 +139,7 @@ body.packmodus .item-name { font-size:18px; }
           title="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
-    <form method="post" action="/a/packliste/{{ token }}/bearbeiten/{{ item.id }}" class="edit-form">
+    <form method="post" action="/a/packliste{{ tp }}bearbeiten/{{ item.id }}" class="edit-form">
       <div class="field-label">Name</div>
       <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
 
@@ -163,7 +163,7 @@ body.packmodus .item-name { font-size:18px; }
       <button type="submit" class="btn-save form-submit-btn">Speichern</button>
     </form>
 
-    <form method="post" action="/a/packliste/{{ token }}/loeschen/{{ item.id }}"
+    <form method="post" action="/a/packliste{{ tp }}loeschen/{{ item.id }}"
           onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
     </form>
@@ -180,7 +180,7 @@ body.packmodus .item-name { font-size:18px; }
     Noch kein Ziel angelegt 🎯<br>
     <span style="font-size:13px">
       {% if user.is_admin %}
-      <a href="/a/packliste/{{ token }}/ziele">Lege zuerst ein Ziel an</a> (z. B. "Sommerurlaub").
+      <a href="/a/packliste{{ tp }}ziele">Lege zuerst ein Ziel an</a> (z. B. "Sommerurlaub").
       {% else %}
       Bitte einen Admin, zuerst ein Ziel anzulegen.
       {% endif %}
@@ -216,7 +216,7 @@ body.packmodus .item-name { font-size:18px; }
   </div>
 
   <div class="add-card" id="add-form-card">
-    <form method="post" action="/a/packliste/{{ token }}/add" id="add-form">
+    <form method="post" action="/a/packliste{{ tp }}add" id="add-form">
       <input type="hidden" name="ziel_id" value="{{ aktives_ziel_id }}">
       <div class="add-row">
         <input class="add-input" type="text" name="name" id="add-name"
@@ -282,14 +282,15 @@ body.packmodus .item-name { font-size:18px; }
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 function toggleGepackt(id, cb) {
   const zielChecked = cb.checked;
   const card = document.getElementById('item-' + id);
   if (card) card.classList.toggle('gepackt', zielChecked);
 
-  fetch(`/a/packliste/${TOKEN}/gepackt/${id}`, {
+  fetch(`/a/packliste${TP}gepackt/${id}`, {
     method: 'POST',
     headers: {'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded'},
     body: `wert=${zielChecked ? '1' : '0'}`,

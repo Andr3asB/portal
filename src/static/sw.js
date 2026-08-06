@@ -1,4 +1,21 @@
-const CACHE_NAME = 'portal-cache-v1';
+// v2 wegen Wunsch #140, Stufe 4: Der Namenswechsel raeumt beim ersten Start
+// nach der Auslieferung einmal alles weg, was noch unter Token-Adressen im
+// Cache lag.
+const CACHE_NAME = 'portal-cache-v2';
+
+// Wunsch #140, Stufe 4: Merker, WESSEN Seiten im Cache liegen.
+//
+// Bis Stufe 3 trennte der Token die Cache-Schluessel von selbst - die Seiten
+// zweier Nutzer lagen unter verschiedenen Adressen. Token-frei ist
+// `/a/einkauf/` fuer alle dieselbe Adresse. Auf einem geteilten Geraet
+// (Familien-iPad, Kioskbildschirm) wuerde der naechste Nutzer sonst offline
+// die Einkaufsliste des vorigen sehen. Deshalb: Beim Nutzerwechsel den
+// Seiten-Cache komplett wegwerfen.
+//
+// Der Merker ist selbst ein (leerer) Cache, weil ein Service Worker jederzeit
+// beendet und neu gestartet wird - eine Variable im Modul waere nach dem
+// naechsten Start weg, `caches.keys()` ueberlebt.
+const NUTZER_PRAEFIX = 'portal-nutzer-';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -7,9 +24,32 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME && !k.startsWith(NUTZER_PRAEFIX))
+            .map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
+});
+
+async function nutzerPruefen(id) {
+  const schluessel = await caches.keys();
+  const alt = schluessel.find(k => k.startsWith(NUTZER_PRAEFIX));
+  const neu = NUTZER_PRAEFIX + id;
+  if (alt === neu) return;
+  if (alt) {
+    await caches.delete(alt);
+    await caches.delete(CACHE_NAME);   // fremde Seiten wegwerfen
+  }
+  await caches.open(neu);
+}
+
+// Jede Seite meldet nach dem Laden, wer sie sieht (siehe base.html).
+self.addEventListener('message', event => {
+  const d = event.data || {};
+  if (d.typ === 'nutzer' && d.id) {
+    event.waitUntil(nutzerPruefen(String(d.id)));
+  }
 });
 
 // Network-first mit Cache-Fallback fuer eigene GET-Seiten. Schreibende

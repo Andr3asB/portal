@@ -16,6 +16,7 @@ def _kann_fuer_andere(user):
     return user["is_admin"] or user["rolle"] == "eltern"
 
 
+@bp.route("/a/geholfen/", defaults={"token": None})
 @bp.route("/a/geholfen/<token>/")
 def index(token):
     user = check_grant(token, APP)
@@ -55,6 +56,7 @@ def index(token):
     )
 
 
+@bp.route("/a/geholfen/tippen/<int:aufgabe_id>", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/geholfen/<token>/tippen/<int:aufgabe_id>", methods=["POST"])
 def tippen(token, aufgabe_id):
     user = check_grant(token, APP)
@@ -87,6 +89,7 @@ def tippen(token, aufgabe_id):
     return redirect(url_for("geholfen_app.index", token=token))
 
 
+@bp.route("/a/geholfen/verlauf", defaults={"token": None})
 @bp.route("/a/geholfen/<token>/verlauf")
 def verlauf(token):
     user = check_grant(token, APP)
@@ -111,6 +114,7 @@ def verlauf(token):
         darf_bearbeiten=darf_bearbeiten, alle_nutzer=alle_nutzer, alle_aufgaben=alle_aufgaben)
 
 
+@bp.route("/a/geholfen/eintrag/<int:eid>/bearbeiten", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/geholfen/<token>/eintrag/<int:eid>/bearbeiten", methods=["POST"])
 def eintrag_bearbeiten(token, eid):
     user = check_grant(token, APP)
@@ -140,6 +144,7 @@ def eintrag_bearbeiten(token, eid):
     return redirect(url_for("geholfen_app.verlauf", token=token))
 
 
+@bp.route("/a/geholfen/eintrag/<int:eid>/loeschen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/geholfen/<token>/eintrag/<int:eid>/loeschen", methods=["POST"])
 def eintrag_loeschen(token, eid):
     user = check_grant(token, APP)
@@ -151,6 +156,7 @@ def eintrag_loeschen(token, eid):
     return redirect(url_for("geholfen_app.verlauf", token=token))
 
 
+@bp.route("/a/geholfen/uebersicht", defaults={"token": None})
 @bp.route("/a/geholfen/<token>/uebersicht")
 def uebersicht(token):
     user = check_grant(token, APP)
@@ -194,6 +200,7 @@ def uebersicht(token):
     )
 
 
+@bp.route("/a/geholfen/aufgaben", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/geholfen/<token>/aufgaben", methods=["GET", "POST"])
 def aufgaben_verwalten(token):
     user = check_grant(token, APP)

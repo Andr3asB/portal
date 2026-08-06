@@ -88,11 +88,11 @@
 
   <div class="top-aktionen">
     <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Vokabel eintragen</button>
-    <a class="btn-lernen" href="/a/vokabeln/{{ token }}/lernen">📖 Lernen</a>
+    <a class="btn-lernen" href="/a/vokabeln{{ tp }}lernen">📖 Lernen</a>
   </div>
 
   <div class="form-card" id="neu-form-card">
-    <form method="post" action="/a/vokabeln/{{ token }}/neu" id="neu-form">
+    <form method="post" action="/a/vokabeln{{ tp }}neu" id="neu-form">
       <div class="form-label">Sprache</div>
       <div class="chip-row" id="neu-sprache-chips">
         {% for s in sprachen %}
@@ -136,7 +136,7 @@
     </div>
 
     <div class="vokabel-edit-panel" id="edit-{{ v.id }}">
-      <form method="post" action="/a/vokabeln/{{ token }}/{{ v.id }}/bearbeiten">
+      <form method="post" action="/a/vokabeln{{ tp }}{{ v.id }}/bearbeiten">
         <div class="form-label">Sprache</div>
         <div class="chip-row" id="edit-sprache-chips-{{ v.id }}">
           {% for s in sprachen %}
@@ -165,7 +165,7 @@
 
         <button type="submit" class="btn-speichern">Speichern</button>
       </form>
-      <form method="post" action="/a/vokabeln/{{ token }}/{{ v.id }}/loeschen"
+      <form method="post" action="/a/vokabeln{{ tp }}{{ v.id }}/loeschen"
             onsubmit="return confirm({{ ('„' ~ v.fremd ~ ' – ' ~ v.deutsch ~ '“ löschen?')|tojson|forceescape }})">
         <button type="submit" class="vokabel-loeschen-btn">🗑️ Vokabel löschen</button>
       </form>
@@ -187,7 +187,8 @@
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 const SPRACHE_STORAGE_KEY = 'vokabeln_letzte_sprache_' + TOKEN;
 
 function spracheWaehlen(btn, gruppe) {
@@ -214,7 +215,7 @@ document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
 let anhoerenAudio = null;
 function wortAnhoeren(id) {
   if (anhoerenAudio) { anhoerenAudio.pause(); anhoerenAudio = null; }
-  anhoerenAudio = new Audio(`/a/vokabeln/${TOKEN}/wort/${id}/audio`);
+  anhoerenAudio = new Audio(`/a/vokabeln${TP}wort/${id}/audio`);
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
 }
 

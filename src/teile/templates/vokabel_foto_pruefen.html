@@ -33,7 +33,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/vokabeln/{{ token }}/foto-import" title="Zurück">←</a>
+<a class="nav-btn" href="/a/vokabeln{{ tp }}foto-import" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -45,7 +45,7 @@
 <main class="main">
   <div class="hinweis">Bitte kontrollieren und bei Bedarf korrigieren. Häkchen entfernen, um eine Zeile nicht zu übernehmen.</div>
 
-  <form method="post" action="/a/vokabeln/{{ token }}/foto-import/speichern">
+  <form method="post" action="/a/vokabeln{{ tp }}foto-import/speichern">
     <input type="hidden" name="sprache_id" value="{{ sprache.id }}">
 
     {% if kapitel %}

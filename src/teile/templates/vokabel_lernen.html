@@ -27,7 +27,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/vokabeln/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/vokabeln{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -39,7 +39,7 @@
   {% if not sprachen %}
   <div class="empty">Aktiviere zuerst mindestens eine Sprache im Menü unter „Sprachen".</div>
   {% else %}
-  <form method="post" action="/a/vokabeln/{{ token }}/lernen/start">
+  <form method="post" action="/a/vokabeln{{ tp }}lernen/start">
     <div class="form-label">Sprache</div>
     <div class="chip-row" id="sprache-chips">
       {% for s in sprachen %}

@@ -229,7 +229,7 @@
   </div>
   {% if user.is_admin %}
   <div class="wunsch-actions">
-    <form method="post" action="/a/werkstatt/{{ token }}/prioritaet/{{ w.id }}">
+    <form method="post" action="/a/werkstatt{{ tp }}prioritaet/{{ w.id }}">
       <select name="prioritaet" class="prio-select" onchange="this.form.submit()">
         <option value="">– Prio –</option>
         <option value="niedrig"  {% if w.prioritaet == 'niedrig'  %}selected{% endif %}>Niedrig</option>
@@ -239,10 +239,10 @@
         <option value="zurueckgestellt"{% if w.prioritaet == 'zurueckgestellt'%}selected{% endif %}>Zurückgestellt</option>
       </select>
     </form>
-    <form method="post" action="/a/werkstatt/{{ token }}/erledigt/{{ w.id }}">
+    <form method="post" action="/a/werkstatt{{ tp }}erledigt/{{ w.id }}">
       <button type="submit" class="btn-done">✓</button>
     </form>
-    <form method="post" action="/a/werkstatt/{{ token }}/loeschen/{{ w.id }}"
+    <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           onsubmit="return confirm({{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button type="submit" class="btn-del">×</button>
     </form>
@@ -278,10 +278,10 @@
   </div>
   {% if user.is_admin %}
   <div class="wunsch-actions">
-    <form method="post" action="/a/werkstatt/{{ token }}/erledigt/{{ w.id }}">
+    <form method="post" action="/a/werkstatt{{ tp }}erledigt/{{ w.id }}">
       <button type="submit" class="btn-done active">✓ OK</button>
     </form>
-    <form method="post" action="/a/werkstatt/{{ token }}/loeschen/{{ w.id }}"
+    <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           onsubmit="return confirm({{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
       <button type="submit" class="btn-del">×</button>
     </form>

@@ -100,7 +100,7 @@
           </div>
 
           <div class="tag-edit-panel" id="tag-edit-{{ slot_id }}">
-            <form method="post" action="/a/essensplan/{{ token }}/eintrag">
+            <form method="post" action="/a/essensplan{{ tp }}eintrag">
               <input type="hidden" name="tag" value="{{ tag.iso }}">
               <input type="hidden" name="mahlzeit" value="{{ mahlzeit }}">
               <select class="tag-select" name="rezept_id">
@@ -139,7 +139,8 @@
 
 {% block extra_scripts %}
 <script>
-const TOKEN = '{{ token }}';
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
 
 function toggleTag(slotId) {
   const p = document.getElementById('tag-edit-' + slotId);
@@ -251,7 +252,7 @@ async function finishMzDrag(e) {
   const targetSlot = under && under.closest('.mahlzeit-slot');
   if (targetSlot && targetSlot !== slot) {
     try {
-      const resp = await fetch(`/a/essensplan/${TOKEN}/verschieben`, {
+      const resp = await fetch(`/a/essensplan${TP}verschieben`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({

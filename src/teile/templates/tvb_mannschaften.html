@@ -43,7 +43,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/tvb/{{ token }}/" title="Zurück">←</a>
+<a class="nav-btn" href="/a/tvb{{ tp }}" title="Zurück">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -70,7 +70,7 @@
       Auswahl.
     </div>
 
-    <form method="post" action="/a/tvb/{{ token }}/mannschaften">
+    <form method="post" action="/a/tvb{{ tp }}mannschaften">
       <div class="alle-zeile">
         <button class="alle-btn" type="button" onclick="alleSetzen(true)">Alle an</button>
         <button class="alle-btn" type="button" onclick="alleSetzen(false)">Alle aus</button>
