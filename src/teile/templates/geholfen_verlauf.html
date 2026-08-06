@@ -59,7 +59,7 @@
         <span class="verlauf-time">{{ e.zeitstempel[:16] }}</span>
         {% if darf_bearbeiten %}
         <button class="verlauf-edit-btn" type="button"
-                onclick="toggleVerlaufEdit({{ e.id }})" title="Bearbeiten">✏️</button>
+                data-klick="toggleVerlaufEdit" data-args='[{{ e.id }}]' title="Bearbeiten">✏️</button>
         {% endif %}
       </div>
 
@@ -88,7 +88,7 @@
         </form>
 
         <form method="post" action="/a/geholfen{{ tp }}eintrag/{{ e.id }}/loeschen"
-              onsubmit="return confirm({{ ('„' ~ e.name ~ ': ' ~ e.aufgabe ~ '“ löschen?')|tojson|forceescape }})">
+              data-bestaetigen="{{ ('„' ~ e.name ~ ': ' ~ e.aufgabe ~ '“ löschen?') }}">
           <button type="submit" class="verlauf-loeschen-btn">🗑️ Eintrag löschen</button>
         </form>
       </div>
@@ -104,7 +104,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function toggleVerlaufEdit(id) {
   const p = document.getElementById('verlauf-edit-' + id);
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';

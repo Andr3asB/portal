@@ -28,6 +28,10 @@ BEKANNTE_AUSNAHMEN = {
     "/push/subscribe",
     "/push/unsubscribe",
     "/settings/darkmode",
+    # Wunsch #142: Ziel der CSP-Verstossmeldungen des Browsers. Bewusst ohne
+    # Autorisierung - die Meldung kommt vom Browser selbst, nicht von einer
+    # Seite, und der Endpunkt aendert keine Daten.
+    "/csp-bericht",
 }
 
 

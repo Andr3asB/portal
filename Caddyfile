@@ -48,7 +48,18 @@ portal.16schwaben.de {
 		# (location.href = 'https://fremd/?t=...') – dafür gibt es in CSP
 		# schlicht kein Mittel mehr, seit `navigate-to` aus dem Standard
 		# gefallen ist.
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors https://wir4.16schwaben.de"
+		# Wunsch #142: Die CSP steht seit Stufe 5 NICHT mehr hier, sondern in
+		# `src/teile/21_csp.py`. Grund: `script-src` arbeitet jetzt mit einem
+		# Nonce, das je Anfrage neu erzeugt und in dieselbe Antwort geschrieben
+		# werden muss, in der es auch in den <script>-Tags steht. Caddy sieht
+		# die Vorlage nicht; ein festes Nonce hier wäre wertlos, weil es sich
+		# abschreiben liesse.
+		#
+		# Bewusst KEINE zweite CSP an dieser Stelle: Zwei Regeln gelten
+		# gleichzeitig und im Schnitt (eine Ressource muss BEIDE erfüllen).
+		# Eine hier vergessene, freizügige Regel würde das nicht auffangen -
+		# sie würde nur die Fehlersuche unübersichtlich machen, weil im
+		# Browser zwei Richtlinien nebeneinander stünden.
 		# Wunsch #134: HSTS. Das Portal hört nur auf 443, gerade deshalb ist
 		# Port 80 auf 10.0.0.200 unbesetzt – ein Gerät im LAN könnte die IP
 		# per ARP-Spoofing übernehmen, dort antworten und den Zugangstoken

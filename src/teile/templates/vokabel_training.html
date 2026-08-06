@@ -43,7 +43,7 @@
 {% endblock %}
 
 {% block nav_left %}
-<a class="nav-btn" href="/a/vokabeln{{ tp }}" title="Zurück" onclick="return beendenUndZurueck()">←</a>
+<a class="nav-btn" href="/a/vokabeln{{ tp }}" title="Zurück" data-klick="beendenUndZurueck">←</a>
 {% endblock %}
 
 {% block nav_title %}
@@ -59,7 +59,7 @@
     <div class="frage-wort" id="frage-wort"></div>
     <input class="frage-input" id="frage-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
     <div class="feedback" id="feedback"></div>
-    <button class="btn-anhoeren" id="anhoeren-btn" type="button" onclick="wortAnhoeren()">🔊 Anhören</button>
+    <button class="btn-anhoeren" id="anhoeren-btn" type="button" data-klick="wortAnhoeren">🔊 Anhören</button>
     <button class="btn-antworten" id="antworten-btn">Antworten</button>
   </div>
   <button class="btn-beenden" id="beenden-btn">Training beenden</button>
@@ -80,7 +80,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 const SESSION_ID = {{ session_id }};

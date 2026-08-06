@@ -85,7 +85,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
       <div class="rezept-info-item">
         <span class="info-label">Auf die Wunschliste?</span>
         <button type="button" id="wunsch-btn" class="btn-wunsch{% if eigener_wunsch %} aktiv{% endif %}"
-                onclick="wunschToggle({{ rezept.id }})">
+                data-klick="wunschToggle" data-args='[{{ rezept.id }}]'>
           <span id="wunsch-label">{{ '✓ Ja' if eigener_wunsch else 'Nein' }}</span><span id="wunsch-anzahl-text">{{ ' (' ~ wunsch_anzahl ~ ')' if wunsch_anzahl else '' }}</span>
         </button>
       </div>
@@ -94,7 +94,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
     <div class="sterne-picker" id="sterne-picker">
       {% for i in range(1, 6) %}
       <button type="button" class="stern-btn{% if eigene_bewertung and i <= eigene_bewertung %} aktiv{% endif %}"
-              data-wert="{{ i }}" onclick="bewerten({{ rezept.id }}, {{ i }})">★</button>
+              data-wert="{{ i }}" data-klick="bewerten" data-args='[{{ rezept.id }}, {{ i }}]'>★</button>
       {% endfor %}
     </div>
   </div>
@@ -105,7 +105,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
     {% for z in zutaten %}
     <div class="zutat-row" id="zutat-{{ z.id }}">
       <span class="zutat-name">{{ z.name }}</span>
-      <button class="btn-zutat-kaufen" type="button" onclick="zutatEinkaufen({{ z.id }}, this)">🛒 Fehlt</button>
+      <button class="btn-zutat-kaufen" type="button" data-klick="zutatEinkaufen" data-args='[{{ z.id }}]'>🛒 Fehlt</button>
     </div>
     {% endfor %}
   </div>
@@ -133,7 +133,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
   <div class="rezept-aktionen">
     <a class="btn-bearbeiten-rezept" href="/a/rezepte{{ tp }}{{ rezept.id }}/bearbeiten">✏️ Bearbeiten</a>
     <form method="post" action="/a/rezepte{{ tp }}{{ rezept.id }}/loeschen" style="flex:1"
-          onsubmit="return confirm({{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          data-bestaetigen="{{ ('„' ~ rezept.name|truncate(40) ~ '“ löschen?') }}">
       <button class="btn-loeschen-rezept" type="submit" style="width:100%">🗑️ Löschen</button>
     </form>
   </div>
@@ -142,7 +142,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

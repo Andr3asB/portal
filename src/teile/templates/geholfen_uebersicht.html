@@ -103,8 +103,8 @@
   <div class="section-label-row">
     <span class="section-label" style="margin:16px 0 8px">Kalender</span>
     <div class="cal-toggle-group">
-      <button class="cal-toggle active" id="btn-10" onclick="showDays(10)">10 Tage</button>
-      <button class="cal-toggle" id="btn-30" onclick="showDays(30)">30 Tage</button>
+      <button class="cal-toggle active" id="btn-10" data-klick="showDays" data-args='[10]'>10 Tage</button>
+      <button class="cal-toggle" id="btn-30" data-klick="showDays" data-args='[30]'>30 Tage</button>
     </div>
   </div>
   <div style="background:var(--surface);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px var(--shadow);overflow-x:auto">
@@ -142,7 +142,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function showDays(n) {
   document.querySelectorAll('.cal-row').forEach(function(row, i) {
     row.style.display = i < n ? '' : 'none';

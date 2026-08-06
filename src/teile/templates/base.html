@@ -343,7 +343,84 @@
   </div>
 </div>
 
-<script>
+<script{{ csp_nonce }}>
+// ===========================================================================
+// Wunsch #142: Aktions-Verteiler – Ersatz für die Inline-Handler.
+//
+// Bis hierher hingen 59 `onclick`/`onsubmit`/`onchange`/`oninput`-Attribute in
+// 27 Vorlagen. Solange die existieren, MUSS die CSP `script-src
+// 'unsafe-inline'` erlauben – und damit läuft eingeschleuster Code genauso
+// selbstverständlich wie unser eigener. Erst ohne sie greift ein Nonce.
+//
+// Statt 59 einzelner `addEventListener`-Blöcke steht hier EIN delegierter
+// Verteiler je Ereignisart. Aus
+//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]'>
+// wird
+//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]'>
+//
+// Die aufgerufenen Funktionen bleiben unverändert. Das geht auf, weil ein
+// Inline-Handler seinen Namen ohnehin nur im globalen Bereich auflösen kann –
+// jede Funktion, die heute in einem `onclick` steht, ist zwangsläufig global.
+//
+// Aufrufkonvention: `fn.apply(element, [...args, element, ereignis])`.
+// Das Element kommt als `this` UND als vorletztes Argument, das Ereignis als
+// letztes. Damit passen alle bisherigen Signaturen ohne Änderung:
+//   toggleKat(id)              -> Zusatzargumente werden ignoriert
+//   spracheWaehlen(this)       -> bekommt das Element als erstes Argument
+//   zutatEinkaufen(id, this)   -> id aus data-args, Element danach
+// Gibt eine Funktion `false` zurück, wird die Standardaktion unterdrückt –
+// genau wie beim alten `onsubmit="return ..."`.
+// ===========================================================================
+(function(){
+  function rufeAuf(el, name, ereignis) {
+    const fn = window[name];
+    if (typeof fn !== 'function') {
+      // Laut statt still: ein Tippfehler im data-Attribut wäre sonst ein
+      // Knopf, der einfach nichts tut - der unangenehmste aller Fehler.
+      console.error('Unbekannte Aktion:', name, el);
+      return;
+    }
+    let args = [];
+    if (el.dataset.args) {
+      try { args = JSON.parse(el.dataset.args); }
+      catch (e) { console.error('data-args ist kein gültiges JSON:', el.dataset.args, el); }
+    }
+    return fn.apply(el, args.concat([el, ereignis]));
+  }
+
+  const ARTEN = { click: 'klick', change: 'aendern', input: 'eingabe' };
+  for (const [typ, attribut] of Object.entries(ARTEN)) {
+    document.addEventListener(typ, function(e) {
+      const el = e.target.closest('[data-' + attribut + ']');
+      if (!el) return;
+      if (rufeAuf(el, el.dataset[attribut], e) === false) e.preventDefault();
+    });
+  }
+
+  // Formulare: erst die Sicherheitsabfrage (Projektkonvention: jedes echte
+  // Löschen fragt nach), dann eine etwaige eigene Prüffunktion.
+  document.addEventListener('submit', function(e) {
+    const f = e.target.closest('form');
+    if (!f) return;
+    if (f.dataset.bestaetigen && !confirm(f.dataset.bestaetigen)) {
+      e.preventDefault();
+      return;
+    }
+    if (f.dataset.absenden && rufeAuf(f, f.dataset.absenden, e) === false) {
+      e.preventDefault();
+    }
+  });
+
+  // Kleinkram, der früher als Ausdruck direkt im Attribut stand.
+  window.nachObenScrollen  = function() { window.scrollTo({top: 0, behavior: 'smooth'}); };
+  window.formularAbsenden  = function(el) {
+    const f = (el && el.form) || el;
+    if (f.requestSubmit) f.requestSubmit(); else f.submit();
+  };
+})();
+</script>
+
+<script{{ csp_nonce }}>
 (function(){
   const TOKEN = {{ (token or '')|tojson }};
   const TP    = {{ tp|tojson }};
@@ -429,7 +506,7 @@
      extra_scripts, damit auch dort serverseitig gerendertes Markup erfasst
      wird. -->
 <script src="/static/twemoji.min.js"></script>
-<script>
+<script{{ csp_nonce }}>
 if (typeof twemoji !== 'undefined') {
   // WICHTIG: folder:'' wuerde twemoji.js NICHT als "kein Unterordner"
   // verstehen - der Wert wird per `how.folder || ...` ausgewertet, ein
@@ -439,7 +516,7 @@ if (typeof twemoji !== 'undefined') {
   twemoji.parse(document.body, { base: '/static/twemoji/', folder: 'svg', ext: '.svg' });
 }
 </script>
-<script>
+<script{{ csp_nonce }}>
 if ('serviceWorker' in navigator) {
   // scope:'/' noetig, damit der Worker die ganze Seite kontrolliert, nicht
   // nur /static/ (Default-Scope waere sonst das Verzeichnis des Skripts) -

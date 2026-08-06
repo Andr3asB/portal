@@ -41,6 +41,12 @@ from flask import abort, current_app, request
 
 UNSICHERE_METHODEN = {"POST", "PUT", "PATCH", "DELETE"}
 
+# Wunsch #142: Der Browser meldet CSP-Verstösse per POST an diesen Endpunkt -
+# ohne Origin-Bezug, weil die Meldung vom Browser selbst kommt und nicht von
+# einer Seite. Eine abgelehnte Meldung wäre eine verlorene Meldung, und es gibt
+# nichts zu fälschen: der Endpunkt ändert keine Daten, er protokolliert nur.
+AUSGENOMMEN = {"/csp-bericht"}
+
 
 def _modus() -> str:
     """'aus' | 'beobachten' | 'scharf'"""
@@ -82,6 +88,8 @@ def init_app(app):
     @app.before_request
     def csrf_pruefen():
         if request.method not in UNSICHERE_METHODEN:
+            return None
+        if request.path in AUSGENOMMEN:
             return None
         modus = _modus()
         if modus == "aus":

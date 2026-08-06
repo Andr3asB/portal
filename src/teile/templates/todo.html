@@ -127,9 +127,9 @@
 {% set gewaehlte_rollen = vorbelegte_rollen.split(',') if vorbelegte_rollen and vorbelegte_rollen != 'alle' else [] %}
 <div class="ziel-wrap">
   <div class="ziel-typ-row">
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="person" {% if ziel_typ_aktuell == 'person' %}checked{% endif %} onchange="updateZielTyp(this)"> Person</label>
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="rollen" {% if ziel_typ_aktuell == 'rollen' %}checked{% endif %} onchange="updateZielTyp(this)"> Rolle(n)</label>
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="alle" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %} onchange="updateZielTyp(this)"> Alle</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="person" {% if ziel_typ_aktuell == 'person' %}checked{% endif %} data-aendern="updateZielTyp"> Person</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="rollen" {% if ziel_typ_aktuell == 'rollen' %}checked{% endif %} data-aendern="updateZielTyp"> Rolle(n)</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="alle" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %} data-aendern="updateZielTyp"> Alle</label>
   </div>
   <div class="todo-options">
     <div class="ziel-person ziel-detail" {% if ziel_typ_aktuell != 'person' %}style="display:none"{% endif %}>
@@ -194,7 +194,7 @@
         {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}
       </form>
       {% if historie.get(t.id) %}
-      <button type="button" class="todo-verlauf-toggle" onclick="toggleVerlauf({{ t.id }})">🕘 Verlauf ({{ historie[t.id]|length }})</button>
+      <button type="button" class="todo-verlauf-toggle" data-klick="toggleVerlauf" data-args='[{{ t.id }}]'>🕘 Verlauf ({{ historie[t.id]|length }})</button>
       <div class="todo-verlauf" id="todo-verlauf-{{ t.id }}">
         {% for h in historie[t.id] %}
         <div class="todo-verlauf-eintrag">
@@ -209,12 +209,12 @@
   </div>
 
   {% if ich_darf_erledigen %}
-  <button class="todo-edit-toggle" type="button" onclick="toggleTodoEdit({{ t.id }})" title="Bearbeiten">✏️</button>
+  <button class="todo-edit-toggle" type="button" data-klick="toggleTodoEdit" data-args='[{{ t.id }}]' title="Bearbeiten">✏️</button>
   {% endif %}
 
   {% if darf_loeschen %}
   <form method="post" action="/a/todo{{ tp }}loeschen/{{ t.id }}"
-        onsubmit="return confirm({{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+        data-bestaetigen="{{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?') }}">
     <button class="todo-del" type="submit">×</button>
   </form>
   {% endif %}
@@ -283,7 +283,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 // Wunsch #93: Standardmäßig ist nur der "+ Neue Aufgabe"-Knopf sichtbar,
 // gleiches Muster wie in der Einkaufsliste (Wunsch #85) - Formular bleibt
 // nach dem Öffnen über mehrere Einträge/Reloads offen (sessionStorage),

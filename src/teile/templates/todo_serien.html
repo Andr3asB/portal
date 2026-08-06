@@ -127,7 +127,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
       </form>
     </div>
     {% if darf_loeschen %}
-    <form method="post" onsubmit="return confirm({{ ('„' ~ s.inhalt|truncate(40) ~ '“ dauerhaft löschen?')|tojson|forceescape }})">
+    <form method="post" data-bestaetigen="{{ ('„' ~ s.inhalt|truncate(40) ~ '“ dauerhaft löschen?') }}">
       <input type="hidden" name="action" value="loeschen">
       <input type="hidden" name="id" value="{{ s.id }}">
       <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
@@ -140,7 +140,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const typHidden = document.getElementById('wiederkehr-typ-hidden');
 const intervallFeld = document.getElementById('intervall-feld');
 const wochentagFeld = document.getElementById('wochentag-feld');

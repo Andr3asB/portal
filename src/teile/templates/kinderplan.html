@@ -101,7 +101,7 @@
     <span class="tag-datum">{{ tag.datum.strftime('%d.%m.') }}</span>
     {% if tag.gesperrt %}<span class="lock-badge">🔒 nur Eltern</span>{% endif %}
     {% if darf_editieren and not tag.gesperrt %}
-    <button class="tag-edit-toggle" type="button" onclick="togglePlan('{{ tag.iso }}')" title="Bearbeiten">✏️</button>
+    <button class="tag-edit-toggle" type="button" data-klick="togglePlan" data-args='["{{ tag.iso }}"]' title="Bearbeiten">✏️</button>
     {% endif %}
   </div>
 
@@ -111,7 +111,7 @@
       {% if tag.status == 'heute' %}
         {% if darf_editieren %}
         <button class="aufgabe-check" type="button"
-                onclick="abhaken({{ ziel.id }}, {{ e.aufgabe_id }}, this)"
+                data-klick="abhaken" data-args='[{{ ziel.id }}, {{ e.aufgabe_id }}]'
                 {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
         {% else %}
         <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
@@ -126,7 +126,7 @@
     <div class="aufgabe-row{% if e.erledigt %} done{% endif %}">
       {% if darf_editieren %}
       <button class="aufgabe-check" type="button"
-              onclick="serieErledigen({{ e.id }}, this)"
+              data-klick="serieErledigen" data-args='[{{ e.id }}]'
               {% if e.erledigt %}disabled{% endif %}>{{ '✓' if e.erledigt else '' }}</button>
       {% else %}
       <span class="aufgabe-check-ghost">{{ '✓' if e.erledigt else '' }}</span>
@@ -134,7 +134,7 @@
       <span style="flex:1">🔁 {{ e.inhalt }}</span>
       {% if darf_editieren %}
       <button class="btn-zuruecklegen" type="button"
-              onclick="serieZuruecklegen({{ e.id }}, this)"
+              data-klick="serieZuruecklegen" data-args='[{{ e.id }}]'
               title="Zurück in den Pool legen">↩️</button>
       {% endif %}
     </div>
@@ -214,7 +214,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

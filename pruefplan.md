@@ -224,7 +224,25 @@ Browser eingeschleusten Code blockieren kann.
 Knopf nicht mehr. Kein Datenverlust, keine Aussperrung. Dafür sind es viele
 Knöpfe, das Prüfen ist mühsam.
 
-**Notausstieg:** Paket zurückrollen (kein Schalter, weil es reines Frontend ist)
+**Notausstieg:** `CSP_MODUS=aus` in der `.env`, dann
+`docker compose up -d portal`. Sekunden, kein Rebuild – die alte, freizügige
+Regel gilt sofort wieder. (Im Plan stand hier ursprünglich „kein Schalter,
+weil reines Frontend". Das stimmt nicht: die neue Regel kommt aus Flask und
+lässt sich deshalb genauso zurücknehmen wie die Stufen davor.)
+
+**Schon von hier aus geprüft** (musst du nicht wiederholen): Vor dem
+Scharfschalten lief die Stufe im Beobachtungsmodus – die strenge Regel ging
+nur als Meldung mit, blockiert wurde nichts. Nach einem Durchgang durch alle
+Apps: null Verstösse. Damit diese Null etwas wert ist, habe ich absichtlich
+fremden Code eingeschleust; der landete prompt im Protokoll. Danach scharf
+geschaltet und nachgemessen: eigene Skripte laufen, eingeschleuster Code wird
+blockiert. Ein Knopf über den neuen Verteiler wurde end-to-end geklickt.
+Ausserdem prüft die Testsuite, dass **jeder** Knopf auf eine Funktion zeigt,
+die es wirklich gibt – ein Tippfehler wäre sonst ein Knopf, der stumm nichts
+tut.
+
+Was dabei **nicht** prüfbar ist: andere Browser (besonders iOS Safari) und der
+Kiosk. Darum geht es unten.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
@@ -241,6 +259,9 @@ Knöpfe, das Prüfen ist mühsam.
 | S5-11 | Verwaltung: Nutzer bearbeiten, App freischalten, QR anzeigen | A-PC | Alles reagiert | | |
 | S5-12 | **Löschabfragen:** Irgendwo etwas löschen | beliebig | Die Sicherheitsabfrage „…wirklich löschen?" erscheint weiterhin | | |
 | S5-13 | Menü (☰), Dark Mode umschalten, ✨-Wunsch abschicken | beliebig | Alles reagiert | | |
+| S5-14 | **iPhone/Safari:** einmal quer durch zwei, drei Apps klicken | A-Handy (iOS) | Alles reagiert – der Verteiler ist neu, und Safari ist der Browser, der am ehesten anders reagiert | | |
+| S5-15 | **Esszimmer-Bildschirm:** etwas antippen (z. B. Geholfen) | Kiosk | Reagiert wie bisher, Bild bleibt sichtbar. Bliebe der Schirm schwarz, fehlte `frame-ancestors` – dann sofort `CSP_MODUS=aus` | | |
+| S5-16 | Vokabel-Foto-Import: ein Foto prüfen, einzelne Zeilen abwählen | beliebig | Abgewählte Zeilen werden blass | | |
 
 ---
 

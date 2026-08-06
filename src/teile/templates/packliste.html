@@ -126,7 +126,7 @@ body.packmodus .item-name { font-size:18px; }
 <div class="item-card{% if item.gepackt %} gepackt{% endif %}" id="item-{{ item.id }}"
      data-kategorie="{{ item.kategorie_id }}" data-person="{{ item.person_id or '' }}">
   <input class="item-check" type="checkbox"
-         onchange="toggleGepackt({{ item.id }}, this)"
+         data-aendern="toggleGepackt" data-args='[{{ item.id }}]'
          {% if item.gepackt %}checked{% endif %}>
   <span class="item-name">{{ item.name }}</span>
 
@@ -135,7 +135,7 @@ body.packmodus .item-name { font-size:18px; }
   {% endif %}
 
   <button class="item-edit-toggle" type="button"
-          onclick="toggleEditPanel({{ item.id }})"
+          data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
           title="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
@@ -164,7 +164,7 @@ body.packmodus .item-name { font-size:18px; }
     </form>
 
     <form method="post" action="/a/packliste{{ tp }}loeschen/{{ item.id }}"
-          onsubmit="return confirm({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          data-bestaetigen="{{ ('„' ~ item.name|truncate(40) ~ '“ löschen?') }}">
       <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
     </form>
   </div>
@@ -281,7 +281,7 @@ body.packmodus .item-name { font-size:18px; }
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

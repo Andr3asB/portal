@@ -87,7 +87,7 @@
           <div class="mahlzeit-kopf">
             <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
             {% if eintrag %}<span class="mahlzeit-drag-handle" title="Verschieben">⠿</span>{% endif %}
-            <button class="mahlzeit-edit-toggle" type="button" onclick="toggleTag('{{ slot_id }}')" title="Bearbeiten">✏️</button>
+            <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten">✏️</button>
           </div>
           <div class="mahlzeit-inhalt">
             {% if eintrag and eintrag.rezept_name %}
@@ -138,7 +138,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

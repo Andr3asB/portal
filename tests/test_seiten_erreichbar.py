@@ -157,6 +157,56 @@ def test_tokenfreie_seite_zeigt_keinen_token_in_links(app, client, admin, stufe4
     assert not fehler, "\n  ".join([""] + fehler)
 
 
+def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, stufe4):
+    """Wunsch #142: Jedes `data-klick` muss eine Funktion treffen, die es gibt.
+
+    Der Verteiler in `base.html` löst den Namen zur Laufzeit über `window[...]`
+    auf. Ein Tippfehler ist deshalb kein Fehler beim Laden, sondern ein Knopf,
+    der beim Drücken nichts tut – der unangenehmste Fehler überhaupt, weil ihn
+    niemand meldet, sondern alle für „hängt halt manchmal" halten.
+
+    Geprüft wird an der **ausgelieferten Seite**, nicht an der Vorlage: Die
+    Funktion kann in der Vorlage selbst oder in `base.html` stehen, und erst im
+    fertigen HTML ist beides beisammen."""
+    verbindung = db["verbindung"]
+    from teile.kern import grant_werte, new_token
+    with app.app_context():
+        for (app_id,) in verbindung.execute(
+            "SELECT id FROM apps WHERE id NOT IN "
+            "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
+        ).fetchall():
+            lookup, enc = grant_werte(new_token())
+            verbindung.execute(
+                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
+                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+        verbindung.commit()
+    client.get(f"/p/{admin['tokens']['home']}")
+
+    import re
+    aktion_re = re.compile(r'data-(?:klick|aendern|eingabe|absenden)="([^"]+)"')
+    skript_re = re.compile(r"<script[^>]*>.*?</script>", re.S)
+    fehler = []
+    geprueft = 0
+    for regel in _seiten_routen(app):
+        tokenfrei = [str(r) for r in app.url_map.iter_rules(regel.endpoint)
+                     if "<token>" not in str(r)]
+        if not tokenfrei:
+            continue
+        seite = client.get(tokenfrei[0]).get_data(as_text=True)
+        # Attribute zählen nur im Markup. Ohne diese Trennung findet der Test
+        # den Beispiel-Schnipsel im Erklärkommentar des Verteilers in
+        # base.html – der steht auf jeder Seite und wäre ein Dauerfehlalarm.
+        markup = skript_re.sub("", seite)
+        for name in set(aktion_re.findall(markup)):
+            geprueft += 1
+            # Funktionsdeklaration oder Zuweisung an window.
+            if not re.search(r"(function\s+%s\s*\(|window\.%s\s*=)" % (name, name), seite):
+                fehler.append(f"{tokenfrei[0]}: '{name}' ist nirgends definiert")
+
+    assert geprueft > 20, f"nur {geprueft} Aktionen geprüft – Filter zu eng?"
+    assert not fehler, "\n  ".join([""] + sorted(set(fehler)))
+
+
 def test_notausstieg_stellt_token_links_wieder_her(app, client, admin):
     """TOKENFREIE_URLS=0 muss den Zustand von vorher zurückbringen.
 

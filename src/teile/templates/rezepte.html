@@ -82,7 +82,7 @@
       </div>
       <button type="button" class="btn-wunsch{% if r.eigener_wunsch %} aktiv{% endif %}"
               data-rid="{{ r.id }}"
-              onclick="event.preventDefault(); event.stopPropagation(); wunschToggle(this)">
+              data-klick="wunschToggleGestoppt">
         <span class="wunsch-label">{{ '✓ Gewünscht' if r.eigener_wunsch else 'Wünschen?' }}</span>{% if r.wunsch_anzahl %}<span class="wunsch-anzahl"> ({{ r.wunsch_anzahl }})</span>{% endif %}
       </button>
     </a>
@@ -102,13 +102,23 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 
 // Wunsch #65: Rezept als "wünsch ich mir" markieren/entmarkieren, per Fetch
 // statt vollem Reload. Höchstens 5 gleichzeitig pro Nutzer (serverseitig
 // durchgesetzt, hier nur die Fehlermeldung dafür).
+// Wunsch #142: stand frueher als Ausdruckskette im onclick-Attribut
+// (preventDefault + stopPropagation + Aufruf). Der Knopf liegt in einer
+// anklickbaren Karte - ohne das Stoppen wuerde zusaetzlich das Rezept
+// geoeffnet.
+function wunschToggleGestoppt(btn, ereignis) {
+  ereignis.preventDefault();
+  ereignis.stopPropagation();
+  wunschToggle(btn);
+}
+
 function wunschToggle(btn) {
   if (btn.disabled) return;
   btn.disabled = true;

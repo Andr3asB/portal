@@ -60,7 +60,7 @@
       <div class="chip-row" id="sprache-chips">
         {% for s in sprachen %}
         <button type="button" class="sprache-chip{% if loop.first %} aktiv{% endif %}"
-                data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this)">{{ s.name }}</button>
+                data-sprache-id="{{ s.id }}" data-klick="spracheWaehlen">{{ s.name }}</button>
         {% endfor %}
       </div>
       <input type="hidden" name="sprache_id" id="sprache-id" value="{{ sprachen[0].id }}" required>
@@ -79,7 +79,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function spracheWaehlen(btn) {
   document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');

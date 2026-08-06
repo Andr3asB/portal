@@ -72,8 +72,8 @@
 
     <form method="post" action="/a/tvb{{ tp }}mannschaften">
       <div class="alle-zeile">
-        <button class="alle-btn" type="button" onclick="alleSetzen(true)">Alle an</button>
-        <button class="alle-btn" type="button" onclick="alleSetzen(false)">Alle aus</button>
+        <button class="alle-btn" type="button" data-klick="alleSetzen" data-args='[true]'>Alle an</button>
+        <button class="alle-btn" type="button" data-klick="alleSetzen" data-args='[false]'>Alle aus</button>
       </div>
 
       <div class="klassen-karte">
@@ -110,7 +110,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function alleSetzen(an) {
   document.querySelectorAll('input[name="sichtbar"]').forEach(function (c) {
     c.checked = an;

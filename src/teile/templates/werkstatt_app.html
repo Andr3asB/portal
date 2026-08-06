@@ -204,7 +204,7 @@
 {# Wunsch #141: Die data-Attribute sind das, wonach das Skript unten filtert. #}
 <div class="wunsch-card" data-prio="{{ w.prioritaet or '' }}" data-status="offen"
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
-  <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
+  <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
       {% if w.prioritaet %}
@@ -230,7 +230,7 @@
   {% if user.is_admin %}
   <div class="wunsch-actions">
     <form method="post" action="/a/werkstatt{{ tp }}prioritaet/{{ w.id }}">
-      <select name="prioritaet" class="prio-select" onchange="this.form.submit()">
+      <select name="prioritaet" class="prio-select" data-aendern="formularAbsenden">
         <option value="">– Prio –</option>
         <option value="niedrig"  {% if w.prioritaet == 'niedrig'  %}selected{% endif %}>Niedrig</option>
         <option value="mittel"   {% if w.prioritaet == 'mittel'   %}selected{% endif %}>Mittel</option>
@@ -243,7 +243,7 @@
       <button type="submit" class="btn-done">✓</button>
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
-          onsubmit="return confirm({{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
       <button type="submit" class="btn-del">×</button>
     </form>
   </div>
@@ -258,7 +258,7 @@
 {% for w in erledigt %}
 <div class="wunsch-card done" data-prio="{{ w.prioritaet or '' }}" data-status="erledigt"
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
-  <div class="wunsch-body" onclick="toggleWunschDetail({{ w.id }})">
+  <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">
       <span class="wunsch-id">#{{ w.id }}</span>
     </div>
@@ -282,7 +282,7 @@
       <button type="submit" class="btn-done active">✓ OK</button>
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
-          onsubmit="return confirm({{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
       <button type="submit" class="btn-del">×</button>
     </form>
   </div>
@@ -296,7 +296,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 // Wunsch #101: Detailansicht (Wunsch, Benutzer, Wunsch-/Implementierungs-
 // datum, Umsetzung) klappt beim Antippen der Karte auf/zu. Die Aktions-
 // Buttons (Prio, Erledigt, Löschen) liegen als Geschwister außerhalb von

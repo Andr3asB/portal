@@ -145,7 +145,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
      data-kategorie="{{ item.kategorie_id }}" data-angebot="{{ 1 if item.angebot else 0 }}"
      data-laeden="{{ item.laden_ids or '' }}">
   <input class="item-check" type="checkbox"
-         onchange="toggleErledigt({{ item.id }}, this)"
+         data-aendern="toggleErledigt" data-args='[{{ item.id }}]'
          {% if item.erledigt %}checked{% endif %}>
   <span class="item-name">{{ item.name }}</span>
 
@@ -155,12 +155,12 @@ body.dark .badge-pending { background:#333; color:#bbb; }
 
   <!-- Bearbeiten-Toggle: Name, Angebot und Löschen stecken alle im Panel -->
   <button class="angebot-toggle-btn" type="button"
-          onclick="toggleEditPanel({{ item.id }})"
+          data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
           title="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
     <form method="post" action="/a/einkauf{{ tp }}bearbeiten/{{ item.id }}" class="edit-form"
-          onsubmit="return pruefeVerbindungOderZeigeHinweis('Bearbeiten')">
+          data-absenden="pruefeVerbindungOderZeigeHinweis" data-args='["Bearbeiten"]'>
       <div class="angebot-form-label">Name</div>
       <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
 
@@ -185,7 +185,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     </form>
 
     <form method="post" action="/a/einkauf{{ tp }}loeschen/{{ item.id }}"
-          onsubmit="return pruefeLoeschenOnline({{ ('„' ~ item.name|truncate(40) ~ '“ löschen?')|tojson|forceescape }})">
+          data-absenden="pruefeLoeschenOnline" data-args='["{{ ('„' ~ item.name|truncate(40) ~ '“ löschen?') }}"]'>
       <button class="btn-loeschen-inline" type="submit">🗑️ Löschen</button>
     </form>
   </div>
@@ -309,7 +309,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

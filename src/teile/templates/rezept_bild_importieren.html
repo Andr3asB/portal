@@ -59,7 +59,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 document.getElementById('foto-form').addEventListener('submit', () => {
   document.getElementById('import-lade').style.display = 'block';
 });

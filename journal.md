@@ -2,6 +2,105 @@
 
 ---
 
+## 2026-08-06 – portal-v125: Wunsch #142, Stufe 5 – CSP ohne `unsafe-inline`
+
+Fünfte von sechs Stufen. `script-src` erlaubt kein `'unsafe-inline'` mehr;
+unsere eigenen Skriptblöcke weisen sich über ein Nonce aus. **Eingeschleuster
+Code läuft damit nicht mehr** – vorher lief er so selbstverständlich wie
+unserer.
+
+Nachgemessen im Browser, nicht behauptet: ein zur Laufzeit eingefügtes
+Inline-Skript ohne Nonce wird blockiert, während alle eigenen Skripte laufen.
+
+### Ein Verteiler statt 59 Einzellösungen
+
+59 `onclick`/`onsubmit`/`onchange`/`oninput`-Attribute in 27 Vorlagen mussten
+weg. Statt 59 einzelner `addEventListener`-Blöcke steht in `base.html` **ein**
+delegierter Verteiler je Ereignisart:
+
+```html
+<button data-klick="toggleKat" data-args='[17]'>
+```
+
+Aufrufkonvention: `fn.apply(element, [...args, element, ereignis])`. Damit
+passen **alle** bisherigen Signaturen ohne Änderung – `toggleKat(id)` ignoriert
+die Zusatzargumente, `spracheWaehlen(this)` bekommt das Element als erstes
+Argument, `zutatEinkaufen(id, this)` beides in der richtigen Reihenfolge. Gibt
+eine Funktion `false` zurück, wird die Standardaktion unterdrückt – genau wie
+beim alten `onsubmit="return …"`.
+
+Das geht nur auf, weil ein Inline-Handler seinen Namen ohnehin nur im globalen
+Bereich auflösen kann: **jede Funktion, die heute in einem `onclick` steht, ist
+zwangsläufig global.** Deshalb musste keine einzige Funktion umgeschrieben
+werden.
+
+Die 11 Löschabfragen wurden zu `data-bestaetigen="…"`, das der Verteiler
+auswertet. Damit entfällt die alte `|tojson|forceescape`-Regel an dieser Stelle
+vollständig: Der Wert ist jetzt schlichter Attributtext, um dessen Maskierung
+Jinjas Autoescaping von selbst kümmert. `server.md` ist entsprechend korrigiert
+– sonst widerspräche die Doku dem Code.
+
+Sechs Fälle standen als Ausdruck statt als Aufruf im Attribut
+(`window.scrollTo(…)`, `this.form.submit()`, eine `preventDefault`-Kette) und
+haben jetzt einen Namen. Einer wurde dabei besser: Die Prüf-Ansicht des
+Vokabel-Foto-Imports suchte ihre Zeile über eine hineingerenderte Nummer – über
+`closest()` braucht es die gar nicht.
+
+### Warum die CSP jetzt in Flask liegt
+
+Das Nonce muss je Anfrage neu erzeugt und in dieselbe Antwort geschrieben
+werden, in der es auch in den `<script>`-Tags steht. Caddy sieht die Vorlage
+nicht; ein festes Nonce im Caddyfile wäre wertlos, weil es sich abschreiben
+liesse. Die CSP-Zeile im Caddyfile ist deshalb ersatzlos weg – bewusst **keine**
+zweite Regel dort, denn zwei CSPs gelten gleichzeitig und im Schnitt, was die
+Fehlersuche nur unübersichtlich machte.
+
+`style-src` behält `'unsafe-inline'`. Rund 200 `style="…"`-Attribute umzubauen
+wäre ein Vielfaches des Aufwands bei einem Bruchteil des Nutzens: Über
+Style-Injektion lässt sich Layout verunstalten, über Script-Injektion alles
+tun, was der angemeldete Nutzer darf.
+
+### Beobachtungsmodus – und warum die Null etwas wert ist
+
+Ausgeliefert wurde zuerst mit `CSP_MODUS=beobachten`: die alte Regel gilt
+weiter, die strenge geht nur als `Report-Only` mit, Verstösse landen über
+`/csp-bericht` im Log. Nach einem Durchgang durch alle Apps: **null Verstösse.**
+
+Eine Null ist aber nur so viel wert wie der Beweis, dass die Messung
+funktioniert – dieselbe Falle wie beim Rauchtest, der still übersprang. Also
+absichtlich ein Inline-Skript eingeschleust: prompt im Log. Erst danach auf
+`scharf`.
+
+### Zwei Wächter, beide gegengeprüft
+
+- `test_keine_inline_handler_mehr` lässt kein neues `onclick=` in die Vorlagen.
+- `test_jede_aktion_zeigt_auf_eine_vorhandene_funktion` rendert jede Seite und
+  prüft, dass jedes `data-klick` eine Funktion trifft, die es wirklich gibt.
+  Ein Tippfehler dort ist sonst kein Ladefehler, sondern ein Knopf, der beim
+  Drücken nichts tut – der unangenehmste Fehler, weil ihn niemand meldet.
+
+Beide mussten korrigiert werden, weil sie **Fehlalarme** meldeten:
+`btn.onclick = fn` in JavaScript ist völlig in Ordnung (eine aus einem Skript
+gesetzte DOM-Eigenschaft blockiert die CSP nicht), und der Erklärkommentar des
+Verteilers enthält selbst ein Beispiel-`data-klick`. Beide filtern jetzt
+Skriptblöcke heraus. Ein Test, dem man nicht glaubt, wird abgeschaltet.
+
+Anschliessend wurde beiden ein echter Fehler untergeschoben, um zu sehen, dass
+sie noch anschlagen. Sie tun es.
+
+83 Tests grün. Regression: 50/50 alte Token-Links, alle vier Nutzer token-frei
+durch jede ihrer Apps, null CSRF-Verdachtsfälle.
+
+**Missgeschick am Rande:** `git checkout src/teile/templates/todo.html`, um eine
+Testmanipulation zurückzunehmen – und damit den noch nicht committeten Umbau
+dieser Datei mit verworfen. Sofort neu erzeugt, aber die Lehre steht: Zum
+Zurücknehmen einer Änderung in einer Datei mit ungesicherter Arbeit gehört eine
+Kopie, kein `git checkout`.
+
+**Offen für Andi:** `pruefplan.md`, Stufe 5.
+
+---
+
 ## 2026-08-06 – portal-v123: Offline-Rückfall auf die Startseite (Nachtrag zu Stufe 4)
 
 Andi meldete nach der Prüfung von S4-10/S4-11: offline kommt **immer** „Keine

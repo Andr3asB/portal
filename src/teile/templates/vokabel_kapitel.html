@@ -64,7 +64,7 @@
   <div class="kap-item {% if not k.aktiv %}inaktiv{% endif %}">
     <div class="kap-row">
       <span class="kap-name">{{ k.name }}</span>
-      <button class="btn-edit-toggle" type="button" onclick="toggleKap({{ k.id }})" title="Umbenennen">✏️</button>
+      <button class="btn-edit-toggle" type="button" data-klick="toggleKap" data-args='[{{ k.id }}]' title="Umbenennen">✏️</button>
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="id" value="{{ k.id }}">
@@ -88,7 +88,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function toggleKap(id) {
   const p = document.getElementById('kap-edit-' + id);
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';

@@ -37,6 +37,11 @@ app.config["SITZUNG_KONSUMIEREN"] = os.environ.get("SITZUNG_KONSUMIEREN", "0")
 # existieren dann zwar, werden aber von nichts verlinkt - der Schalter nimmt
 # die ganze Stufe zurueck, ohne eine einzige Route zu entfernen.
 app.config["TOKENFREIE_URLS"]    = os.environ.get("TOKENFREIE_URLS", "0")
+# Wunsch #142, Stufe 5: CSP mit Nonce statt 'unsafe-inline'.
+#   aus        - die alte, freizuegige Regel (Notausstieg)
+#   beobachten - alte Regel gilt, strenge geht als Report-Only mit
+#   scharf     - strenge Regel gilt
+app.config["CSP_MODUS"]          = os.environ.get("CSP_MODUS", "aus")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

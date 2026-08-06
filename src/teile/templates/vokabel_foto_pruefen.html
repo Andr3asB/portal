@@ -41,6 +41,17 @@
 <div class="nav-sub">{{ paare|length }} erkannt · {{ sprache.name }}</div>
 {% endblock %}
 
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Wunsch #142: stand frueher als Ausdruck im onchange-Attribut und suchte die
+// Zeile ueber eine hineingerenderte Nummer. Ueber closest() braucht es die
+// Nummer gar nicht - die Zeile ist der Vorfahr der Box.
+function paarVerwerfen(box) {
+  box.closest('.paar-row').classList.toggle('verworfen', !box.checked);
+}
+</script>
+{% endblock %}
+
 {% block body %}
 <main class="main">
   <div class="hinweis">Bitte kontrollieren und bei Bedarf korrigieren. Häkchen entfernen, um eine Zeile nicht zu übernehmen.</div>
@@ -60,7 +71,7 @@
     {% for p in paare %}
     <div class="paar-row" id="paar-{{ loop.index0 }}">
       <input class="paar-check" type="checkbox" name="behalten" value="{{ loop.index0 }}"
-             checked onchange="document.getElementById('paar-{{ loop.index0 }}').classList.toggle('verworfen', !this.checked)">
+             checked data-aendern="paarVerwerfen">
       <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Fremdsprache">
       <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
     </div>

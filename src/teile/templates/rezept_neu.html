@@ -90,7 +90,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 document.getElementById('kategorie-row').querySelectorAll('.chip-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#kategorie-row .chip-btn').forEach(b => b.classList.remove('active'));

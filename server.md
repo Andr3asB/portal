@@ -176,6 +176,7 @@ CSRF_MODUS=scharf        # Wunsch #140, Stufe 2: aus | beobachten | scharf
 PORTAL_ORIGIN=           # leer = aus der Anfrage ableiten
 SITZUNG_KONSUMIEREN=1    # Wunsch #140, Stufe 3
 TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
+CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 ```
 
 Die vier `#140`-Schalter sind die Notausstiege der jeweiligen Umbaustufe: auf
@@ -873,6 +874,24 @@ teile/
                        Stufe 3 ein Cookie autorisiert - solange jede Anfrage
                        noch ihren Pfad-Token traegt, kann er nichts
                        kaputtmachen.
+  21_csp.py          – Content-Security-Policy mit Nonce (Wunsch #142).
+                       Die CSP steht seit Stufe 5 HIER und nicht mehr im
+                       Caddyfile: das Nonce muss je Anfrage neu erzeugt und in
+                       dieselbe Antwort geschrieben werden, in der es auch in
+                       den <script>-Tags steht - Caddy sieht die Vorlage nicht.
+                       Stellt `csp_nonce` als Kontextvariable bereit (der Wert
+                       enthaelt das fuehrende Leerzeichen, daher
+                       `<script` + Ausdruck + `>` ohne Leerzeichen davor).
+                       Schalter CSP_MODUS: aus | beobachten | scharf.
+                       `beobachten` laesst die alte Regel gelten und schickt
+                       die strenge nur als Report-Only mit - Verstoesse landen
+                       ueber /csp-bericht im Log (grep-Wort "CSP-Verstoss"),
+                       blockiert wird nichts. Der Modus ist hier mehr wert als
+                       beim CSRF-Riegel: ein uebersehener Inline-Handler faellt
+                       sonst erst auf, wenn jemand den Knopf drueckt.
+                       style-src behaelt bewusst 'unsafe-inline' (rund 200
+                       style-Attribute; Style-Injektion ist ungleich harmloser
+                       als Script-Injektion).
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1319,15 +1338,37 @@ anhängen.
   Weiterleitungen nur mit erneuter Prüfung je Station folgen; die geprüfte
   IP wird für die Verbindung festgenagelt (Muster in `11_rezepte.py`).
   Ein blankes `urllib.request.urlopen(nutzer_url)` ist ein SSRF-Loch.
+- **Keine Inline-Handler** (Wunsch #142). `onclick=`/`onsubmit=`/`onchange=`/
+  `oninput=` im Markup sind verboten – sie erzwängen `script-src
+  'unsafe-inline'`, und damit liefe eingeschleuster Code so selbstverständlich
+  wie eigener. Stattdessen der Verteiler aus `base.html`:
+  `data-klick="fnName" data-args='[1, "text"]'` (analog `data-aendern`,
+  `data-eingabe`; für Formulare `data-bestaetigen` und `data-absenden`).
+  Aufrufkonvention: `fn.apply(element, [...args, element, ereignis])` – das
+  Element kommt als `this` UND als vorletztes Argument, das Ereignis als
+  letztes; ein Rückgabewert `false` unterdrückt die Standardaktion.
+  `tests/test_csp.py::test_keine_inline_handler_mehr` wacht darüber.
+- **Jeder Inline-`<script>`-Block braucht `<script{{ '{{' }} csp_nonce {{ '}}' }}>`.**
+  Ohne Nonce läuft er im Modus `scharf` nicht mehr – und das fällt beim
+  Entwickeln nicht auf, weil dort `CSP_MODUS=aus` steht.
 - **Löschen-Sicherheitsabfrage** (app-übergreifend verpflichtend, seit Wunsch
-  „Einkauf löschen"): jedes echte (nicht reversible) Löschen fragt nach –
-  `onsubmit="return confirm({{ ('„' ~ text|truncate(40) ~ '“ löschen?')|tojson|forceescape }})"`
-  auf dem Lösch-`<form>`. `|forceescape` ist Pflicht, sonst bricht `tojson`
-  das HTML-Attribut auf (siehe Journal 2026-07-27). Reversible Toggles
-  (aktiv/inaktiv, Grant-Entzug) brauchen keine Abfrage.
-- **`|tojson` in `<script>`-Blöcken NIE mit `|forceescape` kombinieren**
-  (Gegenteil der Regel oben): `forceescape` ist nur für HTML-Attribute
-  (`onsubmit="..."`) nötig. Innerhalb von `<script>...</script>` liefert
+  „Einkauf löschen"): jedes echte (nicht reversible) Löschen fragt nach.
+  Reversible Toggles (aktiv/inaktiv, Grant-Entzug) brauchen keine Abfrage.
+
+  **Seit Wunsch #142 (Stufe 5) so, NICHT mehr per `onsubmit`:**
+  ```html
+  <form method="post" action="…"
+        data-bestaetigen="{{ '{{' }} '„' ~ text|truncate(40) ~ '“ löschen?' {{ '}}' }}">
+  ```
+  Den Rest erledigt der Verteiler in `base.html`. Damit entfällt die alte
+  `|tojson|forceescape`-Regel an dieser Stelle vollständig: Der Wert ist jetzt
+  schlichter Attributtext, um dessen Maskierung Jinjas Autoescaping von selbst
+  kümmert. Ein `onsubmit` würde ausserdem im Modus `CSP_MODUS=scharf` gar
+  nicht mehr ausgeführt – `tests/test_csp.py` lässt deshalb keines mehr zu.
+- **`|tojson` in `<script>`-Blöcken NIE mit `|forceescape` kombinieren.**
+  (Seit #142 gibt es keine `onsubmit`-Attribute mehr, in denen `forceescape`
+  nötig wäre – die Regel steht hier weiter, weil `tojson` in Skriptblöcken
+  häufig vorkommt und die Verwechslung nahe liegt.) Innerhalb von `<script>...</script>` liefert
   Flasks `tojson` bereits scriptsicheres JSON (z. B. `let queue =
   {{ daten|tojson }};` in `vokabel_training.html`) – `forceescape`
   HTML-entity-escaped dann zusätzlich Anführungszeichen zu `&#34;` etc.,
@@ -1640,6 +1681,17 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_csp.py` – Wunsch #142. Wichtigster Test: `test_keine_inline_handler_mehr`
+  liest die Vorlagen im Quelltext und laesst kein neues `onclick=` zu. Ohne
+  ihn waere der Umbau in ein paar Wochen still wieder zunichte, denn beim
+  Entwickeln steht `CSP_MODUS=aus` - ein neues Inline-Attribut faellt dort
+  nicht auf, im Betrieb reagiert der Knopf dann einfach nicht. Prueft
+  ausserdem: Nonce in Kopfzeile und Seite identisch, Nonce je Anfrage
+  verschieden, `frame-ancestors` in jedem Modus vorhanden (sonst ist der
+  Kiosk schwarz), Meldeendpunkt nimmt auch Muell an.
+  **Beide Waechter-Tests wurden gegengeprueft** (absichtlicher Fehler
+  eingebaut, Test schlaegt an) - ein Waechter, der nicht ausloesen kann, ist
+  schlimmer als keiner.
 - `test_seiten_erreichbar.py` – Rauchtest ueber alle 36 parameterlosen Seiten,
   **zweimal**: mit Token und token-frei ueber das Cookie. Sucht ausserdem in
   jeder ausgelieferten Seite nach ALLEN Tokens des Nutzers (nicht nur dem der

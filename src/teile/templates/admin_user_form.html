@@ -52,12 +52,12 @@ input[type=text]:focus { border-color:var(--farbe); }
         <input type="text" id="farbe-hex" name="farbe"
                value="{{ edit.farbe if edit else '#4a90d9' }}"
                pattern="^#[0-9a-fA-F]{6}$" placeholder="#4a90d9"
-               oninput="syncFarbe(this.value)">
+               data-eingabe="syncFarbe" data-args='[this.value]'>
       </div>
       <div class="farben-preset">
         {% for f in ['#3498db','#e74c3c','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#ff5722'] %}
         <button type="button" style="background:{{ f }}"
-                onclick="setFarbe('{{ f }}')"
+                data-klick="setFarbe" data-args='["{{ f }}"]'
                 id="preset-{{ loop.index }}"></button>
         {% endfor %}
       </div>
@@ -104,7 +104,7 @@ input[type=text]:focus { border-color:var(--farbe); }
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const PRESETS = {{ ['#3498db','#e74c3c','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e91e63','#ff5722']|tojson }};
 
 function setFarbe(hex) {

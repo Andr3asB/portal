@@ -77,7 +77,7 @@
       <button class="nutzer-pill {% if n.id == user.id %}aktiv{% endif %}"
               data-uid="{{ n.id }}" data-farbe="{{ n.farbe }}"
               style="{% if n.id == user.id %}background:{{ n.farbe }}{% endif %}"
-              onclick="waehleNutzer({{ n.id }}, '{{ n.farbe }}', this)">
+              data-klick="waehleNutzer" data-args='[{{ n.id }}, "{{ n.farbe }}"]'>
         {{ n.name }}
       </button>
       {% endfor %}
@@ -121,7 +121,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 (function() {
   const TP = {{ tp|tojson }};
   let fuerUserId = {{ user.id }};

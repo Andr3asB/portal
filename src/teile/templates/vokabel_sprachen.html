@@ -39,7 +39,7 @@
       <span class="sprache-name">{{ s.name }}</span>
       <label class="switch">
         <input type="checkbox" name="sprache_ids" value="{{ s.id }}"
-               {% if s.id in aktive_ids %}checked{% endif %} onchange="this.form.requestSubmit()">
+               {% if s.id in aktive_ids %}checked{% endif %} data-aendern="formularAbsenden">
         <span class="switch-slider"></span>
       </label>
     </div>

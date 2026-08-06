@@ -44,14 +44,14 @@
     <div class="chip-row" id="sprache-chips">
       {% for s in sprachen %}
       <button type="button" class="sprache-chip{% if loop.first %} aktiv{% endif %}"
-              data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this)">{{ s.name }}</button>
+              data-sprache-id="{{ s.id }}" data-klick="spracheWaehlen">{{ s.name }}</button>
       {% endfor %}
     </div>
     <input type="hidden" name="sprache_id" id="sprache-id" value="{{ sprachen[0].id }}" required>
 
     <div class="form-label">Kapitel</div>
     <div class="chip-row">
-      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="alle" checked onchange="alleUmschalten(this)"> Alle</label>
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="alle" checked data-aendern="alleUmschalten"> Alle</label>
       <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="ohne" class="kapitel-einzel" disabled> Ohne Kapitel</label>
       {% for k in kapitel %}
       <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}" class="kapitel-einzel" disabled> {{ k.name }}</label>
@@ -65,7 +65,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 function spracheWaehlen(btn) {
   document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');

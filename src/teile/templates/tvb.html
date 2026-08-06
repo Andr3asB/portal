@@ -209,7 +209,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 // Wunsch #125: Scroll-Hinweise je nach Position ein-/ausblenden.
 (function () {
   var wrap = document.getElementById('team-wrap');

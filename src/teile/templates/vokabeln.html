@@ -96,7 +96,7 @@
       <div class="form-label">Sprache</div>
       <div class="chip-row" id="neu-sprache-chips">
         {% for s in sprachen %}
-        <button type="button" class="sprache-chip" data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this, 'neu')">{{ s.name }}</button>
+        <button type="button" class="sprache-chip" data-sprache-id="{{ s.id }}" data-klick="spracheWaehlen" data-args='["neu"]'>{{ s.name }}</button>
         {% endfor %}
       </div>
       <input type="hidden" name="sprache_id" id="neu-sprache-id" required>
@@ -131,8 +131,8 @@
         <span class="vokabel-fremd">{{ v.fremd }}</span> – {{ v.deutsch }}
         <div class="vokabel-meta">{{ v.sprache_name }}{% if v.kapitel_namen %} · {{ v.kapitel_namen }}{% endif %}</div>
       </div>
-      <button class="vokabel-anhoeren-btn" type="button" onclick="wortAnhoeren({{ v.id }})" title="Anhören">🔊</button>
-      <button class="vokabel-edit-btn" type="button" onclick="toggleEdit({{ v.id }})" title="Bearbeiten">✏️</button>
+      <button class="vokabel-anhoeren-btn" type="button" data-klick="wortAnhoeren" data-args='[{{ v.id }}]' title="Anhören">🔊</button>
+      <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' title="Bearbeiten">✏️</button>
     </div>
 
     <div class="vokabel-edit-panel" id="edit-{{ v.id }}">
@@ -141,7 +141,7 @@
         <div class="chip-row" id="edit-sprache-chips-{{ v.id }}">
           {% for s in sprachen %}
           <button type="button" class="sprache-chip{% if s.id == v.sprache_id %} aktiv{% endif %}"
-                  data-sprache-id="{{ s.id }}" onclick="spracheWaehlen(this, 'edit-{{ v.id }}')">{{ s.name }}</button>
+                  data-sprache-id="{{ s.id }}" data-klick="spracheWaehlen" data-args='["edit-{{ v.id }}"]'>{{ s.name }}</button>
           {% endfor %}
         </div>
         <input type="hidden" name="sprache_id" id="edit-{{ v.id }}-sprache-id" value="{{ v.sprache_id }}" required>
@@ -166,7 +166,7 @@
         <button type="submit" class="btn-speichern">Speichern</button>
       </form>
       <form method="post" action="/a/vokabeln{{ tp }}{{ v.id }}/loeschen"
-            onsubmit="return confirm({{ ('„' ~ v.fremd ~ ' – ' ~ v.deutsch ~ '“ löschen?')|tojson|forceescape }})">
+            data-bestaetigen="{{ ('„' ~ v.fremd ~ ' – ' ~ v.deutsch ~ '“ löschen?') }}">
         <button type="submit" class="vokabel-loeschen-btn">🗑️ Vokabel löschen</button>
       </form>
     </div>
@@ -186,7 +186,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 const SPRACHE_STORAGE_KEY = 'vokabeln_letzte_sprache_' + TOKEN;

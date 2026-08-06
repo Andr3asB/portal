@@ -559,7 +559,7 @@ input[type="text"].rezept-input {
         {% endif %}
         {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
         <form method="post" action="/a/tierbaukasten{{ tp }}loeschen/{{ k.id }}"
-              onsubmit="return confirm({{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?')|tojson|forceescape }})">
+              data-bestaetigen="{{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?') }}">
           <button type="submit" class="btn-loeschen-tier">×</button>
         </form>
       </div>
@@ -574,7 +574,7 @@ input[type="text"].rezept-input {
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script{{ csp_nonce }}>
 (function() {
   const TOKEN = {{ (token or '')|tojson }};
   const TP    = {{ tp|tojson }};
