@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-08-06 – Wunsch #140, Stufe 2: CSRF-Riegel scharf geschaltet
+
+Nach der Beobachtungsphase auf `CSRF_MODUS=scharf` umgestellt. Reine
+`.env`-Änderung, kein neues Paket.
+
+### Warum die Beobachtungsphase kurz bleiben durfte
+
+Ursprünglich war eine Woche vorgesehen. Das war zu vorsichtig gegriffen:
+`Sec-Fetch-Site` hängt an der Beziehung zwischen Absender und Ziel, **nicht
+an der Route**. Geht ein Formular auf einem Gerät durch, gehen alle Formulare
+auf diesem Gerät durch. Zeit im Alltag deckt weitere Routen ab, aber keine
+weiteren Fälle. Was variiert, ist Gerät/Browser und Anfrageart – und davon
+gibt es genau vier: normales Formular, `fetch()` aus der Seite, die
+nachgespielte Offline-Warteschlange und `navigator.sendBeacon` im
+Vokabeltrainer. Der Service Worker scheidet aus, weil `sw.js` nicht-GET nie
+abfängt.
+
+Alle vier wurden über iPhone, Windows und den ChromeOS-Kiosk durchgespielt
+(Prüfplan S2-01 bis S2-05). Ergebnis: **null Verdachtsfälle** bei echten
+Geräten über die gesamte Beobachtungszeit.
+
+### Verifiziert nach dem Scharfschalten
+
+`same-origin` → 200, `same-site` → **403**, `cross-site` → **403**, lesende
+Anfragen unberührt. Echtes Einkaufs-Formular über HTTPS: same-origin legt an
+(302), cross-site wird abgewiesen (403) – gegengeprüft, dass der abgewiesene
+Artikel tatsächlich nie in der Datenbank landete. Regression über alle 50
+Grants: 50 × HTTP 200.
+
+Der `same-site`-Fall ist der wichtigste: Home Assistant läuft unter derselben
+Domain, ein POST von dort wäre same-site aber nicht same-origin. Der Kiosk ist
+davon nicht betroffen, weil die Seite **im** iFrame Portal-Origin hat – live
+bestätigt durch S2-05.
+
+### Nebenbefund aus der Prüfung
+
+Testfall S2-03 deckte einen vorbestehenden Fehler in der Offline-Warteschlange
+auf, der nichts mit diesem Umbau zu tun hatte (siehe portal-v118 weiter unten).
+Ohne diesen Testfall wäre er weiter unentdeckt geblieben.
+
+---
+
 ## 2026-08-06 – portal-v118: Offline-Warteschlange der Einkaufsliste hing dauerhaft fest
 
 Beim Prüfen von Stufe 2 (Testfall S2-03) gefunden: Nach dem Wiederverbinden
