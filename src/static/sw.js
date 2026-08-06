@@ -71,14 +71,34 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE_NAME).then(cache => cache.put(req, kopie));
       }
       return resp;
-    }).catch(() =>
-      caches.match(req).then(cached => cached || new Response(
+    }).catch(async () => {
+      const gecacht = await caches.match(req);
+      if (gecacht) return gecacht;
+
+      // Wunsch #140, Stufe 4: Rückfall auf die Startseite.
+      //
+      // `/p/<token>` antwortet online mit einer Weiterleitung auf `/start`.
+      // Eine Navigation hat `redirect: 'manual'`, die 302 kommt hier als
+      // opaqueredirect an - `resp.ok` ist false, sie landet also NIE im
+      // Cache. Die installierte PWA und jedes alte Lesezeichen starten aber
+      // genau dort. Ohne diesen Zweig liefe offline jeder Start in die
+      // "noch nie geladen"-Seite, und zwar dauerhaft: Benutzen heilt das
+      // nicht, weil eine 302 nie cachebar wird.
+      //
+      // Nur für Navigationen, nicht für fetch()-Aufrufe aus einer Seite -
+      // die erwarten JSON und kämen mit einer HTML-Startseite nicht klar.
+      if (req.mode === 'navigate') {
+        const start = await caches.match('/start');
+        if (start) return start;
+      }
+
+      return new Response(
         '<!doctype html><meta charset="utf-8" name="viewport" content="width=device-width">' +
         '<body style="font-family:sans-serif;text-align:center;padding:60px 20px;color:#666">' +
         '📡 Keine Verbindung<br><small>Diese Seite wurde noch nie geladen, solange Empfang da war.</small></body>',
         { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 503 }
-      ))
-    )
+      );
+    })
   );
 });
 

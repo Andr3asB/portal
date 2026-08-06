@@ -2,6 +2,52 @@
 
 ---
 
+## 2026-08-06 – portal-v123: Offline-Rückfall auf die Startseite (Nachtrag zu Stufe 4)
+
+Andi meldete nach der Prüfung von S4-10/S4-11: offline kommt **immer** „Keine
+Verbindung – diese Seite wurde noch nie geladen". Zwei Ursachen, eine davon
+dauerhaft.
+
+**Die dauerhafte:** `/p/<token>` antwortet seit Stufe 4 mit einer 302 auf
+`/start`. Eine Navigation hat `redirect: 'manual'`, die Weiterleitung kommt im
+Service Worker als *opaqueredirect* an – `resp.ok` ist `false`, sie landet also
+**nie** im Cache. Die installierte PWA und jedes alte Lesezeichen starten aber
+genau dort. Offline lief damit jeder Start in die Sackgasse, und Benutzen
+heilte das nicht: eine 302 wird nie cachebar.
+
+Behoben: Findet der Worker offline nichts zur angefragten Adresse und ist es
+eine **Navigation**, liefert er die gecachte `/start`. Nur für Navigationen –
+`fetch()`-Aufrufe aus einer Seite erwarten JSON und kämen mit einer
+HTML-Startseite nicht klar.
+
+**Die einmalige:** Der Cache-Name wurde in v122 von `portal-cache-v1` auf `v2`
+gezogen, um die alten, token-behafteten Einträge loszuwerden. Das war richtig –
+gecachte Seiten mit Token in den Links hätten den ganzen Umbau unterlaufen –,
+kostet aber je Seite einen Online-Besuch. Genau das sah wie ein Dauerfehler
+aus. `v2` bleibt jetzt stehen, ein zweiter Umzug findet nicht statt.
+
+### Wie es gefunden wurde
+
+Nicht durch Nachdenken, sondern durch Messen im Browser: `caches.keys()` war
+zunächst komplett leer, die Cache-API selbst funktionierte aber (Probe-Eintrag
+liess sich schreiben). Nach einem Reload lagen `/start`, `/a/einkauf/` und der
+Nutzer-Merker drin – die Speicherung war also intakt. Erst der Blick auf die
+Liste der gecachten Pfade zeigte: **kein einziger `/p/`-Eintrag**, obwohl
+genau diese Adresse der Einstiegspunkt ist.
+
+Die erste Vermutung (`Vary: Cookie` verhindert das Cache-Matching) war falsch
+und liess sich in einem Zug widerlegen: die Antworten tragen weder `Vary` noch
+ein störendes `Cache-Control`.
+
+**Was von hier aus nicht prüfbar war:** ein echter Offline-Zustand. Eine
+fehlgeschlagene Anfrage lässt sich nicht erzeugen, ohne die eigene Verbindung
+zu kappen; ein gestoppter Container liefert 502, also eine *Antwort*, und
+durchläuft den Fehlerzweig gar nicht. Verifiziert sind die beiden Tatsachen,
+aus denen sich das Verhalten ergibt: `/p/<token>` ist nie im Cache,
+`caches.match('/start')` liefert 200. Der eigentliche Offline-Test ist S4-12.
+
+---
+
 ## 2026-08-06 – portal-v120/v121: Wunsch #140, Stufe 4 – der Token ist aus der Adresse verschwunden
 
 Vierte von sechs Stufen und die grösste: 90 Routen, 87 Vorlagen-Links, 26

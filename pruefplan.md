@@ -160,6 +160,17 @@ man sieht – nicht mehr der Link, auf den man getippt hat.
 
 **Notausstieg:** `TOKENFREIE_URLS=0`
 
+**Nachtrag v123 – der Offline-Fehler, den du gemeldet hast:** Zwei Ursachen.
+Die eine war dauerhaft: `/p/<token>` antwortet jetzt mit einer Weiterleitung,
+und eine Weiterleitung kann der Offline-Speicher grundsätzlich nicht ablegen –
+ausgerechnet die Adresse, mit der die App vom Homescreen und jedes alte
+Lesezeichen startet. Behoben: Findet das Portal offline nichts zur
+aufgerufenen Adresse, zeigt es die gespeicherte Startseite statt einer
+Sackgasse. Die andere Ursache war einmalig: Beim Umbau wurde der gesamte
+Offline-Speicher geleert (die alten Seiten enthielten noch Token in ihren
+Links). **Jede Seite braucht deshalb einmal einen Besuch mit Empfang, bevor
+sie offline verfügbar ist.** Das holt sich von selbst nach. Nachtest: S4-12.
+
 **Schon von hier aus geprüft** (musst du nicht wiederholen): alle 50 Zugänge
 über ihre alten Token-Adressen → 50 × OK; alle vier Nutzer token-frei durch
 jede ihrer Apps → 46 × OK; ohne Cookie kommt niemand rein (403); in keiner
@@ -187,6 +198,7 @@ und ist der wichtigste Test dieser Stufe.
 | S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | | |
 | S4-10 | **Geteiltes Gerät:** Auf einem Gerät, auf dem zuletzt *du* drin warst, den Link eines Kindes öffnen. Dann auf eine Kachel tippen. | ein Gerät, das zwei Leute benutzen (iPad/Kiosk) | Es bleibt beim Kind – auch nach dem Tippen. Nirgends deine Daten. Danach mit deinem Link zurückwechseln: es bleibt bei dir. | | |
 | S4-11 | Nach S4-10 auf demselben Gerät **im Flugmodus** eine schon besuchte Seite öffnen | dasselbe Gerät | Die Seite des *aktuellen* Nutzers oder die Offline-Meldung – niemals die des Vorgängers | | |
+| S4-12 | **Nachtest zum Offline-Fehler (v123).** Erst online einmal die Startseite und die Einkaufsliste öffnen. Dann Flugmodus. Dann: (a) die Portal-App vom Homescreen starten, (b) ein altes Lesezeichen mit Token öffnen, (c) die Einkaufsliste öffnen. | A-Handy + A-PWA | (a) und (b) zeigen die Startseite statt „noch nie geladen"; (c) zeigt die Einkaufsliste | | |
 
 ---
 

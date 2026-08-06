@@ -1179,6 +1179,18 @@ steht.
   meldet dem Service Worker ueber `postMessage` den aktuellen Nutzer; beim
   Wechsel wirft er den Seiten-Cache weg. Sonst saehe auf einem geteilten
   Geraet der naechste Nutzer offline die Seiten des vorigen.
+- **`/p/<token>` ist NIE im Cache.** Die Route antwortet mit 302; eine
+  Navigation hat `redirect: 'manual'`, die Antwort kommt als opaqueredirect an
+  und `resp.ok` ist false. Weil PWA und alte Lesezeichen genau dort starten,
+  liefert `sw.js` bei einer fehlschlagenden **Navigation** ersatzweise die
+  gecachte `/start`. Ohne diesen Zweig ist jeder Offline-Start eine Sackgasse,
+  die sich durch Benutzen nicht heilt. Nur fuer Navigationen - `fetch()`-
+  Aufrufe erwarten JSON.
+- `CACHE_NAME` steht auf `portal-cache-v2`. **Nicht ohne Not hochziehen:** Ein
+  Namenswechsel wirft den gesamten Offline-Bestand weg, jede Seite braucht
+  danach wieder einen Online-Besuch. In v122 war das beabsichtigt (die alten
+  Eintraege trugen Token in den Links), sah im Alltag aber wie ein Dauerfehler
+  aus.
 - Das PWA-Manifest haengt token-frei am Cookie und braucht deshalb
   `crossorigin="use-credentials"` am `<link>` - sonst holt der Browser es
   ohne Cookies und bekommt 404.
