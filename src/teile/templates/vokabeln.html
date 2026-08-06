@@ -213,9 +213,34 @@ document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
 });
 
 let anhoerenAudio = null;
-function wortAnhoeren(id) {
+let anhoerenBlobUrl = null;
+async function wortAnhoeren(id) {
   if (anhoerenAudio) { anhoerenAudio.pause(); anhoerenAudio = null; }
-  anhoerenAudio = new Audio(`/a/vokabeln${TP}wort/${id}/audio`);
+  if (anhoerenBlobUrl) { URL.revokeObjectURL(anhoerenBlobUrl); anhoerenBlobUrl = null; }
+  const url = `/a/vokabeln${TP}wort/${id}/audio`;
+  // Wunsch #136: 429 heißt "Kontingent für Sprachausgabe aufgebraucht". Per
+  // fetch statt new Audio(url), weil <audio> HTTP-Fehler nur lautlos ins
+  // console.warn schickt - niemand würde erfahren, warum nichts zu hören
+  // ist. Ein zusätzlicher HEAD-Aufruf wäre KEIN Ausweg: Flask führt die
+  // Route dabei trotzdem vollständig aus (kürzt nur den Antwort-Body), die
+  // Sprachausgabe würde also ein zweites Mal wirklich erzeugt.
+  let antwort;
+  try {
+    antwort = await fetch(url);
+  } catch (err) {
+    console.warn('Aussprache konnte nicht geladen werden:', err);
+    return;
+  }
+  if (antwort.status === 429) {
+    alert('Monatliches Kontingent für Sprachausgabe aufgebraucht - bitte später erneut versuchen.');
+    return;
+  }
+  if (!antwort.ok) {
+    console.warn('Aussprache konnte nicht geladen werden:', antwort.status);
+    return;
+  }
+  anhoerenBlobUrl = URL.createObjectURL(await antwort.blob());
+  anhoerenAudio = new Audio(anhoerenBlobUrl);
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
 }
 

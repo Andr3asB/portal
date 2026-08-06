@@ -113,6 +113,27 @@ def test_sec_fetch_site_schlaegt_origin(client, admin, scharf):
     assert antwort.status_code == 403
 
 
+def test_x_forwarded_proto_zaehlt_fuer_die_erwartete_origin(client, admin, scharf):
+    """Regressionstest für einen am 2026-08-06 gefundenen Fehler: Hinter Caddy
+    läuft die Verbindung zu portal intern als Klartext-HTTP (TLS endet bei
+    Caddy) – ohne X-Forwarded-Proto zu berücksichtigen, hätte die erwartete
+    Origin IMMER 'http://...' gelautet, während jeder echte Browser
+    'https://...' schickt. Der Fehler blieb unentdeckt, weil moderne Browser
+    Sec-Fetch-Site senden und diesen Zweig gar nicht erreichen – erst ein
+    Client ohne diesen Header (z. B. curl, oder ein alter Browser) deckte ihn
+    auf. Origin muss dem WEITERGELEITETEN Schema folgen, nicht dem, das
+    Flask an der internen Verbindung sieht."""
+    antwort = _darkmode(client, admin, **{
+        "Origin": "https://localhost", "X-Forwarded-Proto": "https"})
+    assert antwort.status_code == 200
+
+    # Ohne den Kopf muss weiterhin das tatsächliche Anfrage-Schema gelten
+    # (hier http, wie der Test-Client es sendet) – sonst würde ein simulierter
+    # Vorwärts-Kopf jede Herkunft akzeptieren.
+    antwort = _darkmode(client, admin, **{"Origin": "https://localhost"})
+    assert antwort.status_code == 403
+
+
 # --- Lesende Anfragen bleiben unberührt -------------------------------------
 
 def test_get_wird_nie_geprueft(client, admin, scharf):

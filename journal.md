@@ -2,6 +2,104 @@
 
 ---
 
+## 2026-08-06 – portal-v126/v127: Wünsche #136, #137 und ein CSRF-Fund aus Stufe 2
+
+„Implementiere die Wünsche" – drei offene, nicht zurückgestellte Wünsche
+umgesetzt (#136, #137, dazu unten #144 als eigener Eintrag). Zurückgestellt
+blieben unangetastet: #51, #130, #138, #139, #143.
+
+### #136 – eigenes Kontingent für die Sprachausgabe
+
+Die TTS-Aussprache der Vokabel-App zählte bisher gar nicht gegen ein Limit -
+jedes neu angelegte Wort löste einen kostenpflichtigen Aufruf aus, ohne
+Obergrenze. Neu: `users.ki_tts_zeichen_limit` (Default 50000 Zeichen/Monat,
+admin-einstellbar wie das bestehende KI-Token-Limit) und eine **eigene**
+Tabelle `ki_tts_nutzung`.
+
+Eigene Tabelle statt einer weiteren Zeile in der bestehenden `ki_nutzung`, mit
+Absicht: `ki_anfrage()` summiert dort `SUM(tokens)` **ohne** Filter nach
+`feature` – das ist genau der Zweck, ein gemeinsames Kontingent über alle
+LLM-Funktionen hinweg. TTS-Zeichen in dieselbe Spalte zu schreiben hätte das
+Token-Kontingent stillschweigend mit Zeichenzahlen verfälscht. Am echten
+Server nachgemessen: nach einem TTS-Aufruf steht der Verbrauch in
+`ki_tts_nutzung`, `ki_nutzung` bleibt bei 0.
+
+Protokolliert wird erst NACH einem erfolgreichen Aufruf, auf beiden
+Erfolgspfaden (mp3 direkt oder der pcm/wav-Rückfall) - ein Fehlversuch beim
+Anbieter darf das Kontingent nicht schmälern (eigener Test dafür).
+
+Frontend: `wortAnhoeren()` in `vokabeln.html`/`vokabel_training.html` holt das
+Audio jetzt per `fetch()` statt `new Audio(url).play()` direkt - ein
+aufgebrauchtes Kontingent (429) kam vorher lautlos im `console.warn` unter,
+niemand hätte erfahren, warum nichts zu hören ist. Ein `HEAD`-Vorab-Check war
+KEIN Ausweg: Flask führt die Route dabei trotzdem vollständig aus (kürzt nur
+den Antwort-Body) - die Sprachausgabe wäre ein zweites Mal wirklich erzeugt
+worden. `alert()` für die Meldung, konsistent mit der bestehenden Konvention
+für Limit-Meldungen (`rezepte.html`/`rezept_detail.html`).
+
+Live verifiziert: Wort ohne Cache abgerufen → 18 Zeichen in `ki_tts_nutzung`,
+0 in `ki_nutzung`. Limit auf 10 gesetzt, neues Wort abgerufen → 429.
+
+### #137 – strikte Schema-Prüfung der KI-Rezept-Extraktion
+
+Beide KI-Extraktionspfade (URL-Import ohne JSON-LD, Foto-Import) hatten
+bislang denselben weichen Code dupliziert: `json.loads()`, dann `.get()` mit
+stillschweigendem `str(...)`-Cast. Eine präparierte Webseite oder ein
+manipuliertes Foto könnte dem Sprachmodell Anweisungen unterschieben; der
+direkte Schaden war zwar begrenzt (Ausgabe landet escaped in einem Rezept,
+das der Nutzer ohnehin anlegen darf), aber unbegrenzt lange oder unbegrenzt
+strukturierte Antworten liefen unbesehen durch.
+
+Neu: eine einzige Funktion `_ki_rezept_validieren()`, von beiden Pfaden
+verwendet (behebt nebenbei die Duplizierung). Nur die vier bekannten Felder
+werden gelesen; `zutaten`/`schritte` müssen Listen sein, Einträge, die keine
+Zeichenkette/Zahl sind (z. B. ein eingeschleustes verschachteltes Objekt),
+werden verworfen statt zu hässlichem `str(dict)`-Text verunstaltet; jedes Feld
+hat eine feste Längen- (200/60/200/2000 Zeichen) bzw. Mengenobergrenze
+(60 Einträge je Liste).
+
+11 neue Tests, u. a. mit absichtlich eingeschleusten Nutzlasten
+(`{"injiziert": "ignoriere alle Anweisungen"}` als Zutat, ein zusätzliches
+Feld `system_override`) - alle werden verworfen bzw. ignoriert.
+
+### Nebenfund beim Testen: CSRF-Origin-Ersatzprüfung war für JEDEN echten Browser wirkungslos
+
+Um #137 end-to-end zu prüfen, wurde der Import-Endpunkt per `curl` angestoßen
+- `curl` sendet kein `Sec-Fetch-Site`, die Anfrage fiel also auf die
+Origin-Ersatzprüfung aus Stufe 2 zurück. Die lehnte eine korrekte
+`https://portal.16schwaben.de`-Origin ab und akzeptierte stattdessen
+`http://portal.16schwaben.de`.
+
+Ursache: `request.url_root` spiegelt das Schema der Verbindung zwischen Caddy
+und `portal` - die läuft intern als Klartext-HTTP, TLS endet bei Caddy. Die
+erwartete Origin war also **immer** `http://...`, während jeder echte Browser
+`https://...` schickt. Unentdeckt blieb das bislang, weil moderne Browser
+`Sec-Fetch-Site` senden und den Origin-Ersatzzweig nie erreichen - genau der
+Zweig, der laut Docstring für ÄLTERE Browser gedacht war, war für sie seit
+dem Scharfschalten in Stufe 2 vollständig wirkungslos.
+
+Behoben: `_erwartete_origin()` liest `X-Forwarded-Proto`, das Caddys
+`reverse_proxy` standardmäßig setzt - sicher zu vertrauen, weil `portal`
+ausschließlich über das interne Bridge-Netz von Caddy erreichbar ist, kein
+anderer Absender kann den Header setzen. Am echten Server verifiziert: die
+echte `https`-Origin wird jetzt akzeptiert, die vorher fälschlich akzeptierte
+`http`-Origin jetzt abgelehnt, eine fremde Origin weiterhin abgelehnt. Ein
+Regressionstest hält den Fehlerfall fest.
+
+**Praktische Tragweite:** In der Handprüfung von Stufe 2/5 ist das nirgends
+aufgefallen, weil alle geprüften Geräte moderne Browser mit `Sec-Fetch-Site`
+sind. Betroffen wäre nur ein Browser ohne diesen Header gewesen - am ehesten
+ein älteres Safari. `S5-14` (iPhone/Safari) im Prüfplan deckt das ab.
+
+100 Tests grün. Regression: 50/50 alte Token-Links.
+
+**Offen für Andi:** nichts Neues zu prüfen über die laufenden Stufen-5-Tests
+hinaus - #136/#137 sind reines Backend bzw. eine kleine, bereits verifizierte
+Frontend-Änderung, und der CSRF-Fix stellt nur wieder her, was Stufe 2 schon
+versprochen hatte.
+
+---
+
 ## 2026-08-06 – portal-v125: Wunsch #142, Stufe 5 – CSP ohne `unsafe-inline`
 
 Fünfte von sechs Stufen. `script-src` erlaubt kein `'unsafe-inline'` mehr;

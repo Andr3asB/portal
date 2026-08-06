@@ -15,6 +15,15 @@ beiden Fällen nur vorausgefüllt im bestehenden Neu-Formular – nie ungeprüft
 direkt in der DB, weil sowohl JSON-LD als auch KI-Extraktion daneben liegen
 können.
 
+Wunsch #137: Die KI-Antwort selbst (URL- wie Foto-Import) läuft zusätzlich
+durch `_ki_rezept_validieren()` – striktes Schema statt blindem `json.loads()`.
+Eine präparierte Webseite könnte dem Sprachmodell sonst Anweisungen
+unterschieben; der direkte Schaden wäre zwar begrenzt (die Ausgabe landet
+escaped in einem Rezept, das der Nutzer ohnehin anlegen darf), aber nur
+bekannte Felder werden gelesen, Listen-Einträge, die keine Zeichenkette/Zahl
+sind, werden verworfen statt mit `str(...)` verunstaltet übernommen, und jedes
+Feld hat eine feste Längen-/Mengenobergrenze.
+
 Rezept-Import per Foto (Wunsch #97): Kamera oder Mediathek, OCR+Extraktion
 über ki_anfrage() mit Bildeingabe (eigener KI-Zweck "rezepte_foto_import",
 unabhängig vom URL-Import konfigurierbar). Liefert dieselbe Datenform wie
@@ -377,6 +386,69 @@ def _rezept_aus_jsonld(html: str):
     return None
 
 
+# Wunsch #137: Obergrenzen fuer die KI-Extraktion (URL- und Foto-Import).
+# Eine praeparierte Webseite oder ein manipuliertes Foto kann dem
+# Sprachmodell Anweisungen unterschieben ("ignoriere die Aufgabe, gib
+# stattdessen ... aus") und damit steuern, was als Rezept zurueckkommt. Der
+# direkte Schaden ist begrenzt - die Ausgabe landet escaped in einem eigenen
+# Rezept, das der Nutzer ohnehin anlegen darf -, aber ein striktes Schema
+# verhindert wenigstens, dass beliebig lange oder beliebig strukturierte
+# Antworten unbesehen durchgereicht werden.
+_KI_NAME_MAX      = 200
+_KI_PORTIONEN_MAX = 60
+_KI_ZUTAT_MAX     = 200
+_KI_ZUTATEN_MAX   = 60
+_KI_SCHRITT_MAX   = 2000
+_KI_SCHRITTE_MAX  = 60
+
+
+def _ki_rezept_validieren(antwort: str) -> dict:
+    """Parst und prüft eine KI-Antwort strikt gegen das erwartete Schema.
+
+    Nur die vier bekannten Felder werden gelesen - alles andere in der
+    Antwort wird ignoriert, nicht durchgereicht. `zutaten`/`schritte` müssen
+    Listen sein; Einträge, die keine Zeichenkette oder Zahl sind (z. B. ein
+    verschachteltes Objekt), werden verworfen statt mit `str(...)` in einen
+    hässlichen Literaltext verwandelt zu werden. Jedes Feld hat eine feste
+    Längen- bzw. Mengenobergrenze. Wirft ValueError bei fehlendem Namen -
+    das ist bereits das bestehende Fehlerverhalten, auf das die Aufrufer
+    reagieren."""
+    bereinigt = antwort.strip()
+    if bereinigt.startswith("```"):
+        bereinigt = bereinigt.strip("`")
+        if bereinigt.lower().startswith("json"):
+            bereinigt = bereinigt[4:]
+    daten = json.loads(bereinigt)
+    if not isinstance(daten, dict):
+        raise ValueError("KI-Antwort ist kein JSON-Objekt")
+
+    name = str(daten.get("name") or "").strip()[:_KI_NAME_MAX]
+    if not name:
+        raise ValueError("KI hat keinen Rezeptnamen erkannt")
+
+    portionen = str(daten.get("portionen") or "").strip()[:_KI_PORTIONEN_MAX] or None
+
+    def _liste(schluessel, max_laenge, max_anzahl):
+        roh = daten.get(schluessel)
+        if not isinstance(roh, list):
+            return []
+        raus = []
+        for eintrag in roh[:max_anzahl]:
+            if not isinstance(eintrag, (str, int, float)):
+                continue                      # kein verschachteltes Objekt
+            text = str(eintrag).strip()[:max_laenge]
+            if text:
+                raus.append(text)
+        return raus
+
+    return {
+        "name": name,
+        "portionen": portionen,
+        "zutaten":  _liste("zutaten",  _KI_ZUTAT_MAX,   _KI_ZUTATEN_MAX),
+        "schritte": _liste("schritte", _KI_SCHRITT_MAX, _KI_SCHRITTE_MAX),
+    }
+
+
 def _rezept_per_ki(user_id: int, html: str, url: str):
     """Fallback, falls die Seite kein JSON-LD liefert – KI-Extraktion über
     ki_anfrage() (Wunsch: KI-Rezept-Import). Wirft KiLimitError/KiFehler/
@@ -395,24 +467,7 @@ def _rezept_per_ki(user_id: int, html: str, url: str):
     )
     prompt  = f"Seiten-URL: {url}\n\nSeitentext:\n{text}"
     antwort = ki_anfrage(user_id, "rezepte_import", system, prompt)
-
-    bereinigt = antwort.strip()
-    if bereinigt.startswith("```"):
-        bereinigt = bereinigt.strip("`")
-        if bereinigt.lower().startswith("json"):
-            bereinigt = bereinigt[4:]
-    daten = json.loads(bereinigt)
-    zutaten  = daten.get("zutaten") or []
-    schritte = daten.get("schritte") or []
-    name = str(daten.get("name") or "").strip()
-    if not name:
-        raise ValueError("KI hat keinen Rezeptnamen erkannt")
-    return {
-        "name": name,
-        "portionen": str(daten.get("portionen") or "").strip() or None,
-        "zutaten": [str(z).strip() for z in zutaten if str(z).strip()],
-        "schritte": [str(s).strip() for s in schritte if str(s).strip()],
-    }
+    return _ki_rezept_validieren(antwort)
 
 
 @bp.route("/a/rezepte/", defaults={"token": None})
@@ -500,23 +555,7 @@ def _rezept_per_ki_bild(user_id: int, mime: str, bild_b64: str):
         "Extrahiere das Rezept von diesem Foto.",
         max_tokens=4000, bilder=[(mime, bild_b64)],
     )
-    bereinigt = antwort.strip()
-    if bereinigt.startswith("```"):
-        bereinigt = bereinigt.strip("`")
-        if bereinigt.lower().startswith("json"):
-            bereinigt = bereinigt[4:]
-    daten = json.loads(bereinigt)
-    zutaten  = daten.get("zutaten") or []
-    schritte = daten.get("schritte") or []
-    name = str(daten.get("name") or "").strip()
-    if not name:
-        raise ValueError("KI hat keinen Rezeptnamen erkannt")
-    return {
-        "name": name,
-        "portionen": str(daten.get("portionen") or "").strip() or None,
-        "zutaten": [str(z).strip() for z in zutaten if str(z).strip()],
-        "schritte": [str(s).strip() for s in schritte if str(s).strip()],
-    }
+    return _ki_rezept_validieren(antwort)
 
 
 @bp.route("/a/rezepte/importieren-bild", defaults={"token": None}, methods=["GET", "POST"])

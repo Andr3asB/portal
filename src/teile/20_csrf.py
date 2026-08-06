@@ -56,12 +56,30 @@ def _modus() -> str:
 
 def _erwartete_origin() -> str:
     """Die eigene Herkunft. Konfigurierbar, sonst aus der Anfrage abgeleitet
-    (die geht durch Caddy, das nur die eine Site bedient)."""
+    (die geht durch Caddy, das nur die eine Site bedient).
+
+    Gefundener Fehler (2026-08-06, beim Testen von Wunsch #137 per curl
+    aufgefallen): `request.url_root` liefert das Schema der Verbindung
+    zwischen Caddy und portal - und die läuft intern als Klartext-HTTP, TLS
+    endet bei Caddy. Ohne Korrektur wäre die erwartete Origin also immer
+    `http://...` gewesen, während jeder echte Browser `https://...` schickt -
+    die Origin-Ersatzprüfung für ältere Browser (siehe Modul-Docstring, Punkt
+    1) hätte dadurch NIE gegriffen, für keine einzige echte Anfrage. Unentdeckt
+    blieb das bislang, weil moderne Browser `Sec-Fetch-Site` senden und diesen
+    Zweig gar nicht erst erreichen (siehe `_ist_eigene_anfrage`) - erst `curl`,
+    das keinen `Sec-Fetch-Site`-Header setzt, deckte es auf.
+
+    `X-Forwarded-Proto` setzt Caddys `reverse_proxy` standardmäßig; sicher zu
+    vertrauen, weil `portal` ausschließlich über das interne Bridge-Netz von
+    Caddy erreichbar ist (siehe server.md, Abschnitt Stack) - kein anderer
+    Absender kann diesen Header setzen. Der Host-Teil braucht dieselbe
+    Korrektur nicht: den Host-Header reicht Caddy unverändert durch."""
     fest = str(current_app.config.get("PORTAL_ORIGIN", "")).strip()
     if fest:
         return fest.rstrip("/")
     teile = urlparse(request.url_root)
-    return f"{teile.scheme}://{teile.netloc}"
+    schema = request.headers.get("X-Forwarded-Proto", teile.scheme).split(",")[0].strip()
+    return f"{schema}://{teile.netloc}"
 
 
 def _ist_eigene_anfrage() -> tuple[bool, str]:

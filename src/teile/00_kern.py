@@ -221,6 +221,18 @@ CREATE TABLE IF NOT EXISTS ki_nutzung (
   tokens   INTEGER NOT NULL DEFAULT 0,
   erstellt TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+-- Wunsch #136: eigene, zeichenbasierte Tabelle statt einer weiteren Zeile in
+-- ki_nutzung. ki_anfrage() summiert dort SUM(tokens) UEBER ALLE Features
+-- hinweg (Absicht: ein gemeinsames Kontingent) - TTS-Zeichen in dieselbe
+-- Spalte zu schreiben wuerde das LLM-Token-Kontingent stillschweigend mit
+-- Zeichenzahlen verfaelschen.
+CREATE TABLE IF NOT EXISTS ki_tts_nutzung (
+  id       INTEGER PRIMARY KEY,
+  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  feature  TEXT    NOT NULL,
+  zeichen  INTEGER NOT NULL DEFAULT 0,
+  erstellt TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS tierbaukasten_kreationen (
   id                INTEGER PRIMARY KEY,
   user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -924,7 +936,34 @@ def _tts_anfrage(text, modell, stimme, key, response_format):
         return resp.read()
 
 
-def ki_text_zu_sprache(text: str, sprache_id: int):
+def ki_tts_zeichen_uebrig(user_id: int) -> int:
+    """Wieviele Zeichen des monatlichen TTS-Kontingents noch da sind.
+
+    Wunsch #136: eigene Abfrage statt Wiederverwendung von ki_anfrage()s
+    Limit-Logik - andere Tabelle (ki_tts_nutzung statt ki_nutzung), andere
+    Einheit (Zeichen statt Tokens)."""
+    db = get_db()
+    row = db.execute(
+        "SELECT ki_tts_zeichen_limit FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    limit = row["ki_tts_zeichen_limit"] if row else 50000
+    verbraucht = db.execute("""
+        SELECT COALESCE(SUM(zeichen), 0) FROM ki_tts_nutzung
+        WHERE user_id=? AND erstellt >= date('now', 'start of month')
+    """, (user_id,)).fetchone()[0]
+    return max(0, limit - verbraucht)
+
+
+def _tts_nutzung_protokollieren(user_id: int, zeichen: int):
+    db = get_db()
+    db.execute(
+        "INSERT INTO ki_tts_nutzung(user_id, feature, zeichen) VALUES(?,?,?)",
+        (user_id, "vokabeln_tts", zeichen),
+    )
+    db.commit()
+
+
+def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     """Wandelt Text per OpenRouter-TTS-Endpoint in Sprache um. Gibt
     (audio_bytes, mimetype) zurueck (Wunsch #81) - der Aufrufer braucht den
     Mimetype, um die Datei korrekt auszuliefern/zu cachen, statt die Bytes
@@ -934,13 +973,24 @@ def ki_text_zu_sprache(text: str, sprache_id: int):
     Fehler auf PCM ausweichen und selbst in einen WAV-Container packen
     (Python-Standardbibliothek, keine neue Abhaengigkeit noetig), damit
     <audio>-Tags im Browser die Datei ohne Zusatzwissen abspielen koennen.
-    Zaehlt bewusst NICHT gegen users.ki_token_limit: das Kontingent ist
-    tokenbasiert (LLM-Text), TTS wird pro Zeichen abgerechnet und ist bei
-    kurzen Einzelwoertern vernachlaessigbar, zumal jedes Wort nur einmal
-    erzeugt und dauerhaft gecacht wird (Aufrufer speichert das Ergebnis
-    als Datei, siehe 16_vokabeln.py)."""
+
+    Wunsch #136: zaehlt gegen ein EIGENES, zeichenbasiertes Kontingent
+    (users.ki_tts_zeichen_limit, ki_tts_nutzung) statt gegen
+    users.ki_token_limit - das ist tokenbasiert (LLM-Text) und TTS wird pro
+    Zeichen abgerechnet, eine gemeinsame Zaehlung wuerde die Einheiten
+    vermischen. Wirft KiLimitError bei aufgebrauchtem Kontingent, bevor der
+    kostenpflichtige Aufruf ueberhaupt stattfindet. Der Aufrufer speichert
+    das Ergebnis dauerhaft als Datei (siehe 16_vokabeln.py) - ein einmal
+    erzeugtes Wort zaehlt dadurch kein zweites Mal.
+
+    Protokolliert wird erst NACH einem erfolgreichen Aufruf, auf beiden
+    Erfolgspfaden (mp3 direkt oder der pcm/wav-Rueckfall) - ein Fehlversuch
+    beim Anbieter soll das Kontingent nicht schmaelern."""
     import io, urllib.error, wave
     from flask import current_app
+
+    if ki_tts_zeichen_uebrig(user_id) < len(text):
+        raise KiLimitError("Monatliches Kontingent für Sprachausgabe aufgebraucht.")
 
     key = current_app.config.get("OPENROUTER_API_KEY", "")
     if not key:
@@ -948,7 +998,9 @@ def ki_text_zu_sprache(text: str, sprache_id: int):
 
     modell, stimme = ki_stimme_fuer(sprache_id)
     try:
-        return _tts_anfrage(text, modell, stimme, key, "mp3"), "audio/mpeg"
+        audio = _tts_anfrage(text, modell, stimme, key, "mp3")
+        _tts_nutzung_protokollieren(user_id, len(text))
+        return audio, "audio/mpeg"
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:300]
         if e.code != 400 or "pcm" not in detail.lower():
@@ -970,6 +1022,7 @@ def ki_text_zu_sprache(text: str, sprache_id: int):
         wav.setsampwidth(2)
         wav.setframerate(24000)
         wav.writeframes(pcm)
+    _tts_nutzung_protokollieren(user_id, len(text))
     return puffer.getvalue(), "audio/wav"
 
 
@@ -1120,6 +1173,14 @@ def _init_db(app):
             ("dark_mode", "INTEGER NOT NULL DEFAULT 0"),
             ("rolle",     "TEXT    NOT NULL DEFAULT 'gast'"),
             ("ki_token_limit", "INTEGER NOT NULL DEFAULT 100000"),
+            # Wunsch #136: eigenes Kontingent fuer die TTS-Sprachausgabe,
+            # zeichenbasiert statt tokenbasiert (siehe ki_tts_nutzung oben).
+            # 50000 Zeichen/Monat entsprechen bei durchschnittlich acht
+            # Zeichen je Vokabelwort rund 6000 neuen Woertern - im
+            # Familienalltag praktisch unerreichbar, begrenzt aber den
+            # Schaden, falls doch einmal viele Woerter auf einen Schlag
+            # angelegt werden (z.B. Foto-Import mehrerer Listen).
+            ("ki_tts_zeichen_limit", "INTEGER NOT NULL DEFAULT 50000"),
         ]:
             try:
                 db.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")

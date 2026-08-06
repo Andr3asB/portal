@@ -94,6 +94,13 @@ input[type=text]:focus { border-color:var(--farbe); }
              pattern="^[0-9]+$" placeholder="100000">
     </div>
 
+    <div class="form-group">
+      <label>Sprachausgabe-Zeichen pro Monat</label>
+      <input type="text" inputmode="numeric" name="ki_tts_zeichen_limit"
+             value="{{ edit.ki_tts_zeichen_limit if edit else 50000 }}"
+             pattern="^[0-9]+$" placeholder="50000">
+    </div>
+
     <div class="form-actions">
       <a class="btn btn-secondary" href="/a/admin{{ tp }}">Abbrechen</a>
       <button type="submit" class="btn btn-primary">Speichern</button>

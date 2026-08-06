@@ -1222,8 +1222,9 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 
 | Tabelle | Inhalt |
 |---------|--------|
-| `users` | id, name, farbe, is_admin, ki_key (ungenutzt), dark_mode, rolle ('eltern'/'kind'/'gast'), ki_token_limit (Monats-Kontingent für ki_anfrage(), Default 100000, im Admin editierbar) |
+| `users` | id, name, farbe, is_admin, ki_key (ungenutzt), dark_mode, rolle ('eltern'/'kind'/'gast'), ki_token_limit (Monats-Kontingent für ki_anfrage(), Default 100000, im Admin editierbar), ki_tts_zeichen_limit (Monats-Kontingent für ki_text_zu_sprache(), Default 50000 Zeichen, Wunsch #136, im Admin editierbar) |
 | `ki_nutzung` | id, user_id, feature (z. B. "rezepte_import"), tokens, erstellt – Verbrauchs-Log für ki_anfrage(), gemeinsames Kontingent über alle KI-Features |
+| `ki_tts_nutzung` | id, user_id, feature ("vokabeln_tts"), zeichen, erstellt – Verbrauchs-Log für ki_text_zu_sprache() (Wunsch #136). EIGENE Tabelle, nicht in ki_nutzung: die zählt SUM(tokens) ohne Feature-Filter, Zeichen und Tokens dürfen sich nicht vermischen |
 | `apps` | id, slug, name, emoji, beschreibung |
 | `grants` | id, user_id, app_id, **token_lookup** (UNIQUE, HMAC-SHA256 des Tokens – nur zum Finden der Zeile), **token_enc** (AES-GCM des Tokens, base64(Nonce+CT) – zum Zurückgewinnen für Links/QR), position (sort), gruppe_id (FK home_gruppen) – Wunsch #129: der Klartext-Token steht NICHT mehr in der DB |
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
@@ -1348,6 +1349,19 @@ anhängen.
   Element kommt als `this` UND als vorletztes Argument, das Ereignis als
   letztes; ein Rückgabewert `false` unterdrückt die Standardaktion.
   `tests/test_csp.py::test_keine_inline_handler_mehr` wacht darüber.
+- **KI-Antworten (Rezept-Import, Wunsch #137) laufen durch ein striktes
+  Schema** (`_ki_rezept_validieren()` in `11_rezepte.py`), nicht durch
+  blindes `json.loads()`. Nur bekannte Felder, Listen-Einträge müssen
+  Zeichenkette/Zahl sein, feste Längen-/Mengenobergrenzen. Beide
+  KI-Extraktionspfade (URL- und Foto-Import) nutzen dieselbe Funktion - eine
+  neue KI-gestützte Extraktion sollte das auch tun, statt eigenes Parsing zu
+  schreiben.
+- **KI-Kontingente sind pro EINHEIT eine eigene Tabelle** (Wunsch #136):
+  `ki_nutzung.tokens` (LLM-Text, `ki_anfrage()`) und `ki_tts_nutzung.zeichen`
+  (Sprachausgabe, `ki_text_zu_sprache()`) dürfen nie in derselben Spalte
+  landen - `ki_anfrage()`s Limit-Prüfung summiert `SUM(tokens)` OHNE
+  Feature-Filter, eine vermischte Einheit würde das Kontingent unbemerkt
+  verfälschen.
 - **Jeder Inline-`<script>`-Block braucht `<script{{ '{{' }} csp_nonce {{ '}}' }}>`.**
   Ohne Nonce läuft er im Modus `scharf` nicht mehr – und das fällt beim
   Entwickeln nicht auf, weil dort `CSP_MODUS=aus` steht.

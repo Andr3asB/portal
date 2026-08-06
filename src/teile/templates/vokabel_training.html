@@ -156,10 +156,31 @@ function pruefen() {
 }
 
 let anhoerenAudio = null;
-function wortAnhoeren() {
+let anhoerenBlobUrl = null;
+async function wortAnhoeren() {
   if (!aktuelle) return;
   if (anhoerenAudio) { anhoerenAudio.pause(); anhoerenAudio = null; }
-  anhoerenAudio = new Audio(`/a/vokabeln${TP}wort/${aktuelle.id}/audio`);
+  if (anhoerenBlobUrl) { URL.revokeObjectURL(anhoerenBlobUrl); anhoerenBlobUrl = null; }
+  // Wunsch #136: siehe Kommentar in vokabeln.html - fetch statt new Audio(),
+  // damit ein aufgebrauchtes Sprachausgabe-Kontingent (429) nicht lautlos
+  // untergeht.
+  let antwort;
+  try {
+    antwort = await fetch(`/a/vokabeln${TP}wort/${aktuelle.id}/audio`);
+  } catch (err) {
+    console.warn('Aussprache konnte nicht geladen werden:', err);
+    return;
+  }
+  if (antwort.status === 429) {
+    alert('Monatliches Kontingent für Sprachausgabe aufgebraucht - bitte später erneut versuchen.');
+    return;
+  }
+  if (!antwort.ok) {
+    console.warn('Aussprache konnte nicht geladen werden:', antwort.status);
+    return;
+  }
+  anhoerenBlobUrl = URL.createObjectURL(await antwort.blob());
+  anhoerenAudio = new Audio(anhoerenBlobUrl);
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
 }
 

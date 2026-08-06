@@ -650,7 +650,9 @@ def wort_audio(token, vid):
     pfad = _audio_pfad(row["sprache_id"], row["fremd"])
     if not os.path.exists(pfad):
         try:
-            audio, _mime = ki_text_zu_sprache(row["fremd"], row["sprache_id"])
+            audio, _mime = ki_text_zu_sprache(user["id"], row["fremd"], row["sprache_id"])
+        except KiLimitError:
+            abort(429)
         except KiFehler:
             abort(502)
         os.makedirs(os.path.dirname(pfad), exist_ok=True)

@@ -80,12 +80,14 @@ def user_neu(token):
         if rolle not in ("eltern", "kind", "gast"):
             rolle = "gast"
         ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"))
+        ki_tts_zeichen_limit = _clean_ki_limit(request.form.get("ki_tts_zeichen_limit"), 50000)
         if not name:
             return redirect(url_for("admin_app.user_neu", token=token))
         db = get_db()
         uid = db.execute(
-            "INSERT INTO users(name,farbe,is_admin,rolle,ki_token_limit) VALUES(?,?,?,?,?) RETURNING id",
-            (name, farbe, is_admin, rolle, ki_token_limit),
+            "INSERT INTO users(name,farbe,is_admin,rolle,ki_token_limit,ki_tts_zeichen_limit) "
+            "VALUES(?,?,?,?,?,?) RETURNING id",
+            (name, farbe, is_admin, rolle, ki_token_limit, ki_tts_zeichen_limit),
         ).fetchone()["id"]
         home_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
         lookup, enc = grant_werte(new_token())
@@ -113,10 +115,14 @@ def user_bearbeiten(token, uid):
         if rolle not in ("eltern", "kind", "gast"):
             rolle = "gast"
         ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"), edit["ki_token_limit"])
+        ki_tts_zeichen_limit = _clean_ki_limit(
+            request.form.get("ki_tts_zeichen_limit"), edit["ki_tts_zeichen_limit"])
         if uid == user["id"]:
             is_admin = 1
-        db.execute("UPDATE users SET name=?,farbe=?,is_admin=?,rolle=?,ki_token_limit=? WHERE id=?",
-                   (name, farbe, is_admin, rolle, ki_token_limit, uid))
+        db.execute(
+            "UPDATE users SET name=?,farbe=?,is_admin=?,rolle=?,ki_token_limit=?,"
+            "ki_tts_zeichen_limit=? WHERE id=?",
+            (name, farbe, is_admin, rolle, ki_token_limit, ki_tts_zeichen_limit, uid))
         db.commit()
         return redirect(url_for("admin_app.index", token=token))
     return render_template("admin_user_form.html",
