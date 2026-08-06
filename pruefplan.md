@@ -191,8 +191,8 @@ und ist der wichtigste Test dieser Stufe.
 | S4-02 | Dasselbe | Kind | Alle seine Apps erreichbar | | |
 | S4-03 | Dasselbe | Simone | Alle ihre Apps erreichbar | | |
 | S4-04 | **Alter Link mit Token** (aus deinem Lesezeichen) öffnen | A-Handy | Funktioniert weiterhin und leitet auf die neue Adresse | | |
-| S4-05 | **Portal-App vom Homescreen starten** | A-PWA | Startet und zeigt die Startseite – nicht „Zugang verweigert" | | |
-| S4-06 | Portal neu als App installieren (zum Homescreen hinzufügen) | A-Handy | Installiert sich, startet korrekt | | |
+| S4-05 | **Portal-App vom Homescreen starten** | A-PWA | Startet und zeigt die Startseite – nicht „Zugang verweigert" | ok | |
+| S4-06 | Portal neu als App installieren (zum Homescreen hinzufügen) | A-Handy | Installiert sich, startet korrekt | ok | Bestätigt 2026-08-06. Damit ist der im Plan als „am schlechtesten schätzbar" markierte Posten (PWA-Manifest ohne Token, `crossorigin="use-credentials"`) auf einem echten Gerät belegt. |
 | S4-07 | Esszimmer-Bildschirm ansehen | Kiosk | Läuft unverändert | | |
 | S4-08 | Flugmodus-Test wie S2-03 | A-Handy | Häkchen kommen an | | |
 | S4-09 | Eine Seite als Lesezeichen speichern und später öffnen | A-Handy | Kommt an der richtigen Stelle an | | |
