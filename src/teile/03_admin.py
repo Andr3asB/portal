@@ -1,12 +1,22 @@
 """
 Admin-App – Nutzerverwaltung, App-Freischaltungen, QR-Codes.
 URL-Präfix: /a/admin/<token>/
+
+Wunsch #140, Stufe 6: In der Datenbank steht nur noch der HMAC eines Tokens,
+nicht mehr der Klartext. Diese Seite kann einen Zugangslink deshalb NICHT mehr
+nachschlagen - sie zeigt ihn ausschliesslich in dem einen Moment an, in dem er
+entsteht (`zugang_zeigen()`): beim Anlegen eines Nutzers und bei "Zugänge neu
+erzeugen" (Wunsch #131). Wer seinen Link verliert, bekommt einen neuen; ein
+alter lässt sich nicht mehr hervorholen. Genau das war das Ziel - vorher
+rendete diese Seite alle Zugänge der ganzen Familie im Klartext, und der
+Service Worker cachte sie mit.
 """
+import base64
 import io
 import re
 import segno
-from flask import Blueprint, render_template, request, redirect, url_for, abort, Response
-from teile.kern import get_db, grant as check_grant, new_token, to_int, grant_werte, token_entschluesseln
+from flask import Blueprint, render_template, request, redirect, url_for, abort
+from teile.kern import get_db, grant as check_grant, to_int, grant_anlegen, token_lookup, new_token
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -32,15 +42,40 @@ def _admin(token):
 
 
 def _grants_by_user(db):
-    """Gibt {user_id: {app_id: token}} zurück.
+    """Gibt {user_id: set(app_id)} zurück - WELCHE Apps freigeschaltet sind.
 
-    Wunsch #129: In der DB steht nur noch der verschlüsselte Token; für die
-    Anzeige von Link und QR-Code wird er hier zurückgewonnen."""
+    Wunsch #140, Stufe 6: früher stand hier {user_id: {app_id: token}} und die
+    Seite rendete jeden Zugangslink der ganzen Familie im Klartext. Den Token
+    gibt es nicht mehr zurückzugewinnen, und die Oberfläche braucht ihn auch
+    nicht: für die Grant-Chips zählt nur, OB ein Grant existiert."""
     result = {}
-    for row in db.execute("SELECT user_id, app_id, token_enc FROM grants"):
-        result.setdefault(row["user_id"], {})[row["app_id"]] = \
-            token_entschluesseln(row["token_enc"])
+    for row in db.execute("SELECT user_id, app_id FROM grants"):
+        result.setdefault(row["user_id"], set()).add(row["app_id"])
     return result
+
+
+def _zugang_anzeigen(user, token, kind_name: str, klartext: str, hinweis: str):
+    """Die einzige Stelle, an der ein Zugangslink je zu sehen ist.
+
+    Wunsch #140, Stufe 6: Der Klartext existiert nur in diesem Request. Der
+    QR-Code wird deshalb direkt hier erzeugt und als `data:`-URI eingebettet -
+    eine eigene `/qr.svg`-Route (wie bis Stufe 5) müsste den Token erneut aus
+    der Datenbank holen, und genau das geht nicht mehr. Die CSP erlaubt
+    `img-src 'self' data:` (siehe 21_csp.py), das Bild trägt also.
+
+    Bewusst KEIN Redirect danach: Ein Redirect müsste den Token weiterreichen -
+    über die Adresszeile (landet im Verlauf, das wollten wir gerade abschaffen)
+    oder über die Flask-Session (schriebe ihn in ein Cookie). Die Antwort auf
+    den POST selbst ist der einzige Ort, an dem er niemandem sonst begegnet."""
+    url = f"https://portal.16schwaben.de/p/{klartext}"
+    puffer = io.BytesIO()
+    segno.make(url, error="M").save(
+        puffer, kind="svg", scale=6, border=2, xmldecl=False, nl=False)
+    qr_data_uri = "data:image/svg+xml;base64," + \
+        base64.b64encode(puffer.getvalue()).decode()
+    return render_template("admin_zugang.html",
+        user=user, token=token, farbe=user["farbe"],
+        kind_name=kind_name, url=url, qr_data_uri=qr_data_uri, hinweis=hinweis)
 
 
 def _push_counts(db):
@@ -90,11 +125,14 @@ def user_neu(token):
             (name, farbe, is_admin, rolle, ki_token_limit, ki_tts_zeichen_limit),
         ).fetchone()["id"]
         home_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
-        lookup, enc = grant_werte(new_token())
-        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
-                   (uid, home_id, lookup, enc))
+        klartext = grant_anlegen(db, uid, home_id)
         db.commit()
-        return redirect(url_for("admin_app.index", token=token))
+        # Wunsch #140, Stufe 6: Der Link des neuen Nutzers ist JETZT zu sehen -
+        # oder nie wieder. Deshalb kein Redirect auf die Übersicht.
+        return _zugang_anzeigen(
+            user, token, name, klartext,
+            f"{name} wurde angelegt. Das ist der persönliche Zugang – "
+            "jetzt weitergeben oder scannen lassen.")
     return render_template("admin_user_form.html",
         user=user, token=token, farbe=user["farbe"], edit=None)
 
@@ -136,9 +174,10 @@ def grant_app(token, uid, app_slug):
     db  = get_db()
     app = db.execute("SELECT id FROM apps WHERE slug=?", (app_slug,)).fetchone()
     if app:
-        lookup, enc = grant_werte(new_token())
-        db.execute("INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
-                   (uid, app["id"], lookup, enc))
+        # Der Klartext wird bewusst verworfen: Seit Stufe 4 verlinkt nichts
+        # mehr auf eine App-eigene Adresse - der Nutzer kommt über seinen
+        # Home-Zugang bzw. das Sitzungs-Cookie in jede freigeschaltete App.
+        grant_anlegen(db, uid, app["id"])
         db.commit()
     return redirect(url_for("admin_app.index", token=token))
 
@@ -175,11 +214,20 @@ def neue_tokens(token, uid):
     admin = _admin(token)
     db = get_db()
 
-    grants = db.execute("SELECT id FROM grants WHERE user_id=?", (uid,)).fetchall()
-    for g in grants:
-        lookup, enc = grant_werte(new_token())
-        db.execute("UPDATE grants SET token_lookup=?, token_enc=? WHERE id=?",
-                   (lookup, enc, g["id"]))
+    ziel = db.execute("SELECT name FROM users WHERE id=?", (uid,)).fetchone()
+    if not ziel:
+        abort(404)
+
+    # Wunsch #140, Stufe 6: Jeder Grant bekommt einen neuen Token; nur der des
+    # HOME-Grants wird aufgehoben, denn nur der wird als Link/QR gebraucht.
+    home_id = db.execute("SELECT id FROM apps WHERE slug='home'").fetchone()["id"]
+    neuer_home_token = None
+    for g in db.execute("SELECT id, app_id FROM grants WHERE user_id=?", (uid,)).fetchall():
+        klartext = new_token()
+        db.execute("UPDATE grants SET token_lookup=? WHERE id=?",
+                   (token_lookup(klartext), g["id"]))
+        if g["app_id"] == home_id:
+            neuer_home_token = klartext
     # Wunsch #140: Ohne diese Zeile wäre der Widerruf ab Stufe 3 wirkungslos -
     # das alte Gerät käme über sein Sitzungs-Cookie weiter rein, obwohl der
     # Token erneuert wurde. Steht hier schon ab Stufe 1, damit es nicht
@@ -187,37 +235,25 @@ def neue_tokens(token, uid):
     db.execute("DELETE FROM sitzungen WHERE user_id=?", (uid,))
     db.commit()
 
-    # Erneuert der Admin seine EIGENEN Zugänge, ist der Token in der aktuellen
-    # Adresszeile mit erneuert worden - eine Weiterleitung dorthin liefe ins
-    # Leere (403). Deshalb auf die neue Admin-Adresse umleiten.
+    # Hat der Nutzer (aus welchem Grund auch immer) keinen Home-Grant, gibt es
+    # auch keinen Link zu zeigen - dann zurück zur Übersicht statt einer
+    # leeren Zugangsseite.
+    if not neuer_home_token:
+        return redirect(url_for("admin_app.index", token=token) + f"#user-{uid}")
+
+    # Sonderfall eigener Zugang: Die eigene Sitzung wurde eben gelöscht. Das
+    # ist unkritisch - `grant()` hat zu Beginn dieses Requests bereits
+    # `sitzung_vormerken()` aufgerufen, `19_sitzung.py` stellt am Ende der
+    # Antwort also ein frisches Cookie aus. Dieses Gerät bleibt drin, alle
+    # anderen sind draußen. Genau das soll der Notfallknopf leisten.
+    hinweis = (
+        "Alle bisherigen Links und QR-Codes sind ab sofort ungültig. "
+        f"Das hier ist der neue Zugang für {ziel['name']}."
+    )
     if uid == admin["id"]:
-        neuer_admin_token = token_entschluesseln(db.execute("""
-            SELECT g.token_enc FROM grants g JOIN apps a ON a.id = g.app_id
-            WHERE g.user_id=? AND a.slug='admin'
-        """, (uid,)).fetchone()["token_enc"])
-        return redirect(url_for("admin_app.index", token=neuer_admin_token))
-
-    return redirect(url_for("admin_app.index", token=token) + f"#user-{uid}")
-
-
-@bp.route("/a/admin/user/<int:uid>/qr.svg", defaults={"token": None})
-@bp.route("/a/admin/<token>/user/<int:uid>/qr.svg")
-def qr_svg(token, uid):
-    _admin(token)
-    db = get_db()
-    row = db.execute("""
-        SELECT g.token_enc FROM grants g
-        JOIN apps a ON a.id = g.app_id
-        WHERE g.user_id=? AND a.slug='home'
-    """, (uid,)).fetchone()
-    if not row:
-        abort(404)
-    url = f"https://portal.16schwaben.de/p/{token_entschluesseln(row['token_enc'])}"
-    qr  = segno.make(url, error="M")
-    buf = io.BytesIO()
-    qr.save(buf, kind="svg", omitsize=True, border=2,
-            svgclass=None, lineclass=None, xmldecl=False, nl=False)
-    return Response(buf.getvalue(), mimetype="image/svg+xml")
+        hinweis += (" Dieses Gerät bleibt angemeldet – alle anderen Geräte "
+                    "müssen den neuen Zugang einmal öffnen.")
+    return _zugang_anzeigen(admin, token, ziel["name"], neuer_home_token, hinweis)
 
 
 def init_app(app):

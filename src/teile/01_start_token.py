@@ -2,7 +2,7 @@ from flask import (
     Blueprint, render_template, abort, request, jsonify, redirect, url_for,
 )
 from teile.kern import (
-    get_db, to_int, token_lookup, token_entschluesseln, sitzung_vormerken,
+    get_db, to_int, token_lookup, sitzung_vormerken,
     sitzung_nutzer_id, sitzung_konsumieren_an, _nutzer_aufbereiten,
     tokenfreie_urls_an,
 )
@@ -10,14 +10,11 @@ from teile.kern import (
 bp = Blueprint("start", __name__)
 
 
+# Wunsch #140, Stufe 6: Die Unterabfragen auf die Navigations-Tokens sind
+# entfallen - es gibt keinen Klartext mehr, und seit Stufe 4 braucht ihn auch
+# niemand (alle Adressen sind token-frei).
 _HOME_SELECT = """
-    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-           (SELECT g1.token_enc FROM grants g1
-            JOIN apps a1 ON a1.id = g1.app_id
-            WHERE g1.user_id = u.id AND a1.slug = 'home') AS home_enc,
-           (SELECT g2.token_enc FROM grants g2
-            JOIN apps a2 ON a2.id = g2.app_id
-            WHERE g2.user_id = u.id AND a2.slug = 'hilfe') AS hilfe_enc
+    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle
     FROM   users u
 """
 
@@ -101,7 +98,7 @@ def startseite(token):
     """, (row["id"],)).fetchall()
 
     apps_rows = db.execute("""
-        SELECT a.slug, a.name, a.emoji, a.offline_faehig, g.token_enc AS app_enc,
+        SELECT a.slug, a.name, a.emoji, a.offline_faehig,
                g.id AS grant_id, g.gruppe_id, g.position,
                COALESCE(hg.position, 9999) AS gruppe_pos
         FROM   grants g
@@ -114,9 +111,9 @@ def startseite(token):
     gruppen_map = {g["id"]: {"info": dict(g), "apps": []} for g in gruppen_rows}
     allgemein   = []
     for app_row in apps_rows:
-        # Wunsch #129: Kachel-Links brauchen den Klartext-Token
+        # Wunsch #140, Stufe 6: Kein app_token mehr - die Kacheln verlinken
+        # seit Stufe 4 token-frei (app_pfad() in startseite.html).
         app = dict(app_row)
-        app["app_token"] = token_entschluesseln(app.pop("app_enc"))
         gid = app["gruppe_id"]
         if gid is not None and gid in gruppen_map:
             gruppen_map[gid]["apps"].append(app)

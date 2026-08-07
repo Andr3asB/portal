@@ -35,21 +35,9 @@ def _lookup(token: str) -> str:
     return hmac.new(_key(), token.encode(), hashlib.sha256).hexdigest()
 
 
-def _enc(token: str) -> str:
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    nonce = secrets.token_bytes(12)
-    return base64.urlsafe_b64encode(nonce + AESGCM(_key()).encrypt(nonce, token.encode(), None)).decode()
-
-
-def _dec(blob: str) -> str:
-    if not blob:
-        return ""
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    try:
-        raw = base64.urlsafe_b64decode(blob)
-        return AESGCM(_key()).decrypt(raw[:12], raw[12:], None).decode()
-    except Exception:
-        return "(nicht entschluesselbar)"
+# Wunsch #140, Stufe 6: `_enc`/`_dec` (AES-GCM) sind ersatzlos entfallen. Sie
+# dienten allein dazu, einen Zugangstoken wieder im Klartext hervorzuholen -
+# das gibt es nicht mehr. Der HMAC oben genuegt, um eine Zeile zu FINDEN.
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -71,7 +59,6 @@ CREATE TABLE IF NOT EXISTS grants (
   user_id      INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
   app_id       INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
   token_lookup TEXT    UNIQUE NOT NULL,
-  token_enc    TEXT    NOT NULL,
   UNIQUE(user_id, app_id)
 );
 CREATE TABLE IF NOT EXISTS push_abos (
@@ -110,17 +97,21 @@ def _ensure_home_app(db):
 
 
 def _make_grant(db, user_id, app_id):
+    """Legt einen Grant an. Gibt den Klartext-Token zurueck - oder None, wenn
+    der Grant schon existierte.
+
+    Wunsch #140, Stufe 6: In der DB steht nur noch der HMAC. Existierte der
+    Grant bereits, gilt weiterhin der ALTE Token, und den kann niemand mehr
+    nachschlagen - frueher wurde er hier aus token_enc zurueckgewonnen. Der
+    Aufrufer MUSS None unterscheiden, sonst zeigte er eine Adresse an, die
+    gar nicht gilt."""
     token = secrets.token_urlsafe(18)
-    db.execute(
-        "INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
-        (user_id, app_id, _lookup(token), _enc(token)),
+    cur = db.execute(
+        "INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup) VALUES(?,?,?)",
+        (user_id, app_id, _lookup(token)),
     )
     db.commit()
-    # Bei OR IGNORE (Grant existierte schon) gilt der gespeicherte, nicht der
-    # eben erzeugte Token - deshalb immer aus der DB zurueckentschluesseln.
-    return _dec(db.execute(
-        "SELECT token_enc FROM grants WHERE user_id=? AND app_id=?", (user_id, app_id)
-    ).fetchone()["token_enc"])
+    return token if cur.rowcount else None
 
 
 def cmd_createadmin(args):
@@ -188,23 +179,32 @@ def cmd_grant(args):
         sys.exit(f"App '{app_slug}' nicht gefunden.")
     token = _make_grant(db, user_id, row["id"])
     db.close()
+    if token is None:
+        # Wunsch #140, Stufe 6: Der Grant existierte schon, es gilt weiterhin
+        # der alte Token - und der ist nicht mehr nachschlagbar. Eine Adresse
+        # zu drucken waere hier schlicht gelogen.
+        print(f"Grant fuer '{app_slug}' bestand bereits - unveraendert gelassen.")
+        print("Ein neuer Zugang geht ueber die Verwaltung ('Neuer Zugang + QR').")
+        return
     print(f"Grant erteilt. URL: https://portal.16schwaben.de/a/{app_slug}/{token}/")
 
 
 def cmd_listusers(_):
+    """Wunsch #140, Stufe 6: zeigt KEINE Zugangsadressen mehr an - sie stehen
+    nicht mehr in der Datenbank. Einen neuen Zugang erzeugt (und zeigt einmalig
+    an) die Verwaltung über "Neuer Zugang + QR" bzw. hier `grant`."""
     db = connect()
     rows = db.execute("""
         SELECT u.id, u.name, u.farbe, u.is_admin,
-               g.token_enc, a.slug
+               (SELECT COUNT(*) FROM grants g WHERE g.user_id = u.id) AS n_apps
         FROM   users u
-        LEFT   JOIN grants g ON g.user_id = u.id
-        LEFT   JOIN apps   a ON a.id = g.app_id AND a.slug = 'home'
+        ORDER  BY u.id
     """).fetchall()
     db.close()
     for r in rows:
         admin = " [Admin]" if r["is_admin"] else ""
-        token = _dec(r["token_enc"]) if r["token_enc"] else "(kein Token)"
-        print(f"  ID {r['id']:3}  {r['name']}{admin}  {r['farbe']}  → /p/{token}")
+        print(f"  ID {r['id']:3}  {r['name']}{admin}  {r['farbe']}  "
+              f"{r['n_apps']} App-Zugänge")
 
 
 def cmd_listwuensche(_):

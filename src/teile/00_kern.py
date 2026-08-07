@@ -23,12 +23,19 @@ CREATE TABLE IF NOT EXISTS apps (
   beschreibung   TEXT,
   offline_faehig INTEGER NOT NULL DEFAULT 0
 );
+-- Wunsch #140, Stufe 6: NUR noch token_lookup (HMAC-SHA256). Der frueher
+-- daneben stehende token_enc (AES-GCM, rueckholbar) ist entfallen - das ist
+-- das eigentliche Ziel von Wunsch #129, das damals an der Navigation
+-- scheiterte: base.html baute den ⌂-Knopf und den Hilfe-Link aus dem
+-- Klartext-Token, die Startseite jede Kachel. Seit Stufe 4 sind alle Adressen
+-- token-frei, der Klartext wird also nirgends mehr gebraucht.
+-- Folge: Ein Zugangslink ist NUR im Moment seiner Erzeugung anzeigbar,
+-- danach nie wieder (siehe 03_admin.py, zugang_zeigen()).
 CREATE TABLE IF NOT EXISTS grants (
   id           INTEGER PRIMARY KEY,
   user_id      INTEGER NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
   app_id       INTEGER NOT NULL REFERENCES apps(id)   ON DELETE CASCADE,
   token_lookup TEXT    UNIQUE NOT NULL,
-  token_enc    TEXT    NOT NULL,
   UNIQUE(user_id, app_id)
 );
 CREATE TABLE IF NOT EXISTS sitzungen (
@@ -455,16 +462,12 @@ def new_db():
         db.close()
 
 
-# Wunsch #140: Basis-Abfrage für die Nutzerdaten. home_enc/hilfe_enc liefern
-# die Navigations-Tokens, die base.html auf jeder Seite braucht.
+# Wunsch #140, Stufe 6: Die Unterabfragen auf home_enc/hilfe_enc sind
+# entfallen. Sie holten die Navigations-Tokens, die base.html bis Stufe 3 auf
+# jeder Seite brauchte - seit Stufe 4 sind alle Adressen token-frei, und seit
+# Stufe 6 gibt es den Klartext gar nicht mehr.
 _NUTZER_SELECT = """
-    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle,
-           (SELECT g2.token_enc FROM grants g2
-            JOIN apps a2 ON a2.id = g2.app_id
-            WHERE g2.user_id = u.id AND a2.slug = 'home') AS home_enc,
-           (SELECT g3.token_enc FROM grants g3
-            JOIN apps a3 ON a3.id = g3.app_id
-            WHERE g3.user_id = u.id AND a3.slug = 'hilfe') AS hilfe_enc
+    SELECT u.id, u.name, u.farbe, u.is_admin, u.dark_mode, u.rolle
     FROM   users u
 """
 
@@ -473,11 +476,12 @@ SITZUNG_COOKIE = "portal_sitzung"
 
 
 def _nutzer_aufbereiten(row):
-    """DB-Zeile -> dict mit entschlüsselten Navigations-Tokens."""
-    daten = dict(row)
-    daten["home_token"]  = token_entschluesseln(daten.pop("home_enc"))
-    daten["hilfe_token"] = token_entschluesseln(daten.pop("hilfe_enc"))
-    return daten
+    """DB-Zeile -> dict.
+
+    Seit Stufe 6 nur noch eine Umwandlung: die Aufrufer erwarten ein dict
+    (sie ergaenzen Felder), sqlite3.Row waere unveraenderlich. Die frueher
+    hier entschluesselten Navigations-Tokens gibt es nicht mehr."""
+    return dict(row)
 
 
 def sitzung_nutzer_id(db=None):
@@ -664,9 +668,29 @@ def manifest_pfad(home_token=None) -> str:
     return f"/manifest/{home_token}.json"
 
 
-def grant_werte(token: str):
-    """(token_lookup, token_enc) für ein neues Token - zum Einfügen in grants."""
-    return token_lookup(token), token_verschluesseln(token)
+def grant_anlegen(db, user_id: int, app_id: int) -> str:
+    """Legt einen Grant an und gibt den Klartext-Token zurück – EINMALIG.
+
+    Wunsch #140, Stufe 6: Der Klartext existiert ab jetzt nur noch in genau
+    diesem Moment. Danach steht in der Datenbank nur der HMAC, und niemand -
+    auch kein Admin - kann den Link je wieder anzeigen. Wer ihn braucht, muss
+    ihn hier abgreifen (siehe 03_admin.py) oder den Zugang neu erzeugen.
+
+    Ersetzt das frühere `grant_werte()`, das ein (lookup, enc)-Paar lieferte.
+    Bewusst als Funktion, die gleich einfügt: Ein Aufrufer, der nur den Hash
+    berechnet und das Einfügen selbst schreibt, vergisst leicht, sich den
+    Klartext zu merken - und dann ist der Zugang unbrauchbar angelegt.
+
+    Gibt None zurück, wenn der Grant schon existierte (INSERT OR IGNORE): dann
+    gilt weiterhin der ALTE Token, den niemand mehr kennt. Der Aufrufer muss
+    diesen Fall unterscheiden können, sonst zeigte er einen Link an, der gar
+    nicht gilt."""
+    token = new_token()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO grants(user_id, app_id, token_lookup) VALUES(?,?,?)",
+        (user_id, app_id, token_lookup(token)),
+    )
+    return token if cur.rowcount else None
 
 
 def new_token() -> str:
@@ -674,35 +698,38 @@ def new_token() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Wunsch #129: Zugangstokens nicht mehr im Klartext in der Datenbank.
+# Wunsch #129 + #140 Stufe 6: Zugangstokens NUR noch als Pruefsumme.
 #
-# Der Wunsch verlangte woertlich einen HASH. Das geht hier NICHT: die
-# Navigation braucht die Tokens im Klartext zurueck. base.html baut auf JEDER
-# Seite den ⌂-Knopf aus `home_token` und den Hilfe-Link aus `hilfe_token`, und
-# die Startseite erzeugt jede App-Kachel aus dem Token des jeweiligen Grants.
-# Ein Einweg-Hash liesse sich nicht zuruecklesen - die komplette Navigation
-# waere tot. (Mit dem Cookie-Modell aus Wunsch #140 waere echtes Hashing
-# moeglich; das ist zurueckgestellt.)
+# #129 verlangte woertlich einen Hash. Das ging damals nicht: base.html baute
+# auf jeder Seite den ⌂-Knopf aus `home_token` und den Hilfe-Link aus
+# `hilfe_token`, die Startseite jede Kachel aus dem Token des jeweiligen
+# Grants - ein Einweg-Hash liesse sich nicht zuruecklesen, die Navigation
+# waere tot gewesen. Umgesetzt wurde deshalb zunaechst eine VERSCHLUESSELUNG
+# (token_enc, AES-GCM, rueckholbar) und die Abweichung offen ausgewiesen.
 #
-# Umgesetzt ist deshalb das, worum es dem Wunsch inhaltlich ging - "ein
-# geleaktes Backup darf keinen Vollzugriff geben": die Tokens liegen
-# VERSCHLUESSELT in der DB, der Schluessel steht in der .env. Das taegliche
-# NAS-Backup sichert nur /data, die .env liegt darueber in
-# /srv/familienportal und ist deshalb NICHT im Backup enthalten - ein
-# abhandengekommenes Backup ist damit wertlos.
+# Seit Wunsch #140 Stufe 4 sind alle Adressen token-frei; der Klartext wird
+# nirgends mehr gebraucht. Stufe 6 hat token_enc deshalb entfernt - jetzt
+# steht wirklich nur noch der Hash in der Datenbank, so wie #129 es wollte.
 #
-# Zwei Spalten je Grant, weil Suchen und Zurueckgewinnen verschiedene Dinge
-# sind:
-#   token_lookup - HMAC-SHA256(Schluessel, Token), deterministisch. Nur dafuer
-#                  da, die Zeile zu FINDEN (WHERE token_lookup = ?). Ohne den
-#                  Schluessel nicht nachrechenbar, also auch kein Abgleich
-#                  gegen eine Liste geratener Tokens.
-#   token_enc    - AES-GCM(Token), zufaelliges Nonce. Nur dafuer da, den
-#                  Klartext fuer Links und QR-Codes zurueckzubekommen.
+#   token_lookup - HMAC-SHA256(Schluessel, Token), deterministisch. Findet die
+#                  Zeile (WHERE token_lookup = ?). Ohne den Schluessel nicht
+#                  nachrechenbar, also auch kein Abgleich gegen eine Liste
+#                  geratener Tokens. Mehr braucht es nicht.
+#
+# Folge fuer den Betrieb: Ein Zugangslink ist NUR im Moment seiner Erzeugung
+# anzeigbar. Niemand - auch kein Admin - kann ihn spaeter nachschlagen; wer
+# ihn verloren hat, bekommt einen neuen (03_admin.py, "Zugaenge neu erzeugen",
+# Wunsch #131). Eine geleakte Datenbank gibt dadurch keinen Zugriff mehr her,
+# selbst wenn der TOKEN_KEY mit abhanden kaeme.
 #
 # WICHTIG FUER DEN BETRIEB: Ohne TOKEN_KEY aus der .env kommt niemand mehr
-# rein. Die .env gehoert deshalb an einen zweiten sicheren Ort (Passwort-
-# manager) - ein wiederhergestelltes /data-Backup allein reicht NICHT.
+# rein - der HMAC der vorhandenen Links liesse sich nicht mehr nachrechnen.
+# Die .env gehoert deshalb an einen zweiten sicheren Ort (Passwortmanager);
+# ein wiederhergestelltes /data-Backup allein reicht NICHT.
+#
+# `token_verschluesseln`/`token_entschluesseln` unten bleiben ausschliesslich
+# fuer die #129-Migration bestehen (eine Datenbank aus jener Zeit muss noch
+# gelesen werden koennen) - im laufenden Betrieb ruft sie nichts mehr auf.
 # ---------------------------------------------------------------------------
 
 def _token_key() -> bytes:
@@ -1062,10 +1089,13 @@ def _auto_grant_all(db, slug):
         (app_row[0],),
     ).fetchall()
     for row in missing:
-        lookup, enc = grant_werte(new_token())
+        # Der Klartext wird hier bewusst NICHT aufgehoben: Auto-Grants sind
+        # Zusatz-Apps für bestehende Nutzer, die ohnehin schon über ihren
+        # Home-Link (bzw. das Sitzungs-Cookie) hereinkommen. Ein eigener Link
+        # je App wird seit Stufe 4 nirgends mehr gebraucht.
         db.execute(
-            "INSERT OR IGNORE INTO grants(user_id,app_id,token_lookup,token_enc) VALUES(?,?,?,?)",
-            (row[0], app_row[0], lookup, enc))
+            "INSERT OR IGNORE INTO grants(user_id, app_id, token_lookup) VALUES(?,?,?)",
+            (row[0], app_row[0], token_lookup(new_token())))
 
 
 def _init_db(app):
@@ -1195,6 +1225,82 @@ def _init_db(app):
             db.execute("VACUUM")
             db.commit()
             log.warning("Wunsch #129: %d Zugangstokens verschluesselt abgelegt.", anzahl_neu)
+
+        # Wunsch #140, Stufe 6: token_enc entfernen - ab jetzt steht in der
+        # Datenbank NUR noch der HMAC. Das ist das, was #129 eigentlich wollte
+        # und damals nicht konnte, weil die Navigation den Klartext brauchte.
+        #
+        # Dieselbe Bauart wie die #129-Migration darueber (RENAME + Neuaufbau
+        # statt ALTER ... DROP COLUMN): SQLite kann eine Spalte in einer
+        # Tabelle mit UNIQUE-Constraints nicht zuverlaessig droppen, und der
+        # Zwischenzustand mit grants_alt_v140 ist zugleich das
+        # Wiederaufsetz-Signal - bricht der Lauf mittendrin ab, wird beim
+        # naechsten Start dort weitergemacht statt die Migration zu
+        # ueberspringen.
+        #
+        # Rein umbauend, NICHT datenvernichtend im Sinne der Anmeldung: der
+        # token_lookup jeder Zeile bleibt unveraendert, jeder bereits
+        # verteilte Link funktioniert also unveraendert weiter. Verloren geht
+        # nur die Faehigkeit, einen Link nachtraeglich ANZUZEIGEN. Vorab auf
+        # einer Kopie der Produktionsdatenbank durchgespielt (54/54 Grants
+        # uebernommen, 54/54 alte Klartext-Tokens loesten danach weiterhin auf).
+        grant_cols = [r[1] for r in db.execute("PRAGMA table_info(grants)").fetchall()]
+        alt_v140_da = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='grants_alt_v140'"
+        ).fetchone()
+        if "token_enc" in grant_cols or alt_v140_da:
+            if not alt_v140_da:
+                db.execute("ALTER TABLE grants RENAME TO grants_alt_v140")
+                db.commit()
+            # `position` und `gruppe_id` kommen weiter unten per ALTER dazu -
+            # eine sehr alte Datenbank kann sie an dieser Stelle also noch
+            # nicht haben. Deshalb die zu uebernehmenden Spalten aus der ALTEN
+            # Tabelle ableiten statt fest zu verdrahten; ein fest kodiertes
+            # `SELECT position` waere dort ein Absturz beim Start.
+            alt_cols = [r[1] for r in
+                        db.execute("PRAGMA table_info(grants_alt_v140)").fetchall()]
+            uebernehmen = ["id", "user_id", "app_id", "token_lookup"]
+            zusatz = {
+                "position":  "position  INTEGER NOT NULL DEFAULT 0",
+                "gruppe_id": "gruppe_id INTEGER",
+            }
+            spalten_def = "".join(
+                f"                  {zusatz[c]},\n" for c in zusatz if c in alt_cols)
+            uebernehmen += [c for c in zusatz if c in alt_cols]
+
+            db.execute(f"""
+                CREATE TABLE IF NOT EXISTS grants (
+                  id           INTEGER PRIMARY KEY,
+                  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  app_id       INTEGER NOT NULL REFERENCES apps(id)  ON DELETE CASCADE,
+                  token_lookup TEXT    UNIQUE NOT NULL,
+{spalten_def}                  UNIQUE(user_id, app_id)
+                )
+            """)
+            db.commit()
+            liste = ", ".join(uebernehmen)
+            db.execute(
+                f"INSERT OR IGNORE INTO grants({liste}) "
+                f"SELECT {liste} FROM grants_alt_v140"
+            )
+            db.commit()
+            anzahl_alt = db.execute("SELECT COUNT(*) FROM grants_alt_v140").fetchone()[0]
+            anzahl_neu = db.execute("SELECT COUNT(*) FROM grants").fetchone()[0]
+            if anzahl_neu != anzahl_alt:
+                raise RuntimeError(
+                    f"Stufe-6-Migration unvollstaendig: {anzahl_neu} von {anzahl_alt} "
+                    "uebernommen - grants_alt_v140 bleibt zur Rettung stehen.")
+            db.execute("DROP TABLE grants_alt_v140")
+            db.commit()
+            # Ohne VACUUM stuenden die Geheimtexte weiter in freigegebenen
+            # Seiten der Datei - logisch sauber, aber `strings portal.db`
+            # faende sie weiterhin und das naechste Backup naehme sie mit.
+            # Gleiche Begruendung wie bei #129, dort live gegengeprueft.
+            db.execute("VACUUM")
+            db.commit()
+            log.warning(
+                "Wunsch #140 Stufe 6: token_enc entfernt, %d Grants nur noch als "
+                "Pruefsumme gespeichert.", anzahl_neu)
 
         for col, definition in [
             ("dark_mode", "INTEGER NOT NULL DEFAULT 0"),

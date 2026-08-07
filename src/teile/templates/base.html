@@ -7,8 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="{{ farbe | default('#4a90d9') }}">
   <title>{% block title %}Portal{% endblock %} · 16schwaben.de</title>
-  {% if user is defined and user and user.home_token %}
-  <link rel="manifest" href="{{ manifest_pfad(user.home_token) }}" crossorigin="use-credentials">
+  {% if user is defined and user %}
+  <link rel="manifest" href="{{ manifest_pfad() }}" crossorigin="use-credentials">
   {% else %}
   <link rel="manifest" href="/static/manifest.json">
   {% endif %}
@@ -208,8 +208,8 @@
 <header class="app-header">
   <div class="nav-bar">
     {% block nav_left %}
-    {% if user is defined and user and user.home_token %}
-    <a class="nav-btn" href="{{ start_pfad(user.home_token) }}" title="Startseite">⌂</a>
+    {% if user is defined and user %}
+    <a class="nav-btn" href="{{ start_pfad() }}" title="Startseite">⌂</a>
     {% else %}
     <span class="nav-ghost"></span>
     {% endif %}
@@ -240,7 +240,7 @@
     </div>
 
     <!-- 1. Startseite: immer ganz oben (Wunsch #32) -->
-    <a class="menu-item" href="{{ start_pfad(user.home_token) if user is defined and user else '#' }}">
+    <a class="menu-item" href="{{ start_pfad() }}">
       <span class="menu-emoji">🏠</span>Startseite
     </a>
 
@@ -322,8 +322,8 @@
         <span id="dm-emoji">{{ '☀️' if user is defined and user and user.dark_mode else '🌙' }}</span>
       </button>
 
-      {% if user is defined and user and user.hilfe_token %}
-      <a class="menu-icon-btn" href="{{ app_pfad('hilfe', user.hilfe_token) }}" title="Hilfe">❓</a>
+      {% if user is defined and user %}
+      <a class="menu-icon-btn" href="{{ app_pfad('hilfe') }}" title="Hilfe">❓</a>
       {% endif %}
 
       <button class="menu-icon-btn" id="wunsch-menu-btn" title="Verbesserungsvorschlag">✨</button>

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set app_slug = "admin" %}
+{% block title %}Zugang für {{ kind_name }}{% endblock %}
+
+{% block extra_styles %}
+.zugang-karte {
+  background:var(--surface); border-radius:18px; padding:22px 20px;
+  box-shadow:0 1px 3px var(--shadow); text-align:center;
+}
+.zugang-warnung {
+  background:#fff4e5; color:#8a5200; border-radius:14px;
+  padding:14px 16px; margin-bottom:16px; font-size:14px; line-height:1.5;
+  border-left:5px solid #ff9500;
+}
+body.dark .zugang-warnung { background:#3a2a10; color:#ffd08a; }
+.zugang-hinweis { font-size:15px; margin-bottom:18px; line-height:1.5; }
+.zugang-qr { width:100%; max-width:260px; height:auto; margin:0 auto 18px; display:block; }
+.zugang-url {
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:13px; word-break:break-all; background:var(--surface-2);
+  border-radius:10px; padding:12px 14px; margin-bottom:14px; color:var(--text);
+}
+.zugang-kopieren {
+  width:100%; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:12px; font-size:16px; font-weight:600; cursor:pointer;
+  margin-bottom:10px;
+}
+.zugang-fertig {
+  display:block; text-align:center; padding:12px; font-size:15px;
+  color:var(--text-2); text-decoration:none;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück zur Verwaltung">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🔑 Zugang für {{ kind_name }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+  <div class="zugang-warnung">
+    <strong>Nur jetzt sichtbar.</strong> Dieser Link lässt sich später nicht
+    mehr anzeigen – auch nicht von dir. Wenn er verloren geht, musst du für
+    {{ kind_name }} einen neuen Zugang erzeugen.
+  </div>
+
+  <div class="zugang-karte">
+    <div class="zugang-hinweis">{{ hinweis }}</div>
+    <img class="zugang-qr" src="{{ qr_data_uri }}" alt="QR-Code für {{ kind_name }}">
+    <div class="zugang-url" id="zugang-url">{{ url }}</div>
+    <button class="zugang-kopieren" data-klick="zugangKopieren">📋 Link kopieren</button>
+    <a class="zugang-fertig" href="/a/admin{{ tp }}">Fertig – zurück zur Verwaltung</a>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+function zugangKopieren(knopf) {
+  const text = document.getElementById('zugang-url').textContent.trim();
+  // Ohne sicheren Kontext (oder bei verweigerter Berechtigung) gibt es keine
+  // Zwischenablage - dann bleibt die Adresse zum Abtippen stehen, statt dass
+  // der Knopf wortlos nichts tut.
+  if (!navigator.clipboard) {
+    knopf.textContent = '❌ Bitte von Hand kopieren';
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    knopf.textContent = '✅ Kopiert';
+    setTimeout(() => { knopf.textContent = '📋 Link kopieren'; }, 2000);
+  }).catch(() => {
+    knopf.textContent = '❌ Bitte von Hand kopieren';
+  });
+}
+</script>
+{% endblock %}

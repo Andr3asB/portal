@@ -281,15 +281,34 @@ neu erzeugen.
 rückrollbar – die Klartexte sind danach weg. Ich mache vorher einen Probelauf
 auf einer Kopie der Datenbank und eine Sicherung, wie schon bei Wunsch #129.
 
-**Notausstieg:** Datenbanksicherung zurückspielen (langsamer als die anderen
-Stufen – deshalb hier besonders sorgfältig prüfen)
+**Notausstieg:** Datenbanksicherung zurückspielen – sie liegt auf dem Server
+unter `/data/portal-vor-stufe6.db` (mit der SQLite-Backup-API erstellt, also
+konsistent). Langsamer als die anderen Stufen – deshalb hier besonders
+sorgfältig prüfen.
+
+**Wichtig zu wissen:** Diese Stufe nimmt dem Schalter `TOKENFREIE_URLS=0`
+seine Wirkung. Er kann Links nicht mehr mit Token versehen, weil es keine
+Klartext-Tokens mehr gibt. Er verhindert weiterhin die Weiterleitung von
+`/p/<token>` auf `/start`; als Rückfallebene genügt das, weil ein Link mit
+Token unverändert Vorrang hat.
+
+**Schon von hier aus geprüft** (musst du nicht wiederholen): Die Migration
+habe ich vorab **zweimal** auf einer Kopie der echten Datenbank durchgespielt –
+einmal mit einem Prüfskript, einmal mit dem echten Code, inklusive echter
+Anmeldungen von dir und Friederike über eure bestehenden Links. Danach live:
+**50/50 alte Links funktionieren**, alle vier kommen token-frei in jede ihrer
+Apps, in der Verwaltung steht kein einziger Token mehr, `/qr.svg` ist 404.
+Einen Zugang habe ich testweise neu erzeugt und den angezeigten Link
+ausprobiert – an einem eigens angelegten Testnutzer, nicht an einem echten
+Konto; der ist wieder gelöscht.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
 | S6-01 | Alle vier Zugänge nacheinander öffnen | alle 4 | Jeder kommt in seine Apps | | |
 | S6-02 | Esszimmer-Bildschirm | Kiosk | Läuft unverändert | | |
 | S6-03 | In der Verwaltung nachsehen | A-PC | Es werden **keine** Zugangsadressen mehr im Klartext angezeigt | | |
-| S6-04 | Bei einem Nutzer „Zugänge neu", QR sofort scannen | Kind | Neuer Zugang funktioniert | | |
+| S6-06 | **Push-Benachrichtigung:** jemandem eine Aufgabe zuweisen, auf dessen Gerät die Meldung antippen | 2 Geräte | Die Aufgabenliste öffnet sich. (Die Adresse in der Meldung kam früher aus dem Token – den gibt es nicht mehr, deshalb eigens prüfen) | | |
+| S6-04 | Bei einem Nutzer **„Neuer Zugang + QR"** (der Knopf hieß vorher „Zugänge neu"), QR sofort scannen | Kind | Neuer Zugang funktioniert; der alte Link des Kindes geht danach nicht mehr | | |
 | S6-05 | Verwaltung neu laden und denselben QR nochmal suchen | A-PC | Ist nicht mehr abrufbar – nur direkt nach dem Erzeugen (so gewollt) | | |
 
 ---

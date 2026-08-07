@@ -37,28 +37,24 @@ def test_alle_seiten_mit_token_erreichbar(app, client, admin, db):
     Das ist die Messlatte für Stufe 4: Nach dem Umbau muss dasselbe gelten,
     zusätzlich für die token-freie Form."""
     # Admin bekommt alle Apps, damit wirklich jede Seite geprüft wird.
+    #
+    # Wunsch #140, Stufe 6: Die Klartext-Tokens lassen sich nicht mehr aus der
+    # Datenbank zurückholen - dieser Test merkt sie sich deshalb beim Anlegen,
+    # genau wie es der Produktivcode inzwischen tut (grant_anlegen()).
     verbindung = db["verbindung"]
-    from teile.kern import grant_werte, new_token
+    from teile.kern import token_lookup, new_token
+    tokens = dict(admin["tokens"])
     with app.app_context():
-        for (app_id,) in verbindung.execute(
-            "SELECT id FROM apps WHERE id NOT IN "
+        for app_id, slug in verbindung.execute(
+            "SELECT id, slug FROM apps WHERE id NOT IN "
             "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
         ).fetchall():
-            lookup, enc = grant_werte(new_token())
+            klartext = new_token()
             verbindung.execute(
-                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
-                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+                "INSERT INTO grants(user_id, app_id, token_lookup) "
+                "VALUES(?,?,?)", (admin["id"], app_id, token_lookup(klartext)))
+            tokens[slug] = klartext
         verbindung.commit()
-
-    # Für jede Route den passenden App-Token holen.
-    from teile.kern import token_entschluesseln
-    tokens = {}
-    with app.app_context():
-        for slug, enc in verbindung.execute("""
-            SELECT a.slug, g.token_enc FROM grants g
-            JOIN apps a ON a.id = g.app_id WHERE g.user_id = ?
-        """, (admin["id"],)).fetchall():
-            tokens[slug] = token_entschluesseln(enc)
 
     fehler = []
     for regel in _seiten_routen(app):
@@ -97,16 +93,15 @@ def test_alle_seiten_auch_ohne_token_erreichbar(app, client, admin, db, stufe4):
     weil die token-freie Form dann gar nicht existiert (404) oder niemanden
     autorisiert (403)."""
     verbindung = db["verbindung"]
-    from teile.kern import grant_werte, new_token
+    from teile.kern import token_lookup, new_token
     with app.app_context():
         for (app_id,) in verbindung.execute(
             "SELECT id FROM apps WHERE id NOT IN "
             "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
         ).fetchall():
-            lookup, enc = grant_werte(new_token())
             verbindung.execute(
-                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
-                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+                "INSERT INTO grants(user_id, app_id, token_lookup) "
+                "VALUES(?,?,?)", (admin["id"], app_id, token_lookup(new_token())))
         verbindung.commit()
 
     # Einmal mit Token rein – danach trägt das Cookie.
@@ -169,16 +164,15 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
     Funktion kann in der Vorlage selbst oder in `base.html` stehen, und erst im
     fertigen HTML ist beides beisammen."""
     verbindung = db["verbindung"]
-    from teile.kern import grant_werte, new_token
+    from teile.kern import token_lookup, new_token
     with app.app_context():
         for (app_id,) in verbindung.execute(
             "SELECT id FROM apps WHERE id NOT IN "
             "(SELECT app_id FROM grants WHERE user_id=?)", (admin["id"],)
         ).fetchall():
-            lookup, enc = grant_werte(new_token())
             verbindung.execute(
-                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
-                "VALUES(?,?,?,?)", (admin["id"], app_id, lookup, enc))
+                "INSERT INTO grants(user_id, app_id, token_lookup) "
+                "VALUES(?,?,?)", (admin["id"], app_id, token_lookup(new_token())))
         verbindung.commit()
     client.get(f"/p/{admin['tokens']['home']}")
 
@@ -207,13 +201,22 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
     assert not fehler, "\n  ".join([""] + sorted(set(fehler)))
 
 
-def test_notausstieg_stellt_token_links_wieder_her(app, client, admin):
-    """TOKENFREIE_URLS=0 muss den Zustand von vorher zurückbringen.
+def test_notausstieg_leitet_nicht_mehr_um_aber_verlinkt_token_frei(app, client, admin):
+    """`TOKENFREIE_URLS=0` ist seit Stufe 6 nur noch ein halber Notausstieg.
 
-    Der Schalter ist die Rücknahme für Stufe 4 – ohne Rebuild, ohne Paket.
-    Ein Schalter, der nicht nachweislich greift, ist keine Rückfallebene,
-    sondern ein Versprechen. Also: mit `0` müssen die Links wieder Tokens
-    tragen, und `/p/<token>` darf NICHT umleiten."""
+    Bis Stufe 5 stellte der Schalter den Zustand von vorher vollständig
+    wieder her: Links trugen wieder Tokens. Das kann er nicht mehr, denn seit
+    Stufe 6 gibt es keine Klartext-Tokens, die man einsetzen könnte - die
+    App-Kacheln bleiben token-frei, egal wie der Schalter steht.
+
+    Was er weiterhin tut: `/p/<token>` leitet nicht mehr auf `/start` um, die
+    Adresse mit Token bleibt also stehen. Das genügt als Rückfallebene, weil
+    ein Pfad-Token unverändert Vorrang hat und jede token-freie Adresse
+    zusätzlich über das Cookie trägt.
+
+    Der Test hält das ausdrücklich fest, statt stillschweigend gelockert zu
+    werden: Wer künftig eine echte Rücknahme von Stufe 4 braucht, muss die
+    Datenbanksicherung von vor Stufe 6 einspielen."""
     schluessel = ("SITZUNG_AUSSTELLEN", "SITZUNG_KONSUMIEREN", "TOKENFREIE_URLS")
     vorher = {k: app.config.get(k) for k in schluessel}
     app.config["SITZUNG_AUSSTELLEN"] = "1"
@@ -221,14 +224,14 @@ def test_notausstieg_stellt_token_links_wieder_her(app, client, admin):
     app.config["TOKENFREIE_URLS"] = "0"
     try:
         home = admin["tokens"]["home"]
-        antwort = client.get(f"/p/{home}")
-        assert antwort.status_code == 200, "keine Weiterleitung erwartet"
+        assert client.get(f"/p/{home}").status_code == 200
         # Zweiter Aufruf: jetzt liegt ein Cookie vor – trotzdem kein Redirect.
         antwort = client.get(f"/p/{home}")
         assert antwort.status_code == 200, "Schalter aus, aber trotzdem umgeleitet"
+        # Und die Kacheln sind token-frei – nachweislich, nicht bloss vermutet.
         text = antwort.get_data(as_text=True)
-        assert f"/a/einkauf/{admin['tokens']['einkauf']}/" in text, \
-            "App-Kachel trägt keinen Token mehr, obwohl der Schalter aus ist"
+        assert f"/a/einkauf/{admin['tokens']['einkauf']}/" not in text
+        assert 'href="/a/einkauf/"' in text
     finally:
         app.config.update(vorher)
 

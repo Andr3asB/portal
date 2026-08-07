@@ -16,7 +16,7 @@ def kb_token(app, db):
     """Vergibt allen drei Testnutzern einen Grant für 'kassenbuch' - die
     Familie aus conftest.py bekommt es nicht automatisch, weil das dortige
     Setup gezielte Grant-Listen je Nutzer verwendet, nicht _auto_grant_all()."""
-    from teile.kern import grant_werte, new_token
+    from teile.kern import token_lookup, new_token
     verbindung = db["verbindung"]
     with app.app_context():
         app_id = verbindung.execute(
@@ -24,10 +24,9 @@ def kb_token(app, db):
         tokens = {}
         for name, daten in db["familie"].items():
             klartext = new_token()
-            lookup, enc = grant_werte(klartext)
             verbindung.execute(
-                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) "
-                "VALUES(?,?,?,?)", (daten["id"], app_id, lookup, enc))
+                "INSERT INTO grants(user_id, app_id, token_lookup) "
+                "VALUES(?,?,?)", (daten["id"], app_id, token_lookup(klartext)))
             tokens[name] = klartext
         verbindung.commit()
     return tokens

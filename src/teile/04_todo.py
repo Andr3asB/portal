@@ -57,7 +57,7 @@ Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
 from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int, token_entschluesseln
+from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
 
 bp  = Blueprint("todo_app", __name__)
 APP = "todo"
@@ -90,11 +90,22 @@ def _darf_erledigen(user, row) -> bool:
 
 
 def _todo_url(db, user_id: int) -> str:
+    """Ziel-Adresse für die Push-Benachrichtigung.
+
+    Wunsch #140, Stufe 6: Früher wurde hier der Klartext-Token des Nutzers
+    entschlüsselt und in die Adresse gebaut. Den gibt es nicht mehr - und er
+    wird auch nicht gebraucht: Seit Stufe 4 ist `/a/todo/` token-frei, das
+    Gerät weist sich über sein Sitzungs-Cookie aus. Das ist hier sogar
+    korrekter als vorher, denn eine Push-Nachricht wird auf genau dem Gerät
+    geöffnet, das die Anmeldung ohnehin schon besitzt.
+
+    Weiterhin wird geprüft, ob der Nutzer die App überhaupt hat - ohne Grant
+    liefe die Benachrichtigung in ein 403."""
     row = db.execute("""
-        SELECT g.token_enc FROM grants g JOIN apps a ON a.id=g.app_id
+        SELECT 1 FROM grants g JOIN apps a ON a.id=g.app_id
         WHERE g.user_id=? AND a.slug='todo'
     """, (user_id,)).fetchone()
-    return f"https://portal.16schwaben.de/a/todo/{token_entschluesseln(row['token_enc'])}/" if row else ""
+    return "https://portal.16schwaben.de/a/todo/" if row else ""
 
 
 def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,

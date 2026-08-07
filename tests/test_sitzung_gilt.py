@@ -131,16 +131,24 @@ def test_rollen_bleiben_erhalten(client, kind, stufe3):
     assert user["is_admin"] == 0
 
 
-def test_navigations_tokens_auch_per_cookie(client, admin, stufe3):
-    """base.html braucht sie auf jeder Seite – auch ohne Token in der URL."""
+def test_auch_per_cookie_kommt_kein_token_zurueck(client, admin, stufe3):
+    """Wunsch #140, Stufe 6: Gegenstueck zum gleichnamigen Test in
+    test_grant.py, aber ueber den Cookie-Weg.
+
+    Bis Stufe 3 pruefte dieser Test das Gegenteil (base.html brauchte die
+    Navigations-Tokens auf jeder Seite). Seit Stufe 6 gibt es sie nicht mehr -
+    und der Cookie-Pfad darf da keine Hintertuer sein."""
     from teile.kern import grant
     client.get(f"/p/{admin['tokens']['home']}")
     with client.application.test_request_context(
         headers={"Cookie": _cookie_von(client)}
     ):
         user = grant(None, "einkauf")
-    assert user["home_token"] == admin["tokens"]["home"]
-    assert user["hilfe_token"] == admin["tokens"]["hilfe"]
+    assert "home_token" not in user
+    assert "hilfe_token" not in user
+    werte = {str(v) for v in user.values()}
+    for name, token in admin["tokens"].items():
+        assert token not in werte, f"Token '{name}' steckt in der grant()-Antwort"
 
 
 # --- Widerruf --------------------------------------------------------------
@@ -162,7 +170,10 @@ def test_widerruf_macht_cookie_ungueltig(app, client, admin, kind, stufe3):
     antwort = admin_geraet.post(
         f"/a/admin/{admin['tokens']['admin']}/user/{kind['id']}/neue_tokens",
         headers={"Sec-Fetch-Site": "same-origin"})
-    assert antwort.status_code in (302, 303)
+    # Wunsch #140, Stufe 6: Statt eines Redirects kommt die Zugangsseite mit
+    # dem NEUEN Link - das ist der einzige Moment, in dem er sichtbar ist.
+    assert antwort.status_code == 200
+    assert b"Nur jetzt sichtbar" in antwort.data
 
     # Das Kind-Gerät kommt weder per Cookie noch per altem Link wieder rein.
     assert kind_geraet.get("/start").status_code == 403
@@ -171,15 +182,25 @@ def test_widerruf_macht_cookie_ungueltig(app, client, admin, kind, stufe3):
 
 def test_widerruf_sperrt_den_ausloesenden_admin_nicht_aus(app, client, admin, stufe3):
     """Gegenprobe: Wer den Knopf drückt, darf sich nicht selbst aussperren –
-    sonst wäre der Notfallknopf im Notfall unbenutzbar."""
+    sonst wäre der Notfallknopf im Notfall unbenutzbar.
+
+    Wunsch #140, Stufe 6: Das lief bis eben über eine Weiterleitung auf die
+    NEUE Admin-Adresse. Die gibt es nicht mehr - der neue Token ist ja gerade
+    nicht mehr in eine Adresse einsetzbar. Stattdessen trägt die Antwort ein
+    frisches Sitzungs-Cookie (19_sitzung.py stellt es aus, weil `grant()` zu
+    Beginn des Requests `sitzung_vormerken()` gerufen hat). Dieses Gerät bleibt
+    also drin, alle anderen sind draußen - was der Knopf leisten soll."""
     client.get(f"/p/{admin['tokens']['home']}")
     antwort = client.post(
         f"/a/admin/{admin['tokens']['admin']}/user/{admin['id']}/neue_tokens",
         headers={"Sec-Fetch-Site": "same-origin"})
-    assert antwort.status_code in (302, 303)
-    # Die Weiterleitung zeigt auf die NEUE Admin-Adresse (siehe Wunsch #131).
-    assert "/a/admin/" in antwort.headers["Location"]
-    assert admin["tokens"]["admin"] not in antwort.headers["Location"]
+    assert antwort.status_code == 200
+    assert b"Nur jetzt sichtbar" in antwort.data
+
+    # Der entscheidende Teil: dieses Gerät kommt weiterhin rein (frisches
+    # Cookie), obwohl seine alten Tokens soeben ungültig wurden.
+    assert client.get("/start").status_code == 200
+    assert client.get(f"/p/{admin['tokens']['home']}").status_code == 403
 
 
 def test_abgelaufene_sitzung_gilt_nicht(client, db, admin, stufe3):

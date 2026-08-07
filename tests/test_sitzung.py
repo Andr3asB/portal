@@ -124,7 +124,9 @@ def test_zugaenge_neu_loescht_die_sitzungen(client, db, admin, kind, an):
 
     antwort = client.post(
         f"/a/admin/{admin['tokens']['admin']}/user/{kind['id']}/neue_tokens")
-    assert antwort.status_code in (302, 303)
+    # Wunsch #140, Stufe 6: antwortet mit der einmaligen Zugangsseite (200)
+    # statt mit einer Weiterleitung.
+    assert antwort.status_code == 200
 
     assert db["verbindung"].execute(
         "SELECT COUNT(*) c FROM sitzungen WHERE user_id=?", (kind["id"],)

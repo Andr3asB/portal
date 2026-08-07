@@ -57,7 +57,7 @@ def app(tmp_path_factory, token_key):
 def db(app):
     """Leert die Datenbank und legt die Testfamilie an. Läuft vor jedem Test."""
     import sqlite3
-    from teile.kern import grant_werte, new_token
+    from teile.kern import token_lookup, new_token
 
     verbindung = sqlite3.connect(app.config["DB_PATH"])
     verbindung.row_factory = sqlite3.Row
@@ -84,10 +84,9 @@ def db(app):
             ).fetchone()
             assert app_row is not None, f"App-Slug '{slug}' existiert nicht"
             klartext = new_token()
-            lookup, enc = grant_werte(klartext)
             verbindung.execute(
-                "INSERT INTO grants(user_id, app_id, token_lookup, token_enc) VALUES(?,?,?,?)",
-                (uid, app_row["id"], lookup, enc),
+                "INSERT INTO grants(user_id, app_id, token_lookup) VALUES(?,?,?)",
+                (uid, app_row["id"], token_lookup(klartext)),
             )
             verbindung.commit()
             return klartext

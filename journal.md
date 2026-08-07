@@ -2,6 +2,112 @@
 
 ---
 
+## 2026-08-07 – portal-v131: Wunsch #140, Stufe 6 – Tokens nur noch als Prüfsumme
+
+Letzte der sechs Stufen. `token_enc` ist aus `grants` verschwunden; in der
+Datenbank steht jetzt **nur noch der HMAC**. Damit ist eingelöst, was Wunsch
+#129 eigentlich wollte und damals nicht konnte – die Navigation brauchte den
+Klartext zurück, weil `base.html` den ⌂-Knopf und den Hilfe-Link daraus baute
+und die Startseite jede Kachel. Seit Stufe 4 sind alle Adressen token-frei,
+also wird er nirgends mehr gebraucht.
+
+**Die Zusage steht:** alle 54 Grants übernommen, alle `token_lookup`
+unverändert – jeder bereits verteilte Link funktioniert weiter. Nachgemessen:
+50/50 alte Token-Adressen liefern 200.
+
+### Was jetzt anders ist
+
+Ein Zugangslink ist **nur im Moment seiner Erzeugung sichtbar**. Danach kann
+ihn niemand mehr nachschlagen, auch kein Admin. Die Verwaltungsseite rendete
+bisher die Zugangsadressen der ganzen Familie im Klartext – und der Service
+Worker cachte sie mit. Das war ein eigener Befund aus der Sicherheitsanalyse
+und ist damit erledigt; live gegengeprüft: kein einziger Token mehr in der
+ausgelieferten Seite.
+
+Neu ist `admin_zugang.html`: eine Seite, die genau einen frisch erzeugten
+Zugang zeigt – Link, QR-Code, Kopierknopf, mit deutlichem Hinweis „Nur jetzt
+sichtbar". Sie erscheint beim Anlegen eines Nutzers und bei „Neuer Zugang +
+QR" (vormals „Zugänge neu", Wunsch #131).
+
+**Der QR-Code steckt als `data:`-URI in der Seite.** Die alte Route
+`/a/admin/.../qr.svg` musste den Token aus der Datenbank holen – genau das
+geht nicht mehr; sie ist ersatzlos entfallen (jetzt 404). Dass das Bild trägt,
+verdankt sich `img-src 'self' data:` aus Stufe 5.
+
+Bewusst **kein Redirect** nach dem Erzeugen: Ein Redirect müsste den Token
+weiterreichen – über die Adresszeile (landet im Verlauf, das wollten wir
+gerade abschaffen) oder über die Flask-Session (schriebe ihn in ein Cookie).
+Die Antwort auf den POST selbst ist der einzige Ort, an dem er sonst niemandem
+begegnet.
+
+### Zwei Abhängigkeiten, die beinahe untergegangen wären
+
+**Push-Benachrichtigungen.** `04_todo.py` baute die Ziel-Adresse einer
+Push-Nachricht aus dem entschlüsselten Token des Empfängers. Ohne Anpassung
+hätte jede Aufgaben-Benachrichtigung ins Leere gezeigt. Jetzt zeigt sie auf
+`/a/todo/` – token-frei, das Gerät weist sich über sein Cookie aus. Das ist
+sogar richtiger als vorher: Eine Push-Nachricht wird auf genau dem Gerät
+geöffnet, das die Anmeldung ohnehin besitzt.
+
+**`manage.py`.** `listusers` druckte die Zugangsadresse jedes Nutzers, und
+`_make_grant()` holte bei einem bereits bestehenden Grant den alten Token
+zurück. Beides geht nicht mehr. `listusers` zeigt jetzt die Zahl der
+App-Zugänge, und `_make_grant()` gibt `None` zurück, wenn der Grant schon
+existierte – `grant` sagt das dann auch, statt eine Adresse zu drucken, die
+gar nicht gilt.
+
+### Ehrlich: Stufe 6 verbrennt den Notausstieg von Stufe 4
+
+`TOKENFREIE_URLS=0` stellte bis gestern den Zustand von vorher vollständig
+wieder her. Das kann der Schalter nicht mehr – es gibt keine Klartext-Tokens,
+die man in Links einsetzen könnte. Was er weiterhin tut: `/p/<token>` leitet
+nicht mehr auf `/start` um. Als Rückfallebene genügt das, weil ein Pfad-Token
+unverändert Vorrang hat und jede token-freie Adresse über das Cookie trägt.
+
+Der Test dazu wurde nicht stillschweigend gelockert, sondern umbenannt und mit
+dieser Begründung versehen (`test_notausstieg_leitet_nicht_mehr_um_aber_
+verlinkt_token_frei`). Wer eine echte Rücknahme von Stufe 4 braucht, muss die
+Datenbanksicherung von vor Stufe 6 einspielen:
+`/data/portal-vor-stufe6.db`.
+
+### Vorgehen: erst messen, dann anfassen
+
+Die Stufe ist als einzige nicht per Schalter rückrollbar, deshalb in dieser
+Reihenfolge:
+
+1. **Sicherung** der Produktionsdatenbank über die SQLite-Backup-API (nicht
+   per Dateikopie – bei aktivem WAL wäre die inkonsistent).
+2. **Probelauf** auf einer Kopie mit einem eigenen Skript: 54/54 Grants
+   übernommen, **54/54 alte Klartext-Tokens lösten danach weiterhin auf**,
+   keine FK-Verletzungen, nach `VACUUM` kein Geheimtext-Rest mehr in der Datei.
+3. **Zweiter Probelauf mit dem echten Code** (nicht dem Skript) gegen eine
+   frische Kopie – inklusive echter Anmeldungen von Andi und Friederike über
+   ihre bestehenden Links. Erst danach ausgeliefert.
+4. Nach der Auslieferung: Regression, Verwaltungsseite auf Token-Reste
+   geprüft, einen Zugang tatsächlich neu erzeugt und den angezeigten Link
+   ausprobiert (an einem eigens angelegten Testnutzer, nicht an einem echten
+   Konto – danach wieder entfernt).
+
+Die `.env`-Kopie, die der Probelauf im Container brauchte, wurde anschliessend
+gelöscht; sie enthält den TOKEN_KEY.
+
+### Testnetz: 118 → 129
+
+Neu `test_zugang_einmalig.py` (11 Tests): Verwaltung zeigt keine fremden
+Zugänge, token-frei überhaupt keine; die QR-Route existiert nicht mehr; der
+einmalig angezeigte Link **funktioniert wirklich** (der schlimmste denkbare
+Fehler dieser Stufe wäre ein Link, der angezeigt wird, aber nicht trägt – er
+fiele erst auf, wenn jemand ausgesperrt ist); der alte Link ist danach tot.
+
+Mehrere bestehende Tests prüften bis gestern das GEGENTEIL des neuen
+Verhaltens (`grant()` liefert `home_token`/`hilfe_token`). Sie wurden
+umgedreht, nicht gelöscht – mit Begründung im Docstring, damit erkennbar
+bleibt, dass die Kehrtwende Absicht war.
+
+**Offen für Andi:** `pruefplan.md`, Stufe 6 – S6-01 bis S6-05.
+
+---
+
 ## 2026-08-06 – portal-v129: Wunsch #144 – neue App „Kassenbuch"
 
 Dritter der drei nicht zurückgestellten Wünsche aus diesem Durchgang. Neue

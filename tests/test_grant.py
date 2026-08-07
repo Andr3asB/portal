@@ -79,55 +79,81 @@ def test_rolle_eltern_kommt_durch(app, eltern):
 
 # --- Navigations-Tokens (der Grund, warum #129 nicht hashen konnte) ---------
 
-def test_home_und_hilfe_token_werden_mitgeliefert(app, admin):
-    """base.html baut daraus auf JEDER Seite den Heim-Knopf und den
-    Hilfe-Link. Fallen sie weg, ist die Navigation tot."""
+def test_keine_navigations_tokens_mehr(app, admin):
+    """Wunsch #140, Stufe 6: Kehrtwende gegenüber Stufe 1–3.
+
+    Bis Stufe 3 lieferte `grant()` bewusst `home_token` und `hilfe_token` mit -
+    base.html baute daraus auf jeder Seite den ⌂-Knopf und den Hilfe-Link.
+    Seit Stufe 4 sind alle Adressen token-frei, seit Stufe 6 gibt es den
+    Klartext gar nicht mehr. Stünde hier wieder ein Token drin, wäre der ganze
+    Umbau umsonst: Er landete über das Menü erneut in jeder Seite."""
     from teile.kern import grant
     with app.test_request_context():
         user = grant(admin["tokens"]["einkauf"], "einkauf")
-    assert user["home_token"] == admin["tokens"]["home"]
-    assert user["hilfe_token"] == admin["tokens"]["hilfe"]
+    assert "home_token" not in user
+    assert "hilfe_token" not in user
 
 
-def test_navigations_tokens_sind_nutzereigen(app, admin, kind):
-    """Das Kind darf nicht Andis Heim-Token bekommen."""
+def test_grant_liefert_keinen_einzigen_token_zurueck(app, admin):
+    """Schärfer als der Test oben: KEIN Wert im Rückgabe-dict darf einem der
+    Tokens dieses Nutzers entsprechen - egal unter welchem Namen."""
     from teile.kern import grant
     with app.test_request_context():
-        user = grant(kind["tokens"]["einkauf"], "einkauf")
-    assert user["home_token"] == kind["tokens"]["home"]
-    assert user["home_token"] != admin["tokens"]["home"]
+        user = grant(admin["tokens"]["einkauf"], "einkauf")
+    werte = {str(v) for v in user.values()}
+    for name, token in admin["tokens"].items():
+        assert token not in werte, f"Token '{name}' steckt in der grant()-Antwort"
 
 
-# --- Verschlüsselung (Wunsch #129) -----------------------------------------
+# --- Hashing (Wunsch #129, vollendet in #140 Stufe 6) -----------------------
+
+def test_grants_tabelle_hat_keine_rueckholbare_spalte(app, db):
+    """Der Kern von Stufe 6: `token_enc` ist weg.
+
+    Solange die Spalte existierte, liess sich jeder Zugangslink mit dem
+    TOKEN_KEY zurückrechnen - ein geleaktes Backup plus .env gab Vollzugriff.
+    Jetzt steht nur noch der HMAC da, der sich nicht umkehren lässt."""
+    spalten = [r[1] for r in db["verbindung"].execute("PRAGMA table_info(grants)")]
+    assert "token_enc" not in spalten
+    assert "token" not in spalten
+    assert "token_lookup" in spalten
+
 
 def test_klartext_token_steht_nicht_in_der_datenbank(app, db, admin):
+    """Über ALLE Spalten der Grant-Zeile, nicht nur über zwei bekannte -
+    sonst entginge dem Test eine künftig hinzugefügte Spalte."""
     klartext = admin["tokens"]["einkauf"]
-    treffer = db["verbindung"].execute(
-        "SELECT COUNT(*) c FROM grants WHERE token_enc = ? OR token_lookup = ?",
-        (klartext, klartext),
-    ).fetchone()["c"]
-    assert treffer == 0
+    for zeile in db["verbindung"].execute("SELECT * FROM grants"):
+        for wert in tuple(zeile):
+            assert wert != klartext
 
 
-def test_lookup_ist_deterministisch_und_enc_nicht(app):
-    """Suchen muss reproduzierbar sein, Verschlüsseln darf es nicht –
-    sonst wäre der Geheimtext ein Wiedererkennungsmerkmal."""
-    from teile.kern import token_lookup, token_verschluesseln
+def test_lookup_ist_deterministisch(app):
+    """Suchen muss reproduzierbar sein - sonst fände `grant()` die Zeile nie."""
+    from teile.kern import token_lookup
     with app.test_request_context():
         assert token_lookup("abc") == token_lookup("abc")
-        assert token_verschluesseln("abc") != token_verschluesseln("abc")
+        assert token_lookup("abc") != token_lookup("abd")
 
 
-def test_entschluesseln_kehrt_verschluesseln_um(app):
+def test_lookup_ist_nicht_umkehrbar(app):
+    """Der HMAC darf den Token nicht enthalten - eine Prüfsumme, aus der man
+    das Original herauslesen kann, ist keine."""
+    from teile.kern import token_lookup
+    with app.test_request_context():
+        hash_wert = token_lookup("mein-geheimer-token")
+    assert "mein-geheimer-token" not in hash_wert
+    assert len(hash_wert) == 64          # SHA-256 als Hex
+
+
+def test_verschluesselung_bleibt_fuer_die_alt_migration_nutzbar(app):
+    """`token_verschluesseln`/`token_entschluesseln` werden im Betrieb nicht
+    mehr aufgerufen, müssen aber funktionsfähig bleiben: Die #129-Migration
+    liest damit eine Datenbank aus jener Zeit. Wer sie entfernt, macht ein
+    altes Backup unlesbar."""
     from teile.kern import token_verschluesseln, token_entschluesseln
     with app.test_request_context():
         assert token_entschluesseln(token_verschluesseln("hallo-welt")) == "hallo-welt"
-
-
-def test_kaputter_geheimtext_wirft_nicht(app):
-    """Ein einzelner defekter Grant darf nicht die ganze Seite zerlegen."""
-    from teile.kern import token_entschluesseln
-    with app.test_request_context():
         assert token_entschluesseln("kein-gueltiger-geheimtext") == ""
         assert token_entschluesseln("") == ""
 

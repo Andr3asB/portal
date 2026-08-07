@@ -41,15 +41,10 @@
   border-radius:20px; background:#e5f6ec; color:#34c759; font-weight:600;
   margin-left:4px; vertical-align:middle;
 }
-.user-url { font-size:12px; color:var(--text-2); word-break:break-all; margin-bottom:10px; }
 .user-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
 .btn-edit {
   font-size:13px; padding:6px 12px; border-radius:8px;
   background:var(--surface-2); color:var(--text); border:none; cursor:pointer; text-decoration:none;
-}
-.btn-qr {
-  font-size:13px; padding:6px 12px; border-radius:8px;
-  background:var(--surface-2); color:var(--text); border:none; cursor:pointer;
 }
 /* Wunsch #131: Notfallknopf - rot abgesetzt, weil er alle bisherigen Links
    dieses Nutzers sofort ungültig macht. */
@@ -68,18 +63,6 @@
 .grant-chip.active   { background:#34c759; color:#fff; }
 .grant-chip.inactive { background:var(--chip-bg); color:var(--chip-text); }
 .grant-chip.inactive:hover { background:var(--surface-2); }
-.qr-modal {
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
-  align-items:center; justify-content:center; z-index:200;
-}
-.qr-modal.open { display:flex; }
-.qr-box {
-  background:var(--surface); border-radius:20px; padding:24px; max-width:300px; width:90%;
-  text-align:center;
-}
-.qr-box h3 { margin-bottom:12px; font-size:17px; }
-.qr-box img { width:100%; max-width:220px; }
-.qr-url { font-size:11px; color:#8e8e93; margin-top:8px; word-break:break-all; }
 {% endblock %}
 
 {% block nav_title %}
@@ -96,8 +79,7 @@
 {% block body %}
 <main class="main">
 {% for u in all_users %}
-  {% set u_grants = grants.get(u.id, {}) %}
-  {% set home_tok = u_grants.get(home_app_id) %}
+  {% set u_grants = grants.get(u.id, []) %}
   <div class="user-card">
     <div class="user-header">
       <div class="avatar" style="background:{{ u.farbe }}">{{ u.name[0] }}</div>
@@ -110,25 +92,19 @@
             <span class="badge-push">🔔 {{ push_counts[u.id] }}</span>
           {% endif %}
         </div>
-        {% if home_tok %}
-        <div class="user-url">/p/{{ home_tok }}</div>
-        {% endif %}
       </div>
     </div>
 
     <div class="user-actions">
       <a class="btn-edit" href="/a/admin{{ tp }}user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
-      {% if home_tok %}
-      <button class="btn-qr" data-klick="showQR" data-args='["{{ u.id }}", "{{ u.name }}", "{{ home_tok }}"]'>📱 QR-Code</button>
-      {% endif %}
       {# Wunsch #131: Notfallknopf. Macht in einem Schritt ALLE Adressen dieses
          Nutzers ungültig - für "Handy weg" oder "Link aus Versehen
          weitergegeben". Sicherheitsabfrage, weil danach kein alter Link mehr
          funktioniert (Projekt-Konvention: |tojson|forceescape im Attribut). #}
       <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/neue_tokens"
             style="margin:0"
-            data-bestaetigen="{{ ('Alle Zugänge von ' ~ u.name ~ ' neu erzeugen? Sämtliche bisherigen Links und QR-Codes werden damit sofort ungültig.') }}">
-        <button type="submit" class="btn-neue-tokens">🔄 Zugänge neu</button>
+            data-bestaetigen="{{ ('Neuen Zugang für ' ~ u.name ~ ' erzeugen? Alle bisherigen Links und QR-Codes werden sofort ungültig. Der neue Link wird danach EINMAL angezeigt - danach nie wieder.') }}">
+        <button type="submit" class="btn-neue-tokens">🔑 Neuer Zugang + QR</button>
       </form>
     </div>
 
@@ -151,32 +127,5 @@
 {% endfor %}
 </main>
 
-<!-- QR-Modal -->
-<div class="qr-modal" id="qr-modal">
-  <div class="qr-box">
-    <h3 id="qr-name"></h3>
-    <img id="qr-img" src="" alt="QR-Code">
-    <div class="qr-url" id="qr-url"></div>
-    <button class="btn btn-secondary" style="margin-top:14px;width:100%"
-            data-klick="qrSchliessen">Schließen</button>
-  </div>
-</div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script{{ csp_nonce }}>
-function qrSchliessen() {
-  document.getElementById('qr-modal').classList.remove('open');
-}
-
-function showQR(uid, name, tok) {
-  document.getElementById('qr-name').textContent = '📱 ' + name;
-  document.getElementById('qr-img').src = '/a/admin{{ tp }}user/' + uid + '/qr.svg';
-  document.getElementById('qr-url').textContent = 'https://portal.16schwaben.de/p/' + tok;
-  document.getElementById('qr-modal').classList.add('open');
-}
-document.getElementById('qr-modal').addEventListener('click', function(e){
-  if(e.target===this) this.classList.remove('open');
-});
-</script>
-{% endblock %}

@@ -912,6 +912,16 @@ teile/
                        Buch READ-ONLY oeffnen, aber nichts eintragen/
                        stornieren (eigene_buch-Pruefung serverseitig, nicht
                        nur im Template versteckt).
+  03_admin.py        – ... Wunsch #140 Stufe 6: zeigt KEINE Zugangsadressen
+                       mehr an. `_zugang_anzeigen()` ist die einzige Stelle,
+                       an der ein Link je zu sehen ist - beim Anlegen eines
+                       Nutzers und bei "Neuer Zugang + QR" (vormals "Zugaenge
+                       neu", Wunsch #131). Bewusst ohne Redirect danach: ein
+                       Redirect muesste den Token ueber die Adresszeile oder
+                       die Flask-Session weiterreichen, beides waere genau das,
+                       was der Umbau abschaffen sollte. Die Route `/qr.svg`
+                       ist ersatzlos entfallen (sie musste den Token aus der DB
+                       holen), der QR-Code steckt als data:-URI in der Antwort.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -923,6 +933,11 @@ teile/
     denied.html             – Zugang verweigert / Landing ohne Token
     admin.html              – Nutzerverwaltung, Rollen-Badge, Grant-Chips, QR-Modal, Push-Abo-Badge
     admin_user_form.html    – Nutzer anlegen/bearbeiten (Farbe, Rolle, Admin-Flag)
+    admin_zugang.html       – Wunsch #140 Stufe 6: zeigt EINEN frisch erzeugten
+                              Zugang (Link, QR als data:-URI, Kopierknopf) mit
+                              deutlichem "Nur jetzt sichtbar"-Hinweis. Die
+                              einzige Seite im Portal, die je einen Token
+                              anzeigt
     todo.html               – Aufgabenliste (neu, zuweisen an Person/Rolle(n)/Alle,
                               erledigen; ✏️-Panel bearbeitet dieselben Felder wie das
                               Neu-Formular, gemeinsames Macro ziel_auswahl())
@@ -1259,7 +1274,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `ki_nutzung` | id, user_id, feature (z. B. "rezepte_import"), tokens, erstellt – Verbrauchs-Log für ki_anfrage(), gemeinsames Kontingent über alle KI-Features |
 | `ki_tts_nutzung` | id, user_id, feature ("vokabeln_tts"), zeichen, erstellt – Verbrauchs-Log für ki_text_zu_sprache() (Wunsch #136). EIGENE Tabelle, nicht in ki_nutzung: die zählt SUM(tokens) ohne Feature-Filter, Zeichen und Tokens dürfen sich nicht vermischen |
 | `apps` | id, slug, name, emoji, beschreibung |
-| `grants` | id, user_id, app_id, **token_lookup** (UNIQUE, HMAC-SHA256 des Tokens – nur zum Finden der Zeile), **token_enc** (AES-GCM des Tokens, base64(Nonce+CT) – zum Zurückgewinnen für Links/QR), position (sort), gruppe_id (FK home_gruppen) – Wunsch #129: der Klartext-Token steht NICHT mehr in der DB |
+| `grants` | id, user_id, app_id, **token_lookup** (UNIQUE, HMAC-SHA256 des Tokens – findet die Zeile, nicht umkehrbar), position (sort), gruppe_id (FK home_gruppen) – Wunsch #140 Stufe 6: `token_enc` ist entfallen, es gibt **keinen** Weg mehr zum Klartext. Ein Link ist nur im Moment seiner Erzeugung sichtbar (`_zugang_anzeigen()` in `03_admin.py`) |
 | `home_gruppen` | id, user_id, name, position – per-user app groups |
 | `sitzungen` | id, user_id (FK users, cascade), kennung_lookup (UNIQUE, HMAC des Cookie-Werts – der Klartext steht NIE in der DB), erstellt, gesehen, ablauf (NULL = läuft nie ab, z. B. Kiosk), quelle ('token'/'ha'), geraet (User-Agent, gekürzt) – Wunsch #140 Stufe 1: Sitzungs-Cookies. Eigene Tabelle statt signiertem Cookie, weil nur so ein Widerruf je Gerät möglich ist |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
@@ -1374,6 +1389,13 @@ anhängen.
   Weiterleitungen nur mit erneuter Prüfung je Station folgen; die geprüfte
   IP wird für die Verbindung festgenagelt (Muster in `11_rezepte.py`).
   Ein blankes `urllib.request.urlopen(nutzer_url)` ist ein SSRF-Loch.
+- **Ein Zugangstoken ist nur EINMAL sichtbar** (Wunsch #140, Stufe 6). In der
+  DB steht nur `token_lookup` (HMAC). Wer einen Grant anlegt, muss den
+  Klartext im selben Request anzeigen oder verwerfen - `grant_anlegen()` in
+  `00_kern.py` gibt ihn genau einmal zurueck (und `None`, wenn der Grant schon
+  bestand: dann gilt der ALTE Token, den niemand mehr kennt). Eine Route, die
+  einen Link "nachschlagen" will, kann es nicht geben - genau deshalb ist
+  `/qr.svg` entfallen und der QR-Code eine `data:`-URI.
 - **Keine Inline-Handler** (Wunsch #142). `onclick=`/`onsubmit=`/`onchange=`/
   `oninput=` im Markup sind verboten – sie erzwängen `script-src
   'unsafe-inline'`, und damit liefe eingeschleuster Code so selbstverständlich
@@ -1730,6 +1752,12 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_zugang_einmalig.py` – Wunsch #140 Stufe 6. Der wichtigste Test ist
+  `test_der_angezeigte_link_funktioniert_wirklich`: Ein Link, der zwar
+  angezeigt wird, aber nicht traegt, waere der schlimmste Fehler dieser Stufe -
+  er fiele erst auf, wenn jemand ausgesperrt ist. Dazu: Verwaltung zeigt keine
+  fremden Zugaenge (token-frei ueberhaupt keine), `/qr.svg` existiert nicht
+  mehr, der alte Link ist nach dem Neuerzeugen tot.
 - `test_csp.py` – Wunsch #142. Wichtigster Test: `test_keine_inline_handler_mehr`
   liest die Vorlagen im Quelltext und laesst kein neues `onclick=` zu. Ohne
   ihn waere der Umbau in ein paar Wochen still wieder zunichte, denn beim
