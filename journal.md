@@ -2,6 +2,142 @@
 
 ---
 
+## 2026-08-07 – portal-v143: Mein Fehler – die CSP blockierte JEDE Audiowiedergabe
+
+Andi meldete: „es wird kein Audio ausgegeben, weder am PC noch auf dem iPhone".
+Das war kein Nebeneffekt der Sprachangabe von eben, sondern ein Fehler, den ich
+**zwei Auslieferungen vorher** eingebaut hatte.
+
+### Was passiert ist
+
+- **v125** (Wunsch #142, Stufe 5) schaltete die strenge CSP scharf.
+- **v126** (Wunsch #136) stellte die Wiedergabe von `new Audio(url)` auf
+  `fetch()` + `URL.createObjectURL(blob)` um – nötig, um ein aufgebrauchtes
+  Kontingent als HTTP 429 sauber melden zu können.
+
+Die CSP hatte kein eigenes `media-src`, also griff `default-src 'self'`. Eine
+`blob:`-Adresse ist davon **nicht** gedeckt. Ergebnis: Die Datei wurde erzeugt,
+korrekt ausgeliefert – und vom `<audio>`-Element mit Fehlercode 4 abgelehnt.
+Ohne sichtbare Meldung, auf **allen** Geräten, seit zwei Wochen.
+
+Behoben mit `media-src 'self' blob:`.
+
+### Was das über meine Diagnose von #149 sagt
+
+Andis Meldung „Dänisch funktioniert nicht" war mit hoher Wahrscheinlichkeit
+**genau dieser Fehler** – und nicht das, was ich untersucht habe. Er hatte an
+dem Tag Dänisch getestet; die Audiodateien entstanden dabei auch brav im
+Cache. Nur zu hören war nichts.
+
+Die fehlende Sprachangabe, die ich stattdessen gefunden und behoben habe, war
+trotzdem ein echter Defekt – aber sie war nicht sein Problem. Ich habe die
+Meldung zu schnell auf die interessantere Erklärung geschoben, statt zuerst
+die banale zu prüfen: *kommt überhaupt Ton heraus?* Der Server-seitige Test
+(„Datei wird erzeugt, ist gültiges WAV") hat mich darin bestätigt, obwohl er
+über die Wiedergabe nichts aussagt.
+
+### Warum es so lange unsichtbar blieb
+
+Drei Dinge kamen zusammen:
+
+1. Der Fehler tritt **nur bei scharfer CSP** auf – beim Entwickeln steht
+   `CSP_MODUS=aus`, dort funktioniert alles.
+2. Er erzeugt **keine Server-Fehlermeldung**: Aus Sicht des Portals wurde die
+   Datei erfolgreich ausgeliefert (HTTP 200).
+3. Die Wiedergabe scheitert **stumm** – `play()` lehnt ab, das Ergebnis landet
+   in einem `console.warn`, das niemand liest.
+
+Genau das Muster, das in dieser Sitzung schon dreimal Thema war. Diesmal habe
+ich es selbst gebaut.
+
+### Was daraus folgt
+
+Zwei Regressionstests: `media-src` muss existieren und `blob:` enthalten – in
+**jedem** Modus, auch im Beobachtungsmodus (sonst meldete die Report-Only-Regel
+jeden Abspielversuch als Verstoss und verdeckte echte Funde).
+
+Nachgeprüft, ob noch etwas anderes über `blob:`/`data:` läuft: nur die zwei
+Audio-Stellen (`vokabeln.html`, `vokabel_training.html`), beide jetzt gedeckt.
+`data:` für Bilder war schon erlaubt (QR-Code aus Stufe 6).
+
+Im Browser gegengeprüft: vorher sofort Fehlercode 4, jetzt kein Fehler mehr und
+`networkState: 2` (lädt normal). Dass es hörbar ist, kann nur ein sichtbares
+Fenster zeigen – das Chrome hier meldet sich als verborgen.
+
+182 Tests grün.
+
+---
+
+## 2026-08-07 – portal-v141: Wünsche #149 (Dänisch klang falsch) und #148 (Audio erkennbar)
+
+### #149 – die Meldung stimmte, die Vermutung nicht
+
+Gemeldet war: „Kann es sein, dass Dänisch für die Audio-Wiedergabe nicht
+funktioniert?" Die Prüfung ergab: **technisch funktionierte alles.** Für
+Dänisch lagen fünf Dateien im Cache, erzeugt am selben Tag, gültiges WAV,
+24 kHz mono, rund eine Sekunde – dieselben Werte wie bei Englisch. Auch
+Modell und Stimme waren identisch konfiguriert.
+
+Falsch war die **Aussprache**. Ans Modell ging bis dahin nur der nackte Text:
+
+```
+{"model": "...", "input": "God morgen", "voice": "Kore"}
+```
+
+Kein Wort über die Sprache. Bei „Hej", „ja" oder „God morgen" muss das Modell
+raten – und rät bei einer kleinen Sprache naheliegenderweise auf Englisch.
+Bei Englisch fiel das nie auf, weil die Vermutung dort zufällig stimmt.
+
+**Behoben** durch eine vorangestellte Sprachangabe: `Sprich auf Dänisch: God
+morgen`. Gemini-TTS versteht eine Anweisung vor dem Doppelpunkt als Stil- bzw.
+Sprachvorgabe und spricht sie nicht mit.
+
+Das habe ich nicht geglaubt, sondern gemessen: Eine Anweisung aus **13
+Wörtern** verlängerte das Ergebnis um **0,16 Sekunden**. Mitgesprochen wären
+es rund fünf gewesen. Vorher hatte ich noch geprüft, ob es einen sauberen
+Parameter gibt – `language: "da"` wird zwar ohne Fehler angenommen, ist aber
+im OpenAI-kompatiblen Sprach-Endpunkt gar nicht vorgesehen und wird
+höchstwahrscheinlich still verworfen. Deshalb der dokumentierte Weg über die
+Eingabe.
+
+Der Sprachname kommt aus der Datenbank, **nicht** aus einer Zuordnungstabelle
+im Code: So funktioniert es auch für Sprachen, die später jemand selbst
+anlegt, ohne dass hier etwas nachgepflegt werden muss.
+
+**Der Cache musste entwertet werden.** Die vorhandenen Dateien sind technisch
+einwandfrei und klingen trotzdem falsch – ohne Änderung am Schlüssel wären sie
+ewig weiterverwendet worden und der Fehler wäre behoben, aber weiter hörbar
+gewesen. Der Schlüssel trägt jetzt ein `v2:`. Die alten Dateien werden nicht
+gelöscht; sie fallen einfach heraus und kosten etwas Plattenplatz.
+
+Das Kontingent zählt weiterhin den **reinen** Text, nicht die Anweisung – sonst
+würde jede Vokabel plötzlich das Dreifache kosten, nur weil wir dem Modell
+etwas dazusagen.
+
+Live nachgemessen: Abruf liefert 200 und legt eine neue Datei unter dem
+v2-Schlüssel an; der Verbrauch stieg um 10 Zeichen („God morgen"), nicht um
+die Länge der Anweisung.
+
+**Was ich nicht prüfen kann:** wie es klingt. Das muss ein Ohr beurteilen.
+
+### #148 – erkennbar, wo die Aussprache schon bereitliegt
+
+Der 🔊-Knopf ist jetzt blass, solange es die Datei nicht gibt, und voll
+sichtbar, sobald sie vorliegt. Nach dem ersten Anhören schlägt er sofort um,
+ohne Neuladen – sonst bliebe er blass, obwohl die Aussprache längst da ist.
+
+Die Auskunft kommt aus dem **Dateisystem**, nicht aus einem Merker in der
+Datenbank: Der Cache ist die Wahrheit. Ein Merker könnte davon abweichen –
+etwa nach der gerade beschriebenen Entwertung – und würde dann zuverlässig das
+Falsche anzeigen.
+
+Bewusst über die Deckkraft statt über ein zweites Symbol: Die Zeile bleibt
+ruhig, der Unterschied ist trotzdem auf einen Blick da.
+
+180 Tests grün (10 neu).
+
+---
+
 ## 2026-08-07 – portal-v139: Wunsch #143 – Barcode scannen
 
 Kamera aufs Produkt, Name und Kategorie erscheinen, Nutzer prüft und speichert.

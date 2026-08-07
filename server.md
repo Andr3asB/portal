@@ -1462,6 +1462,26 @@ anhängen.
   KI-Extraktionspfade (URL- und Foto-Import) nutzen dieselbe Funktion - eine
   neue KI-gestützte Extraktion sollte das auch tun, statt eigenes Parsing zu
   schreiben.
+- **Wer eine Ressource ueber `blob:` oder `data:` laedt, muss die CSP
+  mitziehen.** `default-src 'self'` deckt beides NICHT ab. Die
+  Vokabel-Aussprache lief zwei Wochen lang ins Leere, weil `media-src` fehlte:
+  Datei erzeugt, HTTP 200 ausgeliefert, vom <audio>-Element mit Fehlercode 4
+  abgelehnt - ohne Server-Fehler, ohne sichtbare Meldung, auf allen Geraeten.
+  Der Fehler tritt NUR bei scharfer CSP auf; beim Entwickeln steht
+  `CSP_MODUS=aus`, dort faellt er nicht auf.
+- **TTS bekommt IMMER die Sprache mitgeteilt** (Wunsch #149,
+  `tts_eingabe()` in `00_kern.py`): Ohne Angabe raet das Modell und liegt bei
+  kleinen Sprachen daneben - gemeldet als "Daenisch funktioniert nicht",
+  tatsaechlich war es englisch ausgesprochenes Daenisch. Die Anweisung steht
+  VOR einem Doppelpunkt (`Sprich auf Daenisch: ...`) und wird von Gemini-TTS
+  als Stilvorgabe verstanden, nicht mitgesprochen (nachgemessen: 13 Woerter
+  Anweisung = +0,16 s). Der Sprachname kommt aus `vokabel_sprachen`, damit
+  spaeter angelegte Sprachen ohne Code-Aenderung funktionieren. Gezaehlt wird
+  weiter der reine Text, nicht die Anweisung.
+- **Aendert sich, WIE eine gecachte Datei erzeugt wird, muss der Cache-
+  Schluessel mitwandern** (Wunsch #149): `_audio_pfad()` traegt seither ein
+  `v2:`. Sonst blieben die alten, falsch klingenden Dateien fuer immer in
+  Benutzung - der Fehler waere behoben und trotzdem hoerbar.
 - **KI-Kontingente sind pro EINHEIT eine eigene Tabelle** (Wunsch #136):
   `ki_nutzung.tokens` (LLM-Text, `ki_anfrage()`) und `ki_tts_nutzung.zeichen`
   (Sprachausgabe, `ki_text_zu_sprache()`) dürfen nie in derselben Spalte
@@ -1801,6 +1821,10 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_tts_sprache.py` – Wunsch #149/#148: Sprachangabe geht ans Modell,
+  Kontingent zaehlt nur das Wort, Cache-Schluessel ist versioniert, gleiches
+  Wort teilt sich die Datei, verschiedene Sprachen nicht. Dazu die
+  Audio-Kennzeichnung aus #148.
 - `test_barcode.py` – Wunsch #143. Schwerpunkt ist die Ziffern-Pruefung (der
   Code geht in eine URL) - dieser Test hat den `$`/`\Z`-Fehler gefunden. Dazu
   die Produktabfrage mit vorgetaeuschten Antworten, die Pruefung der

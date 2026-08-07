@@ -960,6 +960,38 @@ def ki_stimme_fuer(sprache_id: int):
     return TTS_STANDARD_MODELL, TTS_STANDARD_STIMME
 
 
+def ki_sprachname(sprache_id: int) -> str:
+    """Name der Vokabel-Sprache, z. B. 'Dänisch'. Leer, wenn unbekannt."""
+    db = get_db()
+    row = db.execute(
+        "SELECT name FROM vokabel_sprachen WHERE id=?", (sprache_id,)
+    ).fetchone()
+    return row["name"] if row else ""
+
+
+def tts_eingabe(text: str, sprache_name: str) -> str:
+    """Baut die Eingabe fuers Sprachmodell - mit Sprachangabe (Wunsch #149).
+
+    Bis hierher ging der nackte Text ans Modell, ohne jeden Hinweis auf die
+    Sprache. Bei einem kurzen Wort wie "Hej" oder "God morgen" muss es dann
+    raten - und rät bei einer kleinen Sprache wie Daenisch naheliegenderweise
+    auf Englisch. Genau das war die Meldung "Daenisch funktioniert nicht":
+    Erzeugt wurde immer etwas, es klang nur falsch.
+
+    Gemini-TTS versteht eine vorangestellte Anweisung vor einem Doppelpunkt
+    als Stil-/Sprachvorgabe und spricht sie NICHT mit. Nachgemessen: eine
+    Anweisung aus 13 Woertern verlaengerte das Ergebnis um 0,16 Sekunden -
+    mitgesprochen waeren es rund fuenf gewesen.
+
+    Der Sprachname kommt aus der Datenbank, nicht aus einer Zuordnungstabelle
+    im Code: So funktioniert es auch fuer Sprachen, die spaeter jemand selbst
+    anlegt, ohne dass hier etwas nachgepflegt werden muss."""
+    name = (sprache_name or "").strip()
+    if not name:
+        return text
+    return f"Sprich auf {name}: {text}"
+
+
 def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens: int = 1500,
                bilder=None) -> str:
     """Generischer KI-Aufruf über OpenRouter – von jedem KI-Feature verwendbar.
@@ -1110,8 +1142,12 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
         raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
 
     modell, stimme = ki_stimme_fuer(sprache_id)
+    # Wunsch #149: Sprachangabe voranstellen - ohne sie raet das Modell.
+    # Gezaehlt wird weiterhin der REINE Text (len(text)), nicht die Anweisung:
+    # das Kontingent soll die Vokabeln messen, nicht unsere Formulierung.
+    eingabe = tts_eingabe(text, ki_sprachname(sprache_id))
     try:
-        audio = _tts_anfrage(text, modell, stimme, key, "mp3")
+        audio = _tts_anfrage(eingabe, modell, stimme, key, "mp3")
         _tts_nutzung_protokollieren(user_id, len(text))
         return audio, "audio/mpeg"
     except urllib.error.HTTPError as e:
@@ -1122,7 +1158,7 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
         raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")
 
     try:
-        pcm = _tts_anfrage(text, modell, stimme, key, "pcm")
+        pcm = _tts_anfrage(eingabe, modell, stimme, key, "pcm")
     except urllib.error.HTTPError as e:
         raise KiFehler(f"TTS-Fehler {e.code}: {e.read().decode()[:200]}")
     except Exception as e:

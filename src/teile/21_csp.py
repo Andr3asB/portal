@@ -53,6 +53,18 @@ bp = Blueprint("csp", __name__)
 _BASIS = (
     "default-src 'self'; "
     "img-src 'self' data:; "
+    # `blob:` ist Pflicht, nicht Bequemlichkeit: Die Vokabel-Aussprache wird
+    # per fetch() geholt (um ein aufgebrauchtes Kontingent, HTTP 429, sauber
+    # melden zu koennen) und dann als Blob abgespielt. Ohne eigenes
+    # `media-src` greift `default-src 'self'`, und eine blob:-Adresse ist
+    # davon NICHT gedeckt - das Audio-Element scheitert dann mit Fehlercode 4.
+    #
+    # Genau so ist es passiert: Die strenge CSP kam in v125, die Umstellung
+    # auf Blob-Wiedergabe in v126. Seither wurde die Datei zwar erzeugt und
+    # ausgeliefert, aber nie abgespielt - auf ALLEN Geraeten, ohne sichtbare
+    # Fehlermeldung. Wer hier etwas aendert: erst pruefen, ob eine Ressource
+    # ueber blob:/data: laeuft, sonst bricht sie lautlos weg.
+    "media-src 'self' blob:; "
     "connect-src 'self'; "
     "font-src 'self'; "
     "object-src 'none'; "

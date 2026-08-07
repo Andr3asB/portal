@@ -170,3 +170,30 @@ def test_meldeendpunkt_ueberlebt_muell(client):
     wäre ein Fehler in jeder Antwort, nicht nur in dieser."""
     assert client.post("/csp-bericht", data="kein json").status_code == 204
     assert client.post("/csp-bericht", json={"unerwartet": True}).status_code == 204
+
+
+def test_media_src_erlaubt_blob(client, admin, scharf):
+    """Regressionstest für einen Fehler, der zwei Wochen lang unsichtbar war.
+
+    Die Vokabel-Aussprache wird per `fetch()` geholt und als Blob abgespielt
+    (nötig, um ein aufgebrauchtes Kontingent als HTTP 429 melden zu können).
+    Ohne eigenes `media-src` greift `default-src 'self'` – und eine
+    `blob:`-Adresse ist davon NICHT gedeckt. Das Audio-Element scheitert dann
+    mit Fehlercode 4, ohne dass irgendwo eine Meldung erscheint.
+
+    Genau so passiert: strenge CSP in v125, Umstellung auf Blob-Wiedergabe in
+    v126. Danach wurde die Audiodatei zwar erzeugt und ausgeliefert, aber auf
+    KEINEM Gerät mehr abgespielt."""
+    antwort = client.get(f"/p/{admin['tokens']['home']}")
+    regel = antwort.headers["Content-Security-Policy"]
+    assert "media-src" in regel, "kein media-src – blob:-Audio wird blockiert"
+    media = [t for t in regel.split(";") if "media-src" in t][0]
+    assert "blob:" in media, f"blob: fehlt in {media.strip()!r}"
+
+
+def test_media_src_gilt_in_jedem_modus(client, admin, beobachten):
+    """Auch im Beobachtungsmodus – sonst meldete die Report-Only-Regel jeden
+    Abspielversuch als Verstoss und verdeckte echte Funde."""
+    antwort = client.get(f"/p/{admin['tokens']['home']}")
+    for kopf in ("Content-Security-Policy", "Content-Security-Policy-Report-Only"):
+        assert "media-src 'self' blob:" in antwort.headers[kopf], kopf

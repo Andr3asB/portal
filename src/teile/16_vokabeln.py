@@ -125,7 +125,13 @@ def _audio_pfad(sprache_id, text):
     hinweg) sich die Audiodatei teilen. Endung bewusst neutral (.audio):
     ki_text_zu_sprache() liefert je nach Modell MP3 oder WAV zurueck
     (siehe _audio_mimetype fuers Erkennen beim Ausliefern)."""
-    h = hashlib.sha256(f"{sprache_id}:{text.strip().lower()}".encode()).hexdigest()
+    # Wunsch #149: Das "v2:" entwertet alle vor der Sprachangabe erzeugten
+    # Dateien. Sie klingen falsch (das Modell hat die Sprache geraten), sind
+    # aber technisch einwandfrei - ohne Aenderung am Schluessel wuerden sie
+    # ewig weiterverwendet und der Fehler bliebe unsichtbar bestehen.
+    # Die alten Dateien werden nicht geloescht: Sie fallen einfach aus dem
+    # Cache und kosten nur etwas Plattenplatz.
+    h = hashlib.sha256(f"v2:{sprache_id}:{text.strip().lower()}".encode()).hexdigest()
     data_dir = current_app.config["DATA_DIR"]
     return os.path.join(data_dir, "vokabel_audio", str(sprache_id), f"{h}.audio")
 
@@ -194,6 +200,14 @@ def index(token):
         WHERE  v.user_id=?
         ORDER  BY v.erstellt DESC
     """, (user["id"],)).fetchall()
+    # Wunsch #148: Sichtbar machen, wofuer die Aussprache schon vorliegt.
+    # Geprueft wird die Datei im Cache, nicht ein Merker in der Datenbank -
+    # der Cache IST die Wahrheit (er ueberlebt keinen Datenverlust und wird
+    # von Wunsch #149 bewusst entwertet). Ein Datenbank-Flag koennte davon
+    # abweichen und wuerde dann das Falsche anzeigen.
+    vokabeln = [dict(v) for v in vokabeln]
+    for v in vokabeln:
+        v["audio_da"] = os.path.exists(_audio_pfad(v["sprache_id"], v["fremd"]))
     return render_template("vokabeln.html",
         user=user, token=token, farbe=user["farbe"],
         sprachen=sprachen, kapitel=kapitel, vokabeln=vokabeln)

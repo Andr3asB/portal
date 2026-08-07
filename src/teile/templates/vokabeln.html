@@ -59,6 +59,12 @@
 .vokabel-edit-btn, .vokabel-anhoeren-btn {
   background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2); flex-shrink:0;
 }
+/* Wunsch #148: Liegt die Aussprache schon als Datei vor, ist der Knopf voll
+   sichtbar - sonst blass. Bewusst ueber die Deckkraft und nicht ueber ein
+   zweites Symbol: Die Zeile bleibt ruhig, und der Unterschied ist trotzdem
+   auf einen Blick da. */
+.vokabel-anhoeren-btn { opacity:.35; }
+.vokabel-anhoeren-btn.audio-da { opacity:1; }
 .vokabel-edit-panel {
   display:none; flex-direction:column; gap:4px;
   margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
@@ -131,7 +137,9 @@
         <span class="vokabel-fremd">{{ v.fremd }}</span> – {{ v.deutsch }}
         <div class="vokabel-meta">{{ v.sprache_name }}{% if v.kapitel_namen %} · {{ v.kapitel_namen }}{% endif %}</div>
       </div>
-      <button class="vokabel-anhoeren-btn" type="button" data-klick="wortAnhoeren" data-args='[{{ v.id }}]' title="Anhören">🔊</button>
+      <button class="vokabel-anhoeren-btn{% if v.audio_da %} audio-da{% endif %}" type="button"
+              data-klick="wortAnhoeren" data-args='[{{ v.id }}]'
+              title="{{ 'Anhören (Aussprache liegt bereit)' if v.audio_da else 'Anhören (wird beim ersten Mal erzeugt)' }}">🔊</button>
       <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' title="Bearbeiten">✏️</button>
     </div>
 
@@ -242,6 +250,12 @@ async function wortAnhoeren(id) {
   anhoerenBlobUrl = URL.createObjectURL(await antwort.blob());
   anhoerenAudio = new Audio(anhoerenBlobUrl);
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
+
+  // Wunsch #148: Beim ersten Anhören wird die Datei erzeugt - der Knopf
+  // gehört ab jetzt zu den "liegt bereit"-Knöpfen. Ohne diese Zeile bliebe
+  // er bis zum nächsten Neuladen blass, obwohl die Aussprache längst da ist.
+  document.querySelector(`.vokabel-anhoeren-btn[data-args='[${id}]']`)
+          ?.classList.add('audio-da');
 }
 
 function toggleEdit(id) {
