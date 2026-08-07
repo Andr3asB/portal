@@ -2,6 +2,76 @@
 
 ---
 
+## 2026-08-08 – portal-v147: Wunsch #151 – Testspiele? Nein. Aber der Pokal fehlte.
+
+Der Wunsch fragt, ob es bei den Profis Testspiele gibt, die im Spielplan nicht
+auftauchen. Ich habe die Frage zuerst als Frage behandelt, nicht als Auftrag –
+und die Antwort ist zweigeteilt.
+
+### Testspiele gibt es nicht – bei handball.net
+
+Weder die API noch die Vereinsseite kennen sie: kein einziger Treffer für
+„Testspiel", „Freundschaft" oder „Vorbereitung", und im Spiel-Objekt existiert
+kein Feld, das eine Freundschaftsbegegnung ausweisen würde. handball.net führt
+ausschließlich Pflichtspiele. Da ist nichts zu holen und nichts freizuschalten –
+das ist keine Einstellung, die man umlegt, sondern eine Lücke der Quelle.
+
+### Gefehlt hat etwas anderes: der DHB-Pokal
+
+Beim Nachsehen kam heraus, dass tatsächlich ein Spiel fehlte, nur eben ein
+anderes als vermutet:
+
+    21.08.2026  TSB Heilbronn-Horkheim – TVB Stuttgart   [DHB-Pokal]
+
+Die Ursache ist unauffällig und deshalb erwähnenswert: **handball.net vergibt
+je Wettbewerb eine eigene Team-ID.** Derselbe TVB heißt in der Bundesliga
+`sr.competitor.6272-143352` und im Pokal `sr.competitor.6272-143228`. Die App
+fragte den Liga-Spielplan (kennt naturgemäß nur Ligaspiele) und
+`team/<id>/team-schedule` (hängt an der wettbewerbsgebundenen ID) – **beide
+konnten den Pokal gar nicht liefern.** Kein Fehler, kein Log, keine leere
+Liste: das Spiel war einfach nicht da.
+
+Genau deshalb fällt so etwas nur auf, wenn jemand von außen fragt. Ein Test
+hätte es nicht gefunden – es gab nichts, was falsch war, nur etwas, das nicht
+gefragt wurde.
+
+Der Vereins-Endpunkt `club/sr.competitor.6272/schedule` führt alle Wettbewerbe
+zusammen und ist jetzt die dritte Quelle für die Profis. Bei den Amateur- und
+Jugendmannschaften entfällt er – die hängen an einem anderen Vereinsobjekt
+(handball4all), für das es ihn nicht gibt.
+
+### Warum die Spiele nicht in einen eigenen Umschalter-Eintrag wandern
+
+Sie liegen unter derselben `team_id` wie die Ligaspiele. Für die Familie sind
+das „die Profis", keine zweite Mannschaft; ein Eintrag „TVB Stuttgart
+(DHB-Pokal)" neben „Profis" wäre technisch korrekt und im Alltag unsinnig.
+Die neue Spalte `wettbewerb` macht den Unterschied stattdessen dort sichtbar,
+wo er interessiert: als kleines Kennzeichen am einzelnen Spiel.
+
+Gekennzeichnet wird nur, was **vom Liga-Wettbewerb abweicht** – ein „DAIKIN
+HBL" an jeder der neun Ligabegegnungen wäre reines Rauschen. Der Ligenname
+wird dafür aus der Antwort gelesen statt konstant hinterlegt: er enthält den
+Sponsor und ändert sich planbar.
+
+Bestehende Zeilen bleiben bei `wettbewerb = NULL`. Welcher Wettbewerb es war,
+lässt sich nachträglich nicht rekonstruieren, und ein geratenes „DAIKIN HBL"
+wäre schlechter als keine Angabe – es sähe richtig aus.
+
+### Verifikation
+
+Neun neue Tests. Der erste hält bewusst den **Ist-Zustand** fest: der exakte
+ID-Vergleich übersieht das Pokalspiel. Ginge er eines Tages durch, hätte
+handball.net die IDs vereinheitlicht – dann sagt der Test Bescheid, statt dass
+die Erweiterung stillschweigend überflüssig weiterläuft. Die Gegenrichtung ist
+genauso abgedeckt: der Präfix darf keine fremden Vereine einsammeln, deren
+Nummer zufällig mit 6272 beginnt (`sr.competitor.62721` – der Bindestrich im
+Präfix ist die ganze Absicherung).
+
+Live von hier aus geprüft: 10 Spiele auf der Seite, genau **ein** Kennzeichen –
+das Pokalspiel. 207 Tests grün.
+
+---
+
 ## 2026-08-07 – portal-v145: Wunsch #150 – Vokabel-Kapitel teilen
 
 Geteilt wird das **Kapitel**, nicht die einzelne Vokabel: Eine später

@@ -265,7 +265,7 @@ abrufbar"-Kästchen erzeugt statt eines Fehlers.
 | Quelle | Genutzt von | Auth | Abruf | Anmerkung |
 |--------|-------------|------|-------|-----------|
 | hae-Server (`HAE_API_URL`, über Caddy-Relay `:2021`) | `14_sportschau.py` | `api-key`-Header aus `.env` | live je Seitenaufruf | Eigener Server im Haus, siehe „hae-Server-Relay" oben |
-| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | Inoffiziell: das ist der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufruft. Nur `table`, `schedule`, `team-schedule` existieren – **kein** Kader/Spieler-Endpunkt |
+| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | Inoffiziell: das ist der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufruft. Nur `table`, `schedule`, `team-schedule` existieren – **kein** Kader/Spieler-Endpunkt, und `club/<id>/schedule` (Wunsch #151, s.u.) |
 | Open Food Facts (`world.openfoodfacts.org/api/v2/product/<ean>.json`) | `10_einkauf.py` (Barcode-Erfassung, Wunsch #143) | keine | live je Scan, nichts gecacht | Freie Produktdatenbank, rund 420.000 Produkte fuer Deutschland. Unbekannte Codes beantwortet sie mit HTTP 404 - das ist der Normalfall bei Nicht-Lebensmitteln, kein Fehler. Der Code wird vorher gegen `\A[0-9]{6,14}\Z` geprueft, weil er in den Pfad der Abfrage eingesetzt wird |
 | HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net |
 
@@ -756,6 +756,22 @@ teile/
                        tvb_spiele: jedes bei einem Seitenaufruf gesehene
                        TVB-Spiel wird per UPSERT gespeichert, damit einmal
                        gesehene Ergebnisse dauerhaft sichtbar bleiben.
+                       Wunsch #151: dritte Quelle NUR fuer die Profis,
+                       `club/sr.competitor.6272/schedule` - der einzige
+                       Endpunkt, der alle Wettbewerbe zusammenfuehrt.
+                       handball.net vergibt je Wettbewerb eine eigene
+                       Team-ID (HBL -143352, DHB-Pokal -143228), deshalb
+                       konnten Liga- und Team-Spielplan den Pokal
+                       prinzipiell nicht liefern - er fehlte lautlos.
+                       Zuordnung ueber `_ist_vereins_spiel()` per Praefix
+                       `sr.competitor.6272-` (Bindestrich zwingend, sonst
+                       matcht sr.competitor.62721). Ablage unter derselben
+                       team_id wie die Ligaspiele (fuer die Familie sind
+                       das "die Profis", keine zweite Mannschaft);
+                       unterschieden wird ueber die Spalte `wettbewerb`,
+                       angezeigt nur bei Abweichung vom Ligennamen.
+                       Testspiele fuehrt handball.net NICHT - geprueft,
+                       kein Feld und kein Treffer auf der Vereinsseite.
                        Bewusst kein Cron-Job dafuer (Randfall "niemand
                        oeffnet die App an einem Spieltag" fuer eine
                        Familien-App hinnehmbar, siehe journal.md).
@@ -1343,7 +1359,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
 | `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
-| `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
+| `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), wettbewerb (Wunsch #151 – Name des Wettbewerbs; NULL bei Altbestand, weil nachtraeglich nicht rekonstruierbar), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
@@ -1834,6 +1850,13 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_tvb_wettbewerbe.py` – Wunsch #151. Der erste Test haelt bewusst den
+  IST-Zustand fest (der exakte ID-Vergleich uebersieht das Pokalspiel): geht er
+  eines Tages durch, hat handball.net die IDs vereinheitlicht und die
+  Erweiterung ist ueberfluessig - besser ein roter Test als eine still
+  ueberfluessige Sonderbehandlung. Dazu die Gegenrichtung (fremde Vereine mit
+  Praefix 62721) und dass die Wettbewerbsspalte die Speicherung ueberlebt -
+  der Spielplan liest aus tvb_spiele, nicht aus der API-Antwort.
 - `test_tts_sprache.py` – Wunsch #149/#148: Sprachangabe geht ans Modell,
   Kontingent zaehlt nur das Wort, Cache-Schluessel ist versioniert, gleiches
   Wort teilt sich die Datei, verschiedene Sprachen nicht. Dazu die

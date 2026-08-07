@@ -17,6 +17,11 @@
 .tvb-spiel-team { white-space:normal; word-break:break-word; }
 .tvb-spiel-team.tvb { font-weight:700; }
 .tvb-spiel-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
+/* Wunsch #151: kennzeichnet Spiele ausserhalb der Liga (z.B. DHB-Pokal). */
+.tvb-wettbewerb {
+  display:inline-block; padding:1px 6px; border-radius:8px; font-weight:600;
+  background:var(--fg-3, rgba(127,127,127,.18)); color:var(--text-1);
+}
 .tvb-spiel-ergebnis {
   font-size:16px; font-weight:700; white-space:nowrap; text-align:right; flex-shrink:0;
 }
@@ -131,6 +136,7 @@
           <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
           <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
           <div class="tvb-spiel-meta">
+            {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
             {{ s.spieltag }}{% if s.spieltag and s.ort %} · {% endif %}{{ s.ort }}
           </div>
         </div>
@@ -154,7 +160,10 @@
         <div class="tvb-spiel-teams">
           <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
           <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
-          <div class="tvb-spiel-meta">{{ s.spieltag }}</div>
+          <div class="tvb-spiel-meta">
+            {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
+            {{ s.spieltag }}
+          </div>
         </div>
         <div class="tvb-spiel-ergebnis{% if s.heim_tore is none %} offen{% endif %}">
           {% if s.heim_tore is not none and s.gast_tore is not none %}

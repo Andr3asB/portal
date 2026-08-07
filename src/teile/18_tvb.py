@@ -125,6 +125,9 @@ _TZ = ZoneInfo("Europe/Berlin")
 # https://www.handball.net/vereine/sr.competitor.6272 . Aendern sich vermutlich
 # nur bei einem Vereins-Rebrand oder einer neuen Saison mit neuer Team-ID.
 _TEAM_ID       = "sr.competitor.6272-143352"
+# Wunsch #151: die Vereins-ID OHNE Wettbewerbs-Suffix. Ueber sie laeuft der
+# einzige Endpunkt, der alle Wettbewerbe der Profis zusammenfuehrt.
+_CLUB_ID       = "sr.competitor.6272"
 _TOURNAMENT_ID = "sr.competition.149"
 _API_BASE      = "https://www.handball.net/a/sportdata/1/widgets"
 _HB_BASE       = "https://www.handball.net"
@@ -442,8 +445,9 @@ def _spiel_aus_roh(roh, team_id):
         "heim_tore": roh.get("homeGoals"),
         "gast_tore": roh.get("awayGoals"),
         "anstoss":   anstoss_utc.astimezone(_TZ).isoformat(),
-        "ort":       (roh.get("field") or {}).get("name"),
-        "status":    roh.get("state") or "Pre",
+        "ort":        (roh.get("field") or {}).get("name"),
+        "status":     roh.get("state") or "Pre",
+        "wettbewerb": (roh.get("tournament") or {}).get("name"),
     }
 
 
@@ -451,18 +455,50 @@ def _ist_eigenes_spiel(roh, team_id):
     return roh["homeTeam"]["id"] == team_id or roh["awayTeam"]["id"] == team_id
 
 
+def _ist_vereins_spiel(roh, club_id):
+    """Wunsch #151: Spiele DESSELBEN Vereins ueber Wettbewerbsgrenzen hinweg.
+
+    handball.net vergibt je Wettbewerb eine eigene Team-ID, angehaengt an die
+    Vereins-ID: `sr.competitor.6272-143352` ist der TVB in der DAIKIN HBL,
+    `sr.competitor.6272-143228` derselbe TVB im DHB-Pokal. `_ist_eigenes_spiel`
+    vergleicht exakt und laesst den Pokal deshalb liegen - genau der Grund,
+    warum das Pokalspiel bisher nirgends auftauchte. Der Bindestrich im
+    Praefix ist wichtig: ohne ihn wuerde `sr.competitor.62721` mitmatchen.
+    """
+    praefix = club_id + "-"
+    return any((roh[seite] or {}).get("id", "").startswith(praefix)
+               for seite in ("homeTeam", "awayTeam"))
+
+
 def _tvb_spiele_aktualisieren(db, spiele):
     """UPSERT gesehener Spiele nach tvb_spiele - siehe Docstring oben."""
     for s in spiele:
         db.execute("""
-            INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, aktualisiert_am)
-            VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now'))
+            INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, wettbewerb, aktualisiert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
                 spieltag=excluded.spieltag, heim_tore=excluded.heim_tore, gast_tore=excluded.gast_tore,
-                status=excluded.status, aktualisiert_am=excluded.aktualisiert_am
+                status=excluded.status, wettbewerb=excluded.wettbewerb,
+                aktualisiert_am=excluded.aktualisiert_am
         """, (s["id"], s["team_id"], s["spieltag"], s["heim"], s["gast"],
-              s["heim_tore"], s["gast_tore"], s["anstoss"], s["ort"], s["status"]))
+              s["heim_tore"], s["gast_tore"], s["anstoss"], s["ort"], s["status"],
+              s["wettbewerb"]))
     db.commit()
+
+
+def _haupt_wettbewerb(liga_antwort):
+    """Wunsch #151: Name des Wettbewerbs, der ohnehin ueberall draufsteht.
+
+    Nur Spiele, die davon ABWEICHEN, bekommen im Spielplan ein Kennzeichen -
+    ein "DAIKIN HBL" an jeder einzelnen Ligabegegnung waere reines Rauschen.
+    Der Name wird aus der Antwort gelesen statt konstant hinterlegt, damit er
+    einen Sponsorenwechsel im Ligennamen ohne Codeaenderung mitmacht.
+    """
+    for roh in ((liga_antwort or {}).get("schedule") or {}).get("data") or []:
+        name = (roh.get("tournament") or {}).get("name")
+        if name:
+            return name
+    return None
 
 
 def _tabelle_aufbereiten(tabelle_antwort, team_name):
@@ -535,6 +571,15 @@ def index(token):
     liga_antwort = _handball_net_get(f"tournament/{turnier_id}/schedule") if turnier_id else None
     tabelle_antwort = _handball_net_get(f"tournament/{turnier_id}/table") if turnier_id else None
 
+    # Wunsch #151: Bei den Profis zusaetzlich den VEREINS-Spielplan holen. Der
+    # Liga-Spielplan kennt naturgemaess nur Ligaspiele, `team-schedule` haengt
+    # an der wettbewerbsgebundenen Team-ID - beide koennen den DHB-Pokal gar
+    # nicht liefern. Nur der Vereins-Endpunkt fuehrt alle Wettbewerbe zusammen.
+    # Bei den Amateurmannschaften entfaellt das: die haengen an einem anderen
+    # Vereinsobjekt (handball4all), fuer das es diesen Endpunkt nicht gibt.
+    verein_antwort = (_handball_net_get(f"club/{_CLUB_ID}/schedule")
+                      if gewaehlt["ist_profi"] else None)
+
     fehler_spiele  = team_antwort is None and liga_antwort is None
     fehler_tabelle = turnier_id is not None and tabelle_antwort is None
 
@@ -544,6 +589,13 @@ def index(token):
             continue
         for roh in antwort["schedule"]["data"]:
             if _ist_eigenes_spiel(roh, team_id):
+                gesehene_spiele.append(_spiel_aus_roh(roh, team_id))
+    if verein_antwort:
+        # Bewusst unter der HBL-team_id ablegen: fuer die Familie ist das
+        # "die Profis", nicht "eine zweite Mannschaft". Die Wettbewerbsspalte
+        # macht den Unterschied sichtbar, ohne den Umschalter aufzublaehen.
+        for roh in (verein_antwort.get("schedule") or {}).get("data") or []:
+            if _ist_vereins_spiel(roh, _CLUB_ID):
                 gesehene_spiele.append(_spiel_aus_roh(roh, team_id))
     if gesehene_spiele:
         _tvb_spiele_aktualisieren(db, gesehene_spiele)
@@ -572,6 +624,7 @@ def index(token):
         kopf_verein=kopf_verein, kopf_liga=kopf_liga,
         fehler_spiele=fehler_spiele, fehler_tabelle=fehler_tabelle,
         vergangene=vergangene, kommende=kommende,
+        haupt_wettbewerb=_haupt_wettbewerb(liga_antwort),
         tabelle=_tabelle_aufbereiten(tabelle_antwort, gewaehlt["name"]),
     )
 

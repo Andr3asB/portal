@@ -327,6 +327,7 @@ CREATE TABLE IF NOT EXISTS tvb_spiele (
   anstoss         TEXT    NOT NULL,
   ort             TEXT,
   status          TEXT    NOT NULL,
+  wettbewerb      TEXT,
   aktualisiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS tvb_mannschaften (
@@ -1494,6 +1495,19 @@ def _init_db(app):
             ("sr.competitor.6272-143352",),
         )
         db.commit()
+
+        # Wunsch #151: Bisher zeigte die App nur Bundesliga-Spiele, weil nur der
+        # HBL-Spielplan abgefragt wurde - der DHB-Pokal fiel stillschweigend
+        # heraus. Jetzt kommt der Wettbewerbsname mit, damit sich ein
+        # Pokalspiel im Spielplan auch als solches zu erkennen gibt.
+        # Bestehende Zeilen bleiben NULL: welcher Wettbewerb es war, laesst
+        # sich nachtraeglich nicht rekonstruieren, und ein geratenes
+        # "DAIKIN HBL" waere schlechter als gar keine Angabe.
+        try:
+            db.execute("ALTER TABLE tvb_spiele ADD COLUMN wettbewerb TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
 
         # Wunsch #124: Altersklasse je Mannschaft, damit sich Jugendklassen
         # pro Nutzer ausblenden lassen. tvb_mannschaften ist ein reiner Cache
