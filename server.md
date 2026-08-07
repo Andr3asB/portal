@@ -1752,6 +1752,11 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_push.py` – haelt `PUSH_TTL > 0` fest. Ohne `ttl` schickt `pywebpush`
+  TTL 0, und Microsofts WNS (Windows/Edge) verwirft die Nachricht mit HTTP 400
+  ("Ttl value conflicts with X-WNS-Cache-Policy"). Apple/Google stoert das
+  nicht - der Fehler betraf jahrelang nur ein Geraet und aeusserte sich als
+  "da kommt halt nichts". Gegengeprueft: ohne ttl schlaegt der Test an.
 - `test_zugang_einmalig.py` – Wunsch #140 Stufe 6. Der wichtigste Test ist
   `test_der_angezeigte_link_funktioniert_wirklich`: Ein Link, der zwar
   angezeigt wird, aber nicht traegt, waere der schlimmste Fehler dieser Stufe -

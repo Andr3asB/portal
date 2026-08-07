@@ -307,7 +307,8 @@ Konto; der ist wieder gelöscht.
 | S6-01 | Alle vier Zugänge nacheinander öffnen | alle 4 | Jeder kommt in seine Apps | | |
 | S6-02 | Esszimmer-Bildschirm | Kiosk | Läuft unverändert | | |
 | S6-03 | In der Verwaltung nachsehen | A-PC | Es werden **keine** Zugangsadressen mehr im Klartext angezeigt | | |
-| S6-06 | **Push-Benachrichtigung:** jemandem eine Aufgabe zuweisen, auf dessen Gerät die Meldung antippen | 2 Geräte | Die Aufgabenliste öffnet sich. (Die Adresse in der Meldung kam früher aus dem Token – den gibt es nicht mehr, deshalb eigens prüfen) | | |
+| S6-06 | **Push-Benachrichtigung antippen.** Ich schicke dir eine Testmeldung (`manage.py testpush 1`) – oder du sagst Bescheid, dann jederzeit wieder. Meldung auf dem Handy antippen. | A-Handy | Die Aufgabenliste öffnet sich. (Die Adresse in der Meldung kam früher aus dem Token – den gibt es nicht mehr) | | |
+| S6-07 | **Windows-Rechner neu anmelden:** Portal am PC öffnen, Benachrichtigungen einmal aktivieren. Dann sag Bescheid, ich schicke eine Testmeldung. | A-PC | Die Meldung kommt am PC an. Bis eben scheiterte Push an Windows still (TTL-Fehler, behoben in v134); der Push-Kanal des PCs war zudem abgelaufen und wurde entfernt | | |
 | S6-04 | Bei einem Nutzer **„Neuer Zugang + QR"** (der Knopf hieß vorher „Zugänge neu"), QR sofort scannen | Kind | Neuer Zugang funktioniert; der alte Link des Kindes geht danach nicht mehr | | |
 | S6-05 | Verwaltung neu laden und denselben QR nochmal suchen | A-PC | Ist nicht mehr abrufbar – nur direkt nach dem Erzeugen (so gewollt) | | |
 

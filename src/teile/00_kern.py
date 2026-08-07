@@ -798,6 +798,22 @@ def bereinige_erfuellte_rezeptwuensche(db):
     db.commit()
 
 
+# Wie lange der Push-Dienst die Nachricht aufhebt, wenn das Geraet gerade
+# offline ist. Ein Tag - eine zugewiesene Aufgabe ist auch am Abend noch
+# interessant, laenger aber nicht.
+#
+# WICHTIG, nicht auf 0 setzen: `pywebpush` schickt ohne dieses Argument
+# TTL 0, und Microsofts Push-Dienst (WNS, Windows/Edge) LEHNT DAS AB -
+# "Ttl value conflicts with X-WNS-Cache-Policy", HTTP 400, Nachricht
+# verworfen. Apple und Google stoert TTL 0 nicht, deshalb ist das jahrelang
+# niemandem aufgefallen: Auf den iPhones kamen die Meldungen an, auf dem
+# Windows-Rechner nie - und push_send() protokolliert einen Fehlschlag nur,
+# ohne dass ihn jemand sieht. Gefunden erst, als `manage.py testpush`
+# (Wunsch #140, Stufe 6, Pruefpunkt S6-06) die Zustellung je Geraet einzeln
+# ausgab.
+PUSH_TTL = 86400
+
+
 def push_send(user_id: int, title: str, body: str,
               app_slug: str = "", url: str = "", dedup_key: str = ""):
     """Push-Benachrichtigung an alle Geräte von user_id. Nicht-blockierend (Thread)."""
@@ -834,6 +850,7 @@ def push_send(user_id: int, title: str, body: str,
                         data=payload,
                         vapid_private_key=private_key,
                         vapid_claims={"sub": subject},
+                        ttl=PUSH_TTL,
                     )
                 except WebPushException as e:
                     log.warning("push failed user=%d: %s", user_id, e)

@@ -2,6 +2,75 @@
 
 ---
 
+## 2026-08-07 – portal-v133/v134: Push-Test-Werkzeug – und ein jahrelang unbemerkter Fehler
+
+Andi fragte, wie sich prüfen lässt, ob Push-Benachrichtigungen ankommen (S6-06
+im Prüfplan). Ein Werkzeug dafür gab es nicht – man hätte jemandem eine echte
+Aufgabe zuweisen müssen. Jetzt gibt es zwei Befehle:
+
+```
+docker exec portal python manage.py listpush            # welche Geräte sind angemeldet
+docker exec portal python manage.py testpush 1 "Text"   # Testmeldung an einen Nutzer
+```
+
+`testpush` verschickt bewusst **dieselbe Ziel-Adresse** wie eine echte
+Aufgaben-Benachrichtigung (`/a/todo/`, token-frei) – sonst prüfte der Test
+etwas anderes als den Ernstfall. Und es meldet die Zustellung **je Gerät
+einzeln**. Genau das hat den Fehler unten sichtbar gemacht.
+
+### Push an Windows/Edge ist seit jeher still gescheitert
+
+Der erste Testlauf: zwei iPhones zugestellt, das Windows-Gerät **HTTP 400**.
+Die Antwort von Microsofts Push-Dienst war eindeutig:
+
+```
+X-WNS-ERROR-DESCRIPTION: Ttl value conflicts with X-WNS-Cache-Policy.
+X-WNS-STATUS: dropped
+```
+
+`pywebpush` schickt ohne `ttl`-Argument **TTL 0**. Apple und Google stört das
+nicht, Microsofts WNS lehnt es ab und verwirft die Nachricht. Gegengeprüft:
+derselbe Aufruf mit `ttl=86400` wurde sofort zugestellt.
+
+Behoben mit `PUSH_TTL = 86400` (ein Tag – eine zugewiesene Aufgabe ist auch am
+Abend noch interessant, länger nicht) in `push_send()` und in `testpush`.
+
+**Warum das niemandem aufgefallen ist:** Auf den vier iPhones der Familie kamen
+die Meldungen an. Nur der Windows-Rechner bekam nie eine – und `push_send()`
+protokolliert einen Fehlschlag lediglich per `log.warning`, ohne dass ihn
+jemand liest. Ein Fehler, der nur ein Gerät betrifft und sich als "da kommt halt
+nichts" äußert, wird nicht gemeldet, sondern hingenommen.
+
+Das ist derselbe Fehlertyp wie schon zweimal in diesem Umbau: etwas scheitert
+still. Deshalb gibt `testpush` die Zustellung je Gerät aus, statt nur "fertig"
+zu melden.
+
+### Der Windows-Zugang muss neu angemeldet werden
+
+Nach dem Fix kam vom Windows-Gerät **HTTP 410 (Gone)** – der Push-Kanal selbst
+ist inzwischen abgelaufen (WNS-Kanäle verfallen, wenn sie länger nicht
+erneuert werden). Der Code hat das Abo daraufhin korrekt entfernt, wie
+`push_send()` es auch tut.
+
+Für Andi heißt das: Auf dem Windows-Rechner das Portal öffnen und
+Benachrichtigungen einmal neu aktivieren. Erst dann lässt sich belegen, dass
+Windows-Push jetzt wirklich funktioniert – der Fehler ist behoben, das Gerät
+aber noch nicht wieder angemeldet.
+
+### Drei neue Tests
+
+- `test_push_setzt_eine_ttz_groesser_null` – der eigentliche Wächter.
+  Gegengeprüft: ohne `ttl` schlägt er an.
+- `test_push_ohne_vapid_key_versendet_nichts` – die Testumgebung hat keinen
+  Schlüssel, da darf nichts rausgehen und nichts krachen.
+- `test_push_zieladresse_ist_tokenfrei` – Stufe 6: Stünde in der
+  Benachrichtigung wieder ein Token, landete er über diesen Weg erneut
+  außerhalb des Portals.
+
+132 Tests grün. Ausgeliefert als v133/v134.
+
+---
+
 ## 2026-08-07 – portal-v131: Wunsch #140, Stufe 6 – Tokens nur noch als Prüfsumme
 
 Letzte der sechs Stufen. `token_enc` ist aus `grants` verschwunden; in der

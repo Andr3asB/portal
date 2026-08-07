@@ -12,6 +12,8 @@ Aufruf im Container:
   docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
+  docker exec portal python manage.py listpush
+  docker exec portal python manage.py testpush 1 "Test von Andi"
 """
 import os, sys, sqlite3, secrets, base64, hashlib, hmac
 from pathlib import Path
@@ -336,6 +338,116 @@ def cmd_listki(_):
     db.close()
 
 
+def cmd_listpush(_):
+    """Wer hat welche Geräte für Benachrichtigungen angemeldet?"""
+    db = connect()
+    rows = db.execute("""
+        SELECT u.id, u.name, p.geraet, p.endpoint
+        FROM   push_abos p JOIN users u ON u.id = p.user_id
+        ORDER  BY u.id, p.id
+    """).fetchall()
+    db.close()
+    if not rows:
+        print("  Keine Push-Abos vorhanden.")
+        return
+    for r in rows:
+        # Der Endpunkt ist geraetespezifisch und gehoert nicht vollstaendig
+        # ins Protokoll - die ersten Zeichen genuegen zum Unterscheiden.
+        dienst = r["endpoint"].split("/")[2] if "//" in r["endpoint"] else "?"
+        geraet = (r["geraet"] or "")[:60]
+        print(f"  ID {r['id']:3}  {r['name']:12} {dienst:32} {geraet}")
+
+
+def cmd_testpush(args):
+    """Schickt eine Test-Benachrichtigung an alle Geräte eines Nutzers.
+
+    Verwendung: testpush <user_id> [Text]
+
+    Gedacht für S6-06 im Prüfplan: Seit Wunsch #140 Stufe 6 kann die
+    Ziel-Adresse einer Push-Nachricht nicht mehr aus einem Klartext-Token
+    gebaut werden (den gibt es nicht mehr) - sie ist token-frei und hängt am
+    Sitzungs-Cookie des Geräts. Ob das Antippen wirklich in der Aufgabenliste
+    landet, lässt sich nur auf einem echten Gerät sehen, und dafür sollte man
+    niemandem erst eine echte Aufgabe zuweisen müssen.
+
+    Verschickt wird bewusst dieselbe Ziel-Adresse wie bei einer echten
+    Aufgaben-Benachrichtigung, sonst prüfte der Test etwas anderes als den
+    Ernstfall.
+    """
+    if not args:
+        sys.exit("Verwendung: testpush <user_id> [Text]")
+    try:
+        user_id = int(args[0])
+    except ValueError:
+        sys.exit("user_id muss eine Zahl sein (siehe: listusers)")
+    text = " ".join(args[1:]) or "Wenn du das liest, kommen Benachrichtigungen an."
+
+    private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
+    if not private_key:
+        sys.exit("VAPID_PRIVATE_KEY fehlt in der Umgebung - ohne den Schluessel "
+                 "kann keine Benachrichtigung verschickt werden.")
+    subject = os.environ.get("VAPID_SUBJECT", "mailto:portal@16schwaben.de")
+
+    db = connect()
+    nutzer = db.execute("SELECT name FROM users WHERE id=?", (user_id,)).fetchone()
+    if not nutzer:
+        db.close()
+        sys.exit(f"Kein Nutzer mit ID {user_id} (siehe: listusers)")
+    abos = db.execute(
+        "SELECT id, endpoint, p256dh, auth, geraet FROM push_abos WHERE user_id=?",
+        (user_id,),
+    ).fetchall()
+    if not abos:
+        db.close()
+        sys.exit(f"{nutzer['name']} hat kein Geraet fuer Benachrichtigungen "
+                 "angemeldet (im Portal ueber das Menue aktivieren).")
+
+    import json
+    from pywebpush import webpush, WebPushException
+
+    payload = json.dumps({
+        "title": "Test 🔔",
+        "body":  text,
+        # Dieselbe Adresse, die 04_todo.py fuer echte Aufgaben verwendet.
+        "url":   "https://portal.16schwaben.de/a/todo/",
+        "app":   "todo",
+    })
+
+    ok = fehler = 0
+    for abo in abos:
+        geraet = (abo["geraet"] or "")[:40]
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": abo["endpoint"],
+                    "keys": {"p256dh": abo["p256dh"], "auth": abo["auth"]},
+                },
+                data=payload,
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
+                # Ohne ttl schickt pywebpush 0 - Microsofts WNS lehnt das mit
+                # HTTP 400 ab ("Ttl value conflicts with X-WNS-Cache-Policy").
+                # Gleicher Wert wie PUSH_TTL in 00_kern.py.
+                ttl=86400,
+            )
+            print(f"  OK       {geraet}")
+            ok += 1
+        except WebPushException as e:
+            code = e.response.status_code if e.response is not None else "?"
+            print(f"  FEHLER   {geraet}  (HTTP {code})")
+            if e.response is not None and e.response.status_code in (404, 410):
+                # Abgelaufenes Abo - genau wie push_send() es auch aufraeumt,
+                # sonst sammeln sich tote Geraete an.
+                db.execute("DELETE FROM push_abos WHERE id=?", (abo["id"],))
+                db.commit()
+                print("           -> abgelaufen, Abo entfernt")
+            fehler += 1
+    db.close()
+    print(f"\n  {ok} zugestellt, {fehler} fehlgeschlagen.")
+    if ok:
+        print("  Antippen der Meldung muss die Aufgabenliste oeffnen (S6-06).")
+
+
 def cmd_listapps(_):
     """Nur lesend - offline_faehig ist eine Code-/Deploy-Entscheidung, kein
     per manage.py frei umschaltbares Admin-Setting (siehe 00_kern.py)."""
@@ -360,6 +472,8 @@ CMDS = {
     "ki_stimme":       cmd_ki_stimme,
     "listki":          cmd_listki,
     "listapps":        cmd_listapps,
+    "listpush":        cmd_listpush,
+    "testpush":        cmd_testpush,
 }
 
 if __name__ == "__main__":
