@@ -2,6 +2,86 @@
 
 ---
 
+## 2026-08-07 – portal-v135/v136: Wünsche #146 (Live-Liste) und #147 (fehlende Icons)
+
+### #147 – neun fehlende Icons, nicht eines
+
+Gemeldet war: „Das Icon vom Kassenbuch lädt nicht unter Linux." Die Prüfung
+über alle Vorlagen und alle App-Emoji ergab **neun** fehlende
+Twemoji-Grafiken – acht davon aus den Änderungen der Tage davor, alle
+unbemerkt: 🆘 🏁 🐷 👀 📥 📲 🔑 🔖 🧾.
+
+`twemoji.parse()` ersetzt jedes Emoji durch ein lokal gebündeltes SVG. Fehlt
+die Datei, bleibt unter Linux/Chrome eine leere Kachel – unter iOS/macOS
+springen dagegen oft die System-Emoji ein, weshalb es dort nicht auffällt.
+Genau deshalb konnte sich das ansammeln.
+
+`server.md` warnte bereits ausdrücklich davor (Stolperfalle aus Wunsch #122,
+◀ ▶). Die Warnung hat es nicht verhindert – **eine Warnung in der
+Dokumentation ist kein Wächter.** Der eigentliche Auftrag des Wunsches
+(„merk dir das für die Zukunft") ist deshalb als Test umgesetzt:
+`tests/test_emoji.py` prüft jedes in Vorlagen und Code verwendete Emoji sowie
+jedes App-Emoji aus der Datenbank gegen das Bündel. Gegengeprüft: ohne die
+Datei schlägt er an.
+
+Zwei Sicherungen gegen einen Test, der stillschweigend nichts prüft: das
+SVG-Verzeichnis muss existieren und mehr als 50 Dateien haben, und es müssen
+mehr als 100 Emoji gefunden werden.
+
+### #146 – die Liste aktualisiert sich jetzt wirklich live
+
+Vorher gab es den Mechanismus schon (Wunsch #100), aber mit genau den zwei
+Lücken, die der neue Wunsch benennt: Takt **30 Sekunden** statt 10, und der
+**Einkaufsmodus war ausdrücklich ausgenommen** – aus gutem Grund, denn ein
+`location.reload()` mitten im Laden hätte Scrollposition, Modus und die
+5-Sekunden-Rücknahme zerrissen.
+
+Die Lösung ist deshalb nicht „Guard entfernen und Takt runter", sondern: **es
+wird gar nicht mehr neu geladen.** Die Seite wird erneut vom Server geholt und
+nur der Container `#einkauf-liste` ersetzt.
+
+Warum so und nicht per JSON + Neuaufbau im Javascript:
+- Die Darstellung bleibt an **einer** Stelle (den Jinja-Vorlagen). Eine zweite
+  Render-Logik im Frontend würde früher oder später auseinanderlaufen.
+- Die Knöpfe in den frischen Karten funktionieren **sofort**, weil sie seit
+  Wunsch #142 am delegierten Verteiler in `base.html` hängen und nicht an
+  eigenen Listenern. Der CSP-Umbau zahlt sich hier unerwartet aus.
+
+Nach dem Austausch werden Marktfilter (Einkaufsmodus) bzw. der normale Filter
+wieder angewandt – die frischen Karten wissen davon nichts.
+
+Es wird bewusst **nicht** ausgetauscht, solange etwas Eigenes in der Schwebe
+ist: offene Eingabe, laufende 5-Sekunden-Rücknahme (`PENDING_MOVE`), oder eine
+noch nicht übertragene Offline-Aktion. Sonst verschwände die eigene Arbeit
+unter dem Finger.
+
+**Live im Browser nachgemessen**, im aktiven Einkaufsmodus: Kartenzahl 11 → 12,
+Einkaufsmodus weiter aktiv, Leiste sichtbar, Scrollposition unverändert
+(300 px), kein Neuladen (`performance.now()` lief durch).
+
+**Beinahe-Fehler:** Ich hatte die Funktion zum Auslesen der Offline-Warte-
+schlange aus dem Gedächtnis `ladeWarteschlange()` genannt – sie heißt
+`holeWarteschlange()`. Das wäre ein `ReferenceError` im 10-Sekunden-Takt
+gewesen, der die Synchronisierung still lahmgelegt hätte. Beim Nachsehen im
+Quelltext aufgefallen, nicht beim Testen.
+
+### Nebenbei: ein verschwundener Zugang
+
+Die Regression nach der Auslieferung meldete 49/50 statt 50/50 – Andis
+Tierbaukasten-Zugang fehlte. Nachgeprüft: Nur `revoke_app` löscht Grants, also
+ein bewusster Klick auf einen Grant-Chip in der Verwaltung. Das passt zu
+**S5-11** („Verwaltung: App freischalten"): Ein Klick auf einen *aktiven* Chip
+entzieht die App. Beim Durchprobieren der Chips ist der Zugang wohl abgeschaltet
+und nicht wieder eingeschaltet worden. Kein Code-Fehler; wiederhergestellt.
+
+Erwähnenswert ist es trotzdem: Genau dafür läuft die Regression nach jeder
+Auslieferung. Ohne sie wäre der fehlende Zugang erst aufgefallen, wenn jemand
+den Tierbaukasten gesucht hätte.
+
+137 Tests grün.
+
+---
+
 ## 2026-08-07 – portal-v133/v134: Push-Test-Werkzeug – und ein jahrelang unbemerkter Fehler
 
 Andi fragte, wie sich prüfen lässt, ob Push-Benachrichtigungen ankommen (S6-06

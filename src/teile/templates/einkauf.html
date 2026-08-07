@@ -266,6 +266,10 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     <div class="filter-hinweis">Bei ausgewähltem Markt werden nur Artikel gezeigt, die dort im Angebot sind.</div>
   </div>
 
+  {# Wunsch #146: Die Liste steckt in einem eigenen Container, damit sie sich
+     im laufenden Betrieb austauschen laesst, ohne die Seite neu zu laden -
+     Scrollposition, Einkaufsmodus und offene Eingaben bleiben so erhalten. #}
+  <div id="einkauf-liste">
   {% set has_items = namespace(v=false) %}
   {% for kat in kategorien %}
     {% if gruppen[kat.id] %}
@@ -296,6 +300,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     {% for item in erledigt %}{{ item_card(item, token, laeden, kategorien) }}{% endfor %}
   </div>
   {% endif %}
+  </div>{# /einkauf-liste #}
 
 </main>
 
@@ -616,21 +621,67 @@ function hatUngespeicherteEingabe() {
   return [...document.querySelectorAll('.edit-panel')].some(p => p.style.display === 'flex');
 }
 
+// Wunsch #146: Die Liste im laufenden Betrieb austauschen, statt die Seite
+// neu zu laden.
+//
+// Bis eben galt: bei einer Aenderung `location.reload()`, und im
+// Einkaufsmodus GAR NICHT (der Reload haette mitten im Laden Scrollposition,
+// Modus und die 5-Sekunden-Ruecknahme zerrissen). Genau das bemaengelt der
+// Wunsch: "auch im Einkaufsmodus", "volle Dynamik".
+//
+// Statt die Liste im Javascript neu zu bauen, wird die Seite noch einmal vom
+// Server geholt und nur `#einkauf-liste` ersetzt. Das hat drei Vorteile:
+// die Darstellung bleibt an EINER Stelle (den Jinja-Vorlagen), es gibt keine
+// zweite Render-Logik, die auseinanderlaufen kann - und die Knoepfe in den
+// ausgetauschten Karten funktionieren sofort, weil sie seit Wunsch #142 am
+// delegierten Verteiler in base.html haengen und nicht an eigenen Listenern.
+async function listeAustauschen() {
+  const antwort = await fetch(location.href, { headers: { 'X-Requested-With': 'fetch' } });
+  if (!antwort.ok) return false;
+  const html = await antwort.text();
+  const neu = new DOMParser().parseFromString(html, 'text/html')
+                             .getElementById('einkauf-liste');
+  const alt = document.getElementById('einkauf-liste');
+  if (!neu || !alt) return false;
+
+  alt.replaceWith(neu);
+
+  // Sichtbarkeit wiederherstellen: die frischen Karten wissen nichts vom
+  // aktiven Filter und nichts vom Einkaufsmodus.
+  if (document.body.classList.contains('einkaufsmodus') && einkaufsmodusMarktId) {
+    neu.querySelectorAll('.item-card').forEach(card => {
+      const istAngebot = card.dataset.angebot === '1';
+      const eigeneMaerkte = (card.dataset.laeden || '').split(',').filter(Boolean);
+      card.style.display = (!istAngebot || eigeneMaerkte.includes(einkaufsmodusMarktId)) ? '' : 'none';
+    });
+    aktualisiereKatLabels();
+  } else {
+    wendeFilterAn();
+  }
+  return true;
+}
+
 async function pruefeStandUndSynchronisiere() {
-  // Waehrend des Einkaufsmodus im Laden nicht durch einen Reload stoeren.
-  if (document.body.classList.contains('einkaufsmodus')) return;
+  // Nicht eingreifen, solange etwas Eigenes in der Schwebe ist: eine offene
+  // Eingabe, eine noch nicht uebertragene Offline-Aktion oder eine Karte in
+  // der 5-Sekunden-Ruecknahme. Sonst verschwaende die eigene Arbeit unter
+  // dem Finger.
+  if (hatUngespeicherteEingabe()) return;
+  if (PENDING_MOVE.size > 0) return;
+  if (holeWarteschlange().length > 0) return;
   try {
     const resp = await fetch(`/a/einkauf${TP}stand`);
     const d = await resp.json();
-    if (d.stand && d.stand !== einkaufStandBekannt && !hatUngespeicherteEingabe()) {
-      location.reload();
+    if (d.stand && d.stand !== einkaufStandBekannt) {
+      if (await listeAustauschen()) einkaufStandBekannt = d.stand;
     }
   } catch (e) {
     // Offline oder Fehler - beim naechsten Versuch klappt es wieder.
   }
 }
 
-setInterval(pruefeStandUndSynchronisiere, 30000);
+// Wunsch #146: "spaetestens nach 10 Sekunden".
+setInterval(pruefeStandUndSynchronisiere, 10000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') pruefeStandUndSynchronisiere();
 });

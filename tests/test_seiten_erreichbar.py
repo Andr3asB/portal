@@ -249,3 +249,15 @@ def test_leerer_token_wird_nicht_als_none_gerendert(app, client, admin, stufe4):
         text = client.get(pfad).get_data(as_text=True)
         assert "'None'" not in text and '"None"' not in text, \
             f"{pfad}: None als Zeichenkette in der Seite"
+
+
+def test_einkauf_hat_den_container_fuer_die_live_aktualisierung(client, admin):
+    """Wunsch #146: `#einkauf-liste` ist der Anker, den `listeAustauschen()`
+    ersetzt. Verschwindet oder verrutscht er, hört die Liste still auf, sich
+    zu aktualisieren – und niemand merkt es, weil die Seite ansonsten normal
+    aussieht."""
+    seite = client.get(f"/a/einkauf/{admin['tokens']['einkauf']}/").get_data(as_text=True)
+    assert seite.count('id="einkauf-liste"') == 1
+    # Der Fingerabdruck muss ebenfalls eingebettet sein, sonst vergleicht das
+    # Frontend gegen einen leeren Wert und tauscht bei jedem Durchlauf.
+    assert "einkaufStandBekannt = '" in seite

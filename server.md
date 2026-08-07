@@ -1752,6 +1752,12 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_emoji.py` – Wunsch #147: jedes in Vorlagen/Code verwendete Emoji und
+  jedes App-Emoji aus der Datenbank muss eine lokale Twemoji-Grafik haben.
+  Fehlt sie, bleibt unter Linux/Chrome eine leere Kachel, waehrend iOS/macOS
+  oft System-Emoji einspringen laesst - der Fehler zeigt sich also nur auf
+  einem Teil der Geraete. `server.md` warnte davor schon seit Wunsch #122;
+  eine Warnung in der Doku ist kein Waechter, deshalb jetzt ein Test.
 - `test_push.py` – haelt `PUSH_TTL > 0` fest. Ohne `ttl` schickt `pywebpush`
   TTL 0, und Microsofts WNS (Windows/Edge) verwirft die Nachricht mit HTTP 400
   ("Ttl value conflicts with X-WNS-Cache-Policy"). Apple/Google stoert das
