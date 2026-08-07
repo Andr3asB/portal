@@ -246,22 +246,28 @@ Kiosk. Darum geht es unten.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S5-01 | Einkaufsliste: hinzufügen, abhaken, bearbeiten, löschen | beliebig | Alles reagiert | | |
-| S5-02 | Aufgaben: anlegen, Status ändern, bearbeiten, löschen | beliebig | Alles reagiert | | |
-| S5-03 | Geholfen: antippen, Verlauf, Eintrag bearbeiten/löschen | beliebig | Alles reagiert | | |
-| S5-04 | Rezepte: anlegen, bewerten, wünschen, löschen | beliebig | Alles reagiert | | |
-| S5-05 | Essensplan und Aufgabenplan: eintragen und entfernen | beliebig | Alles reagiert | | |
-| S5-06 | Packliste: hinzufügen, abhaken, Packmodus | beliebig | Alles reagiert | | |
-| S5-07 | Vokabeln: anlegen, trainieren, Auswertung | beliebig | Alles reagiert | | |
-| S5-08 | Tierbaukasten: Figur bauen und speichern | beliebig | Vorschau aktualisiert sich, Speichern geht | | |
-| S5-09 | TVB: Mannschaft umschalten, Kader öffnen | beliebig | Umschalter reagiert | | |
-| S5-10 | Werkstatt: Wunsch aufklappen, Priorität ändern, filtern | beliebig | Alles reagiert | | |
-| S5-11 | Verwaltung: Nutzer bearbeiten, App freischalten, QR anzeigen | A-PC | Alles reagiert | | |
-| S5-12 | **Löschabfragen:** Irgendwo etwas löschen | beliebig | Die Sicherheitsabfrage „…wirklich löschen?" erscheint weiterhin | | |
-| S5-13 | Menü (☰), Dark Mode umschalten, ✨-Wunsch abschicken | beliebig | Alles reagiert | | |
-| S5-14 | **iPhone/Safari:** einmal quer durch zwei, drei Apps klicken | A-Handy (iOS) | Alles reagiert – der Verteiler ist neu, und Safari ist der Browser, der am ehesten anders reagiert | | |
-| S5-15 | **Esszimmer-Bildschirm:** etwas antippen (z. B. Geholfen) | Kiosk | Reagiert wie bisher, Bild bleibt sichtbar. Bliebe der Schirm schwarz, fehlte `frame-ancestors` – dann sofort `CSP_MODUS=aus` | | |
-| S5-16 | Vokabel-Foto-Import: ein Foto prüfen, einzelne Zeilen abwählen | beliebig | Abgewählte Zeilen werden blass | | |
+| S5-01 | Einkaufsliste: hinzufügen, abhaken, bearbeiten, löschen | beliebig | Alles reagiert | ok | |
+| S5-02 | Aufgaben: anlegen, Status ändern, bearbeiten, löschen | beliebig | Alles reagiert | ok | |
+| S5-03 | Geholfen: antippen, Verlauf, Eintrag bearbeiten/löschen | beliebig | Alles reagiert | ok | |
+| S5-04 | Rezepte: anlegen, bewerten, wünschen, löschen | beliebig | Alles reagiert | ok | |
+| S5-05 | Essensplan und Aufgabenplan: eintragen und entfernen | beliebig | Alles reagiert | ok | |
+| S5-06 | Packliste: hinzufügen, abhaken, Packmodus | beliebig | Alles reagiert | ok | |
+| S5-07 | Vokabeln: anlegen, trainieren, Auswertung | beliebig | Alles reagiert | ok | |
+| S5-08 | Tierbaukasten: Figur bauen und speichern | beliebig | Vorschau aktualisiert sich, Speichern geht | ok | |
+| S5-09 | TVB: Mannschaft umschalten, Kader öffnen | beliebig | Umschalter reagiert | ok | |
+| S5-10 | Werkstatt: Wunsch aufklappen, Priorität ändern, filtern | beliebig | Alles reagiert | ok | |
+| S5-11 | Verwaltung: Nutzer bearbeiten, App freischalten, QR anzeigen | A-PC | Alles reagiert | ok | |
+| S5-12 | **Löschabfragen:** Irgendwo etwas löschen | beliebig | Die Sicherheitsabfrage „…wirklich löschen?" erscheint weiterhin | ok | |
+| S5-13 | Menü (☰), Dark Mode umschalten, ✨-Wunsch abschicken | beliebig | Alles reagiert | ok | |
+| S5-14 | **iPhone/Safari:** einmal quer durch zwei, drei Apps klicken | A-Handy (iOS) | Alles reagiert – der Verteiler ist neu, und Safari ist der Browser, der am ehesten anders reagiert | ok | |
+| S5-15 | **Esszimmer-Bildschirm:** etwas antippen (z. B. Geholfen) | Kiosk | Reagiert wie bisher, Bild bleibt sichtbar. Bliebe der Schirm schwarz, fehlte `frame-ancestors` – dann sofort `CSP_MODUS=aus` | ok | |
+| S5-16 | Vokabel-Foto-Import: ein Foto prüfen, einzelne Zeilen abwählen | beliebig | Abgewählte Zeilen werden blass | ok | |
+
+**Ergebnis Stufe 5 (2026-08-07): bestanden.** Alle 16 Testfälle von Andi auf
+echten Geräten geprüft, einschliesslich iPhone/Safari (S5-14) und Kiosk
+(S5-15) – die beiden Fälle, die von hier aus prinzipiell nicht prüfbar waren.
+Damit ist belegt, dass der neue Aktions-Verteiler auf allen Browsern trägt und
+`frame-ancestors` im Home-Assistant-iFrame weiterhin greift.
 
 ---
 
