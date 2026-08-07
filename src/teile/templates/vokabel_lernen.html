@@ -54,7 +54,9 @@
       <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="alle" checked data-aendern="alleUmschalten"> Alle</label>
       <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="ohne" class="kapitel-einzel" disabled> Ohne Kapitel</label>
       {% for k in kapitel %}
-      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}" class="kapitel-einzel" disabled> {{ k.name }}</label>
+      {# Wunsch #150: Fremde Kapitel sind auswaehlbar, aber erkennbar - sonst
+         waere unklar, wessen Vokabeln man gerade uebt. #}
+      <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}" class="kapitel-einzel" disabled> {{ k.name }}{% if k.geteilt_von %} <span style="color:var(--text-2); font-size:12px">· von {{ k.geteilt_von }}</span>{% endif %}</label>
       {% endfor %}
     </div>
 

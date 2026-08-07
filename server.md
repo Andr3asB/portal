@@ -1350,6 +1350,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
+| `vokabel_kapitel_freigabe` | kapitel_id (FK vokabel_kapitel, cascade), user_id (FK users, cascade – WER es zusaetzlich sehen darf), erstellt; PK(kapitel_id, user_id) – Wunsch #150. Geteilt wird das KAPITEL, nicht die Vokabel: spaeter hinzugefuegte Vokabeln wandern automatisch mit. Eigentuemer bleibt `vokabel_kapitel.user_id` |
 | `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
@@ -1469,6 +1470,14 @@ anhängen.
   abgelehnt - ohne Server-Fehler, ohne sichtbare Meldung, auf allen Geraeten.
   Der Fehler tritt NUR bei scharfer CSP auf; beim Entwickeln steht
   `CSP_MODUS=aus`, dort faellt er nicht auf.
+- **Sichtbarkeit und Eigentum sind in der Vokabeln-App zwei verschiedene
+  Fragen** (Wunsch #150). `_VOKABEL_SICHTBAR` / `_kapitel_zugaenglich()` /
+  `_sprache_zugaenglich()` beantworten "darf sehen, ueben, anhoeren" (eigene
+  ODER geteilt). `_kapitel_gehoert_nutzer()` beantwortet "darf aendern"
+  (bearbeiten, loeschen, umbenennen, weiterteilen) - dort NIE die
+  Sichtbarkeitsregel verwenden, sonst koennte ein Empfaenger fremde Vokabeln
+  aendern oder die Freigabe weiterreichen. Die Regel steht bewusst an einer
+  Stelle; vorher war sie an sieben Stellen als `user_id=?` ausgeschrieben.
 - **TTS bekommt IMMER die Sprache mitgeteilt** (Wunsch #149,
   `tts_eingabe()` in `00_kern.py`): Ohne Angabe raet das Modell und liegt bei
   kleinen Sprachen daneben - gemeldet als "Daenisch funktioniert nicht",
@@ -1821,6 +1830,10 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_vokabeln_teilen.py` – Wunsch #150. Die Haelfte der Tests prueft die
+  ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
+  Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
+  im Alltag nicht auf, eine zu enge sofort.
 - `test_tts_sprache.py` – Wunsch #149/#148: Sprachangabe geht ans Modell,
   Kontingent zaehlt nur das Wort, Cache-Schluessel ist versioniert, gleiches
   Wort teilt sich die Datei, verschiedene Sprachen nicht. Dazu die

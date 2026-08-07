@@ -2,6 +2,68 @@
 
 ---
 
+## 2026-08-07 – portal-v145: Wunsch #150 – Vokabel-Kapitel teilen
+
+Geteilt wird das **Kapitel**, nicht die einzelne Vokabel: Eine später
+hinzugefügte Vokabel wandert damit automatisch mit, und das Aufheben ist ein
+Häkchen statt einer Liste.
+
+### Die Zugriffsregel steht jetzt an einer Stelle
+
+Vorher war „gehört mir" an sieben Stellen einzeln als `user_id=?`
+ausgeschrieben – Liste, Trainer-Auswahl, Trainingsstart, Versuch, Audio,
+Auswertung, Sprachwahl. Genau die Bauart, bei der eine Erweiterung eine Stelle
+übersieht und dann entweder zu viel preisgibt oder eine Funktion still nicht
+mitzieht.
+
+Jetzt gibt es ein gemeinsames SQL-Fragment `_VOKABEL_SICHTBAR` (eigene ODER in
+einem mit mir geteilten Kapitel) plus `_kapitel_zugaenglich()` und
+`_sprache_zugaenglich()`. Was **ändernd** ist – bearbeiten, löschen,
+umbenennen, weiterteilen – prüft weiterhin `_kapitel_gehoert_nutzer()`, also
+echtes Eigentum. Diese Trennung ist der ganze Kern:
+
+> Ein geteiltes Kapitel darf der Empfänger benutzen, aber nicht verändern.
+
+### Zwei Dinge, die das Teilen sonst stillschweigend nutzlos gemacht hätten
+
+**1. Die Sprache.** Der Empfänger hat die Sprache des geteilten Kapitels oft
+gar nicht aktiviert. Ohne Sonderregel hätte `_sprache_erlaubt()` den
+Trainingsstart abgewiesen – und zwar mit einer Weiterleitung ohne Begründung.
+`_sprache_zugaenglich()` lässt eine Sprache deshalb auch dann zu, wenn sie in
+einem geteilten Kapitel vorkommt. Live bestätigt: Friederike hat nur Englisch
+und Latein aktiviert und konnte Andis dänisches Kapitel trotzdem trainieren.
+
+**2. Die Auswertung.** Sie aggregierte über `v.user_id = ziel` – Trainings mit
+fremden Vokabeln wären in keiner Statistik aufgetaucht. Der Wunsch verlangt
+aber ausdrücklich, dass **alle** Trainings wie gehabt dokumentiert werden.
+
+### Oberfläche
+
+Auf der Kapitel-Seite je Kapitel ein 👥-Knopf (voll sichtbar, sobald geteilt)
+mit Personen-Häkchen. Darunter ein eigener Abschnitt „Mit mir geteilt" – ohne
+den wären fremde Kapitel im Trainer zwar auswählbar, aber nirgends erklärt.
+Im Trainer steht bei fremden Kapiteln „· von <Name>", sonst wäre unklar,
+wessen Vokabeln man übt. In der Vokabelliste haben fremde Einträge kein
+Bearbeiten-Symbol, sondern 👥 mit dem Namen des Eigentümers.
+
+### Verifikation
+
+16 neue Tests, die Hälfte davon Abgrenzung: Der Empfänger kann fremde
+Vokabeln **nicht** ändern, **nicht** löschen, das Kapitel **nicht** umbenennen
+und **nicht weiterteilen** (sonst wanderte eine Freigabe unbemerkt weiter und
+der Eigentümer wüsste nicht mehr, wer sein Kapitel sieht). Ein unbeteiligter
+Dritter sieht nichts. Nach dem Aufheben ist der Zugriff sofort weg – auch für
+die Audiodateien.
+
+Live durchgespielt: Andi teilt sein dänisches Kapitel mit Friederike, sie sieht
+die Vokabeln und die Herkunft, der Trainer liefert sie, danach wieder
+aufgehoben. Die Testfreigabe habe ich anschliessend entfernt – ob wirklich
+geteilt wird, ist Andis Entscheidung.
+
+198 Tests grün.
+
+---
+
 ## 2026-08-07 – portal-v143: Mein Fehler – die CSP blockierte JEDE Audiowiedergabe
 
 Andi meldete: „es wird kein Audio ausgegeben, weder am PC noch auf dem iPhone".

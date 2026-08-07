@@ -263,6 +263,17 @@ CREATE TABLE IF NOT EXISTS vokabel_sprachen_nutzer (
   sprache_id INTEGER NOT NULL REFERENCES vokabel_sprachen(id) ON DELETE CASCADE,
   UNIQUE(user_id, sprache_id)
 );
+-- Wunsch #150: Ein Kapitel mit anderen teilen. Freigegeben wird das KAPITEL,
+-- nicht die einzelne Vokabel - so wandert eine spaeter hinzugefuegte Vokabel
+-- automatisch mit, und das Aufheben ist eine einzige Zeile weniger.
+-- Der Eigentuemer steht weiterhin an `vokabel_kapitel.user_id`; diese Tabelle
+-- sagt nur, WER es zusaetzlich sehen darf.
+CREATE TABLE IF NOT EXISTS vokabel_kapitel_freigabe (
+  kapitel_id INTEGER NOT NULL REFERENCES vokabel_kapitel(id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  erstellt   TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (kapitel_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS vokabel_kapitel (
   id       INTEGER PRIMARY KEY,
   user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

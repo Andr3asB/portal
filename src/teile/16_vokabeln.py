@@ -103,9 +103,103 @@ def _eigene_kapitel(db, user_id, nur_aktive=True):
 
 
 def _kapitel_gehoert_nutzer(db, user_id, kapitel_id):
+    """Eigentum - NICHT Sichtbarkeit. Fuer alles Aendernde (umbenennen,
+    aktiv/inaktiv, teilen) ist das der richtige Massstab: Ein geteiltes
+    Kapitel darf der Empfaenger benutzen, aber nicht veraendern."""
     return db.execute(
         "SELECT 1 FROM vokabel_kapitel WHERE id=? AND user_id=?", (kapitel_id, user_id)
     ).fetchone() is not None
+
+
+# ---------------------------------------------------------------------------
+# Wunsch #150: geteilte Kapitel
+#
+# Die Zugriffsregel steht bewusst an EINER Stelle. Vorher war "gehoert mir"
+# an sieben Stellen einzeln als `user_id=?` ausgeschrieben - bei einer
+# Erweiterung ist genau das die Bauart, bei der man eine Stelle vergisst und
+# entweder zu viel preisgibt oder eine Funktion still nicht mitzieht.
+#
+# `:uid` als benannter Parameter, weil das Fragment in Abfragen mit
+# unterschiedlicher Parameterzahl eingesetzt wird.
+# ---------------------------------------------------------------------------
+
+_VOKABEL_SICHTBAR = """
+    (v.user_id = :uid
+     OR EXISTS (SELECT 1
+                FROM   vokabel_kapitel_zuordnung z
+                JOIN   vokabel_kapitel_freigabe f ON f.kapitel_id = z.kapitel_id
+                WHERE  z.vokabel_id = v.id AND f.user_id = :uid))
+"""
+
+
+def _vokabel_sichtbar(db, user_id, vokabel_id) -> bool:
+    """Darf dieser Nutzer diese Vokabel sehen/hoeren/ueben?"""
+    return db.execute(f"""
+        SELECT 1 FROM vokabeln v WHERE v.id = :vid AND {_VOKABEL_SICHTBAR}
+    """, {"vid": vokabel_id, "uid": user_id}).fetchone() is not None
+
+
+def _kapitel_zugaenglich(db, user_id, kapitel_id) -> bool:
+    """Eigenes ODER mit mir geteiltes Kapitel."""
+    return db.execute("""
+        SELECT 1 FROM vokabel_kapitel k
+        WHERE  k.id = :kid
+          AND (k.user_id = :uid
+               OR EXISTS (SELECT 1 FROM vokabel_kapitel_freigabe f
+                          WHERE f.kapitel_id = k.id AND f.user_id = :uid))
+    """, {"kid": kapitel_id, "uid": user_id}).fetchone() is not None
+
+
+def _zugaengliche_kapitel(db, user_id):
+    """Eigene + geteilte Kapitel, mit Eigentuemer-Namen.
+
+    `geteilt_von` ist NULL beim eigenen Kapitel - die Oberflaeche nutzt das,
+    um fremde Kapitel als solche zu kennzeichnen. Ohne diesen Hinweis waere
+    unklar, wessen Vokabeln man da gerade uebt."""
+    return db.execute("""
+        SELECT k.id, k.name, k.aktiv, k.user_id,
+               CASE WHEN k.user_id = :uid THEN NULL ELSE u.name END AS geteilt_von
+        FROM   vokabel_kapitel k
+        JOIN   users u ON u.id = k.user_id
+        WHERE  k.aktiv = 1
+          AND (k.user_id = :uid
+               OR EXISTS (SELECT 1 FROM vokabel_kapitel_freigabe f
+                          WHERE f.kapitel_id = k.id AND f.user_id = :uid))
+        ORDER  BY (k.user_id = :uid) DESC, u.name COLLATE NOCASE, k.name COLLATE NOCASE
+    """, {"uid": user_id}).fetchall()
+
+
+def _sprache_zugaenglich(db, user_id, sprache_id) -> bool:
+    """Eigene aktive Sprache ODER eine, die in einem geteilten Kapitel vorkommt.
+
+    Ohne den zweiten Teil liefe das Teilen ins Leere, sobald der Empfaenger
+    die Sprache nicht selbst aktiviert hat - und er haette keinen Hinweis,
+    woran es liegt."""
+    if _sprache_erlaubt(db, user_id, sprache_id):
+        return True
+    return db.execute("""
+        SELECT 1
+        FROM   vokabeln v
+        JOIN   vokabel_kapitel_zuordnung z ON z.vokabel_id = v.id
+        JOIN   vokabel_kapitel_freigabe f  ON f.kapitel_id = z.kapitel_id
+        WHERE  v.sprache_id = :sid AND f.user_id = :uid
+        LIMIT  1
+    """, {"sid": sprache_id, "uid": user_id}).fetchone() is not None
+
+
+def _zugaengliche_sprachen(db, user_id):
+    """Eigene aktive Sprachen plus die aus geteilten Kapiteln."""
+    return db.execute("""
+        SELECT s.id, s.name FROM vokabel_sprachen s
+        WHERE  s.aktiv = 1
+          AND (EXISTS (SELECT 1 FROM vokabel_sprachen_nutzer n
+                       WHERE n.sprache_id = s.id AND n.user_id = :uid)
+               OR EXISTS (SELECT 1 FROM vokabeln v
+                          JOIN vokabel_kapitel_zuordnung z ON z.vokabel_id = v.id
+                          JOIN vokabel_kapitel_freigabe f  ON f.kapitel_id = z.kapitel_id
+                          WHERE v.sprache_id = s.id AND f.user_id = :uid))
+        ORDER  BY s.name COLLATE NOCASE
+    """, {"uid": user_id}).fetchall()
 
 
 def _kapitel_ids_setzen(db, vokabel_id, user_id, kapitel_ids):
@@ -190,6 +284,7 @@ def index(token):
     kapitel  = _eigene_kapitel(db, user["id"])
     vokabeln = db.execute("""
         SELECT v.id, v.fremd, v.deutsch, v.sprache_id, s.name AS sprache_name,
+               v.user_id, (SELECT u.name FROM users u WHERE u.id = v.user_id) AS besitzer,
                (SELECT GROUP_CONCAT(z.kapitel_id) FROM vokabel_kapitel_zuordnung z
                 WHERE z.vokabel_id = v.id) AS kapitel_ids,
                (SELECT GROUP_CONCAT(k.name, ', ') FROM vokabel_kapitel_zuordnung z
@@ -197,9 +292,9 @@ def index(token):
                 WHERE z.vokabel_id = v.id) AS kapitel_namen
         FROM   vokabeln v
         JOIN   vokabel_sprachen s ON s.id = v.sprache_id
-        WHERE  v.user_id=?
-        ORDER  BY v.erstellt DESC
-    """, (user["id"],)).fetchall()
+        WHERE  {SICHTBAR}
+        ORDER  BY (v.user_id = :uid) DESC, v.erstellt DESC
+    """.replace("{SICHTBAR}", _VOKABEL_SICHTBAR), {"uid": user["id"]}).fetchall()
     # Wunsch #148: Sichtbar machen, wofuer die Aussprache schon vorliegt.
     # Geprueft wird die Datei im Cache, nicht ein Merker in der Datenbank -
     # der Cache IST die Wahrheit (er ueberlebt keinen Datenverlust und wird
@@ -331,13 +426,54 @@ def kapitel_verwalten(token):
                 db.execute("UPDATE vokabel_kapitel SET aktiv=? WHERE id=?",
                            (0 if row[0] else 1, kid))
                 db.commit()
+        elif action == "teilen":
+            # Wunsch #150: Teilen darf NUR der Eigentuemer - deshalb hier
+            # _kapitel_gehoert_nutzer und nicht _kapitel_zugaenglich. Sonst
+            # koennte ein Empfaenger das Kapitel weiterreichen.
+            kid = to_int(request.form.get("id"), 0)
+            if _kapitel_gehoert_nutzer(db, user["id"], kid):
+                gewaehlt = {to_int(x) for x in request.form.getlist("mit_user_ids")}
+                gewaehlt.discard(None)
+                gewaehlt.discard(user["id"])          # sich selbst teilen ist sinnlos
+                db.execute("DELETE FROM vokabel_kapitel_freigabe WHERE kapitel_id=?", (kid,))
+                for uid in gewaehlt:
+                    if db.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
+                        db.execute(
+                            "INSERT OR IGNORE INTO vokabel_kapitel_freigabe"
+                            "(kapitel_id, user_id) VALUES(?,?)", (kid, uid))
+                db.commit()
         return redirect(url_for("vokabeln_app.kapitel_verwalten", token=token))
 
-    kapitel = db.execute(
+    kapitel = [dict(k) for k in db.execute(
         "SELECT * FROM vokabel_kapitel WHERE user_id=? ORDER BY name COLLATE NOCASE", (user["id"],)
-    ).fetchall()
+    ).fetchall()]
+    for k in kapitel:
+        k["geteilt_mit"] = [r["user_id"] for r in db.execute(
+            "SELECT user_id FROM vokabel_kapitel_freigabe WHERE kapitel_id=?", (k["id"],))]
+        k["anzahl"] = db.execute(
+            "SELECT COUNT(*) FROM vokabel_kapitel_zuordnung WHERE kapitel_id=?", (k["id"],)
+        ).fetchone()[0]
+
+    andere = db.execute(
+        "SELECT id, name, farbe FROM users WHERE id != ? ORDER BY name COLLATE NOCASE",
+        (user["id"],)).fetchall()
+
+    # Was MIR jemand geteilt hat - nur zur Ansicht, aufheben kann es der
+    # Eigentuemer. Ohne diese Liste waeren fremde Kapitel zwar im Trainer
+    # auswaehlbar, aber nirgends erklaert.
+    geteilt_mir = db.execute("""
+        SELECT k.id, k.name, u.name AS von,
+               (SELECT COUNT(*) FROM vokabel_kapitel_zuordnung z WHERE z.kapitel_id = k.id) AS anzahl
+        FROM   vokabel_kapitel_freigabe f
+        JOIN   vokabel_kapitel k ON k.id = f.kapitel_id
+        JOIN   users u ON u.id = k.user_id
+        WHERE  f.user_id = ?
+        ORDER  BY u.name COLLATE NOCASE, k.name COLLATE NOCASE
+    """, (user["id"],)).fetchall()
+
     return render_template("vokabel_kapitel.html",
-        user=user, token=token, farbe=user["farbe"], kapitel=kapitel)
+        user=user, token=token, farbe=user["farbe"], kapitel=kapitel,
+        andere=andere, geteilt_mir=geteilt_mir)
 
 
 @bp.route("/a/vokabeln/lernen", defaults={"token": None})
@@ -345,8 +481,8 @@ def kapitel_verwalten(token):
 def lernen(token):
     user = _user(token)
     db = get_db()
-    sprachen = _eigene_sprachen(db, user["id"])
-    kapitel  = _eigene_kapitel(db, user["id"])
+    sprachen = _zugaengliche_sprachen(db, user["id"])
+    kapitel  = _zugaengliche_kapitel(db, user["id"])
     return render_template("vokabel_lernen.html",
         user=user, token=token, farbe=user["farbe"], sprachen=sprachen, kapitel=kapitel)
 
@@ -357,7 +493,7 @@ def lernen_start(token):
     user = _user(token)
     db = get_db()
     sprache_id = to_int(request.form.get("sprache_id"))
-    if not sprache_id or not _sprache_erlaubt(db, user["id"], sprache_id):
+    if not sprache_id or not _sprache_zugaenglich(db, user["id"], sprache_id):
         return redirect(url_for("vokabeln_app.lernen", token=token))
 
     auswahl = request.form.getlist("kapitel_ids")  # kann "alle" und/oder "ohne" enthalten
@@ -366,28 +502,35 @@ def lernen_start(token):
     kapitel_ids   = {to_int(k) for k in auswahl if k not in ("alle", "ohne")}
     kapitel_ids.discard(None)
 
+    # Wunsch #150: ueberall die gemeinsame Sichtbarkeitsregel statt user_id -
+    # sonst waere ein geteiltes Kapitel zwar auswaehlbar, das Training aber
+    # leer.
+    p = {"uid": user["id"], "sid": sprache_id}
     if alle_gewaehlt:
-        vokabeln = db.execute(
-            "SELECT id, fremd, deutsch FROM vokabeln WHERE user_id=? AND sprache_id=?",
-            (user["id"], sprache_id),
-        ).fetchall()
+        vokabeln = db.execute(f"""
+            SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
+            WHERE  v.sprache_id = :sid AND {_VOKABEL_SICHTBAR}
+        """, p).fetchall()
     else:
         gefunden = {}
         if ohne_gewaehlt:
+            # "Ohne Kapitel" bleibt bewusst auf EIGENE Vokabeln beschraenkt:
+            # Geteilt wird immer ein Kapitel, eine kapitellose fremde Vokabel
+            # kann es also gar nicht geben.
             for r in db.execute("""
                 SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
-                WHERE v.user_id=? AND v.sprache_id=?
+                WHERE v.user_id = :uid AND v.sprache_id = :sid
                   AND NOT EXISTS (SELECT 1 FROM vokabel_kapitel_zuordnung z WHERE z.vokabel_id=v.id)
-            """, (user["id"], sprache_id)).fetchall():
+            """, p).fetchall():
                 gefunden[r[0]] = r
         for kid in kapitel_ids:
-            if not _kapitel_gehoert_nutzer(db, user["id"], kid):
+            if not _kapitel_zugaenglich(db, user["id"], kid):
                 continue
             for r in db.execute("""
                 SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
                 JOIN vokabel_kapitel_zuordnung z ON z.vokabel_id = v.id
-                WHERE v.user_id=? AND v.sprache_id=? AND z.kapitel_id=?
-            """, (user["id"], sprache_id, kid)).fetchall():
+                WHERE v.sprache_id = :sid AND z.kapitel_id = :kid
+            """, {"sid": sprache_id, "kid": kid}).fetchall():
                 gefunden[r[0]] = r
         vokabeln = list(gefunden.values())
 
@@ -433,7 +576,8 @@ def versuch(token):
         (session_id, user["id"]),
     ).fetchone()
     vokabel_ok = vokabel_id and db.execute(
-        "SELECT 1 FROM vokabeln WHERE id=? AND user_id=?", (vokabel_id, user["id"])
+        f"SELECT 1 FROM vokabeln v WHERE v.id = :vid AND {_VOKABEL_SICHTBAR}",
+        {"vid": vokabel_id, "uid": user["id"]}
     ).fetchone()
     if not (session_ok and vokabel_ok):
         return jsonify(ok=False), 400
@@ -497,21 +641,24 @@ def auswertung(token):
     """, (ziel["id"],)).fetchall()
     max_minuten = max((t["minuten"] or 0) for t in trainingszeit) if trainingszeit else 0
 
-    sprachen = db.execute("""
+    # Wunsch #150: Auch geteilte Vokabeln - der Wunsch verlangt ausdruecklich,
+    # dass ALLE Trainings dokumentiert werden. Ohne das faenden sich Trainings
+    # mit fremden Kapiteln in keiner Auswertung wieder.
+    sprachen = db.execute(f"""
         SELECT DISTINCT s.id, s.name FROM vokabeln v
         JOIN   vokabel_sprachen s ON s.id = v.sprache_id
-        WHERE  v.user_id=?
+        WHERE  {_VOKABEL_SICHTBAR}
         ORDER  BY s.name COLLATE NOCASE
-    """, (ziel["id"],)).fetchall()
+    """, {"uid": ziel["id"]}).fetchall()
 
     sprache_id = to_int(request.args.get("sprache")) or (sprachen[0]["id"] if sprachen else None)
 
     kapitel_auswertung = []
     if sprache_id:
-        vokabeln = db.execute(
-            "SELECT id, fremd, deutsch FROM vokabeln WHERE user_id=? AND sprache_id=?",
-            (ziel["id"], sprache_id),
-        ).fetchall()
+        vokabeln = db.execute(f"""
+            SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
+            WHERE  v.sprache_id = :sid AND {_VOKABEL_SICHTBAR}
+        """, {"uid": ziel["id"], "sid": sprache_id}).fetchall()
         vokabel_ids = [v["id"] for v in vokabeln]
 
         versuche_je_vokabel = {}
@@ -655,9 +802,12 @@ def wort_audio(token, vid):
     erzeugt und dauerhaft im Datenordner gecacht (siehe _audio_pfad)."""
     user = _user(token)
     db = get_db()
-    row = db.execute(
-        "SELECT fremd, sprache_id FROM vokabeln WHERE id=? AND user_id=?", (vid, user["id"])
-    ).fetchone()
+    # Wunsch #150: auch geteilte Vokabeln - "die Media-Dateien anhoeren"
+    # steht ausdruecklich im Wunsch.
+    row = db.execute(f"""
+        SELECT v.fremd, v.sprache_id FROM vokabeln v
+        WHERE  v.id = :vid AND {_VOKABEL_SICHTBAR}
+    """, {"vid": vid, "uid": user["id"]}).fetchone()
     if not row:
         abort(404)
 

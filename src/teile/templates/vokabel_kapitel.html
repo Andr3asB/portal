@@ -37,6 +37,32 @@
   padding:8px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
 }
 .empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
+/* Wunsch #150: Teilen */
+.kap-meta { font-size:12px; color:var(--text-2); margin-top:3px; }
+.btn-teilen {
+  background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2);
+  opacity:.4;
+}
+.btn-teilen.aktiv { opacity:1; }
+.kap-teilen-panel {
+  display:none; flex-direction:column; gap:10px; margin-top:10px;
+  padding-top:10px; border-top:1px solid var(--border);
+}
+.person-chip {
+  display:inline-flex; align-items:center; gap:7px; background:var(--surface-2);
+  border:1.5px solid var(--border); border-radius:16px; padding:7px 13px;
+  font-size:14px; cursor:pointer;
+}
+.person-chip input { margin:0; width:17px; height:17px; }
+.abschnitt {
+  font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin:22px 0 8px;
+}
+.geteilt-item {
+  background:var(--surface); border-radius:12px; padding:12px 16px; margin-bottom:8px;
+  box-shadow:0 1px 3px var(--shadow); border-left:4px solid var(--farbe);
+}
+.geteilt-name { font-size:15px; font-weight:500; }
 {% endblock %}
 
 {% block nav_left %}
@@ -63,8 +89,16 @@
   {% for k in kapitel %}
   <div class="kap-item {% if not k.aktiv %}inaktiv{% endif %}">
     <div class="kap-row">
-      <span class="kap-name">{{ k.name }}</span>
+      <div class="kap-name">
+        {{ k.name }}
+        <div class="kap-meta">
+          {{ k.anzahl }} Vokabel{{ 'n' if k.anzahl != 1 else '' }}{% if k.geteilt_mit %} · geteilt mit {{ k.geteilt_mit|length }}{% endif %}
+        </div>
+      </div>
       <button class="btn-edit-toggle" type="button" data-klick="toggleKap" data-args='[{{ k.id }}]' title="Umbenennen">✏️</button>
+      <button class="btn-teilen{% if k.geteilt_mit %} aktiv{% endif %}" type="button"
+              data-klick="toggleTeilen" data-args='[{{ k.id }}]'
+              title="{{ 'Geteilt mit %d Person(en)'|format(k.geteilt_mit|length) if k.geteilt_mit else 'Mit jemandem teilen' }}">👥</button>
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="id" value="{{ k.id }}">
@@ -79,10 +113,43 @@
         <button type="submit" class="kap-save">Speichern</button>
       </form>
     </div>
+
+    <form class="kap-teilen-panel" id="kap-teilen-{{ k.id }}" method="post">
+      <input type="hidden" name="action" value="teilen">
+      <input type="hidden" name="id" value="{{ k.id }}">
+      <div class="kap-meta">Wer dieses Kapitel mitbenutzen darf – Ansehen, Üben und Anhören. Ändern kannst nur du.</div>
+      <div class="chip-row" style="display:flex; flex-wrap:wrap; gap:8px">
+        {% for p in andere %}
+        <label class="person-chip">
+          <input type="checkbox" name="mit_user_ids" value="{{ p.id }}"
+                 {% if p.id in k.geteilt_mit %}checked{% endif %}>
+          {{ p.name }}
+        </label>
+        {% endfor %}
+      </div>
+      <button type="submit" class="kap-save" style="align-self:flex-start">Freigabe speichern</button>
+    </form>
   </div>
   {% endfor %}
   {% else %}
   <div class="empty">Noch keine Kapitel angelegt.</div>
+  {% endif %}
+
+  {% if geteilt_mir %}
+  <div class="abschnitt">Mit mir geteilt</div>
+  {% for g in geteilt_mir %}
+  <div class="geteilt-item">
+    <div class="geteilt-name">{{ g.name }}</div>
+    <div class="kap-meta">
+      von {{ g.von }} · {{ g.anzahl }} Vokabel{{ 'n' if g.anzahl != 1 else '' }} ·
+      im Trainer auswählbar
+    </div>
+  </div>
+  {% endfor %}
+  <div class="kap-meta" style="margin-top:8px">
+    Diese Kapitel gehören jemand anderem – du kannst damit üben und die Aussprache anhören,
+    aber nichts daran ändern. Aufheben kann die Freigabe nur, wer sie erteilt hat.
+  </div>
   {% endif %}
 </main>
 {% endblock %}
@@ -91,6 +158,11 @@
 <script{{ csp_nonce }}>
 function toggleKap(id) {
   const p = document.getElementById('kap-edit-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function toggleTeilen(id) {
+  const p = document.getElementById('kap-teilen-' + id);
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
 }
 </script>
