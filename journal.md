@@ -2,6 +2,83 @@
 
 ---
 
+## 2026-08-07 – portal-v139: Wunsch #143 – Barcode scannen
+
+Kamera aufs Produkt, Name und Kategorie erscheinen, Nutzer prüft und speichert.
+
+### Erst gemessen, dann gebaut
+
+Zwei Unbekannte standen am Anfang, und beide haben den Entwurf verändert:
+
+**1. Die Browser-Schnittstelle `BarcodeDetector` ist unbrauchbar.** Sie fehlt
+nicht nur auf iOS (den Geräten, mit denen tatsächlich eingekauft wird) –
+nachgemessen fehlt sie **auch in Chrome unter Windows**. Damit schied der
+naheliegende Weg aus. Die Alternative wäre eine mitgelieferte
+JavaScript-Bibliothek von einigen hundert Kilobyte gewesen.
+
+Stattdessen wird **serverseitig aus einem Foto gelesen** (`zxing-cpp`). Das
+nutzt das im Projekt längst etablierte Muster – Rezept- und
+Vokabel-Foto-Import verwenden dasselbe `<input type="file" accept="image/*">` –
+funktioniert auf jedem Gerät und braucht keinen Fremdcode im Browser.
+Bewusst **ohne** `capture="environment"`: Das Attribut zwingt iOS Safari
+direkt in die Kamera und unterschlägt die Auswahl „Mediathek" (Wunsch #106,
+dort schon einmal zurückgebaut).
+
+**2. Die Produktdatenbank taugt.** Mein erster Test mit fünf aus dem Gedächtnis
+geratenen EANs fand nur eines von fünf – das sagte aber nichts über die
+Abdeckung, sondern nur über meine erfundenen Nummern. Mit **echten** Codes aus
+Open Food Facts: alle gefunden, mit Name, Marke, Menge und Kategorien.
+Deutschland allein hat dort rund **420.000 Produkte**.
+
+Zwei neue Abhängigkeiten, exakt gepinnt (Regel aus #135): `zxing-cpp==3.1.1`
+und `pillow==12.3.0`, zusammen rund 9 MB, reine Wheels ohne System-Pakete.
+Der Container liegt danach bei 53 MB von 256 MB.
+
+### Ein echter Fund beim Testschreiben
+
+Der Barcode landet in der Adresse der Produktabfrage, wird also gegen
+`^[0-9]{6,14}$` geprüft. Der Test mit einer Liste böser Eingaben fiel durch:
+
+> **In Python passt `$` auch VOR einem abschließenden Zeilenumbruch.**
+
+`"4008400401621\n"` wäre also durch die Prüfung gerutscht und mitsamt Umbruch
+in die URL geraten. Behoben mit `\A…\Z`. Aufgefallen beim Schreiben des
+Tests, nicht beim Schreiben des Codes – genau dafür schreibt man sie.
+
+### Wenn etwas fehlt, bricht nicht alles ab
+
+Die KI-Kategorie ist eine **Zutat, keine Voraussetzung**: Ist das Kontingent
+aufgebraucht oder die KI nicht erreichbar, kommt der Produktname trotzdem, und
+der Nutzer wählt die Kategorie selbst. Ebenso bei einem unbekannten Produkt –
+dann wird der erkannte Code zurückgegeben und der Name von Hand eingetippt,
+statt die Erfassung ganz abzubrechen.
+
+Die KI bekommt die **vorhandenen** Kategorien vorgegeben, und die Antwort wird
+gegen diese Liste geprüft. Ein frei erfundener Name wäre wertlos – er passt zu
+keiner Zeile in `einkauf_kategorien` – und würde still zu einer falschen
+Einsortierung führen. Bei Unsicherheit bleibt es bei „Sonstiges".
+
+Gespeichert wird **nichts** von allein: Das Ergebnis füllt nur das bestehende
+Formular vor, genau wie beim Rezept-Import und wie im Wunsch beschrieben.
+
+### Verifikation am echten Server
+
+- Echtes EAN-13-Bild → `4008400401621` → „Nutella (750g)" → **Trockenvorrat**
+- Zweites Produkt → **Tiefkühl** (Hähnchen-Schnitzel) – die Einsortierung
+  trifft also nicht bloß zufällig
+- Unbekannter Code → Code kommt zurück, mit dem Hinweis, den Namen einzutippen
+- Bild ohne Barcode → „Nochmal näher und gerader fotografieren?"
+- Falscher Dateityp und fehlendes Foto → 400, ohne Zugang → 403
+
+170 Tests grün (14 neu). `python-barcode` steht nur in `requirements-dev.txt`:
+im Betrieb wird gelesen, nicht erzeugt.
+
+**Offen für Andi:** einmal im Laden ausprobieren. Der Weg über ein Foto ist
+etwas anderes als ein Live-Sucher – das ist der Preis dafür, dass es auf dem
+iPhone überhaupt geht.
+
+---
+
 ## 2026-08-07 – portal-v137: Wunsch #145 – neue App „Geburtstage"
 
 Gemeinsame Liste, persönliche Einstellungen. Slug `geburtstage`, Modul

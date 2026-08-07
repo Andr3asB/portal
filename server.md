@@ -266,6 +266,7 @@ abrufbar"-Kästchen erzeugt statt eines Fehlers.
 |--------|-------------|------|-------|-----------|
 | hae-Server (`HAE_API_URL`, über Caddy-Relay `:2021`) | `14_sportschau.py` | `api-key`-Header aus `.env` | live je Seitenaufruf | Eigener Server im Haus, siehe „hae-Server-Relay" oben |
 | handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | Inoffiziell: das ist der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufruft. Nur `table`, `schedule`, `team-schedule` existieren – **kein** Kader/Spieler-Endpunkt |
+| Open Food Facts (`world.openfoodfacts.org/api/v2/product/<ean>.json`) | `10_einkauf.py` (Barcode-Erfassung, Wunsch #143) | keine | live je Scan, nichts gecacht | Freie Produktdatenbank, rund 420.000 Produkte fuer Deutschland. Unbekannte Codes beantwortet sie mit HTTP 404 - das ist der Normalfall bei Nicht-Lebensmitteln, kein Fehler. Der Code wird vorher gegen `\A[0-9]{6,14}\Z` geprueft, weil er in den Pfad der Abfrage eingesetzt wird |
 | HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net |
 
 Gemeinsam gilt: Bilder/Assets dieser Quellen werden **nicht** eingebunden
@@ -391,7 +392,24 @@ teile/
   09_hilfe.py        – /a/hilfe/<token>/ Hilfe- und Erklärungsseite (alle Apps)
   10_einkauf.py      – /a/einkauf/<token>/ Gemeinsame Einkaufsliste mit Kategorien
                        (aus einkauf_kategorien, editierbar), Läden, Angebot-
-                       Markierung; /bearbeiten/<id> speichert Name+Kategorie+Angebot
+                       Markierung;
+                       **Barcode (Wunsch #143):** /barcode nimmt ein FOTO
+                       entgegen und liest den Code SERVERSEITIG (zxing-cpp).
+                       Nicht im Browser, weil `BarcodeDetector` weder auf iOS
+                       noch in Chrome unter Windows existiert (beides
+                       nachgemessen) - sie fehlt also ausgerechnet auf den
+                       Geraeten, mit denen eingekauft wird. Das Foto-Muster ist
+                       dasselbe wie beim Rezept-/Vokabel-Import, bewusst OHNE
+                       capture="environment" (Wunsch #106). Danach
+                       Open-Food-Facts-Abfrage und KI-Kategorie; beides sind
+                       Zutaten, keine Voraussetzungen - faellt eines aus,
+                       kommt trotzdem so viel zurueck wie moeglich. Gespeichert
+                       wird NICHTS, das Ergebnis fuellt nur das Formular vor.
+                       **Live-Aktualisierung (Wunsch #146):** /stand liefert
+                       den Fingerabdruck, das Frontend tauscht bei Aenderung
+                       nur `#einkauf-liste` aus statt neu zu laden - deshalb
+                       laeuft das auch im Einkaufsmodus, ohne Scrollposition
+                       und Modus zu verlieren; /bearbeiten/<id> speichert Name+Kategorie+Angebot
                        in einem Rutsch (ein Edit-Panel, ein Speichern-Button);
                        _clean_angebot() erzwingt konsistenten Zustand (nie Angebot=1
                        ohne gültigen Markt); _kategorien_aktiv()/_clean_kategorie_id()
@@ -1427,6 +1445,16 @@ anhängen.
   Element kommt als `this` UND als vorletztes Argument, das Ereignis als
   letztes; ein Rückgabewert `false` unterdrückt die Standardaktion.
   `tests/test_csp.py::test_keine_inline_handler_mehr` wacht darüber.
+- **Eine KI-Auswahl aus vorgegebenen Werten wird gegen die Vorgabe geprueft**
+  (Wunsch #143, `_kategorie_per_ki()` in `10_einkauf.py`): Die Kategorien
+  kommen aus der Datenbank, und die Antwort muss einer davon entsprechen. Ein
+  frei erfundener Name wuerde sonst still zu einer falschen Einsortierung
+  fuehren. Bei Unsicherheit lieber KEIN Ergebnis - der Aufrufer faellt dann
+  auf 'Sonstiges' zurueck.
+- **Nutzereingaben, die in eine URL eingesetzt werden, mit `\A…\Z` pruefen,
+  nicht mit `^…$`** (Wunsch #143): In Python passt `$` auch VOR einem
+  abschliessenden Zeilenumbruch - `"4008400401621\n"` rutschte durch eine
+  `^[0-9]+$`-Pruefung und landete mitsamt Umbruch in der Adresse.
 - **KI-Antworten (Rezept-Import, Wunsch #137) laufen durch ein striktes
   Schema** (`_ki_rezept_validieren()` in `11_rezepte.py`), nicht durch
   blindes `json.loads()`. Nur bekannte Felder, Listen-Einträge müssen
@@ -1773,6 +1801,11 @@ python -m venv .venv                                   # einmalig
   Geraet - und hinterlaesst keine verwaiste Sitzung).
 - `test_csrf.py` – Stufe 2: `Sec-Fetch-Site` vor `Origin`, `same-site` wird
   abgelehnt, die drei Modi.
+- `test_barcode.py` – Wunsch #143. Schwerpunkt ist die Ziffern-Pruefung (der
+  Code geht in eine URL) - dieser Test hat den `$`/`\Z`-Fehler gefunden. Dazu
+  die Produktabfrage mit vorgetaeuschten Antworten, die Pruefung der
+  KI-Kategorie gegen die vorhandenen Kategorien und ein echtes Dekodieren
+  eines erzeugten EAN-13.
 - `test_emoji.py` – Wunsch #147: jedes in Vorlagen/Code verwendete Emoji und
   jedes App-Emoji aus der Datenbank muss eine lokale Twemoji-Grafik haben.
   Fehlt sie, bleibt unter Linux/Chrome eine leere Kachel, waehrend iOS/macOS

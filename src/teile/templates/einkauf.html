@@ -21,6 +21,15 @@
 .add-card.open, .filter-card.open { display:block; }
 .filter-hinweis { font-size:12px; color:var(--text-2); margin-top:8px; }
 .btn-los { margin-top:12px; }
+.btn-barcode {
+  width:100%; background:none; border:1.5px dashed var(--border);
+  color:var(--text-2); border-radius:12px; padding:11px;
+  font-size:15px; font-family:inherit; cursor:pointer; margin-bottom:10px;
+}
+.btn-barcode:disabled { opacity:.6; cursor:default; }
+.barcode-status { font-size:13px; margin-bottom:10px; line-height:1.45; }
+.barcode-status.fehler { color:#ff9500; }
+.barcode-status.ok { color:#34c759; }
 .btn-los:disabled { opacity:.4; cursor:default; }
 /* Einkaufsmodus (Wunsch #87): grössere Tap-Flächen, Bedienelemente ausgeblendet */
 #einkaufsmodus-leiste {
@@ -218,6 +227,16 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   </div>
 
   <div class="add-card" id="add-form-card">
+    {# Wunsch #143: Barcode vom Foto. Bewusst OHNE capture="environment" -
+       das Attribut zwingt iOS Safari direkt in die Kamera und unterschlaegt
+       die Auswahl "Mediathek" (Wunsch #106, dort schon einmal zurueckgebaut). #}
+    <button type="button" class="btn-barcode" data-klick="barcodeStarten">
+      📷 Barcode scannen
+    </button>
+    <input type="file" id="barcode-datei" accept="image/*"
+           style="display:none" data-aendern="barcodeFotoGewaehlt">
+    <div class="barcode-status" id="barcode-status"></div>
+
     <form method="post" action="/a/einkauf{{ tp }}add" id="add-form">
       <div class="add-row">
         <input class="add-input" type="text" name="name" id="add-name"
@@ -821,6 +840,65 @@ document.getElementById('einkaufsmodus-beenden-btn')?.addEventListener('click', 
 // verwendet sowohl vom Neu-Formular als auch von jedem Edit-Panel (Wunsch
 // #23-#25: identisches Verhalten und identische Beschriftung an beiden
 // Stellen, ein einziges "Speichern" statt separater Teil-Formulare).
+// ---------------------------------------------------------------------------
+// Wunsch #143: Barcode vom Foto.
+//
+// Der Browser macht hier bewusst NICHTS ausser das Foto zu schicken. Gelesen
+// wird serverseitig (siehe 10_einkauf.py): `BarcodeDetector` gibt es weder
+// auf iOS noch in Chrome unter Windows - also ausgerechnet nicht auf den
+// Geraeten, mit denen eingekauft wird.
+// ---------------------------------------------------------------------------
+function barcodeStarten() {
+  document.getElementById('barcode-datei').click();
+}
+
+function barcodeStatus(text, art) {
+  const el = document.getElementById('barcode-status');
+  el.textContent = text || '';
+  el.className = 'barcode-status' + (art ? ' ' + art : '');
+}
+
+async function barcodeFotoGewaehlt(feld) {
+  const datei = feld.files && feld.files[0];
+  if (!datei) return;
+  const knopf = document.querySelector('.btn-barcode');
+  knopf.disabled = true;
+  barcodeStatus('Barcode wird gelesen …', null);
+
+  const daten = new FormData();
+  daten.append('foto', datei);
+  try {
+    const antwort = await fetch(`/a/einkauf${TP}barcode`, { method: 'POST', body: daten });
+    const d = await antwort.json();
+
+    if (d.name) {
+      document.getElementById('add-name').value = d.name;
+      // Kategorie ueber den vorhandenen Chip setzen, nicht das versteckte
+      // Feld direkt beschreiben: Nur der Klick loest die bestehende Logik mit
+      // aus (Markierung, Freischalten des Absenden-Knopfes).
+      if (d.kategorie_id) {
+        const chip = document.querySelector(
+          `#add-form .kat-row .chip-btn[data-value="${CSS.escape(String(d.kategorie_id))}"]`);
+        if (chip) chip.click();
+      }
+      barcodeStatus(d.kategorie_id
+        ? 'Erkannt – bitte prüfen und speichern.'
+        : 'Erkannt. Kategorie bitte noch wählen.', 'ok');
+    } else {
+      // Auch ohne Produktnamen kann der Code nuetzlich sein - dann steht er
+      // wenigstens da, statt dass man ganz von vorn anfaengt.
+      barcodeStatus(d.fehler || 'Es hat nicht geklappt.', 'fehler');
+      if (d.code) document.getElementById('add-name').focus();
+    }
+  } catch (e) {
+    barcodeStatus('Keine Verbindung – Barcode braucht Empfang.', 'fehler');
+  } finally {
+    knopf.disabled = false;
+    // Zuruecksetzen, damit dasselbe Foto erneut gewaehlt werden koennte.
+    feld.value = '';
+  }
+}
+
 function wireKategorieAngebotForm(root, { requireKategorie }) {
   if (!root) return;
   const katRow       = root.querySelector('.kat-row');

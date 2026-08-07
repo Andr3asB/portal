@@ -12,3 +12,10 @@ segno==1.6.6
 tzdata==2026.3
 dicebear-core==10.3.2
 dicebear-styles==10.2.0
+# Wunsch #143: Barcode vom Foto lesen. Serverseitig statt im Browser,
+# weil die Browser-API `BarcodeDetector` weder auf iOS noch in Chrome
+# unter Windows existiert (nachgemessen) - sie haette ausgerechnet auf
+# den Geraeten gefehlt, mit denen eingekauft wird. Reine Wheels, keine
+# System-Pakete noetig; zusammen rund 9 MB im Abbild.
+zxing-cpp==3.1.1
+pillow==12.3.0

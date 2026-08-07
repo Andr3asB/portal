@@ -10,11 +10,48 @@ erfolgreichen Abarbeiten der Offline-Warteschlange), aber nur wenn gerade
 nichts Ungespeichertes im Weg steht (Name-Feld leer, kein offenes
 Bearbeiten-Panel) - sonst wird der nächste Sync-Versuch abgewartet.
 """
+import io
+import json
+import re
+import urllib.error
+import urllib.request
+
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, to_int
+from teile.kern import (
+    get_db, grant as check_grant, to_int, ki_anfrage, KiLimitError, KiFehler,
+)
 
 bp  = Blueprint("einkauf_app", __name__)
 APP = "einkauf"
+
+# Wunsch #143: Barcode-Erfassung.
+#
+# Gelesen wird SERVERSEITIG aus einem Foto, nicht im Browser. Grund: Die
+# Browser-Schnittstelle `BarcodeDetector` gibt es weder auf iOS noch in Chrome
+# unter Windows (beides nachgemessen) - sie fehlt also ausgerechnet auf den
+# Geraeten, mit denen tatsaechlich eingekauft wird. Die Alternative waere eine
+# mitgelieferte Javascript-Bibliothek von einigen hundert Kilobyte gewesen.
+#
+# Der Foto-Weg nutzt stattdessen das im Projekt schon etablierte Muster
+# (Rezept- und Vokabel-Foto-Import): ein <input type="file" accept="image/*">.
+# Das funktioniert auf jedem Geraet, ohne Fremdcode im Browser.
+#
+# Bewusst OHNE capture="environment" - das Attribut zwingt iOS Safari, direkt
+# die Kamera zu oeffnen, ohne die Auswahl "Mediathek" anzubieten (Wunsch #106,
+# dort schon einmal zurueckgebaut).
+_BARCODE_MAX_BYTES = 8 * 1024 * 1024
+_BARCODE_MIME = {"jpg", "jpeg", "png", "heic", "webp"}
+
+# Nur Ziffern - der Code landet in einer URL. Ohne diese Pruefung koennte ein
+# praeparierter "Barcode" den Pfad der Abfrage veraendern.
+#
+# `\Z` und NICHT `$`: In Python passt `$` auch VOR einem abschliessenden
+# Zeilenumbruch. "4008400401621\n" waere also durch die Pruefung gerutscht und
+# mitsamt Umbruch in die Adresse geraten. Beim Schreiben des Tests aufgefallen,
+# nicht beim Schreiben des Codes.
+_NUR_ZIFFERN = re.compile(r"\A[0-9]{6,14}\Z")
+
+_OFF_TIMEOUT = 12
 
 
 def _user(token):
@@ -52,6 +89,152 @@ def _clean_angebot_laeden(db, angebot, laden_ids):
     if not gueltige:
         return 0, []
     return 1, gueltige
+
+
+def _barcode_aus_bild(rohdaten: bytes):
+    """Erster erkannter Barcode aus einem Foto, sonst None.
+
+    `zxing-cpp` liefert alle gefundenen Codes; auf einer Packung ist meist nur
+    einer, gelegentlich aber auch ein QR-Code daneben. Bevorzugt wird deshalb
+    ein Produktcode (EAN/UPC), erst danach irgendein anderer."""
+    from PIL import Image
+    import zxingcpp
+
+    bild = Image.open(io.BytesIO(rohdaten))
+    # Manche Handy-Fotos kommen als RGBA oder mit Palette - zxing-cpp will
+    # etwas Handfestes.
+    if bild.mode not in ("L", "RGB"):
+        bild = bild.convert("RGB")
+    treffer = zxingcpp.read_barcodes(bild)
+    if not treffer:
+        return None
+    produktcodes = [t for t in treffer if "EAN" in str(t.format) or "UPC" in str(t.format)]
+    gewaehlt = (produktcodes or treffer)[0]
+    text = (gewaehlt.text or "").strip()
+    return text if _NUR_ZIFFERN.match(text) else None
+
+
+def _produkt_zu_barcode(code: str):
+    """Produktdaten von Open Food Facts, oder None.
+
+    Feste Adresse mit geprüftem Ziffern-Code - deshalb ist hier KEINE
+    SSRF-Prüfung wie beim Rezept-Import nötig (dort gibt der Nutzer die
+    komplette Adresse vor, hier nur Ziffern in einem festen Pfad).
+
+    Ein unbekannter Code beantwortet Open Food Facts mit HTTP 404, nicht mit
+    einem leeren Ergebnis - das ist kein Fehler, sondern der Normalfall bei
+    Nicht-Lebensmitteln."""
+    if not _NUR_ZIFFERN.match(code or ""):
+        return None
+    url = (f"https://world.openfoodfacts.org/api/v2/product/{code}.json"
+           "?fields=product_name,product_name_de,brands,quantity")
+    req = urllib.request.Request(url, headers={
+        # Open Food Facts bittet in seiner Doku ausdrücklich um eine
+        # erkennbare Kennung statt eines anonymen Aufrufs.
+        "User-Agent": "Familienportal/1.0 (privates Familienprojekt)",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=_OFF_TIMEOUT) as resp:
+            daten = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+    if daten.get("status") != 1:
+        return None
+    p = daten.get("product") or {}
+    name = (p.get("product_name_de") or p.get("product_name") or "").strip()
+    if not name:
+        return None
+    marke = (p.get("brands") or "").split(",")[0].strip()
+    menge = (p.get("quantity") or "").strip()
+    return {"name": name[:80], "marke": marke[:40], "menge": menge[:30]}
+
+
+def _kategorie_per_ki(user_id: int, produkt: dict, kategorien) -> int:
+    """Ordnet ein Produkt einer der VORHANDENEN Kategorien zu.
+
+    Die Auswahl wird der KI vorgegeben und die Antwort gegen sie geprüft -
+    ein frei erfundener Kategoriename wäre wertlos, weil er zu keiner Zeile in
+    `einkauf_kategorien` passt. Bei Unsicherheit oder Fehler bleibt es bei
+    `None`; `_clean_kategorie_id()` setzt dann 'Sonstiges'."""
+    namen = [k["name"] for k in kategorien]
+    system = (
+        "Du ordnest ein Lebensmittel oder Drogerieprodukt genau EINER Kategorie "
+        "einer Einkaufsliste zu. Antworte AUSSCHLIESSLICH mit dem exakten "
+        "Kategorienamen aus der vorgegebenen Liste, ohne Anführungszeichen, "
+        "ohne Erklärung. Passt nichts eindeutig, antworte: Sonstiges"
+    )
+    beschreibung = " ".join(x for x in (produkt.get("marke"), produkt["name"]) if x)
+    prompt = f"Kategorien: {', '.join(namen)}\n\nProdukt: {beschreibung}"
+    antwort = ki_anfrage(user_id, "einkauf_barcode", system, prompt, max_tokens=30)
+    gewaehlt = (antwort or "").strip().strip('"').strip()
+    for k in kategorien:
+        if k["name"].lower() == gewaehlt.lower():
+            return k["id"]
+    return None
+
+
+@bp.route("/a/einkauf/barcode", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/einkauf/<token>/barcode", methods=["POST"])
+def barcode(token):
+    """Foto -> Barcode -> Produktname + Kategorievorschlag.
+
+    Gibt JSON zurück und speichert NICHTS: Das Ergebnis füllt nur das
+    bestehende Formular vor, der Nutzer prüft und speichert selbst - genau wie
+    beim Rezept-Import und wie im Wunsch beschrieben."""
+    user = _user(token)
+
+    datei = request.files.get("foto")
+    if not datei or not datei.filename:
+        return jsonify(ok=False, fehler="Kein Foto erhalten."), 400
+    endung = datei.filename.rsplit(".", 1)[-1].lower() if "." in datei.filename else ""
+    if endung not in _BARCODE_MIME:
+        return jsonify(ok=False, fehler="Nur JPG, PNG, HEIC oder WEBP."), 400
+    rohdaten = datei.read()
+    if not rohdaten:
+        return jsonify(ok=False, fehler="Die Datei ist leer."), 400
+    if len(rohdaten) > _BARCODE_MAX_BYTES:
+        return jsonify(ok=False, fehler="Das Foto ist zu groß (maximal 8 MB)."), 400
+
+    try:
+        code = _barcode_aus_bild(rohdaten)
+    except Exception:
+        return jsonify(ok=False, fehler="Das Foto konnte nicht gelesen werden."), 400
+    if not code:
+        return jsonify(
+            ok=False,
+            fehler="Kein Barcode erkannt. Nochmal näher und gerader fotografieren?"), 200
+
+    try:
+        produkt = _produkt_zu_barcode(code)
+    except Exception:
+        return jsonify(ok=False, code=code,
+                       fehler="Die Produktdatenbank ist gerade nicht erreichbar."), 200
+    if not produkt:
+        # Der Code wird trotzdem zurückgegeben - dann kann der Nutzer den
+        # Namen selbst eintippen, statt ganz von vorn anzufangen.
+        return jsonify(ok=False, code=code,
+                       fehler="Barcode erkannt, aber das Produkt ist nicht "
+                              "in der Datenbank. Bitte den Namen eintragen."), 200
+
+    db = get_db()
+    kategorien = _kategorien_aktiv(db)
+    kategorie_id = None
+    try:
+        kategorie_id = _kategorie_per_ki(user["id"], produkt, kategorien)
+    except KiLimitError:
+        pass          # Kontingent aufgebraucht - Name reicht, Kategorie waehlt der Nutzer
+    except KiFehler:
+        pass          # KI nicht erreichbar - dito, kein Grund die Erfassung abzubrechen
+    except Exception:
+        pass
+
+    anzeige = produkt["name"]
+    if produkt.get("menge"):
+        anzeige = f"{anzeige} ({produkt['menge']})"
+    return jsonify(ok=True, code=code, name=anzeige[:80],
+                   kategorie_id=kategorie_id)
 
 
 def _stand(db):

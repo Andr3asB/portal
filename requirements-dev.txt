@@ -11,3 +11,6 @@
 #   .venv/Scripts/python -m pytest tests/ -q
 -r src/requirements.txt
 pytest==8.4.2
+# Wunsch #143: nur zum ERZEUGEN eines Test-Barcodes. Im Betrieb wird gelesen
+# (zxing-cpp), nicht erzeugt - deshalb bewusst nicht in src/requirements.txt.
+python-barcode==0.16.1
