@@ -2,6 +2,95 @@
 
 ---
 
+## 2026-08-07 – portal-v137: Wunsch #145 – neue App „Geburtstage"
+
+Gemeinsame Liste, persönliche Einstellungen. Slug `geburtstage`, Modul
+`23_geburtstage.py`, Auto-Grant für alle (wie hilfe/einkauf) – Geburtstage
+sind Familiensache.
+
+### Was pro Nutzer gilt und was nicht
+
+Der Wunsch trennt das ausdrücklich: **Eingetragen wird für alle, eingestellt
+für sich.** Ausblenden, Erinnerung am Tag und Vorlauf-Erinnerung stehen
+deshalb in `geburtstag_einstellungen` mit `(user_id, geburtstag_id)` als
+Schlüssel. Eine fehlende Zeile heißt schlicht „Standard" – sichtbar, keine
+Erinnerung.
+
+Die beiden Erinnerungen sind **unabhängig** voneinander, wie verlangt: nur der
+Tag, nur der Vorlauf, beides oder nichts. Der Vorlauf ist eine freie Zahl
+(1–60 Tage), damit „drei Tage vorher, um zu backen" genauso geht wie „vier
+Wochen vorher, um etwas zu bestellen".
+
+Löschen betrifft alle und ist deshalb auf Urheber, Eltern und Admin begrenzt.
+Wer einen Eintrag nur selbst nicht sehen will, blendet ihn aus – die
+Sicherheitsabfrage sagt das auch so.
+
+### Tag und Monat als Zahlen, Jahr freiwillig
+
+Ein Geburtstag wiederholt sich jährlich, und das Geburtsjahr ist oft unbekannt
+(Nachbarn, Bekannte). Deshalb `tag`/`monat` als Zahlen und `jahr` als
+optionales Feld statt eines Datums. Mit Jahr wird angezeigt, welchen
+Geburtstag die Person feiert; ohne Jahr eben nicht.
+
+**Der 29. Februar** ist der Fall, den man vergisst: In drei von vier Jahren
+gibt es ihn nicht. `_tage_bis()` weicht dann auf den 1. März aus – die in
+Deutschland übliche Handhabung, und deutlich besser als „fällt dieses Jahr
+aus". Vier Tests decken das ab, dazu der Jahreswechsel (am 30.12. ist der 2.1.
+in drei Tagen, nicht in minus 362).
+
+### Wo der tägliche Lauf sitzt – und warum nicht in `util`
+
+`util` ist eigentlich der Ort für Zeitgesteuertes. Die Erinnerungen laufen
+trotzdem im Portal, in einem Hintergrund-Thread. Grund: `push_send()` und die
+VAPID-Schlüssel liegen im Portal. In `util` müssten entweder die Schlüssel
+dupliziert werden (zwei Orte für dasselbe Geheimnis) oder es bräuchte einen
+zusätzlichen, abgesicherten HTTP-Endpunkt zwischen den Containern. Beides sind
+mehr bewegliche Teile – und bewegliche Teile fallen still aus, was in dieser
+Sitzung schon dreimal das Thema war.
+
+Der Thread ist unkritisch, weil Gunicorn hier mit **einem** Worker läuft: genau
+ein Thread, keine Doppelversendung. Gegen Wiederholung nach einem Neustart
+schützt zusätzlich `geburtstag_gesendet` – verschickt wird nur, was für heute
+noch nicht vermerkt ist. Live gegengeprüft: zweiter Lauf am selben Tag
+verschickte 0.
+
+Schalter `GEBURTSTAGS_ERINNERUNGEN` (Default 1), im Test immer 0.
+
+### Zwei Fehler beim Bauen – beide von den Tests gefunden
+
+**1. `database is locked`.** Der Hintergrund-Thread schrieb während der Tests
+nebenher in dieselbe SQLite-Datei. Ein Test, der zufällig gegen einen Thread
+läuft, ist kein Test, sondern ein Würfelspiel – daher der Schalter.
+
+**2. Die eigentliche Ursache war eine andere**, und der erste Befund hätte
+mich fast in die Irre geführt: `DELETE FROM users` scheiterte an einer
+FOREIGN-KEY-Verletzung, weil `geburtstage.erstellt_von` auf `users` zeigte
+**ohne** Löschregel. Das „locked" war nur die Folgeerscheinung. Behoben mit
+`ON DELETE SET NULL`, nicht CASCADE: Der Geburtstag von Oma gehört der
+Familie, nicht demjenigen, der ihn zufällig eingetippt hat. Verlässt jemand
+das Portal, bleibt der Eintrag und nur die Urheberschaft wird vergessen –
+dasselbe Muster wie bei `wuensche`.
+
+### Der Emoji-Wächter hat sich sofort bezahlt gemacht
+
+Beim Schreiben des Hilfe-Kapitels schlug `test_emoji.py` an: 🙈 fehlte im
+Bündel. Wenige Stunden nach seiner Einführung hat der Test also genau den
+Fehler verhindert, für den er gebaut wurde – diesmal, bevor er jemandem
+auffiel. (Ebenso vorab: 🎂 🎈 🎁 für die neue App.)
+
+### Verifikation
+
+Live gegen den Server: zwei Einträge angelegt (einer mit Jahr → „wird 76",
+einer heute → 🎉-Markierung), von einem zweiten Konto gesehen; Andi setzte
+Erinnerung + 7 Tage Vorlauf, Simone blendete denselben Eintrag aus – beides
+wirkte nur beim jeweiligen Nutzer. Erinnerung tatsächlich verschickt (Push kam
+an), zweiter Lauf 0. Testdaten entfernt, Kaskaden räumten Einstellungen und
+Vermerke mit ab. Regression 53/53.
+
+156 Tests grün (19 neu).
+
+---
+
 ## 2026-08-07 – portal-v135/v136: Wünsche #146 (Live-Liste) und #147 (fehlende Icons)
 
 ### #147 – neun fehlende Icons, nicht eines

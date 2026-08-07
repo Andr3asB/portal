@@ -177,6 +177,7 @@ PORTAL_ORIGIN=           # leer = aus der Anfrage ableiten
 SITZUNG_KONSUMIEREN=1    # Wunsch #140, Stufe 3
 TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
+GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
 ```
 
 Die vier `#140`-Schalter sind die Notausstiege der jeweiligen Umbaustufe: auf
@@ -922,6 +923,22 @@ teile/
                        was der Umbau abschaffen sollte. Die Route `/qr.svg`
                        ist ersatzlos entfallen (sie musste den Token aus der DB
                        holen), der QR-Code steckt als data:-URI in der Antwort.
+  23_geburtstage.py  – /a/geburtstage/<token>/ Gemeinsame Geburtstagsliste
+                       (Wunsch #145). Eingetragen wird fuer alle, EINGESTELLT
+                       fuer sich: Ausblenden, Erinnerung am Tag und
+                       Vorlauf-Erinnerung stehen je (user_id, geburtstag_id).
+                       `_tage_bis()` rechnet ueber den Jahreswechsel und weicht
+                       beim 29. Februar in Nicht-Schaltjahren auf den 1. Maerz
+                       aus. Der taegliche Versand laeuft in einem
+                       Hintergrund-Thread HIER und nicht in `util`, weil
+                       push_send() und die VAPID-Schluessel im Portal liegen -
+                       in util muesste man das Geheimnis duplizieren oder einen
+                       weiteren Endpunkt absichern. Unkritisch, weil Gunicorn
+                       mit EINEM Worker laeuft; gegen Wiederholung nach einem
+                       Neustart schuetzt `geburtstag_gesendet`. Schalter
+                       GEBURTSTAGS_ERINNERUNGEN (im Test immer 0 - ein Thread,
+                       der nebenher in dieselbe SQLite-Datei schreibt, liess
+                       die Fixtures mit "database is locked" auflaufen).
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1312,6 +1329,9 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
+| `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
+| `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
+| `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
 | `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
@@ -1337,6 +1357,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `packliste` | Packliste | 🧳 | Packlisten für Reisen/Ausflüge, je Ziel eine eigene Liste (Wunsch #111) | – (zunächst nur Andi als Urheber) |
 | `tvb` | TVB | 🤾 | Nächste Spiele, Ergebnisse und Handball-Bundesliga-Tabelle des TVB Stuttgart (Wunsch #120) | – (alle vier granted) |
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
+| `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
 
 ## Hamburger-Menü (verpflichtende Struktur, seit Wunsch #32)
 

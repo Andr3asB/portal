@@ -43,6 +43,11 @@ def app(tmp_path_factory, token_key):
     os.environ["DATA_DIR"] = str(daten)
     os.environ["TOKEN_KEY"] = token_key
     os.environ["SECRET_KEY"] = "test-secret-key"
+    # Wunsch #145: Der Hintergrund-Thread für Geburtstags-Erinnerungen bleibt
+    # im Test aus. Er schreibt nebenher in dieselbe SQLite-Datei und liess die
+    # Fixtures mit "database is locked" auflaufen - und ein Test, der zufällig
+    # gegen einen Thread läuft, ist ohnehin kein Test, sondern ein Würfelspiel.
+    os.environ["GEBURTSTAGS_ERINNERUNGEN"] = "0"
     # Kein OpenRouter/VAPID/hae im Test – die Module müssen ohne auskommen.
     for leer in ("OPENROUTER_API_KEY", "VAPID_PRIVATE_KEY", "VAPID_PUBLIC_KEY",
                  "HAE_API_URL", "HAE_API_KEY"):
@@ -66,6 +71,10 @@ def db(app):
     # Nur die Tabellen leeren, die Tests befüllen – Schema und Seed-Daten
     # (Apps, Kategorien, Standardaufgaben) bleiben stehen.
     verbindung.execute("DELETE FROM grants")
+    # Wunsch #145: Geburtstage haengen NICHT per CASCADE am Nutzer (sie
+    # gehoeren der Familie, nicht dem Eintragenden) - ohne dieses Leeren
+    # bliebe der Bestand zwischen Tests stehen und liesse Zaehlungen driften.
+    verbindung.execute("DELETE FROM geburtstage")
     verbindung.execute("DELETE FROM users")
     verbindung.commit()
 

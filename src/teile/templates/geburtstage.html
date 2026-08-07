@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% set app_slug = "geburtstage" %}
+{% block title %}Geburtstage{% endblock %}
+
+{% block extra_styles %}
+.gb-neu-toggle {
+  width:100%; background:none; border:1.5px solid var(--farbe); color:var(--farbe);
+  border-radius:12px; padding:12px; font-size:15px; font-weight:600;
+  cursor:pointer; margin-bottom:14px;
+}
+.gb-form-card {
+  background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow); display:none;
+}
+.gb-form-card.open { display:block; }
+.gb-feld { margin-bottom:10px; }
+.gb-feld label {
+  display:block; font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;
+}
+.gb-input, .gb-select {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:10px 12px; font-size:16px; font-family:inherit; outline:none;
+  background:var(--surface); color:var(--text);
+}
+.gb-input:focus, .gb-select:focus { border-color:var(--farbe); }
+.gb-datum-row { display:flex; gap:8px; }
+.gb-datum-row .gb-feld { flex:1; margin-bottom:0; }
+.gb-submit {
+  width:100%; background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  padding:12px; font-size:16px; font-weight:600; cursor:pointer; margin-top:10px;
+}
+.gb-karte {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.gb-kopf { display:flex; align-items:center; gap:12px; }
+.gb-tage {
+  flex-shrink:0; min-width:52px; text-align:center; border-radius:10px;
+  padding:6px 4px; background:var(--surface-2);
+}
+.gb-tage-zahl { font-size:18px; font-weight:700; line-height:1.1; }
+.gb-tage-text { font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.gb-heute .gb-tage { background:var(--farbe); color:#fff; }
+.gb-heute .gb-tage-text { color:#fff; opacity:.85; }
+.gb-mitte { flex:1; min-width:0; }
+.gb-name { font-size:16px; font-weight:600; }
+.gb-datum { font-size:13px; color:var(--text-2); margin-top:2px; }
+.gb-notiz { font-size:13px; color:var(--text-2); margin-top:4px; font-style:italic; }
+.gb-glocke {
+  background:none; border:none; font-size:19px; cursor:pointer;
+  padding:2px 4px; flex-shrink:0; opacity:.35;
+}
+.gb-glocke.aktiv { opacity:1; }
+.gb-panel {
+  display:none; flex-direction:column; gap:10px;
+  margin-top:12px; padding-top:12px; border-top:1px solid var(--border);
+}
+.gb-panel.open { display:flex; }
+.gb-check-row { display:flex; align-items:center; gap:10px; font-size:15px; }
+.gb-check-row input { width:20px; height:20px; flex-shrink:0; }
+.gb-vorlauf-row { display:flex; align-items:center; gap:8px; font-size:15px; flex-wrap:wrap; }
+.gb-vorlauf-row input[type=number] {
+  width:70px; border:1.5px solid var(--border); border-radius:8px;
+  padding:6px 8px; font-size:15px; background:var(--surface); color:var(--text);
+}
+.gb-panel-aktionen { display:flex; gap:8px; align-items:center; }
+.gb-speichern {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:14px; cursor:pointer;
+}
+.gb-loeschen {
+  background:none; border:none; color:#ff3b30; font-size:13px; cursor:pointer;
+}
+.gb-abschnitt { font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:20px 0 8px; }
+.gb-leer { text-align:center; color:var(--text-2); font-size:14px; padding:28px 0; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🎂 Geburtstage</div>
+<div class="nav-sub">{{ sichtbare|length }} in der Liste</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <button class="gb-neu-toggle" data-klick="gbFormularUmschalten">+ Geburtstag eintragen</button>
+
+  <div class="gb-form-card" id="gb-form-card">
+    <form method="post" action="/a/geburtstage{{ tp }}neu">
+      <div class="gb-feld">
+        <label for="gb-name">Wer?</label>
+        <input class="gb-input" id="gb-name" type="text" name="name" required
+               maxlength="80" placeholder="z. B. Oma Erika">
+      </div>
+      <div class="gb-datum-row">
+        <div class="gb-feld">
+          <label for="gb-tag">Tag</label>
+          <input class="gb-input" id="gb-tag" type="number" name="tag"
+                 min="1" max="31" required inputmode="numeric" placeholder="24">
+        </div>
+        <div class="gb-feld">
+          <label for="gb-monat">Monat</label>
+          <select class="gb-select" id="gb-monat" name="monat" required>
+            {% for m in monate %}
+            <option value="{{ loop.index }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="gb-feld">
+        <label for="gb-jahr">Geburtsjahr (freiwillig)</label>
+        <input class="gb-input" id="gb-jahr" type="number" name="jahr"
+               min="1900" max="{{ heute_jahr | default(2026) }}" inputmode="numeric"
+               placeholder="leer lassen, wenn unbekannt">
+      </div>
+      <div class="gb-feld">
+        <label for="gb-notiz">Notiz (freiwillig)</label>
+        <input class="gb-input" id="gb-notiz" type="text" name="notiz"
+               maxlength="200" placeholder="z. B. Nachbarin, mag Rosen">
+      </div>
+      <button class="gb-submit" type="submit">Eintragen</button>
+    </form>
+  </div>
+
+  {% macro karte(e) %}
+  <div class="gb-karte {% if e.tage_bis == 0 %}gb-heute{% endif %}">
+    <div class="gb-kopf">
+      <div class="gb-tage">
+        {% if e.tage_bis == 0 %}
+          <div class="gb-tage-zahl">🎉</div><div class="gb-tage-text">heute</div>
+        {% else %}
+          <div class="gb-tage-zahl">{{ e.tage_bis }}</div>
+          <div class="gb-tage-text">{{ 'Tag' if e.tage_bis == 1 else 'Tage' }}</div>
+        {% endif %}
+      </div>
+      <div class="gb-mitte">
+        <div class="gb-name">{{ e.name }}</div>
+        <div class="gb-datum">
+          {{ e.datum_text }}{% if e.wird_alt %} · wird {{ e.wird_alt }}{% endif %}
+        </div>
+        {% if e.notiz %}<div class="gb-notiz">{{ e.notiz }}</div>{% endif %}
+      </div>
+      <button class="gb-glocke {% if e.erinnerung or e.vorlauf_tage %}aktiv{% endif %}"
+              data-klick="gbPanelUmschalten" data-args='[{{ e.id }}]'
+              title="Erinnerung und Sichtbarkeit">🔔</button>
+    </div>
+
+    <form class="gb-panel" id="gb-panel-{{ e.id }}" method="post"
+          action="/a/geburtstage{{ tp }}{{ e.id }}/einstellung">
+      <label class="gb-check-row">
+        <input type="checkbox" name="erinnerung" {% if e.erinnerung %}checked{% endif %}>
+        Am Geburtstag erinnern
+      </label>
+      <div class="gb-vorlauf-row">
+        <input type="number" name="vorlauf_tage" min="1" max="60" placeholder="–"
+               value="{{ e.vorlauf_tage if e.vorlauf_tage else '' }}">
+        <span>Tage vorher zusätzlich erinnern</span>
+      </div>
+      <label class="gb-check-row">
+        <input type="checkbox" name="ausgeblendet" {% if e.ausgeblendet %}checked{% endif %}>
+        Für mich ausblenden
+      </label>
+      <div class="gb-panel-aktionen">
+        <button class="gb-speichern" type="submit">Speichern</button>
+      </div>
+    </form>
+
+    {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
+    <form method="post" action="/a/geburtstage{{ tp }}{{ e.id }}/loeschen"
+          style="margin-top:6px"
+          data-bestaetigen="{{ ('„' ~ e.name ~ '“ für ALLE löschen? Wenn du ihn nur für dich nicht sehen willst, nutze stattdessen „Für mich ausblenden“.') }}">
+      <button class="gb-loeschen" type="submit">Für alle löschen</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {% if not sichtbare and not ausgeblendete %}
+  <div class="gb-leer">Noch keine Geburtstage eingetragen 🎂</div>
+  {% endif %}
+
+  {% for e in sichtbare %}{{ karte(e) }}{% endfor %}
+
+  {% if ausgeblendete %}
+  <div class="gb-abschnitt">Für mich ausgeblendet</div>
+  {% for e in ausgeblendete %}{{ karte(e) }}{% endfor %}
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+function gbFormularUmschalten() {
+  const karte = document.getElementById('gb-form-card');
+  karte.classList.toggle('open');
+  if (karte.classList.contains('open')) document.getElementById('gb-name').focus();
+}
+
+function gbPanelUmschalten(id) {
+  document.getElementById('gb-panel-' + id).classList.toggle('open');
+}
+</script>
+{% endblock %}

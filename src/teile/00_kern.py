@@ -360,6 +360,47 @@ CREATE TABLE IF NOT EXISTS tvb_kader (
 -- (storniert_von/storniert_am) bereits auf der Zeile selbst protokolliert -
 -- eine eigene Aenderungs-Historie braeuchte es erst, wenn Eintraege auch
 -- BEARBEITET werden duerften, was hier nicht verlangt ist.
+-- Wunsch #145: Geburtstage. Tag und Monat stehen als ZAHLEN da, nicht als
+-- Datumszeichenkette: Ein Geburtstag wiederholt sich jaehrlich, und das
+-- Geburtsjahr ist oft unbekannt (Bekannte, Nachbarn). Mit tag/monat laesst
+-- sich "heute in N Tagen" ohne Datumsrechnerei ueber Jahresgrenzen loesen,
+-- und ein fehlendes Jahr ist einfach NULL statt eines erfundenen Datums.
+-- `erstellt_von` mit ON DELETE SET NULL, NICHT CASCADE: Der Geburtstag von
+-- Oma gehoert der Familie, nicht demjenigen, der ihn zufaellig eingetippt hat.
+-- Verlaesst ein Nutzer das Portal, bleibt der Eintrag stehen und nur die
+-- Urheberschaft wird vergessen - dasselbe Muster wie bei `wuensche`.
+-- (Ohne diese Regel scheitert schon das Loeschen eines Nutzers an einer
+-- FOREIGN-KEY-Verletzung; genau daran liefen die Tests zuerst auf.)
+CREATE TABLE IF NOT EXISTS geburtstage (
+  id           INTEGER PRIMARY KEY,
+  name         TEXT    NOT NULL,
+  tag          INTEGER NOT NULL,
+  monat        INTEGER NOT NULL,
+  jahr         INTEGER,
+  notiz        TEXT,
+  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  erstellt     TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+-- Die Einstellungen sind PRO NUTZER, nicht pro Geburtstag: Der Wunsch
+-- verlangt ausdruecklich, dass jeder fuer sich ausblenden und erinnern kann.
+-- Eine fehlende Zeile heisst "Standard" (sichtbar, keine Erinnerung).
+CREATE TABLE IF NOT EXISTS geburtstag_einstellungen (
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  geburtstag_id INTEGER NOT NULL REFERENCES geburtstage(id) ON DELETE CASCADE,
+  ausgeblendet  INTEGER NOT NULL DEFAULT 0,
+  erinnerung    INTEGER NOT NULL DEFAULT 0,   -- am Tag selbst
+  vorlauf_tage  INTEGER,                      -- NULL = keine Vorab-Erinnerung
+  PRIMARY KEY (user_id, geburtstag_id)
+);
+-- Was schon verschickt wurde. Ohne diese Tabelle wuerde ein Neustart des
+-- Containers am selben Tag dieselbe Erinnerung noch einmal schicken.
+CREATE TABLE IF NOT EXISTS geburtstag_gesendet (
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  geburtstag_id INTEGER NOT NULL REFERENCES geburtstage(id) ON DELETE CASCADE,
+  art           TEXT    NOT NULL,             -- 'tag' | 'vorlauf'
+  datum         TEXT    NOT NULL,             -- YYYY-MM-DD des Versands
+  PRIMARY KEY (user_id, geburtstag_id, art, datum)
+);
 CREATE TABLE IF NOT EXISTS kassenbuch_eintraege (
   id             INTEGER PRIMARY KEY,
   user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -403,6 +444,7 @@ _CORE_APPS = [
     ("packliste",     "Packliste",     "🧳", None),
     ("tvb",           "TVB",           "🤾", None),
     ("kassenbuch",    "Kassenbuch",    "🐷", "Taschengeld verwalten"),
+    ("geburtstage",   "Geburtstage",   "🎂", "Wer wann Geburtstag hat"),
 ]
 
 _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller", "Penny"]
@@ -1691,6 +1733,10 @@ def _init_db(app):
         # Kinder sehen darüber ihr eigenes Kassenbuch, Eltern/Admin die
         # Übersicht aller Kinder (Aufsicht war Teil des Wunsches: "auditiert").
         _auto_grant_all(db, "kassenbuch")
+        # Wunsch #145: Geburtstage sind eine gemeinsame Familiensache -
+        # jeder traegt ein, jeder sieht alles. Ein Grant je Nutzer waere
+        # nur Verwaltungsaufwand ohne Nutzen.
+        _auto_grant_all(db, "geburtstage")
         db.commit()
         db.close()
 
