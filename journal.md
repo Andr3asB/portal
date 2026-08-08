@@ -2,6 +2,83 @@
 
 ---
 
+## 2026-08-08 – portal-v151: Wunsch #153 – Prüfprotokoll fürs Kassenbuch
+
+> „Wie Wirtschaftsprüfer brauchen die Eltern Zugriff auf das Audit Log des
+> Kassenbuchs."
+
+Die Daten dafür gab es seit #144 vollständig – `erstellt_von`, `erstellt`,
+`storniert_von`, `storniert_am` stehen auf jeder Zeile. Sichtbar waren sie
+nirgends: `_eintraege_laden()` hat die Urheber-Spalten nicht einmal
+mitgelesen. Es fehlte also keine Erfassung, sondern die Ansicht.
+
+### Der Unterschied, der die Seite ausmacht
+
+Ein Kassenbuch sortiert nach `datum` – dem Tag, an dem das Geld geflossen ist.
+Ein Prüfer will die andere Reihenfolge: **wann wurde was erfasst.** Erst darin
+fällt auf, dass ein Eintrag vier Tage später nachgetragen oder zwanzig Minuten
+nach dem Anlegen wieder storniert wurde. Im Kontoauszug sieht beides völlig
+unauffällig aus – deshalb ist die Prüfsicht kein anderes Layout derselben
+Liste, sondern eine andere Sortierung derselben Tatsachen.
+
+Daraus folgt der Rest fast von selbst:
+
+- **Eine Zeile erzeugt bis zu zwei Ereignisse.** Anlegen und Stornieren sind
+  zwei Handlungen, zu verschiedenen Zeiten, potenziell von verschiedenen
+  Personen. Als eine Zeile mit Storno-Häkchen wäre die interessantere der
+  beiden unsichtbar.
+- **„nachgetragen"** markiert Einträge, deren Buchungstag vor dem Erfassungstag
+  liegt. Erlaubt und meistens harmlos – aber genau das, wonach man sucht.
+- **„nicht von … selbst"** ist heute unmöglich (nur das Kind darf buchen).
+  Es wird trotzdem geprüft statt angenommen: Fände sich hier je ein fremder
+  Urheber, wäre das der wichtigste Befund der ganzen Seite.
+- **Rechenprobe** mit den Summanden einzeln. Ein Protokoll, das den Saldo nur
+  behauptet, ist wertlos; hier lässt er sich nachzählen. Die Probe kann
+  sichtbar scheitern – sonst würde sie nichts beweisen.
+
+Kinder sehen ihr eigenes Prüfprotokoll **nicht**. Sie haben in ihrem
+Kassenbuch bereits alles, auch die stornierten Zeilen; die Prüfsicht fügt
+nichts hinzu ausser der Perspektive der Aufsicht, und die gehört laut Wunsch
+den Eltern.
+
+### Dabei gefunden: das Kassenbuch datierte nachts falsch
+
+Der Container läuft auf UTC, die Familie lebt in Europe/Berlin. `date.today()`
+liefert deshalb zwischen Mitternacht und 2 Uhr morgens den **Vortag** – und
+die Regel „kein Nachtragen in die Zukunft" schob einen korrekt gewählten
+Tag danach **stumm zurück**. Ein Eintrag um 00:30 landete also auf gestern,
+ohne Hinweis.
+
+Für ein Prüfprotokoll wäre das doppelt schlimm gewesen: Es hätte jeden
+nächtlichen Eintrag als „nachgetragen" markiert und damit genau die
+Markierung entwertet, um derentwillen es die Seite gibt.
+
+Neu in `00_kern.py`: `heute_lokal()`, `utc_zu_lokal()`, `utc_zu_lokal_datum()`
+und `LOKAL_TZ` – der eine Ort, an dem umgerechnet wird. Bisher hatte jedes
+Modul, das die Zeitzone brauchte, seine eigene `_TZ`-Konstante
+(`13_kinderplan.py`, `14_sportschau.py`, `18_tvb.py`); das Kassenbuch hatte
+schlicht keine.
+
+### Verifikation
+
+17 neue Tests. Zwei davon habe ich absichtlich kaputtgemacht, um zu sehen,
+dass sie beissen: Zugriffsgrenze ausgehängt → `test_kind_darf_das_protokoll_
+nicht_sehen` rot; Zeitzonenumrechnung durch die Identität ersetzt → zwei
+weitere rot. Ohne diese Gegenprobe wäre „alles grün" nur eine Behauptung.
+
+Live geprüft – **diesmal mit einem Wegwerf-Konto**, nicht wie beim letzten Mal
+gegen ein echtes Kinderkonto (siehe Eintrag darüber). Fünf Ereignisse in
+Erfassungsreihenfolge, Storno 20 Minuten nach dem Anlegen als eigene Zeile,
+„nachgetragen" an genau der einen Zeile, die es verdient, 09:00 UTC korrekt
+als 11:00 angezeigt, Rechenprobe 10,00 + 7,00 − 2,50 = 14,50 mit den
+stornierten 4,00 € ausserhalb. Zugriff: Kind 403 (auch aufs eigene), Admin
+200, ohne Zugang 403. Konto danach restlos entfernt – keine Einträge, keine
+verwaisten Grants.
+
+224 Tests grün.
+
+---
+
 ## 2026-08-08 – Aufräumen: mein Testmüll in Friederikes Kassenbuch
 
 Andi fragte, ob die drei Einträge in Friederikes Kassenbuch von ihr oder von

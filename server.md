@@ -957,6 +957,25 @@ teile/
                        Buch READ-ONLY oeffnen, aber nichts eintragen/
                        stornieren (eigene_buch-Pruefung serverseitig, nicht
                        nur im Template versteckt).
+                       Wunsch #153: Pruefprotokoll unter
+                       /kind/<id>/pruefung, NUR fuer Eltern/Admin (Kinder
+                       bekommen 403, auch aufs eigene). Der Unterschied zum
+                       Kassenbuch ist die SORTIERUNG: das Buch nach `datum`
+                       (Tag des Geldflusses), das Protokoll nach `erstellt`/
+                       `storniert_am` (Zeitpunkt der Erfassung) - erst darin
+                       faellt ein Nachtrag oder ein schnelles Storno auf.
+                       Eine Zeile erzeugt darum bis zu ZWEI Ereignisse
+                       (`_pruefprotokoll()`): Anlegen und Stornieren sind
+                       zwei Handlungen mit eigener Zeit und eigenem Urheber.
+                       Markierung "nachgetragen" wenn datum < Erfassungstag
+                       (in ORTSZEIT verglichen, sonst waere nachts jeder
+                       Eintrag markiert), Markierung "nicht von X selbst"
+                       wenn erstellt_von != user_id - heute unmoeglich,
+                       wird aber geprueft statt angenommen.
+                       `_rechenprobe()` liefert die Summanden einzeln, damit
+                       sich der Saldo nachzaehlen laesst; ihr `stimmt`-Feld
+                       kann sichtbar scheitern - eine Probe, die nicht
+                       scheitern kann, beweist nichts.
   03_admin.py        – ... Wunsch #140 Stufe 6: zeigt KEINE Zugangsadressen
                        mehr an. `_zugang_anzeigen()` ist die einzige Stelle,
                        an der ein Link je zu sehen ist - beim Anlegen eines
@@ -1423,6 +1442,17 @@ anhängen.
 ## Sicherheitskonventionen (verpflichtend)
 
 - **Ganzzahlen**: immer `to_int()` aus `teile.kern` – nie `int()` direkt auf Nutzereingaben
+- **Datum/Uhrzeit**: immer `heute_lokal()` aus `teile.kern` – **nie `date.today()`**.
+  Der Container läuft auf UTC, die Familie auf Europe/Berlin: zwischen
+  Mitternacht und 2 Uhr liefert `date.today()` den VORTAG. Im Kassenbuch
+  landete ein nächtlicher Eintrag dadurch stumm auf gestern, weil die
+  "kein Nachtragen in die Zukunft"-Regel den korrekt gewählten Tag
+  zurückschob (gefunden bei Wunsch #153). Gespeicherte Zeitstempel
+  (`datetime('now')` in SQLite) sind ebenfalls UTC und gehören für die
+  Anzeige durch `utc_zu_lokal()`, zum Vergleichen durch
+  `utc_zu_lokal_datum()`. Ein eigener `_TZ`-Konstante je Modul ist Altbestand
+  (`13_kinderplan.py`, `14_sportschau.py`, `18_tvb.py`) – neuer Code nimmt
+  die Helfer aus dem Kern.
 - **Farben**: immer `_clean_farbe()` aus `03_admin.py` (Regex `^#[0-9a-fA-F]{6}$`)
 - **DOM**: `textContent` / `createElement` statt `innerHTML` für Nutzerdaten in JS
 - **Logs**: Gunicorn RedactingLogger scrubbt Tokens aus Access-Logs
@@ -1860,6 +1890,12 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_kassenbuch_pruefung.py` – Wunsch #153. Zugriffsgrenze in beide
+  Richtungen (Eltern/Admin 200, Kind 403 auch aufs EIGENE Protokoll), das
+  Storno als eigenes Ereignis, die Sortierung nach Erfassungszeit statt nach
+  Buchungsdatum, "nachgetragen" mit Gegenprobe (zeitnaher Eintrag darf NICHT
+  markiert werden) und die Zeitzonen-Umrechnung. Zwei Tests wurden durch
+  absichtliches Kaputtmachen gegengeprueft.
 - `test_tvb_wettbewerbe.py` – Wunsch #151. Der erste Test haelt bewusst den
   IST-Zustand fest (der exakte ID-Vergleich uebersieht das Pokalspiel): geht er
   eines Tages durch, hat handball.net die IDs vereinheitlicht und die

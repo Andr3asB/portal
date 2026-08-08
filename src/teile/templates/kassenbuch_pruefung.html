@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% set app_slug = "kassenbuch" %}
+{% block title %}Prüfprotokoll · {{ kind.name }}{% endblock %}
+
+{% block extra_styles %}
+.kbp-erklaerung {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+  color:var(--text-2); font-size:13px; line-height:1.5;
+}
+.kbp-probe {
+  background:var(--surface); border-radius:16px; padding:16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.kbp-probe-titel {
+  font-size:12px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;
+}
+.kbp-zeile {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:5px 0; font-size:15px;
+}
+.kbp-zeile.kbp-summe {
+  border-top:1.5px solid var(--border); margin-top:6px; padding-top:9px;
+  font-weight:700; font-size:17px;
+}
+.kbp-zeile-label { color:var(--text-2); }
+.kbp-zeile.kbp-summe .kbp-zeile-label { color:var(--text); }
+.kbp-nebensatz { font-size:12px; color:var(--text-2); margin-top:10px; }
+.kbp-warnung { color:#ff3b30; font-weight:700; }
+
+.kbp-ereignis {
+  display:flex; gap:12px; background:var(--surface); border-radius:14px;
+  padding:12px 14px; margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  border-left:5px solid var(--kbp-farbe, var(--border));
+}
+.kbp-angelegt  { --kbp-farbe:#34c759; }
+.kbp-storniert { --kbp-farbe:#ff9500; }
+.kbp-ereignis-mitte { flex:1; min-width:0; }
+.kbp-was {
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--kbp-farbe, var(--text-2));
+}
+.kbp-sache { font-size:15px; font-weight:500; margin-top:2px; word-break:break-word; }
+.kbp-meta { font-size:12px; color:var(--text-2); margin-top:3px; line-height:1.45; }
+.kbp-betrag { font-size:15px; font-weight:700; white-space:nowrap; align-self:center; }
+.kbp-markierung {
+  display:inline-block; margin-top:5px; padding:1px 7px; border-radius:8px;
+  font-size:11px; font-weight:700; background:#ff950022; color:#c96b00;
+}
+.kbp-markierung.kbp-ernst { background:#ff3b3022; color:#c0271d; }
+.kbp-leer { text-align:center; color:var(--text-2); font-size:14px; padding:28px 0; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/kassenbuch{{ tp }}kind/{{ kind.id }}" title="Zurück zum Kassenbuch">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🔍 Prüfprotokoll</div>
+<div class="nav-sub">{{ kind.name }} · nur zum Ansehen</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="kbp-erklaerung">
+    Das Kassenbuch sortiert nach dem Tag, an dem das Geld geflossen ist. Hier
+    steht die andere Reihenfolge: <strong>wann wurde was erfasst</strong> –
+    neueste Handlung zuerst. Jedes Anlegen und jedes Stornieren ist eine eigene
+    Zeile mit Zeitpunkt und Urheber. Nichts davon lässt sich nachträglich
+    ändern, auch nicht von {{ kind.name }}.
+  </div>
+
+  <div class="kbp-probe">
+    <div class="kbp-probe-titel">Rechenprobe</div>
+    <div class="kbp-zeile">
+      <span class="kbp-zeile-label">Startbetrag</span><span>{{ probe.start_text }}</span>
+    </div>
+    <div class="kbp-zeile">
+      <span class="kbp-zeile-label">+ Einnahmen</span><span>{{ probe.einnahmen_text }}</span>
+    </div>
+    <div class="kbp-zeile">
+      <span class="kbp-zeile-label">− Ausgaben</span><span>{{ probe.ausgaben_text }}</span>
+    </div>
+    <div class="kbp-zeile kbp-summe">
+      <span class="kbp-zeile-label">Im Sparschwein</span><span>{{ probe.saldo_text }}</span>
+    </div>
+    <div class="kbp-nebensatz">
+      {{ probe.anzahl }} Einträge insgesamt, davon {{ probe.storniert_anzahl }} storniert
+      {%- if probe.storniert_anzahl %} ({{ probe.storniert_text }} zählen nicht mit){% endif %}.
+      {% if not probe.stimmt %}
+      <span class="kbp-warnung">Achtung: Die Summe stimmt nicht mit dem angezeigten Kontostand überein – bitte melden.</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not ereignisse %}
+  <div class="kbp-leer">Noch nichts passiert – {{ kind.name }} hat das Kassenbuch nicht eingerichtet.</div>
+  {% endif %}
+
+  {% for e in ereignisse %}
+  <div class="kbp-ereignis {{ 'kbp-storniert' if e.was == 'storniert' else 'kbp-angelegt' }}">
+    <div class="kbp-ereignis-mitte">
+      <div class="kbp-was">{{ "storniert" if e.was == "storniert" else "angelegt" }}</div>
+      <div class="kbp-sache">
+        {%- if e.eintrag_art == "start" -%}
+          Startbetrag
+        {%- else -%}
+          {{ e.zweck or e.person or "ohne Angabe" }}
+        {%- endif -%}
+      </div>
+      <div class="kbp-meta">
+        {{ e.zeit_text }} · durch {{ e.wer }}<br>
+        gebucht auf den {{ e.datum_text }}
+        {%- if e.person and e.zweck %} · {{ e.person }}{% endif %}
+      </div>
+      {% if e.nachgetragen %}
+      <span class="kbp-markierung">nachgetragen</span>
+      {% endif %}
+      {% if e.fremd %}
+      <span class="kbp-markierung kbp-ernst">nicht von {{ kind.name }} selbst</span>
+      {% endif %}
+    </div>
+    <span class="kbp-betrag">{{ e.vorzeichen }}{{ e.betrag_text }}</span>
+  </div>
+  {% endfor %}
+
+</main>
+{% endblock %}

@@ -1,6 +1,7 @@
 import sqlite3, secrets, logging, base64, hashlib, hmac
 from contextlib import contextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from flask import g, current_app, jsonify, request
 
 log = logging.getLogger("portal.kern")
@@ -823,6 +824,56 @@ def token_entschluesseln(blob: str, key: bytes = None) -> str:
     except Exception:
         log.error("Token konnte nicht entschluesselt werden - falscher TOKEN_KEY?")
         return ""
+
+
+# Der Container laeuft auf UTC (bewusst - so sind alle gespeicherten
+# Zeitstempel vergleichbar). Die Familie lebt aber in Europe/Berlin, im Sommer
+# also UTC+2. Wer `date.today()` benutzt, bekommt zwischen Mitternacht und
+# 2 Uhr morgens deshalb den VORTAG - und `datetime('now')` aus SQLite ist
+# ebenfalls UTC. Beides muss fuer die Anzeige umgerechnet werden; die beiden
+# Helfer hier sind der einzige Ort, an dem das passieren soll.
+LOKAL_TZ = ZoneInfo("Europe/Berlin")
+
+
+def heute_lokal() -> str:
+    """Heutiges Datum in Familienzeit als 'YYYY-MM-DD'.
+
+    Ersatz fuer `date.today()`, das im UTC-Container nachts falsch liegt."""
+    return datetime.now(LOKAL_TZ).date().isoformat()
+
+
+def utc_zu_lokal(text, mit_zeit: bool = True):
+    """SQLite-Zeitstempel ('YYYY-MM-DD HH:MM:SS', UTC) -> lesbare Ortszeit.
+
+    Gibt None zurueck, wenn nichts da ist - Aufrufer muessen mit fehlenden
+    Zeitstempeln rechnen (`storniert_am` ist NULL, solange nichts storniert
+    wurde)."""
+    if not text:
+        return None
+    roh = str(text).strip().replace("T", " ")
+    for muster in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            wann = datetime.strptime(roh[:len(muster) + 2], muster)
+            break
+        except ValueError:
+            continue
+    else:
+        return str(text)  # unbekanntes Format lieber roh zeigen als schlucken
+    lokal = wann.replace(tzinfo=timezone.utc).astimezone(LOKAL_TZ)
+    return lokal.strftime("%d.%m.%Y, %H:%M") if mit_zeit else lokal.strftime("%d.%m.%Y")
+
+
+def utc_zu_lokal_datum(text):
+    """Nur der Kalendertag in Ortszeit als 'YYYY-MM-DD' - zum Vergleichen,
+    nicht zum Anzeigen."""
+    if not text:
+        return None
+    roh = str(text).strip().replace("T", " ")
+    try:
+        wann = datetime.strptime(roh[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return str(text)[:10]
+    return wann.replace(tzinfo=timezone.utc).astimezone(LOKAL_TZ).date().isoformat()
 
 
 def to_int(value, default=None):
