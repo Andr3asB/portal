@@ -304,13 +304,26 @@ Konto; der ist wieder gelöscht.
 
 | ID | Test | Gerät | Erwartet | OK? | Notiz |
 |---|---|---|---|---|---|
-| S6-01 | Alle vier Zugänge nacheinander öffnen | alle 4 | Jeder kommt in seine Apps | | |
-| S6-02 | Esszimmer-Bildschirm | Kiosk | Läuft unverändert | | |
-| S6-03 | In der Verwaltung nachsehen | A-PC | Es werden **keine** Zugangsadressen mehr im Klartext angezeigt | | |
-| S6-06 | **Push-Benachrichtigung antippen.** Ich schicke dir eine Testmeldung (`manage.py testpush 1`) – oder du sagst Bescheid, dann jederzeit wieder. Meldung auf dem Handy antippen. | A-Handy | Die Aufgabenliste öffnet sich. (Die Adresse in der Meldung kam früher aus dem Token – den gibt es nicht mehr) | | |
+| S6-01 | Alle vier Zugänge nacheinander öffnen | alle 4 | Jeder kommt in seine Apps | ok | |
+| S6-02 | Esszimmer-Bildschirm | Kiosk | Läuft unverändert | ok | |
+| S6-03 | In der Verwaltung nachsehen | A-PC | Es werden **keine** Zugangsadressen mehr im Klartext angezeigt | ok | |
+| S6-06 | **Push-Benachrichtigung antippen.** Ich schicke dir eine Testmeldung (`manage.py testpush 1`) – oder du sagst Bescheid, dann jederzeit wieder. Meldung auf dem Handy antippen. | A-Handy | Die Aufgabenliste öffnet sich. (Die Adresse in der Meldung kam früher aus dem Token – den gibt es nicht mehr) | ok | |
 | S6-07 | **Windows-Rechner neu anmelden:** Portal am PC öffnen, Benachrichtigungen einmal aktivieren. Dann sag Bescheid, ich schicke eine Testmeldung. | A-PC | Die Meldung kommt am PC an. Bis eben scheiterte Push an Windows still (TTL-Fehler, behoben in v134); der Push-Kanal des PCs war zudem abgelaufen und wurde entfernt | | |
-| S6-04 | Bei einem Nutzer **„Neuer Zugang + QR"** (der Knopf hieß vorher „Zugänge neu"), QR sofort scannen | Kind | Neuer Zugang funktioniert; der alte Link des Kindes geht danach nicht mehr | | |
-| S6-05 | Verwaltung neu laden und denselben QR nochmal suchen | A-PC | Ist nicht mehr abrufbar – nur direkt nach dem Erzeugen (so gewollt) | | |
+| S6-04 | Bei einem Nutzer **„Neuer Zugang + QR"** (der Knopf hieß vorher „Zugänge neu"), QR sofort scannen | Kind | Neuer Zugang funktioniert; der alte Link des Kindes geht danach nicht mehr | ok | |
+| S6-05 | Verwaltung neu laden und denselben QR nochmal suchen | A-PC | Ist nicht mehr abrufbar – nur direkt nach dem Erzeugen (so gewollt) | ok | |
+
+**Stand 08.08.2026:** S6-01 bis S6-06 von Andi bestätigt. Damit ist der
+sechsstufige Umbau abgeschlossen – alle Schalter stehen auf dem Endwert
+(`SITZUNG_AUSSTELLEN=1`, `CSRF_MODUS=scharf`, `SITZUNG_KONSUMIEREN=1`,
+`TOKENFREIE_URLS=1`, `CSP_MODUS=scharf`), und `grants` hat nur noch
+`token_lookup`, keinen `token_enc` mehr.
+
+Offen bleibt allein **S6-07** (Windows-Rechner neu anmelden) – der hängt
+nicht am Umbau, sondern am Push-Kanal des PCs.
+
+Die Sicherungskopie `/data/portal-vor-stufe6.db` wird damit nicht mehr als
+Notausstieg gebraucht. Sie enthält noch die alten Klartext-Tokens und die
+gelöschten Kassenbuch-Einträge – sag Bescheid, dann räume ich sie ab.
 
 ---
 

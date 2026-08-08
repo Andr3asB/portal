@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-08-08 – Stufe 6 bestätigt: der Umbau ist durch. Und: 808 Sitzungen von mir
+
+Andi hat S6-01 bis S6-06 abgehakt. Damit sind alle sechs Stufen aus
+`quiet-enchanting-shore.md` ausgeliefert **und** von echten Geräten bestätigt.
+Alle Schalter stehen auf dem Endwert, `grants` trägt nur noch `token_lookup`.
+Offen ist allein S6-07 (Windows-Push), was nicht am Umbau hängt.
+
+### Beim Nachsehen: die Sitzungstabelle ist zu 99 % meine
+
+817 Zeilen für vier Menschen. Aufgeschlüsselt nach `geraet`:
+
+| Gerät | Sitzungen |
+|---|---|
+| `curl/8.19.0` | 688 |
+| `Python-urllib/3.14` | 120 |
+| echte Browser (iPhone, Windows, Mac, CrOS) | 9 |
+
+**808 von 817 stammen aus meinen eigenen Regressionsläufen.** Jeder Aufruf
+eines Pfad-Tokens ohne Cookie stellt eine Sitzung aus – und mein
+Regressionsskript ruft alle Grants einzeln auf, ohne Cookie-Jar, mehrmals
+täglich. Jede dieser Zeilen ist ein **gültiger, nie ablaufender Zugang**
+(`ablauf` ist NULL, bewusst so wegen des Kiosk).
+
+Das ist dasselbe Muster wie beim Kassenbuch, nur in der Authentifizierung:
+Mein Testen hinterlässt dauerhafte Spuren im Produktivsystem, und weil es
+lautlos passiert, fällt es erst auf, wenn jemand nachzählt. Bitter ist die
+Ironie: Der ganze sechsstufige Umbau hatte zum Ziel, die Zahl langlebiger
+Zugangsgeheimnisse zu senken – und mein Prüfen hat sie verhundertfacht.
+
+Zwei Dinge folgen daraus:
+
+1. **Das Regressionsskript braucht einen Cookie-Jar.** Dann entsteht **eine**
+   Sitzung statt fünfzig, und die lässt sich am Ende gezielt wieder löschen.
+2. **Es fehlt eine Geräteübersicht.** Der Plan hatte sie vorgesehen („die
+   Geräteübersicht macht es sichtbar"), gebaut wurde sie nie. `sitzungen`
+   wird heute nur bei „Neuer Zugang + QR" geleert und ist sonst für niemanden
+   einsehbar – 817 Zeilen konnten deshalb unbemerkt auflaufen.
+
+Gelöscht habe ich noch nichts: Das ist die Authentifizierungstabelle, und ein
+Fehler im `WHERE` sperrt die Familie aus. Andi gefragt.
+
+---
+
 ## 2026-08-08 – portal-v151: Wunsch #153 – Prüfprotokoll fürs Kassenbuch
 
 > „Wie Wirtschaftsprüfer brauchen die Eltern Zugriff auf das Audit Log des
