@@ -315,7 +315,18 @@ teile/
                        gar nicht aktiv ist.
   02_werkstatt.py    – POST /wunsch (JSON, identifiziert Nutzer über Token);
                        _ansicht_aus_pfad() verdichtet window.location.pathname
-                       zu "app_slug/unterseite", token-frei (Wunsch #47)
+                       zu "app_slug/unterseite", token-frei (Wunsch #47).
+                       Wunsch #152: nimmt zusaetzlich `prioritaet` entgegen,
+                       uebernimmt sie aber NUR von einem Admin und nur aus
+                       WUNSCH_PRIORITAETEN (Kern). Die Auswahl im ✨-Dialog
+                       steht in base.html hinter `user.is_admin` - darauf
+                       darf man sich nicht verlassen, /wunsch nimmt JSON und
+                       ein selbstgebauter POST umgeht jedes Template. Ein
+                       unerlaubter Wert wird zu NULL, der Wunsch selbst wird
+                       trotzdem gespeichert (ein still verworfener Vorschlag
+                       waere der schlechtere Ausgang). Voreinstellung im
+                       Dialog ist `zurueckgestellt` = die einzige Prioritaet,
+                       die ein Sammelauftrag nie anfasst.
   03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer (mit Rolle), Grants,
                        QR-Codes, _clean_farbe() (Hex-Validierung)
   04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() mit Push-Deep-Link;
@@ -1895,6 +1906,12 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_wunsch_prioritaet.py` – Wunsch #152. Prueft den ENDPUNKT, nicht die
+  Seite: die Auswahl steht im Template hinter `user.is_admin`, aber `/wunsch`
+  nimmt JSON und ein selbstgebauter POST umgeht jedes Template. Enthaelt
+  bewusst Positiv-Faelle (Admin DARF) - die erste Fassung der Fixture legte
+  ungueltige Tokens an, wodurch fuenf Verbots-Tests aus dem falschen Grund
+  gruen waren; nur die Admin-Tests haben es aufgedeckt.
 - `test_kassenbuch_pruefung.py` – Wunsch #153. Zugriffsgrenze in beide
   Richtungen (Eltern/Admin 200, Kind 403 auch aufs EIGENE Protokoll), das
   Storno als eigenes Ereignis, die Sortierung nach Erfassungszeit statt nach

@@ -175,6 +175,17 @@
     }
     .wunsch-modal-card textarea:focus { border-color: var(--farbe); }
     .wunsch-modal-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+    /* Wunsch #152: Prioritaetswahl beim Anlegen, nur fuer Admins */
+    .wunsch-prio-label {
+      display: block; margin-top: 12px; margin-bottom: 4px;
+      font-size: 12px; font-weight: 700; color: var(--text-2);
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .wunsch-prio-select {
+      width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 9px 11px; font-size: 15px; font-family: inherit;
+      background: var(--surface); color: var(--text);
+    }
     .btn {
       padding: 10px 20px; border-radius: 10px;
       font-size: 15px; font-weight: 500; border: none; cursor: pointer;
@@ -336,6 +347,20 @@
   <div class="wunsch-modal-card">
     <h3>✨ Verbesserungswunsch</h3>
     <textarea id="wunsch-text" rows="4" placeholder="Was soll besser werden?"></textarea>
+    {% if user is defined and user and user.is_admin %}
+    {# Wunsch #152: nur fuer Admins. Voreinstellung "Zurueckgestellt" - ein
+       neuer Wunsch soll erst umgesetzt werden, wenn er ausdruecklich
+       hochgestuft wurde. Serverseitig nochmal geprueft, das hier ist nur
+       die Oberflaeche. #}
+    <label class="wunsch-prio-label" for="wunsch-prio">Priorität</label>
+    <select id="wunsch-prio" class="wunsch-prio-select">
+      <option value="zurueckgestellt" selected>Zurückgestellt</option>
+      <option value="niedrig">Niedrig</option>
+      <option value="mittel">Mittel</option>
+      <option value="hoch">Hoch</option>
+      <option value="sehr_hoch">Sehr hoch</option>
+    </select>
+    {% endif %}
     <div class="wunsch-modal-actions">
       <button class="btn btn-secondary" id="wunsch-cancel">Abbrechen</button>
       <button class="btn btn-primary"   id="wunsch-send">Senden</button>
@@ -478,6 +503,8 @@
         body: JSON.stringify({
           text, app: '{{ app_slug | default("") }}', token: TOKEN,
           pfad: window.location.pathname,
+          // Wunsch #152: nur vorhanden, wenn der Auswahlknopf gerendert wurde
+          prioritaet: (document.getElementById('wunsch-prio') || {}).value || '',
         }),
       });
       const d = await resp.json();
@@ -485,6 +512,10 @@
     } catch(e) {}
     wunschOverlay.classList.remove('open');
     document.getElementById('wunsch-text').value = '';
+    // Wunsch #152: Auswahl zuruecksetzen. Bliebe die letzte Wahl stehen,
+    // bekaeme der naechste Wunsch unbemerkt dieselbe Priorität.
+    const prioFeld = document.getElementById('wunsch-prio');
+    if (prioFeld) prioFeld.value = 'zurueckgestellt';
     // Wunsch #60: Werkstatt-Seite neu laden, wenn dort gerade ein neuer Wunsch
     // eingetragen wurde, damit er sofort in der Liste erscheint.
     if (erfolgreich && '{{ app_slug | default("") }}' === 'werkstatt') {

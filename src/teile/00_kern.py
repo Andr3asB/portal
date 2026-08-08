@@ -834,6 +834,19 @@ def token_entschluesseln(blob: str, key: bytes = None) -> str:
 # Helfer hier sind der einzige Ort, an dem das passieren soll.
 LOKAL_TZ = ZoneInfo("Europe/Berlin")
 
+# Wunsch #152: Die Prioritaeten stehen im Kern, weil sie an ZWEI Stellen
+# gebraucht werden - beim Anlegen eines Wunsches (02_werkstatt.py) und beim
+# Aendern in der Werkstatt (05_werkstatt_app.py). Zwei getrennte Listen
+# wuerden auseinanderlaufen, und die Folge waere still: Ein Wert, den nur
+# eine Seite kennt, wird von der anderen wortlos verworfen.
+WUNSCH_PRIORITAETEN = ("niedrig", "mittel", "hoch", "sehr_hoch", "zurueckgestellt")
+
+# Voreinstellung fuer neu eingereichte Wuensche eines Admins. Bewusst
+# "zurueckgestellt": Das ist die einzige Priorität, die ein Sammelauftrag
+# ("implementiere alle Wuensche") NIE anfasst - ein neuer Wunsch wird damit
+# erst umgesetzt, wenn Andi ihn ausdruecklich hochstuft.
+WUNSCH_PRIO_VOREINSTELLUNG = "zurueckgestellt"
+
 
 def heute_lokal() -> str:
     """Heutiges Datum in Familienzeit als 'YYYY-MM-DD'.

@@ -18,12 +18,12 @@ Werkstatt-App auf einen Wunsch, klappt eine Detailansicht mit Wunsch,
 Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant
+from teile.kern import get_db, grant as check_grant, WUNSCH_PRIORITAETEN
 
 bp  = Blueprint("werkstatt_app", __name__)
 APP = "werkstatt"
 
-_PRIORITAETEN = ("niedrig", "mittel", "hoch", "sehr_hoch", "zurueckgestellt")
+_PRIORITAETEN = WUNSCH_PRIORITAETEN   # Wunsch #152: eine Liste, im Kern
 
 # Wunsch #141: lesbare Beschriftung für die Filter-Chips. "" = Wunsch ohne
 # gesetzte Priorität (kommt bei frisch eingereichten Wünschen vor).

@@ -2,6 +2,56 @@
 
 ---
 
+## 2026-08-08 – portal-v152: Wunsch #152 – Priorität schon beim Eintragen
+
+> „Als Admin will ich neue Wünsche direkt bei der Eingabe priorisieren können.
+> Default ist zurückgestellt."
+
+Die Voreinstellung ist der eigentliche Inhalt des Wunsches, nicht die
+Bequemlichkeit. `zurueckgestellt` ist die einzige Priorität, die ein
+Sammelauftrag („implementiere alle Wünsche") **nie** anfasst. Ein frisch
+notierter Einfall bleibt damit liegen, bis Andi ihn ausdrücklich hochstuft –
+der Dialog wird zum Notizzettel, ohne dass daraus versehentlich ein Auftrag
+wird.
+
+### Wer darf, wird auf dem Server entschieden
+
+Die Auswahl steht im Template hinter `user.is_admin`. Darauf darf man sich
+nicht verlassen: `/wunsch` nimmt JSON entgegen, ein selbstgebauter POST
+umgeht jedes Template. Die Prüfung sitzt deshalb im Endpunkt – und zwar so,
+dass ein unerlaubter Wert **den Wunsch nicht mitreisst**: verworfen wird die
+Priorität, gespeichert wird der Vorschlag. Ein still weggeworfener Wunsch
+wäre der schlechtere Ausgang.
+
+Die Prioritätsliste steht jetzt im Kern (`WUNSCH_PRIORITAETEN`) statt lokal in
+`05_werkstatt_app.py`. Gebraucht wird sie ab sofort an zwei Stellen – beim
+Anlegen und beim Ändern –, und zwei getrennte Listen wären genau die Bauart,
+deren Auseinanderlaufen niemandem auffällt: Ein Wert, den nur eine Seite
+kennt, wird von der anderen wortlos verworfen. Ein Test hält fest, dass beide
+Module dasselbe Objekt benutzen.
+
+Die Auswahl setzt sich nach dem Senden zurück. Bliebe die letzte Wahl stehen,
+bekäme der nächste Wunsch unbemerkt dieselbe Priorität – und „unbemerkt" ist
+bei einer Einstufung, die über automatische Umsetzung entscheidet, das
+Gegenteil von harmlos.
+
+### Ein Test, der aus dem falschen Grund grün war
+
+Meine erste Fixture legte eigene Grants per `INSERT OR IGNORE` an. Wegen
+`UNIQUE(user_id, app_id)` lief das wortlos ins Leere, die Tokens waren
+ungültig – und fünf Tests bestanden trotzdem: kein Nutzer → keine Priorität →
+Erwartung erfüllt. Aufgefallen ist es nur, weil die beiden **Admin**-Tests
+rot waren; wären sie nicht dabei gewesen, hätte ich zehn grüne Haken für eine
+Prüfung gehabt, die nichts prüft.
+
+Genau dafür sind die Positiv-Fälle da: Ein Test, der nur Verbote prüft,
+bestätigt sich selbst, wenn gar nichts funktioniert.
+
+10 neue Tests, 234 grün. Live bestätigt: Admin sieht die Auswahl, das Kind
+nicht.
+
+---
+
 ## 2026-08-08 – Stufe 6 bestätigt: der Umbau ist durch. Und: 808 Sitzungen von mir
 
 Andi hat S6-01 bis S6-06 abgehakt. Damit sind alle sechs Stufen aus

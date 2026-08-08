@@ -1,9 +1,14 @@
 """
 ✨ Verbesserungswünsche – gemeinsamer Endpunkt für alle Apps.
 
-POST /wunsch  { text, app, token, pfad }
+POST /wunsch  { text, app, token, pfad, prioritaet }
   → Speichert Wunsch; token identifiziert den Nutzer (beliebige App).
   → Ohne gültigen Token: anonymer Eintrag.
+  → prioritaet (Wunsch #152) wird NUR von einem Admin übernommen und nur,
+    wenn sie in WUNSCH_PRIORITAETEN steht. Bei allen anderen bleibt sie NULL
+    wie bisher – die Prüfung steht hier serverseitig und nicht bloß im
+    Template, sonst genügte ein selbstgebauter POST, um einen fremden Wunsch
+    an die Spitze der Liste zu setzen.
   → pfad (window.location.pathname) wird zu "app_slug/unterseite" verdichtet
     und token-frei als ansicht gespeichert (Wunsch #47: merken, in welcher
     Ansicht ein Vorschlag eingegeben wurde – ohne das Token in der für
@@ -11,7 +16,8 @@ POST /wunsch  { text, app, token, pfad }
 """
 import re
 from flask import Blueprint, request, jsonify
-from teile.kern import get_db, token_lookup, aktueller_nutzer
+from teile.kern import (get_db, token_lookup, aktueller_nutzer,
+                        WUNSCH_PRIORITAETEN)
 
 bp = Blueprint("werkstatt", __name__)
 
@@ -48,9 +54,18 @@ def wunsch():
     row = aktueller_nutzer(token)
     user_id = row["id"] if row else None
 
+    # Wunsch #152: Nur Admins duerfen beim Anlegen priorisieren. Ein
+    # unbekannter oder unerlaubter Wert wird still zu NULL - der Wunsch geht
+    # dabei NICHT verloren, denn ein verworfener Vorschlag waere der
+    # schlechtere Ausgang als eine fehlende Priorität.
+    prio = (data.get("prioritaet") or "").strip()
+    if not (row and row["is_admin"] and prio in WUNSCH_PRIORITAETEN):
+        prio = None
+
     db.execute(
-        "INSERT INTO wuensche(text, user_id, app_slug, ansicht) VALUES(?,?,?,?)",
-        (text, user_id, app_slug, ansicht),
+        "INSERT INTO wuensche(text, user_id, app_slug, ansicht, prioritaet) "
+        "VALUES(?,?,?,?,?)",
+        (text, user_id, app_slug, ansicht, prio),
     )
     db.commit()
     return jsonify(ok=True)
