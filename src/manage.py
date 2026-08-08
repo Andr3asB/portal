@@ -248,12 +248,23 @@ def cmd_wunsch_erledigt(args):
     if not args:
         sys.exit('Verwendung: wunsch_erledigt <id> ["Beschreibung der Umsetzung"]')
     db = connect()
+    wid = int(args[0])
     umsetzung = args[1] if len(args) > 1 else None
     db.execute(
         "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP, "
         "umsetzung=COALESCE(?, umsetzung) WHERE id=?",
-        (umsetzung, int(args[0])),
+        (umsetzung, wid),
     )
+    # Wunsch #161: derselbe Text zusaetzlich als Aktion, damit der Verlauf
+    # eines Wunsches vollstaendig ist. Die Spalte `umsetzung` bleibt daneben
+    # bestehen - sie traegt die Abschluesse von ~150 alten Wuenschen, die es
+    # als Aktion nie geben wird.
+    if umsetzung:
+        db.execute(
+            "INSERT INTO wunsch_aktionen(wunsch_id, art, text, user_id) "
+            "VALUES(?, 'umsetzung', ?, NULL)",
+            (wid, umsetzung),
+        )
     db.commit()
     db.close()
     print(f"Wunsch #{args[0]} als erledigt markiert.")

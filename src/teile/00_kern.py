@@ -65,6 +65,20 @@ CREATE TABLE IF NOT EXISTS wuensche (
   erstellt  TEXT    NOT NULL DEFAULT (datetime('now')),
   erledigt  INTEGER NOT NULL DEFAULT 0
 );
+-- Wunsch #161: Die Werkstatt wird zum Ticketsystem. Alles, was an einem
+-- Wunsch passiert - Plan, Rueckfrage, Antwort, Umsetzung - steht als eigene
+-- Zeile hier, mit Zeitpunkt und Urheber. `wuensche.umsetzung` bleibt daneben
+-- bestehen: sie wird von `manage.py wunsch_erledigt` gefuellt, ist die
+-- Zusammenfassung des Abschlusses und wuerde beim Umbau auf Aktionen fuer
+-- ~150 alte Wuensche ersatzlos verschwinden.
+CREATE TABLE IF NOT EXISTS wunsch_aktionen (
+  id        INTEGER PRIMARY KEY,
+  wunsch_id INTEGER NOT NULL REFERENCES wuensche(id) ON DELETE CASCADE,
+  art       TEXT    NOT NULL,   -- 'frage' | 'antwort' | 'plan' | 'umsetzung' | 'notiz'
+  text      TEXT    NOT NULL,
+  user_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  erstellt  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS todos (
   id            INTEGER PRIMARY KEY,
   inhalt        TEXT    NOT NULL,
@@ -1325,7 +1339,8 @@ def _init_db(app):
         # Anfang an etwas zum Aendern vorfinden, statt stumm auf KI_MODELL
         # zurueckzufallen. INSERT OR IGNORE - ein von Andi gesetzter Wert
         # wird bei folgenden Deploys nicht ueberschrieben.
-        for zweck in ("rezepte_import", "vokabeln_ocr", "rezepte_foto_import"):
+        for zweck in ("rezepte_import", "vokabeln_ocr", "rezepte_foto_import",
+                      "wunsch_titel"):
             db.execute(
                 "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
                 (zweck, KI_MODELL),

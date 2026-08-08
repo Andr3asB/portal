@@ -75,6 +75,12 @@ def db(app):
     # gehoeren der Familie, nicht dem Eintragenden) - ohne dieses Leeren
     # bliebe der Bestand zwischen Tests stehen und liesse Zaehlungen driften.
     verbindung.execute("DELETE FROM geburtstage")
+    # Wunsch #161: dasselbe Problem bei den Wuenschen - `wuensche.user_id` ist
+    # ON DELETE SET NULL, ein Wunsch ueberlebt das Leeren der Nutzer also und
+    # sammelte sich bisher ueber alle Tests hinweg an. Aufgefallen erst, als
+    # ein Test die wunsch_aktionen GLOBAL zaehlte statt je Wunsch: dort standen
+    # 4 statt 0. Das Leeren nimmt die Aktionen per CASCADE gleich mit.
+    verbindung.execute("DELETE FROM wuensche")
     verbindung.execute("DELETE FROM users")
     verbindung.commit()
 

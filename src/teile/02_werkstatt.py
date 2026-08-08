@@ -15,13 +15,66 @@ POST /wunsch  { text, app, token, pfad, prioritaet }
     Admins sichtbaren Werkstatt-Liste zu leaken).
 """
 import re
-from flask import Blueprint, request, jsonify
-from teile.kern import (get_db, token_lookup, aktueller_nutzer,
-                        WUNSCH_PRIORITAETEN)
+import threading
+
+from flask import Blueprint, current_app, request, jsonify
+from teile.kern import (get_db, token_lookup, aktueller_nutzer, new_db,
+                        ki_anfrage, WUNSCH_PRIORITAETEN)
 
 bp = Blueprint("werkstatt", __name__)
 
 _PFAD_RE = re.compile(r"^/a/([a-z0-9_-]+)/[^/]+(/.*)?$")
+
+
+_TITEL_SYSTEM = (
+    "Du formulierst aus einem Verbesserungswunsch fuer eine private "
+    "Familien-Web-App eine kurze Ueberschrift auf Deutsch. Antworte "
+    "AUSSCHLIESSLICH mit der Ueberschrift, ohne Anfuehrungszeichen, ohne "
+    "Punkt am Ende, hoechstens 60 Zeichen."
+)
+_TITEL_MAX = 80
+
+
+def _titel_nachtragen(app, wunsch_id: int, user_id: int, text: str):
+    """Wunsch #161: Ueberschrift per KI - im Hintergrund.
+
+    Laeuft bewusst in einem eigenen Thread mit eigener Verbindung (`new_db`),
+    aus zwei Gruenden:
+
+    1. Der Wunsch ist bereits gespeichert, wenn dieser Thread startet. Faellt
+       OpenRouter aus, ist das Kontingent leer oder antwortet das Modell
+       Unsinn, bleibt der Wunsch einfach ohne Titel - genau wie vorher. Ein
+       KI-Ausfall darf das Eintragen nie mitreissen; der Wunsch selbst ist das
+       Wertvolle, der Titel ist Beiwerk.
+    2. Der Nutzer wartet nicht auf die KI. Der ✨-Dialog schliesst sofort.
+
+    `g.db` aus einem Thread anzufassen gaebe "Cannot operate on a closed
+    database" - dieselbe Lehre wie bei push_send().
+    """
+    def arbeiten():
+        with app.app_context():
+            try:
+                titel = ki_anfrage(user_id, "wunsch_titel", _TITEL_SYSTEM,
+                                   text[:2000], max_tokens=40)
+            except Exception as fehler:            # KiLimitError, KiFehler, Netz
+                app.logger.info("Kein KI-Titel fuer Wunsch %s: %s", wunsch_id, fehler)
+                return
+            # Modelle liefern die Ueberschrift gern in Anfuehrungszeichen und
+            # manchmal mit Zeilenumbruch - beides hier abraeumen.
+            titel = " ".join((titel or "").split())
+            titel = titel.strip("\"'„“»« ")[:_TITEL_MAX]
+            if not titel:
+                return
+            with new_db() as db:
+                # Nur setzen, wenn immer noch keiner da ist: In der Zwischenzeit
+                # kann ein Admin von Hand einen Titel vergeben haben, und der
+                # hat Vorrang vor der Maschine.
+                db.execute(
+                    "UPDATE wuensche SET titel=? WHERE id=? AND (titel IS NULL OR titel='')",
+                    (titel, wunsch_id))
+                db.commit()
+
+    threading.Thread(target=arbeiten, daemon=True).start()
 
 
 def _ansicht_aus_pfad(pfad):
@@ -62,12 +115,19 @@ def wunsch():
     if not (row and row["is_admin"] and prio in WUNSCH_PRIORITAETEN):
         prio = None
 
-    db.execute(
+    zeile = db.execute(
         "INSERT INTO wuensche(text, user_id, app_slug, ansicht, prioritaet) "
-        "VALUES(?,?,?,?,?)",
+        "VALUES(?,?,?,?,?) RETURNING id",
         (text, user_id, app_slug, ansicht, prio),
-    )
+    ).fetchone()
     db.commit()
+
+    # Wunsch #161: Ueberschrift nachtragen lassen. Erst NACH dem commit, damit
+    # der Thread den Wunsch auch findet, und nur mit bekanntem Nutzer - das
+    # KI-Kontingent haengt an einer Person.
+    if user_id and current_app.config.get("OPENROUTER_API_KEY"):
+        _titel_nachtragen(current_app._get_current_object(), zeile["id"], user_id, text)
+
     return jsonify(ok=True)
 
 

@@ -2,6 +2,72 @@
 
 ---
 
+## 2026-08-08 – portal-v160: Wunsch #161 – die Werkstatt wird zum Ticketsystem
+
+Drei Teile: KI-Überschrift für titellose Wünsche, ein Verlauf je Wunsch, und
+ein Knopf zum Antworten.
+
+### Die Überschrift darf nichts kaputtmachen dürfen
+
+Die KI-Anfrage läuft in einem Hintergrund-Thread und startet **erst nach dem
+Commit**. Das ist die ganze Konstruktion: Fällt OpenRouter aus, ist das
+Kontingent leer oder antwortet das Modell Unsinn, bleibt der Wunsch einfach
+ohne Titel – exakt wie vorher. Der Wunsch ist das Wertvolle, der Titel ist
+Beiwerk, und Beiwerk darf das Wertvolle nie mitreissen.
+
+Zwei Feinheiten, die sonst später weh tun:
+
+- Der Thread benutzt `new_db()`. `g.db` aus einem Thread gäbe „Cannot operate
+  on a closed database" – dieselbe Lehre wie bei `push_send()`.
+- Das `UPDATE` setzt den Titel nur `WHERE titel IS NULL OR titel=''`.
+  Zwischen Absenden und Antwort kann ein Admin von Hand einen Titel vergeben
+  haben, und **der Mensch hat Vorrang vor der Maschine**.
+
+Live bestätigt: „Beim Kochen wäre es praktisch, wenn die Zutatenliste …" wurde
+zu **„Zutaten mit einem Tipp zur Einkaufsliste hinzufügen"** – 160 Tokens.
+
+### Der Verlauf, und wer hineinschreiben darf
+
+`wunsch_aktionen` hält Plan, Rückfrage, Antwort, Umsetzung und Notiz je mit
+Zeitpunkt und Urheber. Anlegen darf **Admin oder der Urheber des Wunsches** –
+genau darum geht es im Wunsch: Wer etwas eingetragen hat, soll auf eine
+Rückfrage antworten können, ohne Admin zu sein. Alle übrigen lesen mit.
+
+`manage.py wunsch_erledigt` schreibt den Umsetzungstext ab jetzt zusätzlich
+als Aktion. Die Spalte `wuensche.umsetzung` bleibt trotzdem: Sie trägt die
+Abschlüsse von rund 150 alten Wünschen, die es als Aktion nie geben wird –
+sie wegzuwerfen, um die Datenhaltung hübsch zu machen, wäre ein schlechter
+Tausch.
+
+Geladen werden die Aktionen in **einer** Abfrage für alle Wünsche. Die
+Werkstatt zeigt 160 Wünsche auf einer Seite; eine Abfrage je Wunsch wären 160
+Abfragen für eine Liste, in der die meisten gar keine Aktionen haben.
+
+### Zwei Funde, die nichts mit dem Wunsch zu tun hatten
+
+**Meine Thread-Attrappe war falsch, nicht der Code.** `type("S", (), {"start":
+target})()` macht die Funktion zum Klassenattribut – und damit zur Methode,
+die `self` bekommt. Der Test war rot, obwohl nichts kaputt war. Ersetzt durch
+eine richtige kleine Klasse.
+
+**Die Testdatenbank wird zwischen Tests nicht vollständig geleert.**
+`conftest.py` löscht `grants`, `geburtstage` und `users` und verlässt sich
+sonst auf `ON DELETE CASCADE`. `wuensche.user_id` ist aber `ON DELETE SET
+NULL` – Wünsche überleben das Leeren also und sammelten sich **seit jeher**
+über alle Tests hinweg an. Aufgefallen ist es erst, weil ein Test die
+Aktionen GLOBAL zählte statt je Wunsch: dort standen 4 statt 0.
+
+Das ist genau die Sorte Leck, die keinen Test rot macht, sondern Tests
+unzuverlässig – ein späterer Test sieht Daten eines früheren. `DELETE FROM
+wuensche` ergänzt; die Aktionen gehen per CASCADE mit.
+
+Gegengeprobt durch drei absichtliche Fehler (Rechteregel raus, Art-Prüfung
+raus, Titel-Vorrang raus): drei Tests fallen.
+
+13 neue Tests, 471 grün. Der Testwunsch samt Verlauf ist wieder entfernt.
+
+---
+
 ## 2026-08-08 – portal-v159: Wunsch #160 – Löschen sieht überall gleich aus
 
 > „[…] Verankert diese Entscheidung für die grafische Oberfläche so, dass alle

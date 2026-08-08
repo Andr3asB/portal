@@ -18,7 +18,8 @@ Werkstatt-App auf einen Wunsch, klappt eine Detailansicht mit Wunsch,
 Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant, WUNSCH_PRIORITAETEN
+from teile.kern import (get_db, grant as check_grant, to_int,
+                        WUNSCH_PRIORITAETEN)
 
 bp  = Blueprint("werkstatt_app", __name__)
 APP = "werkstatt"
@@ -95,6 +96,8 @@ def index(token):
     return render_template("werkstatt_app.html",
         user=user, token=token, farbe=user["farbe"],
         offen=offen, erledigt=erledigt,
+        aktionen=_aktionen_je_wunsch(db), aktions_arten=AKTIONS_ARTEN,
+        urheber_ids=_urheber_ids(db),
         prios_vorhanden=prios_vorhanden, prio_labels=_PRIO_LABELS,
         apps_vorhanden=apps_vorhanden, urheber_vorhanden=urheber_vorhanden,
     )
@@ -147,6 +150,74 @@ def prioritaet(token, wid):
     db.execute("UPDATE wuensche SET prioritaet=? WHERE id=?", (prio, wid))
     db.commit()
     return redirect(url_for("werkstatt_app.index", token=token))
+
+
+# Wunsch #161: Die Werkstatt wird zum Ticketsystem. Jede Handlung an einem
+# Wunsch - Plan, Rueckfrage, Antwort, Umsetzung - ist eine eigene Zeile mit
+# Zeitpunkt und Urheber, statt in einem einzigen Freitextfeld zu verschwinden.
+AKTIONS_ARTEN = {
+    "frage":     ("❓", "Rückfrage"),
+    "antwort":   ("💬", "Antwort"),
+    "plan":      ("📋", "Plan"),
+    "umsetzung": ("🔨", "Umsetzung"),
+    "notiz":     ("📝", "Notiz"),
+}
+
+
+def _aktionen_je_wunsch(db):
+    """{wunsch_id: [aktion, ...]} - alle auf einmal statt je Wunsch einzeln.
+
+    Die Werkstatt zeigt gut 160 Wuensche auf einer Seite; eine Abfrage je
+    Wunsch waeren 160 Abfragen fuer eine Liste, in der die meisten gar keine
+    Aktionen haben."""
+    aus = {}
+    for r in db.execute("""
+        SELECT a.id, a.wunsch_id, a.art, a.text, a.erstellt,
+               u.name AS wer, u.farbe AS wer_farbe
+        FROM   wunsch_aktionen a
+        LEFT   JOIN users u ON u.id = a.user_id
+        ORDER  BY a.erstellt ASC, a.id ASC
+    """):
+        aus.setdefault(r["wunsch_id"], []).append(dict(r))
+    return aus
+
+
+def _urheber_ids(db):
+    """{wunsch_id: user_id} - fuer die Frage, wer eine Aktion anlegen darf."""
+    return {r["id"]: r["user_id"]
+            for r in db.execute("SELECT id, user_id FROM wuensche")}
+
+
+@bp.route("/a/werkstatt/aktion/<int:wid>", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/werkstatt/<token>/aktion/<int:wid>", methods=["POST"])
+def aktion_neu(token, wid):
+    """Eine Aktion an einen Wunsch haengen - z.B. eine Rueckfrage beantworten.
+
+    Erlaubt fuer Admins UND fuer den Urheber des Wunsches. Genau darum geht es
+    im Wunsch: Wer etwas eingetragen hat, soll auf Rueckfragen antworten
+    koennen, ohne dafuer Admin sein zu muessen. Alle uebrigen duerfen die
+    Werkstatt lesen, aber nicht in fremde Vorgaenge hineinschreiben.
+    """
+    user = check_grant(token, APP)
+    if not user:
+        abort(403)
+    db  = get_db()
+    row = db.execute("SELECT user_id FROM wuensche WHERE id=?", (wid,)).fetchone()
+    if not row:
+        abort(404)
+    if not (user["is_admin"] or row["user_id"] == user["id"]):
+        abort(403)
+
+    art  = (request.form.get("art") or "antwort").strip()
+    text = (request.form.get("text") or "").strip()[:2000]
+    if art not in AKTIONS_ARTEN or not text:
+        return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
+
+    db.execute(
+        "INSERT INTO wunsch_aktionen(wunsch_id, art, text, user_id) VALUES(?,?,?,?)",
+        (wid, art, text, user["id"]))
+    db.commit()
+    return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
 
 
 @bp.route("/a/werkstatt/titel/<int:wid>", defaults={"token": None}, methods=["POST"])

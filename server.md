@@ -1427,6 +1427,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
 | `vokabel_kapitel_freigabe` | kapitel_id (FK vokabel_kapitel, cascade), user_id (FK users, cascade – WER es zusaetzlich sehen darf), erstellt; PK(kapitel_id, user_id) – Wunsch #150. Geteilt wird das KAPITEL, nicht die Vokabel: spaeter hinzugefuegte Vokabeln wandern automatisch mit. Eigentuemer bleibt `vokabel_kapitel.user_id` |
+| `wunsch_aktionen` | id, wunsch_id (FK wuensche, CASCADE), art ('frage'/'antwort'/'plan'/'umsetzung'/'notiz'), text, user_id (FK users, SET NULL), erstellt – Wunsch #161: Verlauf je Wunsch. `wuensche.umsetzung` BLEIBT daneben bestehen, sie traegt die Abschluesse von ~150 alten Wuenschen, die es als Aktion nie geben wird. `manage.py wunsch_erledigt` schreibt ab #161 beides |
 | `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
@@ -1453,6 +1454,16 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `tvb` | TVB | 🤾 | Nächste Spiele, Ergebnisse und Handball-Bundesliga-Tabelle des TVB Stuttgart (Wunsch #120) | – (alle vier granted) |
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
+
+## Testdatenbank leeren (conftest.py)
+
+`db` leert `grants`, `geburtstage`, `wuensche` und `users` und verlaesst sich
+sonst auf `ON DELETE CASCADE` von `users`. **Wer eine Tabelle anlegt, deren
+Fremdschluessel auf `users` NICHT cascadet, muss sie hier eintragen** -
+`wuensche.user_id` ist `ON DELETE SET NULL`, Wuensche ueberlebten das Leeren
+deshalb und sammelten sich ueber alle Tests hinweg an (gefunden bei #161, als
+ein Test `wunsch_aktionen` global zaehlte: 4 statt 0). Solche Lecks machen
+keinen Test rot, sie machen Tests unzuverlaessig.
 
 ## Lösch-Symbol (verpflichtend, seit Wunsch #160)
 
@@ -1998,6 +2009,12 @@ python -m venv .venv                                   # einmalig
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
   Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
   Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
+- `test_werkstatt_ticket.py` – Wunsch #161. Schwerpunkt ist, dass ein
+  KI-Ausfall NUR den Titel kostet und nie den Wunsch, dazu der Vorrang eines
+  von Hand gesetzten Titels und die Schreibberechtigung (Admin ODER Urheber).
+  Enthaelt `SofortThread` statt eines Wegwerf-Typs - `type("S", (), {"start":
+  target})()` macht die Funktion zur METHODE und wirft TypeError, der Test
+  war dann rot ohne echten Fehler.
 - `test_loeschen_symbol.py` – Wunsch #160. Waechter ueber alle Vorlagen: jeder
   Knopf in einem Formular mit `/loeschen`-Route muss den Muelleimer tragen.
   Enthaelt einen Test, der prueft, dass ueberhaupt >= 10 solcher Knoepfe

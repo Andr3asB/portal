@@ -79,6 +79,32 @@
 }
 .detail-value { font-size:14px; color:var(--text); white-space:pre-wrap; line-height:1.5; }
 .detail-value.muted { color:var(--text-2); font-style:italic; }
+/* Wunsch #161: Verlauf als Ticket-Historie */
+.aktion {
+  background:var(--surface-2); border-radius:10px; padding:9px 11px;
+  margin-top:6px; border-left:3px solid var(--border);
+}
+.aktion-frage     { border-left-color:#ff9500; }
+.aktion-antwort   { border-left-color:#34c759; }
+.aktion-plan      { border-left-color:#5ac8fa; }
+.aktion-umsetzung { border-left-color:var(--farbe); }
+.aktion-kopf {
+  display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;
+  font-size:11px; margin-bottom:3px;
+}
+.aktion-art { font-weight:700; color:var(--text); }
+.aktion-wer { color:var(--text-2); }
+.aktion-text { font-size:14px; white-space:pre-wrap; line-height:1.45; }
+.aktion-form { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.aktion-select, .aktion-textarea {
+  border:1.5px solid var(--border); border-radius:10px; padding:8px 10px;
+  font-size:14px; font-family:inherit; background:var(--surface); color:var(--text);
+}
+.aktion-textarea { resize:vertical; }
+.aktion-submit {
+  align-self:flex-start; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:8px 16px; font-size:14px; font-weight:600; cursor:pointer;
+}
 /* Wunsch #141: Filter - Maße und Verhalten bewusst identisch zur
    Aufgaben-App (todo.html), damit sich beides gleich anfühlt. */
 .top-aktionen { display:flex; gap:8px; margin-bottom:12px; }
@@ -135,6 +161,41 @@
     <div class="detail-label">Umsetzung</div>
     <div class="detail-value{% if not w.umsetzung %} muted{% endif %}">{{ w.umsetzung or "Noch nicht dokumentiert." }}</div>
   </div>
+
+  {# Wunsch #161: Verlauf des Vorgangs – Plan, Rückfragen, Antworten. #}
+  <div>
+    <div class="detail-label">Verlauf</div>
+    {% set liste = aktionen.get(w.id, []) %}
+    {% if not liste %}
+      <div class="detail-value muted">Noch nichts passiert.</div>
+    {% endif %}
+    {% for a in liste %}
+    <div class="aktion aktion-{{ a.art }}">
+      <div class="aktion-kopf">
+        <span class="aktion-art">{{ aktions_arten[a.art][0] }} {{ aktions_arten[a.art][1] }}</span>
+        <span class="aktion-wer">{{ a.wer or "unbekannt" }} · {{ a.erstellt|de_datum }}</span>
+      </div>
+      <div class="aktion-text">{{ a.text }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if user.is_admin or urheber_ids.get(w.id) == user.id %}
+  <form class="aktion-form" method="post" action="/a/werkstatt{{ tp }}aktion/{{ w.id }}">
+    <select name="art" class="aktion-select">
+      <option value="antwort">💬 Antwort</option>
+      <option value="frage">❓ Rückfrage</option>
+      <option value="notiz">📝 Notiz</option>
+      {% if user.is_admin %}
+      <option value="plan">📋 Plan</option>
+      <option value="umsetzung">🔨 Umsetzung</option>
+      {% endif %}
+    </select>
+    <textarea class="aktion-textarea" name="text" rows="3" maxlength="2000"
+              placeholder="Rückfrage beantworten oder etwas festhalten …" required></textarea>
+    <button class="aktion-submit" type="submit">Hinzufügen</button>
+  </form>
+  {% endif %}
 </div>
 {% endmacro %}
 
