@@ -181,6 +181,11 @@ Konfigurationsvorlagen für `.claude/` auf diesem Rechner.
 - `src/` – Quellcode des Portals (wird nach `/srv/familienportal/src` ausgeliefert)
 - `deploy/` – versionierte Auslieferungspakete (`portal-v1.tar.gz`, …), nie überschreiben
 - `tests/` – Playwright/pytest-Tests, laufen von diesem Rechner aus
+- `scripts/` – Werkzeuge gegen das LAUFENDE Portal, ebenfalls von diesem
+  Rechner aus. `live_pruefung.py` ruft jede App eines Nutzers über HTTPS auf
+  und legt dafür **eine** Sitzung an, die es im `finally` wieder löscht –
+  nie wieder ad hoc mit `curl` prüfen, das hat 808 nie ablaufende Zugänge
+  in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026)
 - `.claude/` – aktive Berechtigungen und Guardrail-Hook, **nicht ändern**
 
 ## Gitignore

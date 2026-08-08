@@ -40,8 +40,44 @@ Zwei Dinge folgen daraus:
    wird heute nur bei „Neuer Zugang + QR" geleert und ist sonst für niemanden
    einsehbar – 817 Zeilen konnten deshalb unbemerkt auflaufen.
 
-Gelöscht habe ich noch nichts: Das ist die Authentifizierungstabelle, und ein
-Fehler im `WHERE` sperrt die Familie aus. Andi gefragt.
+### Aufgeräumt (Andi zugestimmt)
+
+**808 Sitzungen gelöscht**, Prädikat strikt auf
+`geraet IN ('curl/8.19.0','Python-urllib/3.14')` – Kennungen, die kein echtes
+Gerät trägt. Vorher 817, nachher 9, und diese neun sind genau die Browser der
+Familie. Niemand musste sich neu anmelden.
+
+**`/data/portal-vor-stufe6.db` entfernt** – der Notausstieg für Stufe 6 wird
+nach der Bestätigung nicht mehr gebraucht.
+
+**`scripts/live_pruefung.py` angelegt.** Das ist der eigentliche Fix, denn die
+808 Zeilen waren ein Verfahrensfehler, kein Programmierfehler: Geprüft wurde
+ad hoc mit `curl`, ein Aufruf je Grant, ohne Cookie-Jar. Jeder davon stellte
+eine Sitzung aus. Das Skript legt jetzt **eine** an und löscht sie im
+`finally` wieder – auch wenn der Lauf mittendrin abbricht.
+
+Dass es im Repo liegt, ist der zweite Teil des Fixes. Ein Befehl, der nur in
+einer Chat-Historie steht, trägt seine Fehler in die nächste Sitzung; dieser
+lässt sich reparieren. Zweimal live gelaufen (Andi 16 Apps, Friederike),
+jeweils alles 200, danach wieder exakt 9 Sitzungen. Als verbindliche
+Konvention in `server.md` und `CLAUDE.md` aufgenommen.
+
+**Wunsch #154 angelegt:** Geräteübersicht in der Verwaltung. Der eigentliche
+Grund, warum das auflaufen konnte – die Tabelle ist für niemanden einsehbar
+und wird nur bei „Neuer Zugang + QR" geleert, dann aber gleich komplett.
+Ein verlorenes Handy lässt sich derzeit nur abmelden, indem man alle anderen
+Geräte mit aussperrt.
+
+### Noch offen: `portal.db.vor-129`
+
+Beim Aufräumen im selben Verzeichnis gefunden, 360 KB vom 05.08. Die Kopie
+stammt von **vor** Wunsch #129 und hat in `grants` noch eine Spalte `token` –
+also die Zugangsschlüssel der ganzen Familie **im Klartext**. Genau das, was
+sechs Stufen Umbau beseitigen sollten, liegt dort unverändert daneben.
+Nicht angefasst, weil Andi der Löschung einer anderen Datei zugestimmt hatte,
+nicht dieser. Gemeldet.
+
+Ebenfalls dort: `familienportal.db`, 0 Bytes, vom 30.07. – leere Altlast.
 
 ---
 

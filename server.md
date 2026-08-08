@@ -1441,6 +1441,11 @@ anhängen.
 
 ## Sicherheitskonventionen (verpflichtend)
 
+- **Live-Prüfung**: immer `scripts/live_pruefung.py`, **nie ad hoc mit `curl`
+  über Pfad-Tokens**. Jede Anfrage ohne Cookie stellt eine Sitzung aus, und
+  die läuft nie ab (`ablauf` NULL, wegen des Kiosk so gewollt). Am 08.08.2026
+  waren dadurch 808 von 817 Sitzungen Prüfrückstände. Das Skript legt genau
+  eine an (`geraet='PRUEFUNG'`) und entfernt sie auch bei Abbruch.
 - **Ganzzahlen**: immer `to_int()` aus `teile.kern` – nie `int()` direkt auf Nutzereingaben
 - **Datum/Uhrzeit**: immer `heute_lokal()` aus `teile.kern` – **nie `date.today()`**.
   Der Container läuft auf UTC, die Familie auf Europe/Berlin: zwischen
