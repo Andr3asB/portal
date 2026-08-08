@@ -560,7 +560,7 @@ input[type="text"].rezept-input {
         {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
         <form method="post" action="/a/tierbaukasten{{ tp }}loeschen/{{ k.id }}"
               data-bestaetigen="{{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?') }}">
-          <button type="submit" class="btn-loeschen-tier">×</button>
+          <button type="submit" class="btn-loeschen-tier" title="Löschen">🗑️</button>
         </form>
       </div>
       {% endfor %}

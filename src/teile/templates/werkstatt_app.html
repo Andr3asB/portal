@@ -244,7 +244,7 @@
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
-      <button type="submit" class="btn-del">×</button>
+      <button type="submit" class="btn-del" title="Löschen">🗑️</button>
     </form>
   </div>
   {% endif %}
@@ -283,7 +283,7 @@
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
-      <button type="submit" class="btn-del">×</button>
+      <button type="submit" class="btn-del" title="Löschen">🗑️</button>
     </form>
   </div>
   {% endif %}

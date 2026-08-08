@@ -148,6 +148,11 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- **Löschen trägt im ganzen Portal 🗑️** – nie ✕, nie nur Text (Wunsch #160).
+  Gilt für jedes Bedienelement, das einen Datensatz wirklich entfernt;
+  `tests/test_loeschen_symbol.py` wächtert es über alle Vorlagen. Ausgenommen
+  ist das Kassenbuch: dort wird **storniert**, nicht gelöscht (die Zeile bleibt
+  stehen), ein Mülleimer würde etwas anderes versprechen als die App tut.
 - Aktionsknöpfe einer Seite stehen **oben im `<main>`** als `.top-aktionen`-Zeile
   (Vorbild `todo.html`: Rahmen in `var(--farbe)`, transparenter Grund) – nie auf
   dem farbigen Kopfband. Der dafür gedachte Block `header_extra` ist mit

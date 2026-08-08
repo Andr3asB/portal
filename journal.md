@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-08-08 – portal-v159: Wunsch #160 – Löschen sieht überall gleich aus
+
+> „[…] Verankert diese Entscheidung für die grafische Oberfläche so, dass alle
+> zukünftigen Apps auf die gleiche Weise gebaut werden."
+
+Der zweite Satz war der eigentliche Auftrag. Ein Umbau hält bis zur nächsten
+App – und genau so ist die Uneinheitlichkeit ja entstanden.
+
+### Erst erheben, dann ändern
+
+Statt zu schätzen, alle Vorlagen durchsucht. 14 Bedienelemente zum Entfernen:
+
+| Symbol | Anzahl | Wo |
+|---|---|---|
+| 🗑️ | 8 | Einkauf, Geholfen-Verlauf, Packliste, Rezept, Startseite (2×), Todo-Serien, Vokabeln |
+| ✕ | 5 | Aufgaben, Werkstatt (2×), Tierbaukasten, Kassenbuch |
+| nur Text | 1 | Geburtstage („Für alle löschen") |
+
+Die Mehrheit war also schon richtig. Entstanden ist der Rest nicht durch eine
+Entscheidung, sondern durch Abschreiben von der jeweils benachbarten Datei –
+dieselbe Mechanik wie bei #155, wo ich selbst einen Knopf an die falsche
+Stelle gehängt hatte, weil er dort so aussah.
+
+### Das Kassenbuch bleibt beim ✕ – mit Absicht
+
+Sein ✕ ist **kein Löschen, sondern ein Storno**: Die Zeile bleibt für immer
+stehen und zählt nur nicht mehr zum Kontostand (#144, #153, #156). Ein
+Mülleimer würde etwas versprechen, das die App nicht tut – und das ausgerechnet
+in der einen App, deren ganzer Zweck die Unveränderlichkeit ist.
+
+Ein eigener Test hält fest, dass diese Ausnahme **beabsichtigt** ist, damit
+sie niemand später „korrigiert". Er schlägt an, sobald das Kassenbuch
+tatsächlich eine Löschen-Route bekäme.
+
+### Der Wächter sucht über die Route, nicht über die Beschriftung
+
+`tests/test_loeschen_symbol.py` findet Löschknöpfe über
+`action="...loeschen..."`. Über die Beschriftung zu suchen wäre zirkulär: Der
+Test fände dann nur, was ohnehin schon richtig heisst, und übersähe genau die
+Fälle, um die es geht. Dazu ein Test, der prüft, dass überhaupt mindestens
+zehn Knöpfe gefunden wurden – ein kaputtes Muster wäre sonst leer und grün.
+
+Gegengeprobt: `todo.html` auf ✕ zurückgedreht → zwei Tests fallen.
+
+Live nachgemessen statt angeschaut: Auf `/a/todo/` lädt die Grafik
+`1f5d1.svg`, der Knopf ist 31×23 gross und sichtbar.
+
+Verankert in `CLAUDE.md` (UI-Konventionen) und `server.md` (eigener Abschnitt
+mit dem Muster zum Abschreiben) – plus ein Absatz in der Hilfe, der den
+Unterschied zwischen Löschen, Ausblenden und Stornieren erklärt.
+
+458 Tests grün.
+
+---
+
 ## 2026-08-08 – portal-v158: Wunsch #159 – Löschen nur noch im Bearbeiten-Modus
 
 > „Der Link für alle löschen soll nur noch im editieren Modus erscheinen"

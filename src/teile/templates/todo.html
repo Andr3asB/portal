@@ -215,7 +215,7 @@
   {% if darf_loeschen %}
   <form method="post" action="/a/todo{{ tp }}loeschen/{{ t.id }}"
         data-bestaetigen="{{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?') }}">
-    <button class="todo-del" type="submit">×</button>
+    <button class="todo-del" type="submit" title="Löschen">🗑️</button>
   </form>
   {% endif %}
 </div>

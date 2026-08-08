@@ -1454,6 +1454,31 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
 
+## Lösch-Symbol (verpflichtend, seit Wunsch #160)
+
+Jedes Bedienelement, das einen Datensatz **entfernt**, trägt 🗑️ – nie ✕,
+nie nur Text:
+
+```html
+<form method="post" action="/a/<app>{{ tp }}loeschen/{{ x.id }}"
+      data-bestaetigen="„...“ löschen?">
+  <button class="..." type="submit" title="Löschen">🗑️</button>
+</form>
+```
+
+Vor #160 war es uneinheitlich: 🗑️ in acht Vorlagen, ✕ in vier
+(Aufgaben, Werkstatt 2×, Tierbaukasten), reiner Text in einer (Geburtstage).
+Entstanden ist das nicht durch eine Entscheidung, sondern durch Abschreiben
+von der jeweils benachbarten Datei – deshalb wächtert
+`tests/test_loeschen_symbol.py` es jetzt über ALLE Vorlagen. Er sucht über die
+ROUTE (`action="...loeschen..."`), nicht über die Beschriftung; sonst fände er
+nur, was ohnehin schon richtig heißt.
+
+**Ausnahme Kassenbuch.** Dort gibt es kein Löschen, sondern ein **Storno**:
+die Zeile bleibt fuer immer stehen und zählt nur nicht mehr zum Kontostand
+(Wünsche #144/#153/#156). Ein Mülleimer würde etwas anderes versprechen, als
+die App tut. Ein eigener Test hält fest, dass diese Ausnahme absichtlich ist.
+
 ## Aktionsknöpfe (verpflichtend, seit Wunsch #155)
 
 Aktionen einer Seite stehen **oben im `<main>`** als `.top-aktionen`-Zeile,
@@ -1973,6 +1998,11 @@ python -m venv .venv                                   # einmalig
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
   Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
   Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
+- `test_loeschen_symbol.py` – Wunsch #160. Waechter ueber alle Vorlagen: jeder
+  Knopf in einem Formular mit `/loeschen`-Route muss den Muelleimer tragen.
+  Enthaelt einen Test, der prueft, dass ueberhaupt >= 10 solcher Knoepfe
+  gefunden wurden (sonst waere die Pruefung leer und gruen), und einen, der die
+  Kassenbuch-Ausnahme als BEABSICHTIGT festhaelt.
 - `test_kopfleiste.py` – Wunsch #155. Waechter ueber ALLE Vorlagen: kein
   `header_extra`, keine Schaltflaeche zwischen `</header>` und `<main>`.
   Kommentare werden vorher entfernt, sonst loesten die Hinweistexte in
