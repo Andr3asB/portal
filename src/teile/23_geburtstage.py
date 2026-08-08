@@ -138,27 +138,89 @@ def index(token):
         monate=MONATE, heute_jahr=date.today().year)
 
 
-@bp.route("/a/geburtstage/neu", defaults={"token": None}, methods=["POST"])
-@bp.route("/a/geburtstage/<token>/neu", methods=["POST"])
-def neu(token):
-    user = _user(token)
-    name = (request.form.get("name") or "").strip()[:80]
+def _eingaben_lesen():
+    """Formularwerte pruefen -> (name, tag, monat, jahr, notiz) oder None.
+
+    Wunsch #158: Anlegen und Bearbeiten teilen sich diese Pruefung. Zwei
+    Kopien waeren die Bauart, bei der man eine Grenze nur an einer Stelle
+    nachzieht - und dann laesst sich per Bearbeiten eintragen, was beim
+    Anlegen abgelehnt wird.
+    """
+    name  = (request.form.get("name") or "").strip()[:80]
     tag   = to_int(request.form.get("tag"))
     monat = to_int(request.form.get("monat"))
     jahr  = to_int(request.form.get("jahr"))
     notiz = (request.form.get("notiz") or "").strip()[:200] or None
 
-    if not name or not tag or not monat or not (1 <= tag <= 31) or not (1 <= monat <= 12):
-        return redirect(url_for("geburtstage_app.index", token=token))
+    if not name or not tag or not monat:
+        return None
+    if not (1 <= tag <= 31) or not (1 <= monat <= 12):
+        return None
     # Ein Jahr in der Zukunft oder vor 1900 ist ein Tippfehler, kein Geburtstag.
     if jahr is not None and not (1900 <= jahr <= date.today().year):
         jahr = None
+    return name, tag, monat, jahr, notiz
+
+
+def _darf_aendern(user, row):
+    """Ein Eintrag gilt fuer ALLE - deshalb duerfen ihn nur der Urheber sowie
+    Eltern/Admin anfassen. Dieselbe Regel wie beim Loeschen; wer ihn nur fuer
+    sich loswerden will, blendet ihn aus."""
+    return (row["erstellt_von"] == user["id"]
+            or user["is_admin"] or user["rolle"] == "eltern")
+
+
+@bp.route("/a/geburtstage/neu", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/geburtstage/<token>/neu", methods=["POST"])
+def neu(token):
+    user = _user(token)
+    werte = _eingaben_lesen()
+    if werte is None:
+        return redirect(url_for("geburtstage_app.index", token=token))
+    name, tag, monat, jahr, notiz = werte
 
     db = get_db()
     db.execute(
         "INSERT INTO geburtstage(name, tag, monat, jahr, notiz, erstellt_von) "
         "VALUES(?,?,?,?,?,?)",
         (name, tag, monat, jahr, notiz, user["id"]))
+    db.commit()
+    return redirect(url_for("geburtstage_app.index", token=token))
+
+
+@bp.route("/a/geburtstage/<int:gid>/bearbeiten", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/geburtstage/<token>/<int:gid>/bearbeiten", methods=["POST"])
+def bearbeiten(token, gid):
+    """Wunsch #158: Eintraege korrigierbar machen.
+
+    `erstellt_von` bleibt bewusst unangetastet - wer den Eintrag angelegt hat,
+    bleibt sein Urheber, auch wenn ein Elternteil einen Tippfehler behebt.
+    Sonst wanderte mit jeder Korrektur die Zustaendigkeit mit, und der
+    urspruengliche Urheber koennte seinen eigenen Eintrag ploetzlich nicht
+    mehr aendern.
+
+    Die Erinnerungssperre (`geburtstag_gesendet`) wird NICHT geleert: Sie
+    schluesselt auf den VERSANDTAG, nicht auf das Geburtsdatum. Eine Korrektur
+    kann deshalb keine kuenftige Erinnerung unterdruecken - und eine bereits
+    heute verschickte soll sich auch nicht durch eine Namensaenderung
+    wiederholen lassen.
+    """
+    user = _user(token)
+    db   = get_db()
+    row  = db.execute("SELECT erstellt_von FROM geburtstage WHERE id=?", (gid,)).fetchone()
+    if not row:
+        abort(404)
+    if not _darf_aendern(user, row):
+        abort(403)
+
+    werte = _eingaben_lesen()
+    if werte is None:
+        return redirect(url_for("geburtstage_app.index", token=token))
+    name, tag, monat, jahr, notiz = werte
+
+    db.execute(
+        "UPDATE geburtstage SET name=?, tag=?, monat=?, jahr=?, notiz=? WHERE id=?",
+        (name, tag, monat, jahr, notiz, gid))
     db.commit()
     return redirect(url_for("geburtstage_app.index", token=token))
 
@@ -173,7 +235,7 @@ def loeschen(token, gid):
     row  = db.execute("SELECT erstellt_von FROM geburtstage WHERE id=?", (gid,)).fetchone()
     if not row:
         abort(404)
-    if not (row["erstellt_von"] == user["id"] or user["is_admin"] or user["rolle"] == "eltern"):
+    if not _darf_aendern(user, row):
         abort(403)
     db.execute("DELETE FROM geburtstage WHERE id=?", (gid,))
     db.commit()

@@ -142,6 +142,10 @@
         </div>
         {% if e.notiz %}<div class="gb-notiz">{{ e.notiz }}</div>{% endif %}
       </div>
+      {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
+      <button class="gb-glocke" data-klick="gbEditUmschalten" data-args='[{{ e.id }}]'
+              title="Eintrag bearbeiten">✏️</button>
+      {% endif %}
       <button class="gb-glocke {% if e.erinnerung or e.vorlauf_tage %}aktiv{% endif %}"
               data-klick="gbPanelUmschalten" data-args='[{{ e.id }}]'
               title="Erinnerung und Sichtbarkeit">🔔</button>
@@ -168,6 +172,47 @@
     </form>
 
     {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
+    {# Wunsch #158: Korrigieren statt löschen-und-neu-anlegen. Gleiche
+       Berechtigung wie beim Löschen – der Eintrag gilt für alle. #}
+    <form class="gb-panel" id="gb-edit-{{ e.id }}" method="post"
+          action="/a/geburtstage{{ tp }}{{ e.id }}/bearbeiten">
+      <div class="gb-feld">
+        <label for="gb-edit-name-{{ e.id }}">Wer?</label>
+        <input class="gb-input" id="gb-edit-name-{{ e.id }}" type="text" name="name"
+               required maxlength="80" value="{{ e.name }}">
+      </div>
+      <div class="gb-datum-row">
+        <div class="gb-feld">
+          <label for="gb-edit-tag-{{ e.id }}">Tag</label>
+          <input class="gb-input" id="gb-edit-tag-{{ e.id }}" type="number" name="tag"
+                 min="1" max="31" required inputmode="numeric" value="{{ e.tag }}">
+        </div>
+        <div class="gb-feld">
+          <label for="gb-edit-monat-{{ e.id }}">Monat</label>
+          <select class="gb-select" id="gb-edit-monat-{{ e.id }}" name="monat" required>
+            {% for m in monate %}
+            <option value="{{ loop.index }}" {% if loop.index == e.monat %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="gb-feld">
+        <label for="gb-edit-jahr-{{ e.id }}">Geburtsjahr (freiwillig)</label>
+        <input class="gb-input" id="gb-edit-jahr-{{ e.id }}" type="number" name="jahr"
+               min="1900" max="{{ heute_jahr | default(2026) }}" inputmode="numeric"
+               value="{{ e.jahr if e.jahr else '' }}"
+               placeholder="leer lassen, wenn unbekannt">
+      </div>
+      <div class="gb-feld">
+        <label for="gb-edit-notiz-{{ e.id }}">Notiz (freiwillig)</label>
+        <input class="gb-input" id="gb-edit-notiz-{{ e.id }}" type="text" name="notiz"
+               maxlength="200" value="{{ e.notiz if e.notiz else '' }}">
+      </div>
+      <div class="gb-panel-aktionen">
+        <button class="gb-speichern" type="submit">Änderung speichern</button>
+      </div>
+    </form>
+
     <form method="post" action="/a/geburtstage{{ tp }}{{ e.id }}/loeschen"
           style="margin-top:6px"
           data-bestaetigen="{{ ('„' ~ e.name ~ '“ für ALLE löschen? Wenn du ihn nur für dich nicht sehen willst, nutze stattdessen „Für mich ausblenden“.') }}">
@@ -193,6 +238,13 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+function gbEditUmschalten(id) {
+  // Erinnerungs-Panel zuklappen, sonst stehen zwei Formulare offen
+  // uebereinander und man weiss nicht, welches "Speichern" wohin gehoert.
+  document.getElementById('gb-panel-' + id).classList.remove('open');
+  document.getElementById('gb-edit-' + id).classList.toggle('open');
+}
+
 function gbFormularUmschalten() {
   const karte = document.getElementById('gb-form-card');
   karte.classList.toggle('open');
@@ -200,6 +252,9 @@ function gbFormularUmschalten() {
 }
 
 function gbPanelUmschalten(id) {
+  // Gegenstueck zu gbEditUmschalten: das jeweils andere Panel zuklappen.
+  const edit = document.getElementById('gb-edit-' + id);
+  if (edit) edit.classList.remove('open');
   document.getElementById('gb-panel-' + id).classList.toggle('open');
 }
 </script>

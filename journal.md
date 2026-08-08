@@ -2,6 +2,62 @@
 
 ---
 
+## 2026-08-08 – portal-v157: Wunsch #158 – Geburtstage bearbeiten
+
+Erster Wunsch, der über den stündlichen Durchlauf (#157) hereinkam.
+
+> „Die Einträge sollen editierbar sein"
+
+Ein Stift neben jedem Eintrag öffnet Name, Tag, Monat, Jahr und Notiz. Wer
+ändern darf, ist **dieselbe Regel wie beim Löschen** – Urheber, Eltern oder
+Admin: Der Eintrag gilt für die ganze Familie, das macht Bearbeiten zu einer
+Berechtigungsfrage und nicht bloss zu einem Formular. Beide Wege benutzen
+jetzt denselben Helfer `_darf_aendern()`, statt die Bedingung zweimal
+auszuschreiben.
+
+### Drei Dinge, die man beim Bearbeiten leicht kaputtmacht
+
+**Die Prüfung.** Anlegen und Bearbeiten teilen sich `_eingaben_lesen()`. Zwei
+Kopien wären die Bauart, bei der man eine Grenze nur an einer Stelle nachzieht
+– und dann liesse sich per Bearbeiten eintragen, was beim Anlegen abgelehnt
+wird. Ein Monat 13 käme so bis in `_tage_bis()`.
+
+**Die Urheberschaft.** `erstellt_von` bleibt unangetastet. Wanderte sie mit
+jeder Korrektur mit, könnte das Kind seinen eigenen Eintrag plötzlich nicht
+mehr anfassen, nachdem ein Elternteil einen Tippfehler behoben hat.
+
+**Die Erinnerungssperre.** Vorab geprüft statt angenommen: `geburtstag_gesendet`
+schlüsselt auf den **Versandtag**, nicht auf das Geburtsdatum. Eine Korrektur
+kann deshalb keine künftige Erinnerung unterdrücken – auch dann nicht, wenn
+für denselben Eintrag am selben Tag schon eine Vorlauf-Meldung rausging. Kein
+Aufräumen nötig, aber ein Test hält es fest.
+
+### Ein Test, der nichts prüfte
+
+Die erste Fassung fragte `hasattr(modul, "_eingaben_lesen")` ab – der wäre
+grün geblieben, während eine zweite Kopie längst abweicht. Ersetzt durch fünf
+parametrisierte Fälle, die **beide Wege** mit demselben Unsinn füttern
+(Monat 13, Monat 0, Tag 32, Tag 0, leerer Name) und verlangen, dass beide
+ablehnen.
+
+Gegengeprobt durch Ausbau der Rechteregel und Aufweichen der Monatsgrenze:
+vier Tests fallen.
+
+### Live: der CSRF-Riegel hat mich erwischt
+
+Der erste Live-Versuch bekam **403**. Kein Fehler im neuen Code – mein
+`curl`-POST hatte weder `Origin` noch `Sec-Fetch-Site`, und `CSRF_MODUS` steht
+seit Stufe 2 auf `scharf`. Mit den Headern dann: gültige Änderung greift,
+Monat 13 wird verworfen, `erstellt_von` bleibt. Ein unfreiwilliger, aber
+willkommener Beleg, dass Stufe 2 im Alltag wirklich beisst.
+
+Geprüft wurde an einem eigens angelegten Testeintrag, der danach wieder
+entfernt wurde – nicht an einem echten Geburtstag der Familie.
+
+16 neue Tests, 363 grün.
+
+---
+
 ## 2026-08-08 – Wunsch #157: stündlicher Wunsch-Durchlauf, mit ehrlichen Grenzen
 
 > „In Zukunft sollst du alle 60 Minuten prüfen, ob Wünsche priorisiert und zur

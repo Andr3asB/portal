@@ -1007,6 +1007,17 @@ teile/
                        ist ersatzlos entfallen (sie musste den Token aus der DB
                        holen), der QR-Code steckt als data:-URI in der Antwort.
   23_geburtstage.py  – /a/geburtstage/<token>/ Gemeinsame Geburtstagsliste
+                       Wunsch #158: /bearbeiten aendert Name/Tag/Monat/Jahr/
+                       Notiz. Berechtigung ueber `_darf_aendern()` - dieselbe
+                       Regel wie beim Loeschen (Urheber, Eltern, Admin), weil
+                       der Eintrag fuer alle gilt. `erstellt_von` wird NICHT
+                       mitgeschrieben, sonst verloere der Eintragende die
+                       Zustaendigkeit, sobald jemand anderes einen Tippfehler
+                       behebt. Die Pruefung teilen sich Anlegen und Bearbeiten
+                       (`_eingaben_lesen()`). `geburtstag_gesendet` wird beim
+                       Aendern NICHT geleert - die Tabelle schluesselt auf den
+                       VERSANDTAG, eine Korrektur kann also keine kuenftige
+                       Erinnerung unterdruecken.
                        (Wunsch #145). Eingetragen wird fuer alle, EINGESTELLT
                        fuer sich: Ausblenden, Erinnerung am Tag und
                        Vorlauf-Erinnerung stehen je (user_id, geburtstag_id).
@@ -1950,6 +1961,13 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_geburtstage_bearbeiten.py` – Wunsch #158. Prueft die Berechtigung in
+  beide Richtungen und drei Dinge, die beim Bearbeiten leicht kippen:
+  `erstellt_von` bleibt, andere Eintraege bleiben, und die Erinnerungssperre
+  unterdrueckt nach einer Datumskorrektur nichts. Der Vergleich "Anlegen und
+  Bearbeiten lehnen dasselbe ab" laeuft ueber das VERHALTEN beider Endpunkte -
+  die erste Fassung fragte nur ab, ob es einen gemeinsamen Helfer GIBT, und
+  waere gruen geblieben, waehrend eine zweite Kopie abweicht.
 - `test_kassenbuch_unveraenderlich.py` – Wunsch #156. Erzwingt die Zusage, auf
   der die Vollstaendigkeit des Pruefprotokolls beruht: genau DREI schreibende
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
