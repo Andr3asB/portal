@@ -68,16 +68,34 @@ und wird nur bei „Neuer Zugang + QR" geleert, dann aber gleich komplett.
 Ein verlorenes Handy lässt sich derzeit nur abmelden, indem man alle anderen
 Geräte mit aussperrt.
 
-### Noch offen: `portal.db.vor-129`
+### `portal.db.vor-129` – die letzte Klartext-Kopie, jetzt weg
 
 Beim Aufräumen im selben Verzeichnis gefunden, 360 KB vom 05.08. Die Kopie
-stammt von **vor** Wunsch #129 und hat in `grants` noch eine Spalte `token` –
+stammt von **vor** Wunsch #129 und hatte in `grants` noch eine Spalte `token` –
 also die Zugangsschlüssel der ganzen Familie **im Klartext**. Genau das, was
-sechs Stufen Umbau beseitigen sollten, liegt dort unverändert daneben.
-Nicht angefasst, weil Andi der Löschung einer anderen Datei zugestimmt hatte,
-nicht dieser. Gemeldet.
+sechs Stufen Umbau beseitigen sollten, lag dort unverändert daneben.
 
-Ebenfalls dort: `familienportal.db`, 0 Bytes, vom 30.07. – leere Altlast.
+Erst gemeldet statt gelöscht, weil Andis Zustimmung einer anderen Datei galt;
+auf Rückfrage beide entfernt – zusammen mit `familienportal.db` (0 Bytes,
+30.07., leere Altlast) und zwei verwaisten WAL-Dateien, die beim Hineinsehen
+entstanden waren. Auch das wieder meine Spur: Ein `PRAGMA table_info` im
+Lesemodus legt `-wal`/`-shm` an, und die überleben die Hauptdatei.
+
+Danach das ganze Datenverzeichnis durchgezählt – Livedatenbank plus alle 24
+Snapshots:
+
+| Form der Tokens | Dateien |
+|---|---|
+| nur Prüfsumme (`token_lookup`) | 17 |
+| verschlüsselt (`token_enc`) | 8 |
+| **Klartext** | **0** |
+
+Die acht verschlüsselten sind Stundensnapshots vom 07.08. zwischen 09:00 und
+16:00, also von vor der Umstellung; sie rollen im Laufe des Tages von selbst
+heraus. Klartext gibt es nirgends mehr.
+
+Übrig im Verzeichnis: `portal.db`, `snapshots/`, `vokabel_audio/`,
+`.cert_mtime` – sonst nichts.
 
 ---
 
