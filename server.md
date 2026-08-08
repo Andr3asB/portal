@@ -770,8 +770,18 @@ teile/
                        das "die Profis", keine zweite Mannschaft);
                        unterschieden wird ueber die Spalte `wettbewerb`,
                        angezeigt nur bei Abweichung vom Ligennamen.
-                       Testspiele fuehrt handball.net NICHT - geprueft,
-                       kein Feld und kein Treffer auf der Vereinsseite.
+                       Testspiele fehlen und bleiben es (Nachtrag zu #151):
+                       Sie FINDEN STATT (S-Cup Altensteig u.a.), aber keine
+                       Quelle veroeffentlicht sie maschinenlesbar -
+                       handball.net fuehrt nur Pflichtspiele, die
+                       Vereinsseite tvbstuttgart.de bindet dasselbe Widget
+                       ein (gleiche Luecke), und in der
+                       Freundschaftsspiel-Liste von handball-world.news
+                       kommt der TVB in der ganzen Saison 2026/27 nicht vor.
+                       Sie stehen nur als Fließtext in Nachrichten.
+                       Andi hat einen Handeintrag ausdruecklich ABGELEHNT
+                       ("wenn es nicht automatisch geht dann brauche ich die
+                       Daten nicht") - nicht erneut vorschlagen.
                        Bewusst kein Cron-Job dafuer (Randfall "niemand
                        oeffnet die App an einem Spieltag" fuer eine
                        Familien-App hinnehmbar, siehe journal.md).

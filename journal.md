@@ -2,6 +2,119 @@
 
 ---
 
+## 2026-08-08 – Aufräumen: mein Testmüll in Friederikes Kassenbuch
+
+Andi fragte, ob die drei Einträge in Friederikes Kassenbuch von ihr oder von
+mir stammen. Von mir. `journal.md` hält es selbst fest – „Live gegen den
+echten Server verifiziert (**Friederikes echtes Konto**)", mit exakt diesen
+Beträgen: Start 15,00 €, Einnahme 5,00 € (Oma), Ausgabe 3,00 € (Eis),
+storniert. In der Datenbank steht als Urheber sie, weil ich über ihren Zugang
+gebucht habe; unterscheiden lässt sich das dort nicht mehr.
+
+Zwei Fehler, nicht einer: **live gegen ein echtes Kinderkonto getestet**
+statt gegen ein Wegwerf-Konto, und den Testmüll danach **stehen gelassen**.
+Ihr Kontostand zeigte zwei Tage lang 20,00 €, die sie nie hatte.
+
+### Die Löschung ist eine bewusste Ausnahme von der Ledger-Regel
+
+Andi wies zu Recht auf das Audit-Log hin. Wunsch #144 sagt ausdrücklich:
+
+> „Es soll auch möglich sein, einen Eintrag wieder zu löschen, aber auch
+> diese Einträge bleiben in der Datenbank stehen – ein bisschen wie bei
+> einem Buchhaltungssystem."
+
+Genau deshalb hat die App **keinen** Löschpfad, nur Stornieren. Ich musste
+also auf DB-Ebene löschen, und das ist ein Bruch mit dem Prinzip – auf
+Andis ausdrückliche Anweisung („sauber löschen, es soll nichts zurück
+bleiben"). Vertretbar, weil es keine Buchführung war, sondern meine
+Verunreinigung derselben: Ein Ledger soll echte Vorgänge unveränderlich
+festhalten, nicht die Spuren meines Testlaufs. Festgehalten wird es hier,
+weil es im Ledger selbst nicht stehen kann, ohne genau das zu hinterlassen,
+was weg sollte.
+
+Der Wächter in `settings.json` hat übrigens das erste `DELETE` ohne
+`WHERE`-Klausel blockiert. Richtig so – der zweite Versuch nannte die drei
+IDs explizit.
+
+### Was wirklich weg ist und was nicht
+
+| Ort | Zustand |
+|---|---|
+| Live-Datenbank | 0 Zeilen, `VACUUM` gelaufen, Rohsuche in der Datei ohne Treffer |
+| 24 Stundensnapshots | enthalten sie noch, rollen von selbst binnen 24 h heraus |
+| `data/portal-vor-stufe6.db` | enthält sie – bleibt bis Stufe 6 abgehakt ist, das ist der Rückfall |
+| Tages-Backup auf dem NAS | enthält sie; ausserhalb von `/srv/familienportal/`, wird nicht angefasst |
+
+„Nichts zurück bleiben" gilt also für alles, was im Alltag sichtbar ist, und
+für die Datei selbst. Die Sicherungen absichtlich zu durchlöchern wäre der
+falsche Preis dafür – sie laufen ohnehin aus.
+
+### Nebenbei gefunden: Wunsch #153
+
+> „Wie Wirtschaftsprüfer brauchen die Eltern Zugriff auf das Audit Log des
+> Kassenbuchs."
+
+Steht offen, `app_slug=kassenbuch`, Priorität mittel. Passt inhaltlich
+unmittelbar an diese Sitzung an: Heute ist das Audit-Log nur in den Spalten
+`erstellt_von`/`storniert_von`/`storniert_am` vorhanden und nirgends
+sichtbar. Als nächstes dran.
+
+---
+
+## 2026-08-08 – portal-v149: Nachtrag zu #151 – meine Begründung war falsch
+
+Andi schickte mir am selben Tag einen Artikel: Der TVB spielt gerade den
+Sparkassen-Cup in Altensteig, 37:34 gegen Elbflorenz, Halbfinale gegen
+Erlangen. Es gibt also sehr wohl Testspiele.
+
+Mein Fehler war nicht die Messung, sondern der Schluss daraus. Geprüft hatte
+ich, dass **handball.net** keine Testspiele führt – das stimmt und stimmt
+weiterhin. Geschrieben hatte ich sinngemäß, dass es sie **nicht gibt**. Das
+ist der Sprung von „meine Quelle kennt es nicht" auf „es existiert nicht",
+und er ist besonders verführerisch, wenn die Messung selbst sauber war: Ich
+hatte ein negatives Ergebnis in der Hand und habe seine Reichweite überdehnt.
+
+Bemerkenswert daran ist, dass ich im selben Wunsch den umgekehrten Fehler
+richtig behandelt hatte – beim Pokal war mir klar, dass ein leeres Ergebnis
+an der Abfrage liegen kann und nicht an der Wirklichkeit. Genau diese
+Skepsis habe ich zwei Absätze später nicht mehr angewendet.
+
+### Was die Nachrecherche ergab
+
+| Quelle | Testspiele |
+|---|---|
+| handball.net API + Vereinsseite | nein, auch kein S-Cup (Suche „Altensteig" leer) |
+| tvbstuttgart.de/sportszone/spielplan | nein – dasselbe handball.net-Widget, gleiche Lücke |
+| handball-world.news „Freundschaftsspiele", Saison 2026/27, alle Spieltage | Liste existiert, TVB kommt darin **null mal** vor |
+| Nachrichtenartikel | ja – aber als Fließtext |
+
+Die Spiele existieren also und sind nirgends maschinenlesbar. Die
+Vereinsseite hilft ausgerechnet deshalb nicht, weil sie dasselbe Widget
+einbindet wie wir – zwei Quellen, eine Lücke.
+
+### Entscheidung: nichts bauen
+
+Ich habe drei Wege vorgelegt (Handeintrag durch den Admin, KI-Auswertung der
+Vereins-News, KI-Vorschlag mit Bestätigung). Andis Antwort:
+
+> „Wenn es nicht automatisch geht dann brauche ich die Daten nicht."
+
+Damit ist der Fall erledigt, und zwar ohne Code. Festgehalten, weil die
+Neigung sonst gross ist, so etwas beim nächsten Anlass erneut vorzuschlagen:
+**Ein Formular, in das jemand von Hand abtippt, was anderswo schon steht, ist
+für dieses Portal keine Lösung.** Der Aufwand landet bei der Familie, und
+genau das soll das Portal abnehmen.
+
+Geändert wurde deshalb nur der Hilfetext, der die falsche Begründung
+weitergetragen hätte („weil es sie an der Quelle schlicht nicht gibt"). Jetzt
+steht dort, was zutrifft: Die Spiele gibt es, veröffentlicht sie aber niemand
+in einer Form, die sich abrufen lässt.
+
+Das Kennzeichen aus v147 bleibt selbstverständlich – der DHB-Pokal fehlte
+wirklich und ist jetzt drin.
+
+---
+
 ## 2026-08-08 – portal-v147: Wunsch #151 – Testspiele? Nein. Aber der Pokal fehlte.
 
 Der Wunsch fragt, ob es bei den Profis Testspiele gibt, die im Spielplan nicht
