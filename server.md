@@ -1950,6 +1950,11 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_kassenbuch_unveraenderlich.py` – Wunsch #156. Erzwingt die Zusage, auf
+  der die Vollstaendigkeit des Pruefprotokolls beruht: genau DREI schreibende
+  Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
+  Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
+  Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
 - `test_kopfleiste.py` – Wunsch #155. Waechter ueber ALLE Vorlagen: kein
   `header_extra`, keine Schaltflaeche zwischen `</header>` und `<main>`.
   Kommentare werden vorher entfernt, sonst loesten die Hinweistexte in

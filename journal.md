@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-08-08 – portal-v156: Wunsch #156 – es gibt keine Änderungen zu protokollieren
+
+> „Werden im Protokoll auch Änderungen dokumentiert (z.B. wenn der Betreff
+> editiert oder der Betrag verändert wird)? Das soll auch dokumentiert sein."
+
+Wieder eine Frage, und nach #151 habe ich sie nachgesehen statt beantwortet.
+Im ganzen Projekt gibt es **genau eine** ändernde Anweisung auf
+`kassenbuch_eintraege` – das Storno – und **kein** `DELETE`. Eine
+Bearbeiten-Route existiert nicht; die App hat für Betrag, Zweck, Person und
+Datum schlicht keinen Knopf. Das ist so seit #144 („ein bisschen wie bei
+einem Buchhaltungssystem") und war nie ein Versäumnis.
+
+Einem Eintrag kann also genau zweierlei widerfahren: angelegt und storniert.
+Beides steht seit #153 im Prüfprotokoll. Es fehlt nichts.
+
+### Trotzdem war die Frage berechtigt
+
+**Ein Prüfer kann nicht unterscheiden, ob keine Änderungen stattgefunden haben
+oder ob Änderungen nicht protokolliert werden.** Beides sieht auf der Seite
+identisch aus. Genau das ist der Grund, warum Andi gefragt hat – und deshalb
+war „passt schon" die falsche Antwort.
+
+Zwei Dinge nachgeholt:
+
+**Die Zusage steht jetzt auf der Seite.** Ein abgesetzter Absatz erklärt, dass
+Betrag, Zweck, Person und Datum von niemandem mehr angefasst werden können,
+auch nicht vom Admin, und dass das Fehlen von „geändert" damit eine Zusage ist
+und keine Lücke.
+
+**Die Zusage ist jetzt erzwungen, nicht nur eingehalten.** Vier neue Tests:
+die schreibenden Routen des Kassenbuchs sind genau drei (über `url_map`, nicht
+über den Quelltext – eine anderswo registrierte Route fiele sonst durch); es
+gibt kein `DELETE`; das einzige `UPDATE` fasst ausschliesslich die drei
+Storno-Spalten an; und ein Storno lässt am laufenden Objekt Betrag, Zweck,
+Person, Datum und Art unverändert.
+
+Der erste Test nennt im Fehlerfall gleich die Konsequenz: Wer eine
+Bearbeiten-Route ergänzt, muss das Prüfprotokoll um eine dritte Ereignisart
+erweitern. Damit hängt die Vollständigkeit des Protokolls nicht mehr daran,
+dass jemand daran denkt.
+
+347 Tests grün.
+
+---
+
 ## 2026-08-08 – portal-v155: Wunsch #155 – die Verwaltung war die letzte
 
 > „Die Buttons sind noch mit dem Header des Portals verbunden. das haben wir

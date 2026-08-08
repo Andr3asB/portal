@@ -28,6 +28,8 @@
 .kbp-zeile.kbp-summe .kbp-zeile-label { color:var(--text); }
 .kbp-nebensatz { font-size:12px; color:var(--text-2); margin-top:10px; }
 .kbp-warnung { color:#ff3b30; font-weight:700; }
+/* Wunsch #156: die Unveraenderlichkeits-Zusage abgesetzt vom uebrigen Text */
+.kbp-zusage { border-left:4px solid var(--farbe); }
 
 .kbp-ereignis {
   display:flex; gap:12px; background:var(--surface); border-radius:14px;
@@ -68,8 +70,16 @@
     Das Kassenbuch sortiert nach dem Tag, an dem das Geld geflossen ist. Hier
     steht die andere Reihenfolge: <strong>wann wurde was erfasst</strong> –
     neueste Handlung zuerst. Jedes Anlegen und jedes Stornieren ist eine eigene
-    Zeile mit Zeitpunkt und Urheber. Nichts davon lässt sich nachträglich
-    ändern, auch nicht von {{ kind.name }}.
+    Zeile mit Zeitpunkt und Urheber.
+  </div>
+
+  <div class="kbp-erklaerung kbp-zusage">
+    <strong>Warum hier nie „geändert" steht:</strong> Betrag, Zweck, Person und
+    Datum lassen sich nach dem Speichern von <em>niemandem</em> mehr anfassen –
+    auch nicht von {{ kind.name }}, auch nicht von dir. Die App hat dafür gar
+    keinen Knopf. Einem Eintrag kann genau zweierlei widerfahren: angelegt und
+    storniert, und beides steht oben. Das Fehlen von Änderungen ist also eine
+    Zusage und keine Lücke im Protokoll.
   </div>
 
   <div class="kbp-probe">
