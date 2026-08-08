@@ -2009,7 +2009,11 @@ python -m venv .venv                                   # einmalig
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
   Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
   Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
-- `test_werkstatt_ticket.py` – Wunsch #161. Schwerpunkt ist, dass ein
+- `test_werkstatt_ticket.py` – Wuensche #161 und #166. Zu #166: die Meldung
+  geht NUR bei art='frage' raus und NIE an den Verfasser - beides eigene
+  Tests, weil beides im Alltag nicht auffiele (zu viele Meldungen entwerten
+  sich langsam, eine Selbstmeldung nervt nur den Admin).
+  Zu #161: Schwerpunkt ist, dass ein
   KI-Ausfall NUR den Titel kostet und nie den Wunsch, dazu der Vorrang eines
   von Hand gesetzten Titels und die Schreibberechtigung (Admin ODER Urheber).
   Enthaelt `SofortThread` statt eines Wegwerf-Typs - `type("S", (), {"start":

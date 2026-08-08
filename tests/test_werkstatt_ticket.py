@@ -220,3 +220,56 @@ def test_geloeschter_wunsch_raeumt_die_aktionen_mit_ab(db, werkstatt_token, wuns
     v.execute("DELETE FROM wuensche WHERE id=?", (wunsch,))
     v.commit()
     assert v.execute("SELECT COUNT(*) c FROM wunsch_aktionen").fetchone()["c"] == 0
+
+
+# --- Wunsch #166: Rückfragen melden sich ------------------------------------
+
+@pytest.fixture()
+def push_protokoll(monkeypatch):
+    """Fängt push_send ab – die Tests prüfen, WER benachrichtigt wird."""
+    modul = importlib.import_module("teile.05_werkstatt_app")
+    gesendet = []
+    monkeypatch.setattr(modul, "push_send",
+                        lambda uid, titel, text, app="", url="", **kw:
+                            gesendet.append({"uid": uid, "titel": titel,
+                                             "text": text, "url": url}))
+    return gesendet
+
+
+def test_rueckfrage_meldet_sich_beim_admin(client, db, werkstatt_token, wunsch,
+                                           push_protokoll):
+    """Der Kern von #166 – eine Rückfrage soll nicht unbemerkt liegen bleiben."""
+    _aktion(client, werkstatt_token["TestKind"], wunsch, "frage", "Welche Liste?")
+    assert [p["uid"] for p in push_protokoll] == [db["familie"]["TestAdmin"]["id"]]
+
+
+def test_antwort_meldet_sich_nicht(client, db, werkstatt_token, wunsch, push_protokoll):
+    """Nur Rückfragen. Würde jede Notiz melden, wäre die Meldung wertlos –
+    und dann schaut irgendwann niemand mehr hin."""
+    _aktion(client, werkstatt_token["TestKind"], wunsch, "antwort", "Die Einkaufsliste.")
+    _aktion(client, werkstatt_token["TestKind"], wunsch, "notiz", "Nur so.")
+    assert push_protokoll == []
+
+
+def test_eigene_rueckfrage_kommt_nicht_zurueck(client, db, werkstatt_token, wunsch,
+                                               push_protokoll):
+    """Sonst meldet sich Andis Handy bei jeder Rückfrage, die er selbst stellt."""
+    _aktion(client, werkstatt_token["TestAdmin"], wunsch, "frage", "Wie meinst du das?")
+    assert push_protokoll == []
+
+
+def test_meldung_verlinkt_auf_den_wunsch(client, db, werkstatt_token, wunsch,
+                                         push_protokoll):
+    """Ohne Sprungziel müsste man die Rückfrage in 160 Wünschen suchen."""
+    _aktion(client, werkstatt_token["TestKind"], wunsch, "frage", "Welche Liste?")
+    assert push_protokoll[0]["url"].endswith(f"#wunsch-{wunsch}")
+    assert f"#{wunsch}" in push_protokoll[0]["titel"]
+
+
+def test_verworfene_aktion_meldet_sich_nicht(client, db, werkstatt_token, wunsch,
+                                             push_protokoll):
+    """Ein leerer Text legt keine Aktion an – dann darf es auch keine
+    Benachrichtigung geben."""
+    _aktion(client, werkstatt_token["TestKind"], wunsch, "frage", "   ")
+    assert _aktionen(db, wunsch) == []
+    assert push_protokoll == []

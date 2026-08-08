@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-08-09 – portal-v161: Wunsch #166 – Rückfragen melden sich
+
+> „Wird eine Rückfrageaktion eingetragen, dann soll eine Pushbenachrichtigung
+> an den Admin erfolgen."
+
+Die Ergänzung, die #161 erst nützlich macht: Eine Rückfrage, die niemand
+bemerkt, ist keine Rückfrage.
+
+**Nur bei `art='frage'`.** Würde jede Antwort und jede Notiz melden, wären die
+Meldungen schnell nichts mehr wert – und dann schaut niemand mehr hin. Das ist
+kein Sparen an Funktion, sondern die Funktion selbst.
+
+**Nicht an den Verfasser.** Sonst meldet sich Andis Handy bei jeder Rückfrage,
+die er selbst stellt – und er stellt die meisten.
+
+**An alle Admins, nicht an „den Admin".** Der Wunsch sagt Singular, aber ein
+fest verdrahteter Empfänger wäre still kaputt, sobald es einen zweiten Admin
+gibt. Heute ist es genau einer, und genau deshalb fällt so ein Fehler erst
+Jahre später auf.
+
+Die Meldung verlinkt direkt auf `#wunsch-<id>` – ohne Sprungziel müsste man
+die Rückfrage in 165 Wünschen suchen.
+
+### Live geprüft, aber bewusst ohne Zustellung
+
+Es war 01:51 Uhr. Eine Testmeldung auf die Familienhandys wäre unhöflich
+gewesen, also habe ich den Pfad so geprüft, dass garantiert nichts zugestellt
+wird: Rückfrage **als Admin selbst** eingetragen. Ergebnis: Aktion angelegt,
+**null** Push-Versuche im Log – das ist zugleich der Live-Beleg für die
+Selbst-Ausschluss-Regel. Die Zustellung selbst ist durch die Tests abgedeckt
+und der Kanal ohnehin erprobt (heute kamen Meldungen auf dem iPhone an).
+
+Gegengeprobt durch zwei absichtliche Fehler (Beschränkung auf `frage`
+entfernt, Selbst-Ausschluss entfernt): zwei Tests fallen.
+
+5 neue Tests, 476 grün. Testwunsch wieder entfernt.
+
+### Nebenbei bestätigt
+
+In `wunsch_aktionen` steht jetzt genau eine echte Zeile: der Abschluss von
+#161, den `manage.py wunsch_erledigt` seit gestern mitschreibt. Der
+Mechanismus greift also im Alltag, ohne dass jemand daran denken muss.
+
+---
+
 ## 2026-08-08 – portal-v160: Wunsch #161 – die Werkstatt wird zum Ticketsystem
 
 Drei Teile: KI-Überschrift für titellose Wünsche, ein Verlauf je Wunsch, und

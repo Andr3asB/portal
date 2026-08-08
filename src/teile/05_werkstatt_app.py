@@ -18,7 +18,7 @@ Werkstatt-App auf einen Wunsch, klappt eine Detailansicht mit Wunsch,
 Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import (get_db, grant as check_grant, to_int,
+from teile.kern import (get_db, grant as check_grant, to_int, push_send,
                         WUNSCH_PRIORITAETEN)
 
 bp  = Blueprint("werkstatt_app", __name__)
@@ -217,7 +217,40 @@ def aktion_neu(token, wid):
         "INSERT INTO wunsch_aktionen(wunsch_id, art, text, user_id) VALUES(?,?,?,?)",
         (wid, art, text, user["id"]))
     db.commit()
+
+    if art == "frage":
+        _admins_benachrichtigen(db, user, wid, text)
+
     return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
+
+
+def _admins_benachrichtigen(db, absender, wid, text):
+    """Wunsch #166: Eine Rueckfrage soll nicht unbemerkt liegen bleiben.
+
+    Nur bei art='frage' - eine Antwort oder Notiz zu melden wuerde die
+    Meldungen entwerten, und dann schaut irgendwann niemand mehr hin.
+
+    Wer die Frage selbst gestellt hat, bekommt sie nicht zugestellt (sonst
+    meldet sich Andis Handy bei jeder eigenen Rueckfrage). Verschickt wird an
+    ALLE Admins, nicht an "den Admin": Es koennen mehrere sein, und ein fest
+    verdrahteter Empfaenger waere still kaputt, sobald sich das aendert.
+
+    `push_send()` arbeitet selbst in einem Thread und mit eigener Verbindung -
+    ein nicht erreichbarer Push-Dienst darf das Speichern der Aktion nicht
+    mitreissen, die ist zu diesem Zeitpunkt bereits committet.
+    """
+    zeile = db.execute("SELECT titel, text FROM wuensche WHERE id=?", (wid,)).fetchone()
+    betreff = (zeile["titel"] or zeile["text"] or "").strip() if zeile else ""
+    for admin in db.execute(
+            "SELECT id FROM users WHERE is_admin=1 AND id != ?", (absender["id"],)):
+        push_send(
+            admin["id"],
+            f"❓ Rückfrage zu #{wid}",
+            f"{absender['name']}: {text[:120]}" if betreff == "" else
+            f"{betreff[:60]} – {text[:100]}",
+            "werkstatt",
+            f"https://portal.16schwaben.de/a/werkstatt/#wunsch-{wid}",
+        )
 
 
 @bp.route("/a/werkstatt/titel/<int:wid>", defaults={"token": None}, methods=["POST"])
