@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-08-08 – portal-v158: Wunsch #159 – Löschen nur noch im Bearbeiten-Modus
+
+> „Der Link für alle löschen soll nur noch im editieren Modus erscheinen"
+
+„Für alle löschen" stand bisher dauerhaft unter jeder Karte – in einer Liste,
+in der man normalerweise nichts löschen will, war es damit der auffälligste
+Knopf der Seite. Jetzt steckt es im Panel, das der Stift aufklappt.
+
+Ein kleiner Umbau mit einem Haken: Das Bearbeiten-Panel war selbst ein
+`<form>`. Da Formulare nicht ineinander dürfen, ist daraus ein `<div>`
+geworden, das beide Formulare nebeneinander aufnimmt. Die Umschalt-Funktion
+greift weiterhin über die id, also blieb das JavaScript unverändert.
+
+### Ein Test, der zweimal nichts geprüft hat
+
+**Erste Fassung:** Sie verglich Positionen im HTML – Löschen muss nach dem
+Panel-Anfang und vor der nächsten Karte stehen. Beim absichtlichen
+Kaputtmachen blieb sie grün, und das zu Recht: Schiebt man das Formular aus
+dem Panel heraus, landet es unmittelbar dahinter – immer noch vor der
+nächsten Karte. Die Grenze war die falsche.
+
+**Zweite Fassung:** Tiefenzählung über die `div`-Ebenen, um die echte
+Panel-Grenze zu finden. Diesmal war der Test rot, obwohl der Code stimmte –
+und die Ursache lag in meinem Werkzeug, nicht in der App: Beim Schreiben der
+Testdatei wurde `` im regulären Ausdruck zu einem echten
+**Backspace-Zeichen** (0x08). Das Muster `</?div` trifft nie etwas, die
+Schleife lief leer, und der Helfer meldete „Panel wird nie geschlossen".
+
+Sichtbar wurde es erst über `cat -A`, das Steuerzeichen als `^H` anzeigt. Im
+Editor sah die Zeile völlig normal aus. Ersetzt durch `</?div[ >]` – ohne
+Escape, damit die Frage gar nicht mehr aufkommt.
+
+Beide Male hätte ich den Test ohne die Gegenprobe für gut befunden: einmal
+grün ohne zu prüfen, einmal rot ohne echten Fehler.
+
+Live nachgemessen statt angeschaut: Löschen liegt im Panel, ist zugeklappt
+unsichtbar (Höhe 0), nach dem Stiftklick sichtbar, und die Formulare sind
+nicht verschachtelt.
+
+3 neue Tests, 366 grün.
+
+---
+
 ## 2026-08-08 – portal-v157: Wunsch #158 – Geburtstage bearbeiten
 
 Erster Wunsch, der über den stündlichen Durchlauf (#157) hereinkam.

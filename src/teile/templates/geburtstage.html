@@ -174,8 +174,10 @@
     {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
     {# Wunsch #158: Korrigieren statt löschen-und-neu-anlegen. Gleiche
        Berechtigung wie beim Löschen – der Eintrag gilt für alle. #}
-    <form class="gb-panel" id="gb-edit-{{ e.id }}" method="post"
-          action="/a/geburtstage{{ tp }}{{ e.id }}/bearbeiten">
+    {# Wunsch #159: Container statt Formular – das Löschen-Formular gehört
+       jetzt mit hier hinein, und Formulare darf man nicht verschachteln. #}
+    <div class="gb-panel" id="gb-edit-{{ e.id }}">
+    <form method="post" action="/a/geburtstage{{ tp }}{{ e.id }}/bearbeiten">
       <div class="gb-feld">
         <label for="gb-edit-name-{{ e.id }}">Wer?</label>
         <input class="gb-input" id="gb-edit-name-{{ e.id }}" type="text" name="name"
@@ -213,11 +215,15 @@
       </div>
     </form>
 
+    {# Wunsch #159: Löschen erscheint NUR im Bearbeiten-Modus. Es stand vorher
+       dauerhaft unter jeder Karte und war damit der auffälligste Knopf einer
+       Liste, in der man normalerweise nichts löschen will. #}
     <form method="post" action="/a/geburtstage{{ tp }}{{ e.id }}/loeschen"
-          style="margin-top:6px"
+          style="margin-top:10px"
           data-bestaetigen="{{ ('„' ~ e.name ~ '“ für ALLE löschen? Wenn du ihn nur für dich nicht sehen willst, nutze stattdessen „Für mich ausblenden“.') }}">
       <button class="gb-loeschen" type="submit">Für alle löschen</button>
     </form>
+    </div>
     {% endif %}
   </div>
   {% endmacro %}

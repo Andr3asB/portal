@@ -199,3 +199,65 @@ def test_korrektur_unterdrueckt_keine_erinnerung(client, db, eintraege, app):
     assert (gid, "tag") in arten, (
         "Die Tages-Erinnerung muss trotz des heutigen 'vorlauf'-Vermerks fällig sein"
     )
+
+
+# --- Wunsch #159: Löschen nur im Bearbeiten-Modus --------------------------
+
+def _panel_inhalt(seite, panel_id):
+    """Der Text ZWISCHEN dem öffnenden div des Panels und seinem passenden
+    schliessenden div – per Tiefenzählung, nicht per "bis zum nächsten </div>".
+
+    Die erste Fassung dieses Tests hat bis zur nächsten Karte gesucht. Das
+    war wertlos: Schiebt man das Löschen-Formular aus dem Panel heraus,
+    landet es unmittelbar dahinter – immer noch vor der nächsten Karte, und
+    der Test blieb grün. Aufgefallen erst beim absichtlichen Kaputtmachen.
+    """
+    import re
+    beginn = seite.index(f'id="{panel_id}"')
+    # zurück zum '<div' dieses Tags
+    auf = seite.rindex("<div", 0, beginn)
+    tiefe = 0
+    for m in re.finditer("</?div[ >]", seite[auf:]):
+        tiefe += -1 if m.group(0).startswith("</") else 1
+        if tiefe == 0:
+            return seite[auf:auf + m.start()]
+    raise AssertionError(f"Panel {panel_id} wird nie geschlossen")
+
+
+def test_loeschen_steckt_im_bearbeiten_panel(client, db, eintraege):
+    """Der Löschen-Knopf stand vorher dauerhaft unter jeder Karte – in einer
+    Liste, in der man normalerweise nichts löschen will, war er damit der
+    auffälligste Knopf der Seite."""
+    gid = eintraege["ids"]["vom_kind"]
+    antwort = client.get(f"/a/geburtstage/{eintraege['tokens']['TestAdmin']}/")
+    seite = antwort.get_data(as_text=True)
+
+    assert f"/{gid}/loeschen" in seite, "Voraussetzung: der Admin darf löschen"
+    assert f"/{gid}/loeschen" in _panel_inhalt(seite, f"gb-edit-{gid}"), (
+        "Das Löschen-Formular gehört IN das Bearbeiten-Panel, nicht daneben."
+    )
+
+
+def test_bearbeiten_panel_ist_zugeklappt(client, db, eintraege):
+    """Das Panel trägt `gb-panel` ohne `open` – und `.gb-panel` ist
+    `display:none`. Ohne das wäre das Verschieben wirkungslos: Der
+    Löschen-Knopf stünde weiterhin sichtbar da, nur woanders."""
+    gid = eintraege["ids"]["vom_kind"]
+    seite = client.get(f"/a/geburtstage/{eintraege['tokens']['TestAdmin']}/") \
+                  .get_data(as_text=True)
+    beginn = seite.index(f'id="gb-edit-{gid}"')
+    # Das class-Attribut steht unmittelbar vor der id
+    davor = seite[max(0, beginn - 120):beginn]
+    assert 'class="gb-panel"' in davor, davor
+    assert "open" not in davor
+
+
+def test_ohne_berechtigung_gibt_es_gar_kein_loeschen(client, db, eintraege):
+    """Gegenprobe: Das Kind sieht beim fremden Eintrag weder Bearbeiten noch
+    Löschen – sonst hätte das Verschieben den Knopf nur versteckt statt ihn
+    an die Berechtigung zu binden."""
+    gid = eintraege["ids"]["vom_admin"]
+    seite = client.get(f"/a/geburtstage/{eintraege['tokens']['TestKind']}/") \
+                  .get_data(as_text=True)
+    assert f'/{gid}/loeschen' not in seite
+    assert f'id="gb-edit-{gid}"' not in seite
