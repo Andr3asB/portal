@@ -526,6 +526,11 @@ _NUTZER_SELECT = """
     FROM   users u
 """
 
+# Wunsch #154: Wie oft "zuletzt benutzt" hoechstens fortgeschrieben wird.
+# Eine Stunde reicht fuer die Frage "ist dieses Geraet noch in Gebrauch?" und
+# haelt die Schreiblast auf der SQLite-Datei klein.
+GESEHEN_TAKT_MINUTEN = 60
+
 SITZUNG_COOKIE = "portal_sitzung"
 # Bewusst nicht "session": Flasks eigenes Cookie heisst so.
 
@@ -551,11 +556,28 @@ def sitzung_nutzer_id(db=None):
         return None
     db = db or get_db()
     zeile = db.execute("""
-        SELECT user_id FROM sitzungen
+        SELECT id, user_id FROM sitzungen
         WHERE kennung_lookup = ?
           AND (ablauf IS NULL OR ablauf > datetime('now'))
     """, (token_lookup(wert),)).fetchone()
-    return zeile["user_id"] if zeile else None
+    if not zeile:
+        return None
+
+    # Wunsch #154: "zuletzt benutzt" festhalten. `gesehen` wurde bisher nur
+    # beim Anlegen gesetzt und nie wieder - eine Geraeteliste haette damit
+    # zwar eine Spalte gehabt, aber immer den Erstellzeitpunkt gezeigt.
+    # Das waere schlechter als gar keine Angabe: es sieht richtig aus.
+    #
+    # Die Drosselung steckt in der WHERE-Klausel und nicht in Python: so ist
+    # es EINE Anweisung ohne Lesen-Aendern-Schreiben, und bei jedem Aufruf
+    # faellt hoechstens einmal je Stunde und Sitzung ein Schreibvorgang an.
+    db.execute("""
+        UPDATE sitzungen SET gesehen = datetime('now')
+        WHERE id = ?
+          AND (gesehen IS NULL OR gesehen < datetime('now', ?))
+    """, (zeile["id"], f"-{GESEHEN_TAKT_MINUTEN} minutes"))
+    db.commit()
+    return zeile["user_id"]
 
 
 def grant(token: str, app_slug: str):

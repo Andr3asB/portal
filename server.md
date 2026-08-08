@@ -328,7 +328,16 @@ teile/
                        Dialog ist `zurueckgestellt` = die einzige Prioritaet,
                        die ein Sammelauftrag nie anfasst.
   03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer (mit Rolle), Grants,
-                       QR-Codes, _clean_farbe() (Hex-Validierung)
+                       QR-Codes, _clean_farbe() (Hex-Validierung).
+                       Wunsch #154: /geraete listet alle Sitzungen mit Person,
+                       Geraet, Anmeldung und letzter Benutzung;
+                       /geraete/<sid>/abmelden entfernt GENAU EINE Sitzung.
+                       Unterschied zu "Neuer Zugang + QR": dort werden alle
+                       Token neu erzeugt und damit saemtliche Geraete des
+                       Nutzers ausgesperrt - hier bleibt der Link gueltig.
+                       `_geraet_lesbar()` prueft von speziell nach allgemein
+                       (Edge/Opera nennen sich auch "Chrome", jeder Chrome
+                       nennt sich auch "Safari").
   04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() mit Push-Deep-Link;
                        Ziel: Person (zugewiesen_an, wie bisher) ODER eine/mehrere
                        Rollen bzw. "alle" (zugewiesen_rollen, kommagetrennt,
@@ -1452,6 +1461,14 @@ anhängen.
 
 ## Sicherheitskonventionen (verpflichtend)
 
+- **Sitzungen sind Zugangsgeheimnisse**: jede Zeile in `sitzungen` ist ein
+  gueltiger, nie ablaufender Zugang (`ablauf` NULL, wegen des Kiosk so
+  gewollt). Wer welche hat, steht seit Wunsch #154 unter
+  `/a/admin/<token>/geraete`; dort laesst sich auch eine EINZELNE abmelden,
+  ohne die Token des Nutzers anzufassen. `gesehen` wird von
+  `sitzung_nutzer_id()` fortgeschrieben, gedrosselt auf
+  `GESEHEN_TAKT_MINUTEN` (60) - die Drosselung steht in der WHERE-Klausel,
+  nicht in Python.
 - **Live-Prüfung**: immer `scripts/live_pruefung.py`, **nie ad hoc mit `curl`
   über Pfad-Tokens**. Jede Anfrage ohne Cookie stellt eine Sitzung aus, und
   die läuft nie ab (`ablauf` NULL, wegen des Kiosk so gewollt). Am 08.08.2026
@@ -1906,6 +1923,13 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_geraete.py` – Wunsch #154. Kern sind zwei Tests, die die Wirklichkeit
+  treffen sollen statt einer bequemen Naeherung: `..._ueberlebt_die_kuerzung`
+  kuerzt eine ECHTE User-Agent-Kennung erst auf `_GERAET_MAX` und parst dann
+  (bei 80 faellt er - so wurde die Kuerzung ueberhaupt entdeckt), und die
+  Drosselungs-Tests setzen `gesehen` gezielt auf -5 Minuten bzw. -2 Stunden.
+  Die erste Fassung rief nur zweimal auf, beide Aufrufe fielen in dieselbe
+  Sekunde, und der Test bestand auch OHNE Drosselung.
 - `test_wunsch_prioritaet.py` – Wunsch #152. Prueft den ENDPUNKT, nicht die
   Seite: die Auswahl steht im Template hinter `user.is_admin`, aber `/wunsch`
   nimmt JSON und ein selbstgebauter POST umgeht jedes Template. Enthaelt

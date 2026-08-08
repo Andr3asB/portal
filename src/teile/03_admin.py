@@ -16,7 +16,8 @@ import io
 import re
 import segno
 from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant, to_int, grant_anlegen, token_lookup, new_token
+from teile.kern import (get_db, grant as check_grant, to_int, grant_anlegen,
+                        token_lookup, new_token, utc_zu_lokal)
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -258,3 +259,86 @@ def neue_tokens(token, uid):
 
 def init_app(app):
     app.register_blueprint(bp)
+
+
+# ---------------------------------------------------------------------------
+# Wunsch #154: Geräteübersicht
+#
+# Anlass war ein Fund am 08.08.2026: 817 Sitzungen für vier Menschen, davon
+# 808 aus Prüfabläufen - unbemerkt, weil die Tabelle für niemanden einsehbar
+# war. Jede Zeile ist ein gültiger, nie ablaufender Zugang (`ablauf` NULL,
+# wegen des Esszimmer-Bildschirms so gewollt).
+#
+# Bis hierher liess sich ein einzelnes Gerät gar nicht abmelden: `sitzungen`
+# wurde nur bei "Neuer Zugang + QR" geleert, und zwar komplett samt neuer
+# Token. Wer sein Handy verlor, sperrte damit auch alle eigenen anderen
+# Geräte aus und brauchte einen neuen QR-Code.
+# ---------------------------------------------------------------------------
+
+_BROWSER = [("Edg/", "Edge"), ("OPR/", "Opera"), ("Chrome/", "Chrome"),
+            ("Firefox/", "Firefox"), ("Safari/", "Safari")]
+_SYSTEME = [("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"),
+            ("Windows", "Windows"), ("Macintosh", "Mac"), ("CrOS", "Chromebook"),
+            ("X11", "Linux"), ("Linux", "Linux")]
+
+
+def _geraet_lesbar(kennung):
+    """User-Agent -> "iPhone · Safari". Der rohe Wert bleibt als Tooltip.
+
+    Erkennt die Reihenfolge bewusst von speziell nach allgemein: Edge und
+    Opera nennen sich beide zusätzlich "Chrome", und jeder Chrome nennt sich
+    zusätzlich "Safari". Wer der Reihe nach von hinten prüft, hält am Ende
+    jedes Gerät für ein Safari.
+    """
+    kennung = (kennung or "").strip()
+    if not kennung:
+        return "unbekannt"
+    system  = next((name for muster, name in _SYSTEME if muster in kennung), None)
+    browser = next((name for muster, name in _BROWSER if muster in kennung), None)
+    if system and browser:
+        return f"{system} · {browser}"
+    return system or browser or kennung[:40]
+
+
+@bp.route("/a/admin/geraete", defaults={"token": None})
+@bp.route("/a/admin/<token>/geraete")
+def geraete(token):
+    admin = _admin(token)
+    db = get_db()
+    zeilen = db.execute("""
+        SELECT s.id, s.erstellt, s.gesehen, s.quelle, s.geraet, s.ablauf,
+               u.name, u.farbe
+        FROM   sitzungen s
+        JOIN   users u ON u.id = s.user_id
+        ORDER  BY COALESCE(s.gesehen, s.erstellt) DESC
+    """).fetchall()
+    geraete_liste = [{
+        "id":       z["id"],
+        "name":     z["name"],
+        "farbe":    z["farbe"],
+        "kennung":  z["geraet"] or "",
+        "lesbar":   _geraet_lesbar(z["geraet"]),
+        "erstellt": utc_zu_lokal(z["erstellt"]),
+        "gesehen":  utc_zu_lokal(z["gesehen"]),
+        "quelle":   z["quelle"] or "token",
+    } for z in zeilen]
+    return render_template("admin_geraete.html",
+        user=admin, token=token, farbe=admin["farbe"], geraete=geraete_liste)
+
+
+@bp.route("/a/admin/geraete/<int:sid>/abmelden",
+          defaults={"token": None}, methods=["POST"])
+@bp.route("/a/admin/<token>/geraete/<int:sid>/abmelden", methods=["POST"])
+def geraet_abmelden(token, sid):
+    """Meldet EIN Gerät ab, ohne die Zugänge des Nutzers anzufassen.
+
+    Der Unterschied zu "Neuer Zugang + QR" ist der ganze Zweck: Dort werden
+    alle Token neu erzeugt und damit sämtliche Geräte dieses Nutzers
+    ausgesperrt. Hier verliert genau dieses eine seinen Nachweis - der Link
+    bzw. QR-Code des Nutzers bleibt gültig, er kann sich damit jederzeit
+    wieder anmelden."""
+    _admin(token)
+    db = get_db()
+    db.execute("DELETE FROM sitzungen WHERE id=?", (sid,))
+    db.commit()
+    return redirect(url_for("admin_app.geraete", token=token))

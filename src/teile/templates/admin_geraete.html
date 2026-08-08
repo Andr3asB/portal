@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% set app_slug = "admin" %}
+{% block title %}Angemeldete Geräte{% endblock %}
+
+{% block extra_styles %}
+.ag-erklaerung {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+  color:var(--text-2); font-size:13px; line-height:1.5;
+}
+.ag-zeile {
+  display:flex; align-items:center; gap:12px;
+  background:var(--surface); border-radius:14px; padding:12px 14px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  border-left:6px solid var(--wer-farbe, var(--border));
+}
+.ag-mitte { flex:1; min-width:0; }
+.ag-geraet { font-size:15px; font-weight:600; }
+.ag-wer { font-size:13px; color:var(--text-2); }
+.ag-meta { font-size:12px; color:var(--text-2); margin-top:3px; line-height:1.45; }
+.ag-abmelden {
+  background:none; border:1.5px solid var(--border); border-radius:10px;
+  color:var(--text-2); font-size:13px; font-weight:600;
+  padding:7px 11px; cursor:pointer; flex-shrink:0;
+}
+.ag-leer { text-align:center; color:var(--text-2); font-size:14px; padding:28px 0; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück zur Verwaltung">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">📱 Angemeldete Geräte</div>
+<div class="nav-sub">{{ geraete|length }} Sitzung{{ '' if geraete|length == 1 else 'en' }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="ag-erklaerung">
+    Jede Zeile ist ein Gerät, das sich einmal über einen Link oder QR-Code
+    angemeldet hat und seitdem ohne Token hineinkommt. <strong>Abmelden</strong>
+    trifft nur dieses eine Gerät – der Link des Nutzers bleibt gültig, er kann
+    sich damit jederzeit wieder anmelden. Wer <em>alle</em> Geräte einer Person
+    aussperren will, nimmt in der Verwaltung „Neuer Zugang + QR“; danach
+    braucht sie einen neuen Link.
+  </div>
+
+  {% if not geraete %}
+  <div class="ag-leer">Kein Gerät angemeldet.</div>
+  {% endif %}
+
+  {% for g in geraete %}
+  <div class="ag-zeile" style="--wer-farbe: {{ g.farbe }}">
+    <div class="ag-mitte">
+      <div class="ag-geraet" title="{{ g.kennung }}">{{ g.lesbar }}</div>
+      <div class="ag-wer">{{ g.name }}</div>
+      <div class="ag-meta">
+        zuletzt benutzt: {{ g.gesehen or "noch nie" }}<br>
+        angemeldet: {{ g.erstellt }}
+      </div>
+    </div>
+    <form method="post" action="/a/admin{{ tp }}geraete/{{ g.id }}/abmelden"
+          data-bestaetigen="{{ g.lesbar }} von {{ g.name }} abmelden? Das Gerät braucht danach wieder den Link oder QR-Code.">
+      <button class="ag-abmelden" type="submit">Abmelden</button>
+    </form>
+  </div>
+  {% endfor %}
+
+</main>
+{% endblock %}

@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-08-08 – portal-v154: Wunsch #154 – Geräteübersicht
+
+Der Wunsch stammt aus dem Aufräumen vom selben Tag: 817 Sitzungen für vier
+Menschen, unbemerkt, weil die Tabelle für niemanden einsehbar war.
+
+Die Seite (`⚙️ Verwaltung → 📱 Geräte`) listet jede angemeldete Sitzung mit
+Person, Gerät, Anmeldezeitpunkt und letzter Benutzung – und erlaubt, **ein
+einzelnes** Gerät abzumelden. Das ist der eigentliche Zugewinn: Bis hierher
+gab es nur „Neuer Zugang + QR", das alle Token neu erzeugt. Wer sein Handy
+verlor, sperrte damit auch Tablet und Kiosk aus und brauchte einen neuen
+QR-Code. Jetzt verliert genau ein Gerät seinen Nachweis, der Link bleibt
+gültig.
+
+### Zwei Sachen, die vorher nur so aussahen, als gäbe es sie
+
+**`gesehen` wurde nie fortgeschrieben.** Die Spalte existiert seit Stufe 1 und
+wurde ausschließlich beim Anlegen gesetzt. Eine Liste mit „zuletzt benutzt"
+hätte also dauerhaft den Anmeldezeitpunkt gezeigt – und zwar überzeugend, denn
+die Zahl sieht ja plausibel aus. Jetzt schreibt `sitzung_nutzer_id()` mit,
+gedrosselt auf einmal je Stunde. Die Drosselung steckt in der WHERE-Klausel
+statt in Python: eine Anweisung, kein Lesen-Ändern-Schreiben.
+
+**`_GERAET_MAX = 80` schnitt jeden Browsernamen ab.** „Mozilla/5.0 (Windows NT
+10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)" ist auf's Zeichen
+genau 80 lang – „Chrome/141.0" kam nie in der Datenbank an. Die Liste hätte
+für immer nur Betriebssysteme gezeigt. Jetzt 200.
+
+Beides fiel erst beim Hinsehen auf, nicht beim Testen – und das ist die
+Pointe: **Meine Tests benutzten künstlich kurze User-Agents.** Sie prüften
+eine Zeichenkette, die in der Wirklichkeit nie vorkommt. Deshalb gibt es
+jetzt einen Test, der die echte Kennung erst auf `_GERAET_MAX` kürzt und
+dann parst; bei 80 fällt er.
+
+### Und ein Test, der gar nichts prüfen konnte
+
+Die erste Fassung der Drosselungs-Prüfung rief zweimal auf und verglich
+`gesehen`. Beide Aufrufe fielen in dieselbe Sekunde, `datetime('now')` lieferte
+zweimal denselben Wert – der Test bestand auch nach **entfernter** Drosselung.
+Aufgefallen ist es nur, weil ich die Drosselung testweise ausgebaut und
+erwartet habe, dass etwas rot wird. Es wurde nichts rot.
+
+Neu geschrieben mit gesetztem Versatz (−5 Minuten: darf nicht schreiben;
+−2 Stunden: muss schreiben). Jetzt fällt er ohne Drosselung.
+
+`_geraet_lesbar()` prüft übrigens von speziell nach allgemein: Edge und Opera
+nennen sich beide zusätzlich „Chrome", und jeder Chrome nennt sich zusätzlich
+„Safari". Wer der Reihe nach von hinten sucht, hält am Ende jedes Gerät für
+ein Safari – auch dafür ein eigener Test.
+
+16 neue Tests, 250 grün. Live bestätigt: zehn Geräte mit Person und Zeiten,
+eine neue Sitzung zeigt „Windows · Chrome", die alten weiterhin nur
+„Windows" (deren gekürzte Kennung lässt sich nicht rekonstruieren).
+
+---
+
 ## 2026-08-08 – portal-v152: Wunsch #152 – Priorität schon beim Eintragen
 
 > „Als Admin will ich neue Wünsche direkt bei der Eingabe priorisieren können.

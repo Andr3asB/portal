@@ -47,7 +47,12 @@ from teile.kern import get_db, token_lookup, SITZUNG_COOKIE
 # ein Import in die andere Richtung waere ein Ringschluss.
 COOKIE_NAME = SITZUNG_COOKIE
 _MAX_AGE = 365 * 24 * 3600
-_GERAET_MAX = 80
+# Wunsch #154: 80 Zeichen schnitten bei JEDEM echten Browser vor dem Namen ab -
+# "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like
+# Gecko)" ist bereits genau 80 lang, "Chrome/141.0" kam nie an. Die
+# Geraeteliste zeigte deshalb nur das Betriebssystem. 200 reicht fuer jeden
+# gaengigen User-Agent; die Spalte ist Text, das kostet nichts.
+_GERAET_MAX = 200
 
 
 def _schalter_an() -> bool:
