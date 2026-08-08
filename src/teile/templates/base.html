@@ -90,9 +90,6 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .nav-sub { font-size: 13px; opacity: .85; margin-top: 1px; }
-    .nav-extra {
-      padding: 14px calc(16px + var(--sr)) 14px calc(16px + var(--sl));
-    }
     .offline-banner {
       background: rgba(0,0,0,.18);
       color: #fff;
@@ -237,8 +234,12 @@
     {% endif %}
   </div>
   <div class="offline-banner" id="offline-banner" style="display:none">📡 Offline – manche Funktionen sind eingeschränkt</div>
-  {% block header_extra %}{% endblock %}
 </header>
+{# Wunsch #155: Hier stand ein Block `header_extra`, ueber den Aktionsknoepfe
+   direkt auf das farbige Kopfband geklebt wurden. Zuletzt nutzte ihn nur noch
+   die Verwaltung - ueberall sonst stehen Aktionen oben im <main>, abgesetzt
+   auf dem normalen Hintergrund (`.top-aktionen`, siehe todo.html). Der Block
+   ist entfernt, damit das Muster nicht zurueckkommt. #}
 
 {% block body %}{% endblock %}
 

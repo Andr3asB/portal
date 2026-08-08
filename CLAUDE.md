@@ -148,6 +148,10 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- Aktionsknöpfe einer Seite stehen **oben im `<main>`** als `.top-aktionen`-Zeile
+  (Vorbild `todo.html`: Rahmen in `var(--farbe)`, transparenter Grund) – nie auf
+  dem farbigen Kopfband. Der dafür gedachte Block `header_extra` ist mit
+  Wunsch #155 aus `base.html` entfernt; `tests/test_kopfleiste.py` wächtert das.
 - Jede neue Funktion gehört in die Hilfe-App (`09_hilfe.py`/`hilfe.html`),
   bei Bedarf als eigenes Kapitel mit Sprunglink im Inhaltsverzeichnis.
   Gehört zum „dokumentieren"-Schritt der Arbeitsweise oben, genauso

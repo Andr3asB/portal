@@ -1443,6 +1443,33 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
 
+## Aktionsknöpfe (verpflichtend, seit Wunsch #155)
+
+Aktionen einer Seite stehen **oben im `<main>`** als `.top-aktionen`-Zeile,
+Vorbild `todo.html`:
+
+```html
+<div class="top-aktionen">
+  <a class="top-aktion" href="...">+ Neues Mitglied</a>
+</div>
+```
+
+```css
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.top-aktion {
+  flex:1; display:block; text-align:center; text-decoration:none;
+  background:none; border:1.5px solid var(--farbe); color:var(--farbe);
+  border-radius:12px; padding:12px 10px; font-size:14px; font-weight:600;
+}
+```
+
+**Nie auf das farbige Kopfband.** Der Block `header_extra` in `base.html`, der
+das ermöglichte, ist ersatzlos entfallen – `admin.html` war zuletzt die einzige
+Vorlage, die ihn noch benutzte. Ein Template, das ihn wieder definiert, würde
+NICHTS rendern (der Knopf verschwände lautlos); `tests/test_kopfleiste.py`
+fängt genau das ab und prüft zusätzlich, dass zwischen `</header>` und
+`<main>` keine Schaltfläche steht.
+
 ## Hamburger-Menü (verpflichtende Struktur, seit Wunsch #32)
 
 Gilt in `base.html` für das ganze Portal, immer in dieser Reihenfolge:
@@ -1923,6 +1950,12 @@ python -m venv .venv                                   # einmalig
   ABGRENZUNG (Empfaenger kann nicht aendern/loeschen/umbenennen/weiterteilen,
   Dritte sehen nichts, Aufheben wirkt sofort) - eine zu weite Freigabe faellt
   im Alltag nicht auf, eine zu enge sofort.
+- `test_kopfleiste.py` – Wunsch #155. Waechter ueber ALLE Vorlagen: kein
+  `header_extra`, keine Schaltflaeche zwischen `</header>` und `<main>`.
+  Kommentare werden vorher entfernt, sonst loesten die Hinweistexte in
+  base.html/admin.html den Test selbst aus. Enthaelt einen Test, der prueft,
+  dass ueberhaupt Vorlagen gefunden wurden - sonst waere die Parametrisierung
+  leer und alles gruen.
 - `test_geraete.py` – Wunsch #154. Kern sind zwei Tests, die die Wirklichkeit
   treffen sollen statt einer bequemen Naeherung: `..._ueberlebt_die_kuerzung`
   kuerzt eine ECHTE User-Agent-Kennung erst auf `_GERAET_MAX` und parst dann

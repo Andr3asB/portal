@@ -2,6 +2,68 @@
 
 ---
 
+## 2026-08-08 – portal-v155: Wunsch #155 – die Verwaltung war die letzte
+
+> „Die Buttons sind noch mit dem Header des Portals verbunden. das haben wir
+> doch in allen Apps geändert. scheint hier zurückgeblieben zu sein."
+
+Stimmte auf's Wort. `base.html` hatte einen Block `header_extra`, über den man
+Knöpfe direkt auf das farbige Kopfband kleben konnte – und genau **eine**
+Vorlage benutzte ihn noch: `admin.html`. Überall sonst stehen Aktionen oben im
+`<main>`, abgesetzt auf dem normalen Hintergrund.
+
+Pikant daran: Ich habe heute Nachmittag den Geräte-Knopf für #154 genau dort
+eingehängt, weil das in dieser Datei so aussah wie die richtige Stelle. Ich
+habe den Bestand nachgeahmt, statt zu prüfen, ob der Bestand noch dem Muster
+entspricht – und damit eine Altlast frisch verstärkt.
+
+### Nicht nur verschoben, sondern die Möglichkeit entfernt
+
+Die beiden Knöpfe sitzen jetzt als `.top-aktionen`-Zeile oben im Inhalt, in
+derselben Bauart wie `todo.html`. Dazu geflogen sind:
+
+- der Block `header_extra` in `base.html` – sein einziger Nutzer war weg, und
+  ein Erweiterungspunkt, der nur das falsche Muster ermöglicht, lädt zur
+  Wiederholung ein;
+- die Regel `.nav-extra`, die nur für ihn da war;
+- `.btn-add` in `admin.html` (weiß auf farbigem Grund) – außerhalb des Headers
+  unsichtbar. Sie stehen zu lassen hätte geheißen, beim nächsten Knopf
+  versehentlich wieder danach zu greifen.
+
+### Gemessen statt angeschaut
+
+Screenshots liefen wieder in einen Timeout, also über `getBoundingClientRect()`
+– dieselbe Methode wie beim CSS-Prozenthöhen-Fall:
+
+| | Verwaltung | todo (Referenz) |
+|---|---|---|
+| Abstand Header → Leiste | 16 px | 16 px |
+| Leiste liegt in | `<main>` | `<main>` |
+| Hintergrund dahinter | rgb(245,245,247) | – |
+| Knopf: Rahmen / Grund | var(--farbe) / transparent | dito |
+| Radius / Padding / Schrift | 12px / 12px 10px / 14px 600 | identisch |
+
+Bleibt ein Unterschied von 3 px in der Höhe. Nachgemessen: `line-height` ist in
+beiden `normal`, die Differenz kommt vom Emoji im Text. Kein Layoutfehler,
+also stehen gelassen – den hätte ich sonst „repariert", ohne dass etwas kaputt
+war.
+
+### Wächter statt einmaligem Umbau
+
+`tests/test_kopfleiste.py` geht alle Vorlagen durch: keine darf `header_extra`
+benutzen, und zwischen `</header>` und `<main>` darf keine Schaltfläche
+stehen. Kommentare werden vorher herausgeschnitten, sonst hätten die
+Hinweistexte in `base.html` und `admin.html` den Test selbst ausgelöst.
+Gegengeprüft durch Wiedereinbau des Blocks: fällt.
+
+Solche Abweichungen entstehen nicht durch eine falsche Entscheidung, sondern
+dadurch, dass eine Datei beim Umbau übersehen wird. Ein Test findet die
+nächste, ein aufgeräumtes `admin.html` nicht.
+
+343 Tests grün.
+
+---
+
 ## 2026-08-08 – portal-v154: Wunsch #154 – Geräteübersicht
 
 Der Wunsch stammt aus dem Aufräumen vom selben Tag: 817 Sitzungen für vier

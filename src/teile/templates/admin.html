@@ -3,17 +3,6 @@
 {% block title %}Verwaltung{% endblock %}
 
 {% block extra_styles %}
-.header-title { font-size:22px; font-weight:700; }
-.header-sub   { font-size:13px; opacity:.8; margin-top:2px; }
-.btn-add {
-  background:rgba(255,255,255,.22); color:#fff;
-  border:1.5px solid rgba(255,255,255,.4);
-  border-radius:10px; padding:10px 18px; font-size:15px; font-weight:600;
-  text-decoration:none; white-space:nowrap; cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,.15);
-  display:inline-block;
-}
-.btn-add:active { background:rgba(255,255,255,.32); }
 .user-card {
   background:var(--surface); border-radius:16px; padding:16px;
   margin-bottom:12px; box-shadow:0 1px 3px var(--shadow);
@@ -63,9 +52,14 @@
 .grant-chip.active   { background:#34c759; color:#fff; }
 .grant-chip.inactive { background:var(--chip-bg); color:var(--chip-text); }
 .grant-chip.inactive:hover { background:var(--surface-2); }
-/* Wunsch #154: zweiter Knopf im Kopf, optisch zurückhaltender als "+ Neues
-   Mitglied" - Geräte ansehen ist die seltenere Handlung. */
-.btn-geraete { background:var(--surface-2); color:var(--text); }
+/* Wunsch #155: gleiche Bauart wie .top-aktionen in todo.html/rezepte.html */
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.top-aktion {
+  flex:1; display:block; text-align:center; text-decoration:none;
+  background:none; border:1.5px solid var(--farbe); color:var(--farbe);
+  border-radius:12px; padding:12px 10px; font-size:14px; font-weight:600;
+  white-space:nowrap;
+}
 {% endblock %}
 
 {% block nav_title %}
@@ -73,16 +67,15 @@
 <div class="nav-sub">{{ all_users|length }} Familienmitglieder</div>
 {% endblock %}
 
-{% block header_extra %}
-<div class="nav-extra">
-  <a class="btn-add" href="/a/admin{{ tp }}user/neu">+ Neues Mitglied</a>
-  {# Wunsch #154 #}
-  <a class="btn-add btn-geraete" href="/a/admin{{ tp }}geraete">📱 Geräte</a>
-</div>
-{% endblock %}
-
 {% block body %}
 <main class="main">
+  {# Wunsch #155: Die Knöpfe hingen als einzige App noch am farbigen Header
+     (block header_extra). Überall sonst stehen Aktionen oben im Inhalt. #}
+  <div class="top-aktionen">
+    <a class="top-aktion" href="/a/admin{{ tp }}user/neu">+ Neues Mitglied</a>
+    <a class="top-aktion" href="/a/admin{{ tp }}geraete">📱 Geräte</a>
+  </div>
+
 {% for u in all_users %}
   {% set u_grants = grants.get(u.id, []) %}
   <div class="user-card">
