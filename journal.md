@@ -2,6 +2,52 @@
 
 ---
 
+## 2026-08-08 – Wunsch #157: stündlicher Wunsch-Durchlauf, mit ehrlichen Grenzen
+
+> „In Zukunft sollst du alle 60 Minuten prüfen, ob Wünsche priorisiert und zur
+> Umsetzung freigegeben sind […] dann beginne mit der Implementierung
+> automatisch."
+
+Eingerichtet: ein wiederkehrender Auftrag, jede Stunde um :23 (bewusst nicht
+:00 – dort landen die Anfragen der halben Welt gleichzeitig). Er holt die
+freigegebenen Wünsche, und wenn keine da sind, antwortet er mit **einer Zeile**
+und tut sonst nichts. Ohne diese Regel wären 24 Fortschrittsberichte am Tag
+das Ergebnis, und die Automatik würde zur Belästigung.
+
+### Was „freigegeben" heisst
+
+**Ausdrücklich gesetzte Priorität, die nicht `zurueckgestellt` ist.** Wünsche
+ohne Priorität (NULL) fasst der Lauf nicht an – „noch nicht priorisiert" ist
+nicht dasselbe wie „freigegeben". Damit greift genau das Tor, das Andi sich
+mit #152 gebaut hat: Sein eigener Wunsch startet auf `zurueckgestellt`, und
+erst sein Hochstufen gibt ihn frei.
+
+### Drei Grenzen, die ich nicht wegdiskutieren kann
+
+Der erste Versuch, den Auftrag anzulegen, wurde vom Berechtigungs-Wächter
+**blockiert** – ein wiederkehrender, unbeaufsichtigter Job, der Code schreibt,
+auf den Familienserver ausliefert und nach GitHub pusht. Ich habe bewusst
+keinen Umweg gebaut, sondern es Andi vorgelegt; er hat zugestimmt.
+
+Wichtiger sind aber die Grenzen des Werkzeugs selbst:
+
+| Gewünscht | Tatsächlich |
+|---|---|
+| „In Zukunft" | Der Auftrag lebt **nur in dieser Sitzung**. Nichts auf Platte, weg beim Schliessen. |
+| dauerhaft | Wiederkehrende Aufträge **laufen nach 7 Tagen ab**. |
+| „wenn ausreichend Kontingent, dann beginne" | **Ich kann mein Kontingent nicht abfragen.** Ich kann nur aufhören, wenn es endet – der nächste Lauf macht weiter. |
+
+Das Ergebnis ist also nicht „ab jetzt automatisch", sondern „solange dieses
+Fenster offen ist, höchstens sieben Tage". Das steht hier, damit es in vier
+Tagen niemanden überrascht, wenn nichts mehr passiert – ein Automatismus, der
+still aufhört, ist schlimmer als keiner.
+
+Der dauerhafte Weg wäre eine geplante Aufgabe ausserhalb von Claude, die Claude
+Code stündlich mit diesem Auftrag startet. Andi wollte es „erstmal nur ganz
+einfach"; das bleibt offen.
+
+---
+
 ## 2026-08-08 – portal-v156: Wunsch #156 – es gibt keine Änderungen zu protokollieren
 
 > „Werden im Protokoll auch Änderungen dokumentiert (z.B. wenn der Betreff
