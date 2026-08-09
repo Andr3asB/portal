@@ -39,6 +39,15 @@ SSH     = ["ssh", "-p", "2222", HOST]
 BASIS   = "https://portal.16schwaben.de"
 KENNUNG = "PRUEFUNG"
 
+# Unterseiten, die nicht die Startseite ihrer App sind und deshalb sonst nie
+# angefasst würden. Jede App-Startseite prüft das Skript ohnehin; hier stehen
+# nur Seiten, die man von Hand aufsuchen muss. Wer eine neue baut, trägt sie
+# ein - sonst merkt niemand, wenn sie 500 wirft, bis jemand sie braucht.
+UNTERSEITEN = {
+    "admin": [("/a/admin/geraete", "Verwaltung › Geräte"),
+              ("/a/admin/ki",      "Verwaltung › KI-Verbrauch")],
+}
+
 
 def auf_dem_server(python_code: str) -> str:
     """Führt Python IM Container aus und gibt stdout zurück.
@@ -123,6 +132,11 @@ def main() -> int:
             print(f"  {code}  {app['name']}")
             if code != 200:
                 fehler.append((app["name"], code))
+            for pfad, beschriftung in UNTERSEITEN.get(app["slug"], []):
+                code = hole(pfad, cookie)
+                print(f"  {code}  {beschriftung}")
+                if code != 200:
+                    fehler.append((beschriftung, code))
     finally:
         # Auch bei Abbruch: die Sitzung darf nicht stehen bleiben. Genau das
         # Versäumnis hat 808 Zugänge in der Datenbank hinterlassen.

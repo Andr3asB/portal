@@ -47,6 +47,10 @@ app.config["CSP_MODUS"]          = os.environ.get("CSP_MODUS", "aus")
 # Thread, der nebenher in dieselbe SQLite-Datei schreibt, blockiert sonst
 # die Testfixtures ("database is locked").
 app.config["GEBURTSTAGS_ERINNERUNGEN"] = os.environ.get("GEBURTSTAGS_ERINNERUNGEN", "1")
+# Wunsch #183: Stuendlicher Waechter ueber das OpenRouter-Guthaben. Aus
+# demselben Grund wie oben in der Testumgebung 0 - und der Thread wuerde dort
+# ausserdem bei jedem Testlauf OpenRouter anrufen.
+app.config["KI_GUTHABEN_WACHT"] = os.environ.get("KI_GUTHABEN_WACHT", "1")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

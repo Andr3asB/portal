@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% set app_slug = "admin" %}
+{% block title %}KI-Verbrauch{% endblock %}
+
+{% block extra_styles %}
+.kib-karte {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  margin-bottom:12px; box-shadow:0 1px 3px var(--shadow);
+}
+.kib-erklaerung { color:var(--text-2); font-size:13px; line-height:1.5; }
+.kib-ueberschrift {
+  font-size:13px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.04em; margin:18px 0 8px;
+}
+
+/* Guthaben */
+.kib-stand { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.kib-zahl { font-size:34px; font-weight:700; line-height:1.1; }
+/* Ein fester Rotton statt einer Variablen: base.html kennt keine Warnfarbe,
+   und #e0524d traegt sowohl auf #ffffff als auch auf #2c2c2e. */
+.kib-zahl.knapp { color:#e0524d; }
+.kib-waehrung { font-size:15px; color:var(--text-2); }
+.kib-detail { color:var(--text-2); font-size:13px; line-height:1.6; margin-top:10px; }
+.kib-detail strong { color:var(--text); font-weight:600; }
+.kib-warnung {
+  margin-top:10px; padding:10px 12px; border-radius:10px;
+  background:rgba(192,57,43,.12); color:var(--text); font-size:13px; line-height:1.5;
+}
+
+/* Verbrauch je Nutzer */
+.kib-zeile {
+  display:flex; align-items:center; gap:12px;
+  background:var(--surface); border-radius:14px; padding:11px 14px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+  border-left:6px solid var(--wer-farbe, var(--border));
+}
+.kib-mitte { flex:1; min-width:0; }
+.kib-name { font-size:15px; font-weight:600; }
+.kib-meta { font-size:12px; color:var(--text-2); margin-top:3px; line-height:1.45; }
+.kib-balken {
+  height:6px; border-radius:3px; background:var(--border);
+  margin-top:6px; overflow:hidden;
+}
+.kib-balken i { display:block; height:100%; background:var(--wer-farbe, var(--farbe)); }
+.kib-anteil { font-size:13px; color:var(--text-2); flex-shrink:0; text-align:right; }
+
+/* Je Funktion */
+.kib-feature {
+  display:flex; justify-content:space-between; gap:10px;
+  padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;
+}
+.kib-feature:last-child { border-bottom:none; }
+.kib-feature span { color:var(--text-2); font-size:13px; }
+.kib-leer { text-align:center; color:var(--text-2); font-size:14px; padding:22px 0; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück zur Verwaltung">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🤖 KI-Verbrauch</div>
+<div class="nav-sub">Kontingente und Guthaben</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <div class="kib-karte kib-erklaerung">
+    Alle KI-Funktionen des Portals laufen über <strong>ein</strong> gemeinsames
+    OpenRouter-Konto. Jede Anfrage wird mit Nutzer und Token-Zahl protokolliert;
+    <strong>Vorlesen</strong> zählt Zeichen statt Tokens und hat deshalb eine
+    eigene Spalte. Die Kontingente unten gelten je Kalendermonat und stehen im
+    Nutzerformular. OpenRouter rechnet in <strong>US-Dollar</strong>.
+  </div>
+
+  <div class="kib-ueberschrift">Guthaben bei OpenRouter</div>
+
+  {% if not guthaben %}
+  <div class="kib-karte kib-erklaerung">
+    OpenRouter ist gerade nicht erreichbar oder es ist kein Schlüssel
+    hinterlegt. Der Verbrauch unten stammt aus der eigenen Datenbank und
+    stimmt trotzdem.
+  </div>
+  {% else %}
+  <div class="kib-karte">
+    <div class="kib-stand">
+      <div class="kib-zahl {{ 'knapp' if guthaben.rest <= schwelle else '' }}">
+        {{ '%.2f'|format(guthaben.rest)|replace('.', ',') }}
+      </div>
+      <div class="kib-waehrung">USD verfügbar</div>
+    </div>
+    <div class="kib-detail">
+      {# `in` statt `is not none`: ein fehlender Schluessel ergaebe in Jinja
+         Undefined, und Undefined ist nicht None - die Zeile stuende dann mit
+         leerer Zahl da. #}
+      {% if 'konto_rest' in guthaben %}
+      Konto-Guthaben: <strong>{{ '%.2f'|format(guthaben.konto_rest)|replace('.', ',') }} USD</strong>
+      {% if guthaben.get('konto_gekauft') is not none %}
+        (aufgeladen {{ '%.2f'|format(guthaben.konto_gekauft)|replace('.', ',') }},
+         verbraucht {{ '%.2f'|format(guthaben.konto_verbraucht or 0)|replace('.', ',') }})
+      {% endif %}<br>
+      {% endif %}
+      {% if 'limit_rest' in guthaben %}
+      Limit dieses Schlüssels: <strong>{{ '%.2f'|format(guthaben.limit_rest)|replace('.', ',') }} USD</strong>
+      von {{ '%.2f'|format(guthaben.limit)|replace('.', ',') }}
+      {% if guthaben.limit_reset %}(setzt sich {{ guthaben.limit_reset }} zurück){% endif %}<br>
+      {% endif %}
+      {% if guthaben.get('usage_taeglich') is not none %}
+      Verbrauch heute: {{ '%.4f'|format(guthaben.usage_taeglich)|replace('.', ',') }} USD,
+      diesen Monat: {{ '%.4f'|format(guthaben.usage_monatlich or 0)|replace('.', ',') }} USD
+      {% endif %}
+    </div>
+    {% if guthaben.rest <= schwelle %}
+    <div class="kib-warnung">
+      Unter {{ '%.2f'|format(schwelle)|replace('.', ',') }} USD – es liegt eine
+      Aufgabe zum Aufladen in der Liste. Ohne Guthaben fallen Rezept-Import,
+      Foto-Import und Vorlesen aus; alles andere im Portal läuft weiter.
+    </div>
+    {% else %}
+    <div class="kib-detail">
+      Fällt der Wert auf {{ '%.2f'|format(schwelle)|replace('.', ',') }} USD oder
+      darunter, legt das Portal Andi automatisch eine Aufgabe an und schickt
+      eine Push-Nachricht dazu.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="kib-ueberschrift">Verbraucht in diesem Monat</div>
+
+  {% for n in nutzer %}
+  <div class="kib-zeile" style="--wer-farbe: {{ n.farbe }}">
+    <div class="kib-mitte">
+      <div class="kib-name">{{ n.name }}</div>
+      <div class="kib-meta">
+        {{ '{:,}'.format(n.tokens_monat).replace(',', '.') }} von
+        {{ '{:,}'.format(n.ki_token_limit).replace(',', '.') }} Tokens
+        · insgesamt {{ n.anfragen }} Anfrage{{ '' if n.anfragen == 1 else 'n' }}
+        {%- if tts.get(n.id) %}
+        · {{ '{:,}'.format(tts.get(n.id)).replace(',', '.') }} Zeichen vorgelesen
+        {%- endif %}
+      </div>
+      <div class="kib-balken">
+        <i style="width: {{ [100, (n.tokens_monat * 100 // (n.ki_token_limit or 1))]|min }}%"></i>
+      </div>
+    </div>
+    <div class="kib-anteil">
+      {{ (n.tokens_monat * 100 // (n.ki_token_limit or 1)) }}&thinsp;%
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="kib-ueberschrift">Wofür, in diesem Monat</div>
+  <div class="kib-karte">
+    {% if not je_feature %}
+    <div class="kib-leer">Diesen Monat noch keine KI-Anfrage.</div>
+    {% endif %}
+    {% for f in je_feature %}
+    <div class="kib-feature">
+      <div>{{ f.feature }}<br><span>{{ f.anfragen }} Anfrage{{ '' if f.anfragen == 1 else 'n' }}</span></div>
+      <div>{{ '{:,}'.format(f.tokens).replace(',', '.') }}<br><span>Tokens</span></div>
+    </div>
+    {% endfor %}
+  </div>
+
+</main>
+{% endblock %}

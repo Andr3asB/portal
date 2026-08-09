@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-01 (portal-v92: Wunsch #95 Sportschau-Zeitraum wählbar 14/30/60/90 Tage)*
+*Letzte Aktualisierung: 2026-08-09 (portal-v181: Wunsch #183 KI-Verbrauch und OpenRouter-Guthaben)*
 
 ## Host
 
@@ -178,7 +178,14 @@ SITZUNG_KONSUMIEREN=1    # Wunsch #140, Stufe 3
 TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
+KI_GUTHABEN_WACHT=1         # Wunsch #183: stuendlicher Blick aufs OpenRouter-Guthaben
 ```
+
+`PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN` und `KI_GUTHABEN_WACHT` stehen
+heute NICHT in der echten `.env` - sie greifen mit ihrer Voreinstellung (leer
+bzw. 1). Sie sind hier aufgefuehrt, weil man sie dort eintragen kann und die
+Voreinstellung dann uebersteuert wird; `env_file: .env` reicht jede Zeile
+durch.
 
 Die vier `#140`-Schalter sind die Notausstiege der jeweiligen Umbaustufe: auf
 `0` setzen, `docker compose up -d portal`, fertig - kein Rebuild, kein Paket.
@@ -1018,6 +1025,24 @@ teile/
                        Aendern NICHT geleert - die Tabelle schluesselt auf den
                        VERSANDTAG, eine Korrektur kann also keine kuenftige
                        Erinnerung unterdruecken.
+  24_ki_budget.py    – /a/admin/<token>/ki  KI-Verbrauch je Nutzer und
+                       OpenRouter-Guthaben (Wunsch #183). Nur Admins.
+                       Zwei Guthaben-Begriffe, die nicht dasselbe sind:
+                       `/api/v1/credits` = Konto (gekauft minus Gesamt-
+                       verbrauch), `/api/v1/key` = Limit DIESES Schluessels
+                       mit monatlichem Reset. `guthaben_lesen()` nimmt den
+                       KLEINEREN - ist eines von beiden leer, geht keine
+                       Anfrage mehr durch; nur aufs Konto zu schauen
+                       uebersieht ein aufgebrauchtes Monatslimit.
+                       Betraege sind USD, nicht EUR (der Wunsch sagt Euro).
+                       `guthaben_pruefen()` laeuft stuendlich als Daemon-
+                       Thread (Schalter `KI_GUTHABEN_WACHT`, im Test 0) und
+                       legt bei <= 1,00 USD EINE Aufgabe fuer den ersten
+                       Admin an + Push. Deduplizierung ueber
+                       `_aufgabe_schon_offen()`: solange eine offene Aufgabe
+                       mit der Marke existiert, entsteht keine zweite.
+                       Antwortet OpenRouter nicht, passiert NICHTS - ein
+                       Netzwerkfehler ist kein leeres Konto.
                        (Wunsch #145). Eingetragen wird fuer alle, EINGESTELLT
                        fuer sich: Ausblenden, Erinnerung am Tag und
                        Vorlauf-Erinnerung stehen je (user_id, geburtstag_id).

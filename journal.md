@@ -2,6 +2,97 @@
 
 ---
 
+## 2026-08-09 – portal-v180/v181: Wunsch #183 – KI-Verbrauch und Guthaben sichtbar
+
+> „Es soll eine Übersicht geben, in der man pro Benutzer die verbrauchten
+> Token von OpenRouter sieht. Außerdem soll das Guthaben bei OpenRouter
+> dargestellt werden. Fällt das Guthaben auf ein Euro oder niedriger, bekommt
+> Andi eine Aufgabe eingestellt, damit er das Guthaben wieder auflädt. Die
+> Aufgabe soll so eingestellt sein, dass eine Push-Benachrichtigung ausgelöst
+> wird.“
+
+Neues Modul `24_ki_budget.py`, Seite unter „Verwaltung › 🤖 KI-Verbrauch“.
+Die Zahlen lagen seit #81 bzw. #136 in `ki_nutzung` und `ki_tts_nutzung` –
+sichtbar waren sie nirgends.
+
+### Zwei Dinge, die beide „Guthaben“ heißen
+
+OpenRouter liefert sie an zwei Endpunkten, und sie sind nicht dasselbe:
+
+| Endpunkt | Bedeutung | heute |
+|---|---|---|
+| `/api/v1/credits` | gekaufte Credits minus **Gesamt**verbrauch | 9,92 USD |
+| `/api/v1/key` | Limit **dieses Schlüssels**, setzt sich monatlich zurück | 9,95 USD von 10 |
+
+Ausschlaggebend ist der **kleinere** von beiden: Ist eines von beiden leer,
+geht keine Anfrage mehr durch. Würde die Warnung nur aufs Konto-Guthaben
+schauen, liefe ein aufgebrauchtes Monatslimit still in 402er-Fehler – mit
+einem Konto, das laut Anzeige voll ist. Beide Werte stehen deshalb auf der
+Seite, die große Zahl oben ist der kleinere.
+
+### Euro steht im Wunsch, USD steht auf der Seite
+
+OpenRouter rechnet in US-Dollar. Bei einer Schwelle von 1,00 ist der
+Unterschied belanglos – aber eine Zahl, die anders heißt als sie ist, führt
+irgendwann in die Irre. Die Schwelle ist deshalb `1.00 USD` und die Einheit
+steht überall dran, auch in der Aufgabe und in der Push-Nachricht.
+
+### Eine Aufgabe je Ebbe, nicht eine je Prüfung
+
+Der Wächter läuft stündlich als Hintergrund-Thread (Muster wie die
+Geburtstage in `23_geburtstage.py`, Schalter `KI_GUTHABEN_WACHT`). Ohne
+Deduplizierung stünden nach einer Woche 168 gleichlautende Aufgaben in der
+Liste – und die würde man sammelweise wegwischen, die 169. dann auch. Es
+entsteht deshalb nur eine Aufgabe, solange keine offene dieser Art existiert;
+nach dem Abhaken darf wieder gewarnt werden.
+
+Ein Netzwerkfehler ist ausdrücklich **kein** Alarm: Antwortet OpenRouter
+nicht, passiert nichts. Sonst stünde nach dem ersten Aussetzer eine Aufgabe
+da, die nichts bedeutet – und die nächste echte würde geglaubt wie diese.
+
+### Zehn Fehler eingebaut, zwei Tests waren blind
+
+Nach der stehenden Regel jeden Wächter einmal absichtlich gebrochen. Acht
+wurden sofort rot, zwei nicht:
+
+- **`test_nur_admins`** prüfte mit dem *Home*-Token des Kindes. Das scheitert
+  schon am fehlenden Grant – der `is_admin`-Zweig wurde nie erreicht. Ohne
+  ihn blieb der Test grün. Jetzt bekommt das Kind im Test einen echten
+  Admin-Grant und muss trotzdem 403 sehen.
+- **`test_seite_zeigt_verbrauch_je_nutzer`** suchte `1.234`. Diese Zahl steht
+  aber auch in der Aufstellung je Funktion weiter unten – als die Nutzerzeile
+  ihre Zahl gar nicht mehr ausgab, fand der Test sie trotzdem. Jetzt sucht er
+  `1.234 von`.
+
+Beides derselbe Fehlertyp wie schon mehrfach: Der Test findet, wonach er
+sucht, nur woanders.
+
+### `live_pruefung.py` kennt jetzt Unterseiten
+
+Das Skript prüfte bisher nur die Startseite jeder App. Eine Unterseite, die
+man von Hand aufsuchen muss, hätte still 500 werfen können, bis jemand sie
+braucht. `UNTERSEITEN` listet sie jetzt – heute `› Geräte` und
+`› KI-Verbrauch`.
+
+### Live geprüft
+
+Alle 19 Seiten 200, Guthaben aus dem laufenden Container gelesen (9,92 USD),
+Seite mit echten Zahlen gerendert: Andi 9.124 Tokens, Friederike 4.663,
+Simone 2.071, Johannes 0 – jeweils von 100.000 im Monat. 911 Tests grün.
+
+**v181 direkt hinterher**, weil die Seite „setzt sich monthly zurück“
+schrieb. Auf einer deutschen Seite steht kein `monthly`.
+
+### Was offen ist
+
+Die Push-Nachricht des Wächters ist **nicht** live ausgelöst worden – das
+Guthaben liegt bei 9,92 USD, und ein künstlich herbeigeführter Alarm hätte
+eine echte Aufgabe in Andis Liste hinterlassen. Der Weg ist derselbe wie bei
+jeder anderen Aufgaben-Push (`push_send(…, "todo", …)`), im Test geprüft;
+bestätigt ist er erst, wenn das Guthaben tatsächlich zur Neige geht.
+
+---
+
 ## 2026-08-09 – portal-v179: Wunsch #182 – Werkstatt-Karte neu aufgeteilt
 
 > „Die Ansicht sieht nach der Feldanpassung für Prio noch schräger aus als
