@@ -668,6 +668,19 @@ def detail(token, rid):
         "SELECT sterne FROM rezept_bewertungen WHERE rezept_id=? AND user_id=?",
         (rid, user["id"]),
     ).fetchone()
+    # Wunsch #165: Wann stand das Gericht zuletzt auf dem Tisch? Die Daten
+    # legt Wunsch #162 an; hier werden sie nur gelesen. Sortiert nach dem TAG
+    # des Essensplans, nicht nach dem Zeitpunkt des Anhakens - gefragt ist
+    # "wann gab es das", nicht "wann hat es jemand vermerkt". Wer vier Wochen
+    # spaeter nachtraegt, soll den Verlauf nicht durcheinanderbringen.
+    gekocht = db.execute("""
+        SELECT g.tag, g.mahlzeit, g.markiert_am, u.name AS wer
+        FROM   rezept_gekocht g
+        LEFT   JOIN users u ON u.id = g.markiert_von
+        WHERE  g.rezept_id = ?
+        ORDER  BY g.tag DESC, g.mahlzeit DESC
+    """, (rid,)).fetchall()
+
     wunsch_anzahl = db.execute(
         "SELECT COUNT(*) FROM rezept_wuensche WHERE rezept_id=?", (rid,)
     ).fetchone()[0]
@@ -678,7 +691,8 @@ def detail(token, rid):
         user=user, token=token, farbe=user["farbe"], rezept=rezept, zutaten=zutaten, schritte=schritte,
         durchschnitt=bewertung["schnitt"], anzahl_bewertungen=bewertung["anzahl"],
         eigene_bewertung=eigene["sterne"] if eigene else 0, kategorien=KATEGORIEN,
-        wunsch_anzahl=wunsch_anzahl, eigener_wunsch=eigener_wunsch)
+        wunsch_anzahl=wunsch_anzahl, eigener_wunsch=eigener_wunsch,
+        gekocht=gekocht, mahlzeit_labels={"mittag": "mittags", "abend": "abends"})
 
 
 @bp.route("/a/rezepte/<int:rid>/bearbeiten", defaults={"token": None}, methods=["GET", "POST"])

@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-08-09 – portal-v165: Wunsch #165 – „wann gab es das zuletzt?"
+
+> „Unterhalb der Bewertung soll ein Bereich aufklappbar sein, in dem dann die
+> Liste der Einträge steht, wann das Gericht auf dem Essensplan als ‚gekocht'
+> markiert wurde."
+
+Der Abschluss der Vierer-Reihe #162–#165. Die Daten legt #162 an, hier werden
+sie nur gelesen – der Grund, warum sie damals in einer eigenen Tabelle am
+Rezept landeten statt als Häkchen am Planeintrag, zahlt sich jetzt aus.
+
+### Sortiert nach dem Tag des Essens, nicht nach dem Anhaken
+
+Die naheliegende Sortierung wäre `markiert_am` gewesen – der Zeitpunkt, zu dem
+jemand den Haken gesetzt hat. Falsch: Gefragt ist „wann gab es das", nicht
+„wann hat es jemand vermerkt". Wer eine Woche später nachträgt, würde den
+Verlauf sonst durcheinanderbringen und stünde fälschlich ganz oben.
+
+Ein Test hat genau diesen Fall: ein Eintrag vom 20.07., abgehakt erst am
+08.08. Nach Vermerkzeit stünde er vorn, nach Essenstag ganz hinten – wo er
+hingehört.
+
+### Zugeklappt steht schon die Antwort da
+
+„🍳 Gekocht — 3×, zuletzt am 05.08.2026". Die häufigste Frage ist „wann
+zuletzt?", und dafür soll man nicht erst aufklappen müssen. Die vollständige
+Liste mit Datum, Mahlzeit und Namen kommt erst auf Tippen.
+
+Ohne Einträge steht dort nicht einfach nichts, sondern der Hinweis, wie die
+Liste sich füllt – eine leere Liste ohne Erklärung liesse offen, ob die
+Funktion kaputt ist.
+
+### Live über beide Apps hinweg
+
+Im Essensplan das heutige Abendessen abgehakt, dann ins Rezept: „1×, zuletzt
+am 09.08.2026" und in der Liste „09.08.2026 abends · Andi". Auf- und
+zuklappen geprüft, Platzierung nachgemessen (Bewertung bei y=422, Verlauf bei
+y=464, gleicher Abschnitt). Vermerk danach wieder entfernt.
+
+Beim Messen hatte ich zuerst `!!x & y` geschrieben – Operator-Rangfolge
+verdreht, das Ergebnis war `0` und damit wertlos. Sauber nachgemessen statt
+die falsche Zahl stehen zu lassen.
+
+Gegengeprobt durch Verdrehen der Sortierung und Entfernen der WHERE-Klausel:
+drei Tests fallen.
+
+7 neue Tests, 506 grün. Damit sind #162–#165 komplett.
+
+---
+
 ## 2026-08-09 – portal-v164: Wunsch #164 – Portionen umrechnen
 
 > „Die Portionen sollen anpassbar sein, da man manchmal ein Rezept für 4 hat,

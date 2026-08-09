@@ -125,3 +125,77 @@ def test_ohne_portionsangabe_kein_waehler(client, db, rezept):
     seite = client.get(
         f"/a/rezepte/{rezept['token']}/{rid}").get_data(as_text=True)
     assert 'data-basis=""' in seite
+
+
+# --- Wunsch #165: Verlauf „gekocht" im Rezept ------------------------------
+
+@pytest.fixture()
+def gekocht_verlauf(db, rezept):
+    """Drei Einträge – bewusst mit einem NACHGETRAGENEN dabei: am 20.7.
+    gegessen, aber erst am 8.8. abgehakt."""
+    v = db["verbindung"]
+    uid = db["familie"]["TestAdmin"]["id"]
+    for tag, mahlzeit, markiert in [
+            ("2026-07-20", "abend",  "2026-08-08 19:00:00"),   # nachgetragen
+            ("2026-08-01", "mittag", "2026-08-01 13:00:00"),
+            ("2026-08-05", "abend",  "2026-08-05 19:30:00")]:
+        v.execute("INSERT INTO rezept_gekocht(rezept_id, tag, mahlzeit, "
+                  "markiert_von, markiert_am) VALUES(?,?,?,?,?)",
+                  (rezept["rid"], tag, mahlzeit, uid, markiert))
+    v.commit()
+    return rezept
+
+
+def _seite(client, rezept):
+    return client.get(
+        f"/a/rezepte/{rezept['token']}/{rezept['rid']}").get_data(as_text=True)
+
+
+def test_verlauf_listet_alle_termine(client, db, gekocht_verlauf):
+    seite = _seite(client, gekocht_verlauf)
+    for datum in ("20.07.2026", "01.08.2026", "05.08.2026"):
+        assert datum in seite, datum
+
+
+def test_neuester_termin_zuerst(client, db, gekocht_verlauf):
+    """Sortiert nach dem TAG des Essensplans, nicht nach dem Zeitpunkt des
+    Anhakens. Der Eintrag vom 20.07. wurde zuletzt vermerkt (08.08.) – nach
+    Vermerkzeit stünde er faelschlich ganz oben, obwohl es ihn zuerst gab."""
+    seite = _seite(client, gekocht_verlauf)
+    assert seite.index("05.08.2026") < seite.index("01.08.2026") < seite.index("20.07.2026")
+
+
+def test_zusammenfassung_steht_schon_zugeklappt_da(client, db, gekocht_verlauf):
+    """Die haeufigste Frage ist „wann zuletzt?" – dafuer soll man nicht
+    erst aufklappen muessen."""
+    seite = _seite(client, gekocht_verlauf)
+    assert "3×, zuletzt am 05.08.2026" in seite
+
+
+def test_liste_ist_zugeklappt(client, db, gekocht_verlauf):
+    """`.gekocht-liste` ist display:none, `offen` kommt erst per Klick dazu."""
+    seite = _seite(client, gekocht_verlauf)
+    assert 'id="gekocht-liste"' in seite
+    assert 'class="gekocht-liste offen"' not in seite
+
+
+def test_ohne_verlauf_steht_eine_erklaerung_da(client, db, rezept):
+    """Eine leere Liste ohne Erklaerung liesse offen, ob es kaputt ist."""
+    seite = _seite(client, rezept)
+    assert "noch nie vermerkt" in seite
+    assert "als \u201egekocht\u201c abgehakt" in seite
+
+
+def test_verlauf_eines_anderen_rezepts_taucht_nicht_auf(client, db, gekocht_verlauf):
+    """Ohne die WHERE-Klausel saehe jedes Rezept die Termine aller anderen."""
+    v = db["verbindung"]
+    rid2 = v.execute(
+        "INSERT INTO rezepte(name, portionen) VALUES('Anderes','2') RETURNING id"
+    ).fetchone()["id"]
+    v.execute("INSERT INTO rezept_zutaten(rezept_id, name, position) "
+              "VALUES(?, '1 Ei', 0)", (rid2,))
+    v.commit()
+    seite = client.get(
+        f"/a/rezepte/{gekocht_verlauf['token']}/{rid2}").get_data(as_text=True)
+    assert "20.07.2026" not in seite
+    assert "noch nie vermerkt" in seite
