@@ -120,7 +120,8 @@
              Freitext-Eintrag lässt sich nicht führen, wann welches Rezept
              gekocht wurde. #}
           {% if eintrag and eintrag.rezept_id %}
-          <form class="gekocht-form" method="post" action="/a/essensplan{{ tp }}gekocht">
+          <form class="gekocht-form" method="post" action="/a/essensplan{{ tp }}gekocht"
+                data-fetch="gekochtAktualisiert">
             <input type="hidden" name="tag" value="{{ tag.iso }}">
             <input type="hidden" name="mahlzeit" value="{{ mahlzeit }}">
             <button class="gekocht-btn{% if eintrag.gekocht %} aktiv{% endif %}" type="submit"
@@ -170,6 +171,19 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+/* Wunsch #171: Der Haken schaltet um, ohne dass die Seite neu laedt und an
+   den Anfang der Zwei-Wochen-Liste springt. `this` ist das Formular. */
+function gekochtAktualisiert(antwort) {
+  if (!antwort || !antwort.ok) return;
+  const knopf = this.querySelector('.gekocht-btn');
+  knopf.classList.toggle('aktiv', antwort.gekocht);
+  knopf.textContent = antwort.gekocht ? '✅ gekocht' : '⬜ gekocht?';
+  knopf.title = antwort.gekocht ? 'Als nicht gekocht markieren' : 'Als gekocht markieren';
+  knopf.setAttribute('aria-label', knopf.title);
+  const inhalt = this.closest('.mahlzeit-slot').querySelector('.mahlzeit-inhalt');
+  if (inhalt) inhalt.classList.toggle('ist-gekocht', antwort.gekocht);
+}
+
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

@@ -502,6 +502,36 @@
     // ERST hier, nach allen Abbruchgruenden: Ein Knopf, der nach einer
     // abgelehnten Bestaetigung deaktiviert stehen bliebe, waere schlimmer
     // als gar kein Signal.
+    // Wunsch #171: Kleine Umschalter ohne Seitensprung. Ein Formular mit
+    // `data-fetch="funktionsname"` wird per fetch abgeschickt; die Antwort
+    // geht an die genannte Funktion, die nur die betroffene Stelle
+    // aktualisiert. Vorher lud die ganze Seite neu und sprang an den Anfang -
+    // mitten in einer Zwei-Wochen-Liste oder 170 Wuenschen aergerlich.
+    //
+    // Das FORMULAR bleibt ein echtes Formular. Faellt Javascript aus, wird es
+    // normal abgeschickt und der Server leitet weiter wie bisher; die Route
+    // antwortet nur dann mit JSON, wenn ausdruecklich danach gefragt wird.
+    if (f.dataset.fetch) {
+      e.preventDefault();
+      const knopf = f.querySelector('button[type=submit], button:not([type])');
+      if (knopf) knopf.disabled = true;
+      fetch(f.action, {
+        method: 'POST',
+        body: new FormData(f),
+        headers: {'Accept': 'application/json'},
+      })
+        .then(r => r.json())
+        .then(d => { rufeAuf(f, f.dataset.fetch, d); })
+        .catch(err => {
+          // Laut statt still: Wer nicht sieht, dass sein Tipp verpufft ist,
+          // tippt nicht nochmal - er glaubt, es sei gespeichert.
+          console.error('Umschalten fehlgeschlagen', err);
+          alert('Das hat nicht geklappt. Bitte die Seite neu laden.');
+        })
+        .finally(() => { if (knopf) knopf.disabled = false; });
+      return;
+    }
+
     if (f.dataset.arbeitet) {
       const knopf = f.querySelector('button[type=submit], button:not([type])');
       if (knopf && !knopf.disabled) {

@@ -942,6 +942,26 @@ def utc_zu_lokal_datum(text):
     return wann.replace(tzinfo=timezone.utc).astimezone(LOKAL_TZ).date().isoformat()
 
 
+def antwort_oder_weiter(ziel_url: str, **daten):
+    """Wunsch #171: JSON fuer die Seite, Weiterleitung fuer alles andere.
+
+    Kleine Umschalter (gekocht, erledigt, storniert) werden per fetch mit
+    `Accept: application/json` abgeschickt und aktualisieren nur ihre eigene
+    Stelle - vorher lud die ganze Seite neu und sprang an den Anfang.
+
+    Der Formular-Weg bleibt trotzdem funktionsfaehig: Ohne diesen Kopf gibt es
+    die Weiterleitung wie bisher. Das ist kein toter Code, sondern der Pfad,
+    den ein Browser ohne Javascript und die Zurueck-Taste nehmen.
+
+    Ein gemeinsamer Helfer, damit nicht vier Routen dieselbe Fallunter-
+    scheidung leicht verschieden erfinden.
+    """
+    from flask import redirect
+    if "application/json" in (request.headers.get("Accept") or ""):
+        return jsonify(ok=True, **daten)
+    return redirect(ziel_url)
+
+
 def to_int(value, default=None):
     """Wandelt value in int um; bei ungültiger Eingabe -> default (kein Crash)."""
     try:

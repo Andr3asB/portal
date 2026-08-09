@@ -11,7 +11,8 @@ sind zu einem Block einklappbar (Wunsch #42).
 """
 from datetime import date, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, to_int
+from teile.kern import (get_db, grant as check_grant, to_int,
+                        antwort_oder_weiter)
 
 bp  = Blueprint("essensplan_app", __name__)
 APP = "essensplan"
@@ -161,7 +162,10 @@ def gekocht_umschalten(token):
             "INSERT INTO rezept_gekocht(rezept_id, tag, mahlzeit, markiert_von) "
             "VALUES(?,?,?,?)", (rid, tag, mahlzeit, user["id"]))
     db.commit()
-    return redirect(url_for("essensplan_app.index", token=token))
+    # Wunsch #171: ohne Seitensprung. Der neue Zustand geht zurueck, damit die
+    # Seite den Knopf umschalten kann, ohne alles neu zu laden.
+    return antwort_oder_weiter(url_for("essensplan_app.index", token=token),
+                               gekocht=not schon_da)
 
 
 @bp.route("/a/essensplan/verschieben", defaults={"token": None}, methods=["POST"])

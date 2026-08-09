@@ -269,7 +269,10 @@ def einstellung(token, gid):
             vorlauf_tage = excluded.vorlauf_tage
     """, (user["id"], gid, ausgeblendet, erinnerung, vorlauf))
     db.commit()
-    return redirect(url_for("geburtstage_app.index", token=token))
+    # Wunsch #171: Anker statt Seitenanfang. Kein fetch, weil "fuer mich
+    # ausblenden" den Eintrag zwischen den beiden Abschnitten der Seite
+    # verschiebt - die Liste muss neu gebaut werden.
+    return redirect(url_for("geburtstage_app.index", token=token) + f"#gb-{gid}")
 
 
 # ---------------------------------------------------------------------------

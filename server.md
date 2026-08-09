@@ -1475,6 +1475,30 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Umschalter ohne Seitensprung (Wunsch #171)
+
+Formular mit `data-fetch="funktionsname"` -> der Absende-Verteiler in
+`base.html` schickt es per fetch mit `Accept: application/json` und uebergibt
+die Antwort an die genannte Funktion. Serverseitig entscheidet der gemeinsame
+Helfer `antwort_oder_weiter(ziel_url, **daten)` in `00_kern.py`: JSON bei
+diesem Accept-Kopf, sonst Weiterleitung wie bisher.
+
+**Nicht jeder Umschalter darf fetch benutzen.** Kriterium:
+
+> Aendert der Umschalter die Reihenfolge oder Gruppierung der Liste?
+
+- **Nein** -> fetch (gekocht im Essensplan, Storno im Kassenbuch)
+- **Ja**  -> Weiterleitung mit `#anker` auf die eigene Karte (erledigt und
+  Prioritaet in der Werkstatt, Erinnerungen bei den Geburtstagen)
+
+Eine Karte, die an Ort und Stelle umspringt, waehrend die Sortierung veraltet,
+ist schlimmer als ein Sprung - man handelt dann auf einer Liste, die nicht
+mehr stimmt. Wer einen Anker setzt, muss das Sprungziel als `id` an der Karte
+haben; `tests/test_umschalter_ohne_sprung.py` prueft beides.
+
+Der Formularweg bleibt in beiden Faellen funktionsfaehig (Zurueck-Taste, kein
+Javascript) - das ist kein toter Code.
+
 ## Icon-Knoepfe benennen (Wunsch #175)
 
 Jeder `<button>`, dessen Beschriftung nur aus Zeichen besteht (Emoji, Pfeil,

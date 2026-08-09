@@ -183,6 +183,7 @@
       </span>
       {% if eigenes_buch and not e.storniert and e.art != "start" %}
       <form method="post" action="/a/kassenbuch{{ tp }}eintrag/{{ e.id }}/stornieren"
+            data-fetch="stornoAktualisiert"
             data-bestaetigen="{{ ('„' ~ (e.zweck or e.person or (e.art|capitalize)) ~ '“ stornieren? Zählt danach nicht mehr zum Kontostand, bleibt aber im Kassenbuch sichtbar.') }}">
         <button class="kb-storno-btn" type="submit" title="Stornieren" aria-label="Stornieren">×</button>
       </form>
@@ -196,6 +197,23 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+/* Wunsch #171: Storno ohne Seitensprung. Der Kontostand aendert sich mit -
+   er ist der eigentliche Grund fuer das Storno; bliebe er stehen, wirkte die
+   Aktion folgenlos. */
+function stornoAktualisiert(antwort) {
+  if (!antwort || !antwort.ok || !antwort.storniert) return;
+  const zeile = this.closest('.kb-eintrag');
+  zeile.classList.add('kb-storniert');
+  const meta = zeile.querySelector('.kb-eintrag-meta');
+  if (meta && !meta.querySelector('.kb-badge-storniert')) {
+    meta.insertAdjacentHTML('beforeend',
+      ' · <span class="kb-badge-storniert">storniert</span>');
+  }
+  this.remove();
+  const saldo = document.querySelector('.kb-saldo-betrag');
+  if (saldo) saldo.textContent = antwort.saldo_text;
+}
+
 function kbArtGewaehlt(radio) {
   const einnahme = document.getElementById('kb-art-label-einnahme');
   const ausgabe  = document.getElementById('kb-art-label-ausgabe');

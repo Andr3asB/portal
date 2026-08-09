@@ -263,7 +263,7 @@
 <div class="section-label" data-abschnitt="offen">Offen</div>
 {% for w in offen %}
 {# Wunsch #141: Die data-Attribute sind das, wonach das Skript unten filtert. #}
-<div class="wunsch-card" data-prio="{{ w.prioritaet or '' }}" data-status="offen"
+<div class="wunsch-card" id="wunsch-{{ w.id }}" data-prio="{{ w.prioritaet or '' }}" data-status="offen"
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">
@@ -318,7 +318,7 @@
 {% if erledigt %}
 <div class="section-label" data-abschnitt="erledigt">Erledigt</div>
 {% for w in erledigt %}
-<div class="wunsch-card done" data-prio="{{ w.prioritaet or '' }}" data-status="erledigt"
+<div class="wunsch-card done" id="wunsch-{{ w.id }}" data-prio="{{ w.prioritaet or '' }}" data-status="erledigt"
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">

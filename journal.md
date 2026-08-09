@@ -2,6 +2,69 @@
 
 ---
 
+## 2026-08-09 – portal-v174: Wunsch #171 – Umschalter ohne Seitensprung
+
+Vier Umschalter luden die ganze Seite neu und sprangen an den Anfang. Die
+Lösung ist **nicht überall dieselbe**, und das Kriterium dafür ist die
+eigentliche Arbeit an diesem Wunsch:
+
+> Ändert der Umschalter die Reihenfolge oder Gruppierung der Liste?
+
+| Umschalter | Weg |
+|---|---|
+| gekocht (Essensplan) | fetch – ändert nur diesen einen Knopf |
+| storniert (Kassenbuch) | fetch – Zeile bleibt, nur der Saldo ändert sich |
+| erledigt / Priorität (Werkstatt) | Anker – verschiebt zwischen den Listen |
+| Erinnerung (Geburtstage) | Anker – „ausblenden" wechselt den Abschnitt |
+
+Eine Karte, die an Ort und Stelle umspringt, während die Sortierung veraltet,
+ist **schlimmer** als ein Sprung: Man handelt dann auf einer Liste, die nicht
+mehr stimmt. Andis Wunsch nennt den Anker selbst als zulässige Alternative –
+gut, dass er das getan hat, sonst hätte ich hier etwas Falsches gebaut.
+
+### Mechanik: ein Attribut, kein viertes Skript
+
+`data-fetch="funktionsname"` am Formular, ausgewertet im vorhandenen
+Absende-Verteiler – dieselbe Bauart wie `data-bestaetigen` und
+`data-arbeitet`. Serverseitig entscheidet der gemeinsame Helfer
+`antwort_oder_weiter()`: JSON, wenn `Accept: application/json` mitkommt, sonst
+Weiterleitung wie bisher. Der Formularweg bleibt damit **funktionsfähig**, und
+ein Test hält beide Wege fest.
+
+Zwei Details, die sonst still danebengehen: Der Fehlerfall bekommt ein
+sichtbares `alert` – wer nicht merkt, dass sein Tipp verpufft ist, tippt nicht
+nochmal, sondern glaubt, es sei gespeichert. Und der Knopf wird im `finally`
+freigegeben, nicht im `then`; sonst bliebe er nach einem Fehler tot.
+
+### Zum dritten Mal: mein Erklärkommentar hat den Wächter ausgelöst
+
+Der Verteiler nennt `data-fetch="funktionsname"` als Beispiel, und der Test
+suchte danach eine Funktion dieses Namens. Nach `header_extra` (#155) und
+`button::before` (#169) der dritte Fall – Kommentare werden jetzt vor der
+Prüfung herausgeschnitten, und der Test sagt das auch.
+
+### Beim Live-Test zwei echte Datensätze angefasst
+
+**Wunsch #178** stand auf „hoch". Mein Test schickte eine leere Priorität an
+die Route – damit war sie NULL, der Wunsch also aus der Freigabe gefallen.
+Sofort zurückgesetzt.
+
+**Der gekocht-Vermerk vom 09.08. mittags** existierte bereits. Mein erster
+Aufruf löschte ihn, der zweite legte ihn neu an: gleiches Rezept, gleicher
+Tag, gleiche Person – aber mit **meinem** Zeitstempel statt dem
+ursprünglichen. Der ist nicht wiederherstellbar. Für die Anzeige folgenlos
+(#165 sortiert nach dem Tag des Essens), aber es ist eine Änderung, die ich
+verursacht habe, und sie gehört benannt.
+
+Beides dieselbe Ursache: **Ich habe echte Datensätze als Testziel benutzt.**
+Beim Kassenbuch (06.08.) war die Lehre schon einmal fällig, beim Geburtstag
+und beim Werkstatt-Wunsch habe ich extra Wegwerf-Einträge angelegt – hier
+nicht, weil es „nur ein Umschalter" war. Genau da rutscht es durch.
+
+8 neue Tests, 856 grün.
+
+---
+
 ## 2026-08-09 – portal-v173: Wunsch #175 – Icon-Knöpfe haben jetzt Namen
 
 Ein Knopf mit der Aufschrift ✏️ oder 🗑️ liest sich für VoiceOver als

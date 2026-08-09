@@ -19,7 +19,7 @@ Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import (get_db, grant as check_grant, to_int, push_send,
-                        WUNSCH_PRIORITAETEN)
+                        antwort_oder_weiter, WUNSCH_PRIORITAETEN)
 
 bp  = Blueprint("werkstatt_app", __name__)
 APP = "werkstatt"
@@ -120,7 +120,13 @@ def toggle_erledigt(token, wid):
             "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP WHERE id=?", (wid,)
         )
     db.commit()
-    return redirect(url_for("werkstatt_app.index", token=token))
+    # Wunsch #171: bei 170 Wuenschen sprang die Seite nach jedem Haken an den
+    # Anfang zurueck - man verlor die Stelle, an der man gerade war.
+    # Wunsch #171: Anker statt Seitenanfang. Ein fetch waere hier falsch: Der
+    # Haken verschiebt den Wunsch zwischen "offen" und "erledigt", die Liste
+    # muss also ohnehin neu sortiert werden. Eine Karte, die an Ort und Stelle
+    # umspringt, zeigte eine veraltete Reihenfolge - schlimmer als ein Sprung.
+    return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
 
 
 @bp.route("/a/werkstatt/loeschen/<int:wid>", defaults={"token": None}, methods=["POST"])
@@ -149,7 +155,9 @@ def prioritaet(token, wid):
         abort(404)
     db.execute("UPDATE wuensche SET prioritaet=? WHERE id=?", (prio, wid))
     db.commit()
-    return redirect(url_for("werkstatt_app.index", token=token))
+    # Wunsch #171: Anker statt Seitenanfang - die Prioritaet bestimmt die
+    # Sortierung, die Liste muss neu gebaut werden (siehe toggle_erledigt).
+    return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
 
 
 # Wunsch #161: Die Werkstatt wird zum Ticketsystem. Jede Handlung an einem

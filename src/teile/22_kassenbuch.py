@@ -34,7 +34,7 @@ from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import (get_db, grant as check_grant, heute_lokal, utc_zu_lokal,
-                        utc_zu_lokal_datum)
+                        utc_zu_lokal_datum, antwort_oder_weiter)
 
 bp  = Blueprint("kassenbuch_app", __name__)
 APP = "kassenbuch"
@@ -362,6 +362,7 @@ def stornieren(token, eid):
     ).fetchone()
     if not row:
         abort(404)
+    storniert = False
     if row["art"] != "start" and not row["storniert"]:
         db.execute("""
             UPDATE kassenbuch_eintraege
@@ -369,7 +370,14 @@ def stornieren(token, eid):
             WHERE id=?
         """, (user["id"], eid))
         db.commit()
-    return redirect(url_for("kassenbuch_app.index", token=token))
+        storniert = True
+    # Wunsch #171: ohne Seitensprung. Der neue Kontostand geht mit zurueck -
+    # er ist der eigentliche Grund, warum man storniert, und muss sich sofort
+    # aendern, sonst wirkt das Storno folgenlos.
+    eintraege = _eintraege_laden(db, user["id"])
+    return antwort_oder_weiter(url_for("kassenbuch_app.index", token=token),
+                               storniert=storniert,
+                               saldo_text=_cent_zu_euro_text(_saldo_cent(eintraege)))
 
 
 def init_app(app):

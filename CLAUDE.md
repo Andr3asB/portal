@@ -151,6 +151,10 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - **Icon-Knöpfe** (Beschriftung nur ein Zeichen) brauchen `aria-label`; steht
   auch ein `title` dran, sind beide Texte identisch (Wunsch #175,
   `tests/test_aria_labels.py`).
+- **Umschalter ohne Seitensprung** (Wunsch #171): `data-fetch="fn"` am
+  Formular, serverseitig `antwort_oder_weiter()`. Aber nur, wenn der
+  Umschalter die Listen-Reihenfolge NICHT ändert – sonst Weiterleitung mit
+  `#anker` auf die eigene Karte.
 - **Lange Vorgänge:** Formulare, deren Absenden spürbar dauert (KI-Anfrage),
   tragen `data-arbeitet="Wird gelesen …"` – der Verteiler in `base.html`
   deaktiviert und beschriftet den Knopf um (Wunsch #176).

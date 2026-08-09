@@ -125,7 +125,7 @@
   </div>
 
   {% macro karte(e) %}
-  <div class="gb-karte {% if e.tage_bis == 0 %}gb-heute{% endif %}">
+  <div class="gb-karte {% if e.tage_bis == 0 %}gb-heute{% endif %}" id="gb-{{ e.id }}">
     <div class="gb-kopf">
       <div class="gb-tage">
         {% if e.tage_bis == 0 %}
