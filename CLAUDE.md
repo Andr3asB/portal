@@ -148,6 +148,9 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- **Lange Vorgänge:** Formulare, deren Absenden spürbar dauert (KI-Anfrage),
+  tragen `data-arbeitet="Wird gelesen …"` – der Verteiler in `base.html`
+  deaktiviert und beschriftet den Knopf um (Wunsch #176).
 - **Vier globale Regeln in `base.html`** (Tippfläche #169, Feldschrift ≥16px
   #170, `.main` max-width 720px #173, `:focus-visible`-Ring #174) – keine
   Vorlage darf sie überschreiben, `tests/test_tippflaeche.py` wächtert alle

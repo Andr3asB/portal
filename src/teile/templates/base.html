@@ -493,7 +493,34 @@
     }
     if (f.dataset.absenden && rufeAuf(f, f.dataset.absenden, e) === false) {
       e.preventDefault();
+      return;
     }
+    // Wunsch #176: Formulare, die spuerbar dauern (KI-Anfrage), sagen das
+    // ueber `data-arbeitet="Wird gelesen ..."`. Der Knopf wird deaktiviert
+    // und umbeschriftet - ohne Signal haelt man die Seite fuer kaputt oder
+    // tippt ein zweites Mal und importiert doppelt.
+    // ERST hier, nach allen Abbruchgruenden: Ein Knopf, der nach einer
+    // abgelehnten Bestaetigung deaktiviert stehen bliebe, waere schlimmer
+    // als gar kein Signal.
+    if (f.dataset.arbeitet) {
+      const knopf = f.querySelector('button[type=submit], button:not([type])');
+      if (knopf && !knopf.disabled) {
+        knopf.dataset.vorher = knopf.textContent;
+        knopf.textContent = f.dataset.arbeitet;
+        knopf.disabled = true;
+      }
+    }
+  });
+
+  // Zurueck-Navigation holt die Seite aus dem Vor-/Zurueck-Speicher des
+  // Browsers - der Knopf staende dann fuer immer deaktiviert da.
+  window.addEventListener('pageshow', function(e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('button[data-vorher]').forEach(function(k) {
+      k.textContent = k.dataset.vorher;
+      k.disabled = false;
+      delete k.dataset.vorher;
+    });
   });
 
   // Kleinkram, der früher als Ausdruck direkt im Attribut stand.

@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-08-09 – portal-v171: Wunsch #176 – das Warten sichtbar machen
+
+Drei Formulare warten mehrere Sekunden auf eine KI-Antwort und gaben dabei
+kein Signal: Rezept-aus-URL, Rezept-aus-Bild, Vokabel-Foto-Import. Man hält
+es für kaputt oder tippt ein zweites Mal – und importiert doppelt.
+
+Gelöst im **vorhandenen** Absende-Verteiler in `base.html`: Ein Formular mit
+`data-arbeitet="Wird gelesen …"` bekommt beim Absenden einen deaktivierten,
+umbeschrifteten Knopf. Drei Attribute statt drei Skriptblöcke, und der
+nächste lange Vorgang braucht nur dasselbe Attribut.
+
+### Zwei Stellen, an denen so etwas kippt
+
+**Die Reihenfolge.** Das Signal kommt erst, nachdem alle Abbruchgründe
+durch sind – Löschabfrage abgelehnt, Prüffunktion verweigert. Ein Knopf, der
+nach einem *abgebrochenen* Absenden deaktiviert stehen bleibt, ist schlimmer
+als gar kein Signal: Die Seite sieht aus, als arbeite sie, und tut nichts.
+Dafür musste das bestehende `preventDefault` ein `return` bekommen; ohne das
+lief der Code danach weiter. Ein Test prüft beide Reihenfolgen und das
+`return` – gegengeprobt, er fällt.
+
+**Die Zurück-Navigation.** Holt der Browser die Seite aus seinem
+Vor-/Zurück-Speicher, ist der Knopf noch deaktiviert – für immer, und niemand
+käme auf die Idee, dass Neuladen hilft. Ein `pageshow`-Handler stellt ihn
+wieder her.
+
+Dazu ein Wächter, der über alle Vorlagen prüft, dass ein `data-arbeitet` auch
+wirklich an einem Formular mit Absende-Knopf hängt – sonst liefe die Anzeige
+lautlos ins Leere.
+
+Live bestätigt: Das Attribut kommt in beiden Rezept-Importseiten an.
+
+6 neue Tests (davon einer je Vorlage), 708 grün.
+
+---
+
 ## 2026-08-09 – portal-v169: Wunsch #172 – Darstellung folgt dem Gerät
 
 Drei Zustände statt zwei: ☀️ Hell → 🌙 Dunkel → 🌗 Wie das Gerät, im Kreis.

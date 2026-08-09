@@ -1475,6 +1475,21 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Lange Vorgaenge anzeigen (Wunsch #176)
+
+Formulare, deren Absenden spuerbar dauert (KI-Anfrage), tragen
+`data-arbeitet="Wird gelesen …"`. Der Absende-Verteiler in `base.html`
+deaktiviert dann den Submit-Knopf und beschriftet ihn um.
+
+Zwei Fallen, beide gewaechtert in `tests/test_arbeitet_anzeige.py`:
+
+1. **Reihenfolge.** Das Signal kommt NACH `data-bestaetigen` und
+   `data-absenden`. Ein Knopf, der nach einem abgebrochenen Absenden
+   deaktiviert stehen bliebe, ist schlimmer als kein Signal - die Seite sieht
+   aus, als arbeite sie.
+2. **Zurueck-Navigation.** Ein `pageshow`-Handler (`e.persisted`) macht den
+   Knopf wieder frei; sonst bleibt er nach Zurueck fuer immer tot.
+
 ## Darstellung hell/dunkel (Wunsch #172)
 
 `users.dark_mode`: **0 = immer hell, 1 = immer dunkel, 2 = wie das Geraet**

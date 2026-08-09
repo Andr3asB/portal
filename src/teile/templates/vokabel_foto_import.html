@@ -55,7 +55,7 @@
   <div class="empty">Aktiviere zuerst mindestens eine Sprache im Menü unter „Sprachen".</div>
   {% else %}
   <div class="add-card">
-    <form method="post" enctype="multipart/form-data" id="foto-form">
+    <form method="post" enctype="multipart/form-data" id="foto-form" data-arbeitet="Wird gelesen …">
       <div class="field-label">Sprache</div>
       <div class="chip-row" id="sprache-chips">
         {% for s in sprachen %}
