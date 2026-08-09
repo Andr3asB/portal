@@ -58,10 +58,18 @@ def toggle_darkmode():
     if not row:
         abort(403)
     db = get_db()
-    new_val = 0 if row["dark_mode"] else 1
-    db.execute("UPDATE users SET dark_mode=? WHERE id=?", (new_val, row["id"]))
+    # Wunsch #172: drei Zustaende im Kreis - 2 (wie das Geraet) -> 0 (immer
+    # hell) -> 1 (immer dunkel) -> 2. Die Automatik steht bewusst am Anfang
+    # des Kreises: Sie ist der Normalfall, die beiden anderen sind bewusste
+    # Uebersteuerungen.
+    naechster = {2: 0, 0: 1, 1: 2}
+    neu = naechster.get(row["dark_mode"], 0)
+    db.execute("UPDATE users SET dark_mode=? WHERE id=?", (neu, row["id"]))
     db.commit()
-    return jsonify(ok=True, dark=bool(new_val))
+    # `dark` bleibt fuer aeltere PWA-Staende im Cache erhalten, die noch das
+    # alte Feld auswerten - fuer sie sieht "wie das Geraet" wie "hell" aus,
+    # was der harmlosere der beiden moeglichen Irrtuemer ist.
+    return jsonify(ok=True, modus=neu, dark=(neu == 1))
 
 
 def init_app(app):

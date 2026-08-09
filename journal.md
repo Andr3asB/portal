@@ -2,6 +2,56 @@
 
 ---
 
+## 2026-08-09 – portal-v169: Wunsch #172 – Darstellung folgt dem Gerät
+
+Drei Zustände statt zwei: ☀️ Hell → 🌙 Dunkel → 🌗 Wie das Gerät, im Kreis.
+Die Automatik steht am Anfang des Kreises, weil sie der Normalfall ist; die
+anderen beiden sind bewusste Übersteuerungen.
+
+### Die dunklen Farben stehen weiterhin nur an einer Stelle
+
+Der naheliegende Weg wäre gewesen, den `body.dark`-Block zu kopieren und die
+Kopie in `@media (prefers-color-scheme: dark)` unter `body.auto` zu stellen.
+Zwölf Farbwerte, zweimal getippt – und beim nächsten Mal zieht jemand einen
+davon nur an einer Stelle nach. Auffallen würde es nie, weil kaum jemand beide
+Modi nebeneinander sieht.
+
+Stattdessen stehen die Werte in einer Jinja-Variablen (`{% set %}`) und werden
+zweimal ausgegeben. Ein Test prüft beides: in der **Vorlage** genau einmal, im
+**gerenderten HTML** zweimal.
+
+### Niemand wird migriert
+
+`dark_mode` bekommt als Spalten-Default die 2 (Automatik) – neue Konten
+starten damit. Bestehende Konten fasse ich **nicht** an: Simone und Johannes
+stehen auf 0, und ob das eine bewusste Wahl war oder nie berührt wurde, lässt
+sich nicht unterscheiden. Ihre Darstellung ohne Rückfrage umzustellen wäre
+dieselbe Anmaßung wie damals, Andis entfernte Tierbaukasten-App
+wiederherzustellen. Ein Tipp im Menü genügt.
+
+Nach der Auslieferung nachgesehen: alle vier Werte unverändert.
+
+### Der Knopf zeigt jetzt den Zustand, nicht das Ziel
+
+Vorher stand dort die Sonne, wenn Dunkelmodus aktiv war – gemeint als „hier
+tippen für hell", gelesen als „es ist hell". Bei drei Zuständen wäre das
+vollends unlesbar geworden. Jetzt zeigt der Knopf, was gilt, und der
+Titel nennt es im Klartext.
+
+### Beim Testen Andis Einstellung verstellt – und zurückgesetzt
+
+Der Live-Durchlauf schaltete zweimal und ließ sein Konto auf „immer hell"
+stehen. Zurückgesetzt auf den Ausgangswert 1. Dass mir das auffiel, liegt nur
+daran, dass ich den Zustand vorher und nachher ausgelesen habe – ohne diese
+Angewohnheit hätte er morgen ein helles Portal gehabt und sich gewundert.
+
+`dark` bleibt in der Antwort erhalten für ältere PWA-Stände im Cache; für sie
+sieht „wie das Gerät" wie „hell" aus – der harmlosere der beiden Irrtümer.
+
+11 neue Tests, 657 grün.
+
+---
+
 ## 2026-08-09 – portal-v168: Wünsche #170, #173, #174 – drei globale Regeln
 
 Alle drei sind dieselbe Bauart wie #169: **eine Regel in `base.html` statt 44

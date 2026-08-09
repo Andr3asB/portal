@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   farbe     TEXT    NOT NULL DEFAULT '#4a90d9',
   is_admin  INTEGER NOT NULL DEFAULT 0,
   ki_key    TEXT,
-  dark_mode INTEGER NOT NULL DEFAULT 0,
+  dark_mode INTEGER NOT NULL DEFAULT 2,   -- 0=hell, 1=dunkel, 2=wie das Geraet (#172)
   rolle     TEXT    NOT NULL DEFAULT 'gast'
 );
 CREATE TABLE IF NOT EXISTS apps (
@@ -1528,7 +1528,7 @@ def _init_db(app):
                 "Pruefsumme gespeichert.", anzahl_neu)
 
         for col, definition in [
-            ("dark_mode", "INTEGER NOT NULL DEFAULT 0"),
+            ("dark_mode", "INTEGER NOT NULL DEFAULT 2"),
             ("rolle",     "TEXT    NOT NULL DEFAULT 'gast'"),
             ("ki_token_limit", "INTEGER NOT NULL DEFAULT 100000"),
             # Wunsch #136: eigenes Kontingent fuer die TTS-Sprachausgabe,

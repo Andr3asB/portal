@@ -1475,6 +1475,22 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Darstellung hell/dunkel (Wunsch #172)
+
+`users.dark_mode`: **0 = immer hell, 1 = immer dunkel, 2 = wie das Geraet**
+(Spalten-Default seit #172). Der Menue-Knopf schaltet im Kreis 2 -> 0 -> 1 -> 2.
+
+- `body.dark` traegt die dunklen Werte; `body.auto` bekommt sie NUR innerhalb
+  von `@media (prefers-color-scheme: dark)`. Steht `body.auto` ausserhalb,
+  ist die Automatik in Wahrheit ein Dauer-Dunkelmodus.
+- Die zwoelf Farbwerte stehen in `base.html` in EINER Jinja-Variablen
+  (`{% set dunkle_werte %}`) und werden zweimal ausgegeben. Zwei getippte
+  Bloecke wuerden auseinanderlaufen, ohne dass es auffaellt - kaum jemand
+  sieht beide Modi nebeneinander. `tests/test_darkmode.py` waechtert das.
+- **Bestehende Konten wurden bewusst NICHT migriert.** Ob eine 0 eine bewusste
+  Wahl war oder nie beruehrt wurde, laesst sich nicht unterscheiden; fremde
+  Einstellungen ohne Rueckfrage umzustellen ist nicht unsere Entscheidung.
+
 ## Globale UI-Regeln in base.html (verpflichtend)
 
 Vier Regeln gelten portalweit und duerfen von keiner Vorlage ueberschrieben
