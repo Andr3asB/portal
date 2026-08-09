@@ -471,6 +471,7 @@
    *     eintrag:    '.item-card',          // was bewegt wird
    *     platzhalter:'item-drag-placeholder',
    *     idAus:      el => el.id.replace('item-', ''),
+   *     gruppe:     el => el.dataset.kategorie,  // optional, siehe #181
    *     speichern:  reihenfolge => fetch(...),
    *   });
    */
@@ -558,8 +559,24 @@
     function folge(e) {
       const { eintrag, schatten, platzhalter, abstandY } = zustand;
       schatten.style.top = `${e.clientY - abstandY}px`;
-      const andere = [...document.querySelectorAll(opt.eintrag)]
-        .filter(el => el !== platzhalter && el !== eintrag && !el.classList.contains('gepackt'));
+
+      // Wunsch #181: Nur Eintraege DERSELBEN Gruppe kommen als Ziel infrage.
+      // Ohne `opt.gruppe` verhaelt sich alles wie vorher (flache Liste).
+      //
+      // Der gemeldete Fehler hatte zwei Ursachen an dieser Stelle:
+      //   1. Ohne Gruppenfilter war der naechste Kandidat unterhalb der
+      //      letzten Zeile einer Kategorie der erste Eintrag der FOLGENDEN -
+      //      und der steht hinter deren Ueberschrift. Der Eintrag sprang also
+      //      sichtbar in die naechste Kategorie.
+      //   2. Der Rueckfall haengte den Platzhalter an das Ende des GESAMTEN
+      //      Behaelters, nicht an das Ende der eigenen Gruppe. Ans Listenende
+      //      ziehen landete damit ganz unten, quer durch alle Kategorien.
+      const schluessel = opt.gruppe ? opt.gruppe(eintrag) : null;
+      const andere = [...document.querySelectorAll(opt.eintrag)].filter(el =>
+        el !== platzhalter && el !== eintrag &&
+        !el.classList.contains('gepackt') &&
+        (schluessel === null || opt.gruppe(el) === schluessel));
+
       for (const el of andere) {
         const r = el.getBoundingClientRect();
         if (e.clientY < r.top + r.height / 2) {
@@ -567,7 +584,13 @@
           return;
         }
       }
-      platzhalter.parentNode.appendChild(platzhalter);
+      // Hinter den letzten der eigenen Gruppe - nicht ans Ende von allem.
+      const letzter = andere[andere.length - 1];
+      if (letzter) {
+        letzter.parentNode.insertBefore(platzhalter, letzter.nextSibling);
+      } else {
+        platzhalter.parentNode.appendChild(platzhalter);
+      }
     }
 
     document.querySelectorAll(opt.griff).forEach(g =>

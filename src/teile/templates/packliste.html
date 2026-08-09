@@ -363,6 +363,11 @@ ziehSortierung({
   eintrag:     '.item-card',
   platzhalter: 'item-drag-placeholder',
   idAus:       el => parseInt(el.id.replace('item-', ''), 10),
+  // Wunsch #181: Sortiert wird INNERHALB einer Kategorie. Ein Eintrag in eine
+  // andere Kategorie zu ziehen wuerde seine Kategorie nicht mitaendern - er
+  // spraenge beim naechsten Laden zurueck, weil die Gruppierung serverseitig
+  // aus kategorie_id kommt. Die Kategorie aendert man ueber den Stift.
+  gruppe:      el => el.dataset.kategorie || '',
   speichern:   reihenfolge => {
     fetch(`/a/packliste${TP}reorder`, {
       method: 'POST',

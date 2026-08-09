@@ -1485,6 +1485,17 @@ eine eigene, fast wortgleiche Fassung derselben ~120 Zeilen. Sie wurden bei
 #178 bewusst NICHT migriert (funktionieren, und ein Umbau war ohne sichtbaren
 Browser nicht pruefbar). Wer sie anfasst, stellt sie bitte auf den Helfer um.
 
+**`gruppe:`** (optional, Wunsch #181): Ohne diese Angabe sucht der Helfer die
+Einfuegestelle ueber ALLE passenden Elemente der Seite. In einer nach
+Kategorien gruppierten Liste springt ein Eintrag dann beim Ziehen ans
+Listenende in die Nachbarkategorie - der naechste Kandidat unterhalb der
+letzten Zeile ist deren erster Eintrag, und der steht hinter deren
+Ueberschrift. Wer gruppierte Listen sortierbar macht, MUSS `gruppe` angeben.
+
+Sortiert wird nur INNERHALB einer Gruppe. Ein Wechsel der Kategorie per Ziehen
+waere folgenlos: Die Gruppierung kommt serverseitig aus `kategorie_id`, der
+Eintrag spraenge beim naechsten Laden zurueck.
+
 `packlisten_eintraege.position`: Reihenfolge je Ziel. **Neue Eintraege gehen
 ans Ende** (`MAX(position)+1`) - auf 0 wuerde jeder neue Eintrag die von Hand
 sortierte Liste durcheinanderschieben.

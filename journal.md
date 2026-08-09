@@ -2,6 +2,60 @@
 
 ---
 
+## 2026-08-09 – portal-v178: Wunsch #181 – mein Fehler von gestern in der Packliste
+
+> „Es gibt einen Fehler, wenn man einen Eintrag ans Ende der liste verschieben
+> will, dann springt er in die nachfolgende Kategorie."
+
+Genau beschrieben, und die Ursache saß in `ziehSortierung()` aus #178 – meinem
+eigenen Code von gestern. **Zwei Fehler in einer Funktion**, die zusammen
+genau dieses Bild ergeben:
+
+1. **Kein Gruppenfilter.** Die Suche nach der Einfügestelle lief über *alle*
+   Einträge der Seite. Zieht man unter die letzte Zeile einer Kategorie, ist
+   der nächste Kandidat der erste Eintrag der *folgenden* – und der steht
+   hinter deren Überschrift. Der Eintrag landete sichtbar drüben.
+2. **Der Rückfall hängte ans Ende von allem.** `platzhalter.parentNode
+   .appendChild(...)` schiebt an das Ende des gesamten Behälters, nicht an
+   das Ende der eigenen Gruppe. „Ans Listenende ziehen" bedeutete also: quer
+   durch alle Kategorien nach ganz unten.
+
+Behoben über ein optionales `gruppe:`-Kriterium; die Packliste gruppiert nach
+`data-kategorie`. Ohne Angabe verhält sich der Helfer wie vorher (flache
+Liste) – die Kategorien-Seite bleibt damit unberührt.
+
+Sortiert wird bewusst nur **innerhalb** einer Kategorie. Ein Eintrag in eine
+andere zu ziehen würde seine `kategorie_id` nicht mitändern – er spränge beim
+nächsten Laden zurück, weil die Gruppierung serverseitig aus dieser Spalte
+kommt. Die Kategorie ändert man über den Stift.
+
+### Der Wächter überlebte die erste Gegenprobe
+
+Er prüfte, ob `opt.gruppe` im Code vorkommt. Beim absichtlichen Kaputtmachen
+blieb die Zeile `const schluessel = opt.gruppe ? …` stehen, während der Filter
+selbst ausgehebelt war – der Test blieb grün. Jetzt prüft er den **Vergleich**
+(`opt.gruppe(el) === schluessel`), und die Gegenprobe fällt.
+
+Fünfter Test dieser Art in zwei Tagen. Das Muster hat sich geschärft: **Ein
+Wächter, der nur auf einen Namen prüft, überlebt fast jede Sabotage.** Er muss
+auf die Stelle zielen, an der die Wirkung entsteht.
+
+### Serverseitig festgenagelt
+
+Der wichtigste Test ist nicht der über den JavaScript-Text, sondern der über
+das Verhalten: Ein `reorder` quer durch zwei Kategorien darf **keine einzige**
+`kategorie_id` ändern. Das ist die Zusage, auf die es ankommt – und sie gilt
+unabhängig davon, was das Frontend schickt.
+
+Live an einem **Wegwerf-Ziel** geprüft (vier Einträge in zwei Kategorien),
+danach entfernt: Der erste Eintrag wandert ans Ende und behält seine
+Kategorie. Keine echten Packlisten angefasst – die Lehre von gestern hat
+gehalten.
+
+4 neue Tests, 874 grün.
+
+---
+
 ## 2026-08-09 – portal-v177: Wünsche #179 und #180 – zwei kleine, einer davon meiner
 
 ### #180: ein Folgefehler meiner eigenen Änderung

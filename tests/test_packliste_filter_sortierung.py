@@ -181,3 +181,74 @@ def test_zieh_helfer_liegt_in_base():
         "packliste.html bringt eine eigene Zieh-Logik mit statt den Helfer "
         "aus base.html zu nutzen."
     )
+
+
+# --- Wunsch #181: Umsortieren darf die Kategorie nicht wechseln -----------
+
+def test_umsortieren_aendert_keine_kategorie(client, db, liste):
+    """Der Kern des gemeldeten Fehlers, serverseitig festgenagelt.
+
+    Die Anzeige gruppiert nach `kategorie_id`, die Reihenfolge kommt aus
+    `position`. Ein Eintrag, der beim Ziehen scheinbar in eine andere
+    Kategorie rutscht, springt beim naechsten Laden zurueck - das ist der
+    verwirrendste Teil des Fehlers. Sortieren darf die Zuordnung nie
+    anfassen."""
+    v = db["verbindung"]
+    # "Technik" ist bereits Seed-Kategorie (UNIQUE auf name) - eine mit
+    # garantiert freiem Namen anlegen.
+    zweite = v.execute(
+        "INSERT INTO packlisten_kategorien(name, position) VALUES(?, 99) RETURNING id",
+        ("PRUEF-Kategorie 181",)).fetchone()["id"]
+    fremd = v.execute(
+        "INSERT INTO packlisten_eintraege(name, ziel_id, kategorie_id, position) "
+        "VALUES('Ladekabel', ?, ?, 9) RETURNING id", (liste["ziel"], zweite)).fetchone()["id"]
+    v.commit()
+
+    vorher = {r["id"]: r["kategorie_id"] for r in v.execute(
+        "SELECT id, kategorie_id FROM packlisten_eintraege")}
+
+    # Reihenfolge quer durch beide Kategorien schicken - so, wie es das
+    # Frontend im Fehlerfall getan haette.
+    a, b, c = liste["ids"]
+    client.post(f"/a/packliste/{liste['token']}/reorder",
+                json={"order": [fremd, a, c, b]})
+
+    nachher = {r["id"]: r["kategorie_id"] for r in v.execute(
+        "SELECT id, kategorie_id FROM packlisten_eintraege")}
+    assert nachher == vorher, "Umsortieren hat eine Kategorie-Zuordnung geaendert"
+
+
+def test_zieh_helfer_kennt_gruppengrenzen():
+    """Ohne Gruppenfilter war der naechste Kandidat unterhalb der letzten
+    Zeile einer Kategorie der erste Eintrag der FOLGENDEN - der Eintrag sprang
+    sichtbar hinueber."""
+    base = (TPL / "base.html").read_text(encoding="utf-8")
+    block = base[base.index("function folge("):]
+    block = block[:block.index("\n    }")]
+    glatt = " ".join(block.split())
+    # Auf den VERGLEICH pruefen, nicht auf das blosse Vorkommen von
+    # "opt.gruppe": Die erste Fassung dieses Tests ueberlebte die Gegenprobe,
+    # weil die Zuweisung `const schluessel = opt.gruppe ? ...` stehen blieb,
+    # waehrend der Filter selbst ausgehebelt war.
+    assert "opt.gruppe(el) === schluessel" in glatt, (
+        "ziehSortierung() vergleicht die Gruppe nicht - Eintraege koennen "
+        "beim Ziehen in die Nachbarkategorie springen (Wunsch #181)."
+    )
+
+
+def test_rueckfall_haengt_an_die_eigene_gruppe():
+    """Der zweite Teil des Fehlers: `appendChild` auf den Behaelter setzte den
+    Eintrag ans Ende von ALLEM - ans Listenende ziehen landete quer durch
+    alle Kategorien ganz unten."""
+    base = (TPL / "base.html").read_text(encoding="utf-8")
+    block = base[base.index("function folge("):]
+    block = block[:block.index("\n    }")]
+    assert "andere[andere.length - 1]" in block
+    assert "letzter.nextSibling" in block
+
+
+def test_packliste_gruppiert_nach_kategorie():
+    inhalt = (TPL / "packliste.html").read_text(encoding="utf-8")
+    block = inhalt[inhalt.index("ziehSortierung({"):]
+    block = block[:block.index("});")]
+    assert "gruppe:" in block and "dataset.kategorie" in block
