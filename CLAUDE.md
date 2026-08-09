@@ -148,6 +148,10 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- **Tippfläche:** jeder `button` hat via `base.html` mindestens 44×44 px
+  unsichtbare Trefferfläche (Wunsch #169). Nie ein eigenes
+  `button::before`/`::after` in einer Vorlage definieren –
+  `tests/test_tippflaeche.py` wächtert das.
 - **Löschen trägt im ganzen Portal 🗑️** – nie ✕, nie nur Text (Wunsch #160).
   Gilt für jedes Bedienelement, das einen Datensatz wirklich entfernt;
   `tests/test_loeschen_symbol.py` wächtert es über alle Vorlagen. Ausgenommen

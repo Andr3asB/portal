@@ -1475,6 +1475,18 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Tippfläche (verpflichtend, seit Wunsch #169)
+
+Jeder `button` bekommt in `base.html` per `button::before` eine unsichtbare,
+zentrierte Trefferfläche von mindestens 44×44 px (`max(100%, 44px)` je Achse,
+`button { position:relative }` als Bezugsrahmen). Optik unverändert.
+
+**Kein Template darf ein eigenes `button::before`/`::after` definieren** -
+das ersätze die Fläche, und der Knopf wäre still wieder klein (ein Tipp
+daneben fühlt sich wie eigenes Zittern an, nie wie ein Fehler).
+`tests/test_tippflaeche.py` wächtert beides. Wer ein Knopf-Pseudo-Element
+braucht, nimmt ein anderes oder übernimmt die Fläche mit.
+
 ## Lösch-Symbol (verpflichtend, seit Wunsch #160)
 
 Jedes Bedienelement, das einen Datensatz **entfernt**, trägt 🗑️ – nie ✕,
@@ -2037,6 +2049,10 @@ python -m venv .venv                                   # einmalig
   Enthaelt `SofortThread` statt eines Wegwerf-Typs - `type("S", (), {"start":
   target})()` macht die Funktion zur METHODE und wirft TypeError, der Test
   war dann rot ohne echten Fehler.
+- `test_tippflaeche.py` – Wunsch #169. Waechtert die 44px-Regel in base.html
+  (beide Achsen einzeln - die erste Gegenprobe brach nur width, und der Test
+  blieb gruen, weil height die Zeichenkette noch enthielt) und dass keine
+  Vorlage ein eigenes button::before/after definiert.
 - `test_loeschen_symbol.py` – Wunsch #160. Waechter ueber alle Vorlagen: jeder
   Knopf in einem Formular mit `/loeschen`-Route muss den Muelleimer tragen.
   Enthaelt einen Test, der prueft, dass ueberhaupt >= 10 solcher Knoepfe

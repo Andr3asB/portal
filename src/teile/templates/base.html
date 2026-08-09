@@ -58,6 +58,26 @@
       color: var(--text);
     }
 
+    /* Wunsch #169: Tippflaeche auf Fingergroesse. Viele Knoepfe sind optisch
+       klein (17-33px hoch, live gemessen). Statt 44 Vorlagen umzubauen,
+       bekommt JEDER button eine unsichtbare, zentrierte Trefferflaeche von
+       mindestens 44x44px (Apple-Empfehlung) - ein Pseudo-Element, das ueber
+       den Knopf hinausragt und Tipps an ihn weiterreicht. Die Optik aendert
+       sich nicht. In der Luecke zwischen zwei Knoepfen gewinnt der im DOM
+       spaetere - dort landete ein Tipp vorher ins Leere, das ist kein
+       Rueckschritt. Keine Vorlage definiert ein eigenes button::before
+       (gewaechtert in tests/test_tippflaeche.py); position:relative gilt nur,
+       solange eine Vorlage nichts anderes setzt. */
+    button { position: relative; }
+    button::before {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      width:  max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+
     /* App-Header */
     .app-header {
       background: var(--farbe);

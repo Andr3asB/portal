@@ -2,6 +2,56 @@
 
 ---
 
+## 2026-08-09 – portal-v167: Wunsch #169 – Tippziele auf Fingergröße
+
+Erster freigegebener Wunsch aus dem UX-Review. Andi hat sechs der acht
+Vorschläge freigegeben (#169–#173, #176); #174 und #175 warten noch.
+
+### Eine Regel statt 44 Korrekturen
+
+Jeder `button` bekommt in `base.html` ein unsichtbares, zentriertes
+Pseudo-Element von mindestens 44×44 px, das Tipps an den Knopf weiterreicht.
+Die Optik ändert sich um kein Pixel; der 17 px hohe „gekocht?"-Knopf bleibt
+zierlich, trifft sich aber wie ein großer.
+
+Vorab geprüft statt gehofft: **keine** Vorlage definiert ein eigenes
+`button::before`/`::after` (das würde die Fläche ersetzen), und das einzige
+`position:absolute` in einem knopfartigen Element sitzt in einem `label`,
+dem ein relativer Bezugsrahmen sogar entgegenkommt. Bewusst nur `button` –
+Links im Fließtext mit Riesen-Trefferzone würden Absätze überdecken, und die
+kleinen Bedienelemente sind fast ausnahmslos Buttons.
+
+In der Lücke zwischen zwei Knöpfen gewinnt jetzt der im DOM spätere – dort
+landete ein Tipp vorher **ins Leere**, das ist kein Rückschritt.
+
+### Der Wächter biss zweimal daneben, bevor er sass
+
+1. Er sprang auf die erste Erwähnung von „button::before" an – die steht in
+   meinem eigenen Erklärkommentar. Der Slice begann im Kommentar und enthielt
+   die Regel nie. → Auf den Selektor (`button::before {`) anspringen.
+2. Die Gegenprobe entfernte nur die width-Untergrenze – und der Test blieb
+   grün, weil height die gesuchte Zeichenkette weiterhin enthielt. → Beide
+   Achsen einzeln prüfen.
+
+Beides Varianten desselben Musters aus dieser Woche: ein Test, der zufällig
+grün ist, prüft nichts. Ohne die Gegenproben wären beide unbemerkt geblieben.
+
+### Verifikation mit einer offenen Flanke
+
+Live ausgeliefert und bestätigt, dass die Regel in den Seiten ankommt. Die
+**Wirkungsmessung** (elementFromPoint 8 px neben einem kleinen Knopf muss den
+Knopf treffen) steht noch aus: Das Chrome-Fenster ist minimiert, Chrome legt
+dann kein Layout an. Der Test dafür liegt bereit; nachholen, sobald das
+Fenster offen ist – oder Andi tippt schlicht am iPhone, das ist ohnehin die
+echte Probe.
+
+Kein Hilfe-Kapitel: Es gibt nichts zu erklären, die Knöpfe treffen sich
+einfach besser.
+
+2 neue Wächter-Tests (+1 je Vorlage), 553 grün.
+
+---
+
 ## 2026-08-09 – UX-Review aller Seiten: acht Vorschläge in der Werkstatt (#169–#176)
 
 Andis Auftrag: alle Seiten nach modernen UI/UX-Gesichtspunkten für iPhone und
