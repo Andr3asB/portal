@@ -144,11 +144,11 @@
       </div>
       {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
       <button class="gb-glocke" data-klick="gbEditUmschalten" data-args='[{{ e.id }}]'
-              title="Eintrag bearbeiten">✏️</button>
+              title="Eintrag bearbeiten" aria-label="Eintrag bearbeiten">✏️</button>
       {% endif %}
       <button class="gb-glocke {% if e.erinnerung or e.vorlauf_tage %}aktiv{% endif %}"
               data-klick="gbPanelUmschalten" data-args='[{{ e.id }}]'
-              title="Erinnerung und Sichtbarkeit">🔔</button>
+              title="Erinnerung und Sichtbarkeit" aria-label="Erinnerung und Sichtbarkeit">🔔</button>
     </div>
 
     <form class="gb-panel" id="gb-panel-{{ e.id }}" method="post"

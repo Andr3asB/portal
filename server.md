@@ -1475,6 +1475,17 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Icon-Knoepfe benennen (Wunsch #175)
+
+Jeder `<button>`, dessen Beschriftung nur aus Zeichen besteht (Emoji, Pfeil,
+✓), braucht ein `aria-label`. Wo zusaetzlich ein `title` steht, sind **beide
+Texte identisch** - zwei verschiedene Texte am selben Knopf laden dazu ein,
+einen zu pflegen und den anderen zu vergessen, und vergessen wird immer der,
+den niemand sieht.
+
+`tests/test_aria_labels.py` waechtert Vorhandensein, Gleichheit und dass der
+Name kein Platzhalter ist ("Knopf", "...").
+
 ## Lange Vorgaenge anzeigen (Wunsch #176)
 
 Formulare, deren Absenden spuerbar dauert (KI-Anfrage), tragen

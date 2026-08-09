@@ -148,6 +148,9 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- **Icon-Knöpfe** (Beschriftung nur ein Zeichen) brauchen `aria-label`; steht
+  auch ein `title` dran, sind beide Texte identisch (Wunsch #175,
+  `tests/test_aria_labels.py`).
 - **Lange Vorgänge:** Formulare, deren Absenden spürbar dauert (KI-Anfrage),
   tragen `data-arbeitet="Wird gelesen …"` – der Verteiler in `base.html`
   deaktiviert und beschriftet den Knopf um (Wunsch #176).

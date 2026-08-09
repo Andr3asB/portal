@@ -318,8 +318,8 @@ input[type="text"].rezept-input {
           {% endfor %}
         </div>
         <div class="pfeil-nav">
-          <button type="button" class="btn-pfeil unsichtbar" disabled>←</button>
-          <button type="button" class="btn-pfeil weiter" id="pfeil-1-weiter" disabled>→</button>
+          <button type="button" class="btn-pfeil unsichtbar" disabled title="Zurück" aria-label="Zurück">←</button>
+          <button type="button" class="btn-pfeil weiter" id="pfeil-1-weiter" disabled title="Weiter" aria-label="Weiter">→</button>
         </div>
       </div>
 
@@ -332,8 +332,8 @@ input[type="text"].rezept-input {
           {% endfor %}
         </div>
         <div class="pfeil-nav">
-          <button type="button" class="btn-pfeil" id="pfeil-2-zurueck">←</button>
-          <button type="button" class="btn-pfeil weiter" id="pfeil-2-weiter" disabled>→</button>
+          <button type="button" class="btn-pfeil" id="pfeil-2-zurueck" title="Zurück" aria-label="Zurück">←</button>
+          <button type="button" class="btn-pfeil weiter" id="pfeil-2-weiter" disabled title="Weiter" aria-label="Weiter">→</button>
         </div>
       </div>
 
@@ -343,7 +343,7 @@ input[type="text"].rezept-input {
 
         <div id="tier-vorschau-bereich">
         <div class="vorschau-box">
-          <button type="button" class="btn-drehen" id="dreh-links">◀</button>
+          <button type="button" class="btn-drehen" id="dreh-links" title="Nach links drehen" aria-label="Nach links drehen">◀</button>
           <svg id="tier-svg" viewBox="0 0 200 220" style="--koerper-farbe:#e8b04b; --muster-farbe:#ffffff; --koerperbau-scale:1;">
             <defs>
               {% for k in tiere %}
@@ -396,7 +396,7 @@ input[type="text"].rezept-input {
               </g>
             </g>
           </svg>
-          <button type="button" class="btn-drehen" id="dreh-rechts">▶</button>
+          <button type="button" class="btn-drehen" id="dreh-rechts" title="Nach rechts drehen" aria-label="Nach rechts drehen">▶</button>
         </div>
         <div class="ansicht-label" id="ansicht-label">Von vorne</div>
         </div>
@@ -532,7 +532,7 @@ input[type="text"].rezept-input {
         <input type="text" class="rezept-input" name="name" maxlength="40" placeholder="z. B. Bommel" autocomplete="off">
 
         <div class="pfeil-nav">
-          <button type="button" class="btn-pfeil" id="pfeil-3-zurueck">←</button>
+          <button type="button" class="btn-pfeil" id="pfeil-3-zurueck" title="Zurück" aria-label="Zurück">←</button>
           <span></span>
         </div>
         <button class="btn-add" type="submit">🐾 Speichern</button>
@@ -560,7 +560,7 @@ input[type="text"].rezept-input {
         {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
         <form method="post" action="/a/tierbaukasten{{ tp }}loeschen/{{ k.id }}"
               data-bestaetigen="{{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?') }}">
-          <button type="submit" class="btn-loeschen-tier" title="Löschen">🗑️</button>
+          <button type="submit" class="btn-loeschen-tier" title="Löschen" aria-label="Löschen">🗑️</button>
         </form>
       </div>
       {% endfor %}

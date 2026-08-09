@@ -165,7 +165,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   <!-- Bearbeiten-Toggle: Name, Angebot und Löschen stecken alle im Panel -->
   <button class="angebot-toggle-btn" type="button"
           data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
-          title="Bearbeiten">✏️</button>
+          title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
     <form method="post" action="/a/einkauf{{ tp }}bearbeiten/{{ item.id }}" class="edit-form"

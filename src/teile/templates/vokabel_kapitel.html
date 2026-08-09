@@ -95,10 +95,10 @@
           {{ k.anzahl }} Vokabel{{ 'n' if k.anzahl != 1 else '' }}{% if k.geteilt_mit %} · geteilt mit {{ k.geteilt_mit|length }}{% endif %}
         </div>
       </div>
-      <button class="btn-edit-toggle" type="button" data-klick="toggleKap" data-args='[{{ k.id }}]' title="Umbenennen">✏️</button>
+      <button class="btn-edit-toggle" type="button" data-klick="toggleKap" data-args='[{{ k.id }}]' title="Umbenennen" aria-label="Umbenennen">✏️</button>
       <button class="btn-teilen{% if k.geteilt_mit %} aktiv{% endif %}" type="button"
               data-klick="toggleTeilen" data-args='[{{ k.id }}]'
-              title="{{ 'Geteilt mit %d Person(en)'|format(k.geteilt_mit|length) if k.geteilt_mit else 'Mit jemandem teilen' }}">👥</button>
+              title="{{ 'Geteilt mit %d Person(en)'|format(k.geteilt_mit|length) if k.geteilt_mit else 'Mit jemandem teilen' }}" aria-label="{{ 'Geteilt mit %d Person(en)'|format(k.geteilt_mit|length) if k.geteilt_mit else 'Mit jemandem teilen' }}">👥</button>
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="id" value="{{ k.id }}">

@@ -301,11 +301,12 @@
       </select>
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}erledigt/{{ w.id }}">
-      <button type="submit" class="btn-done">✓</button>
+      <button type="submit" class="btn-done" title="Als erledigt markieren"
+              aria-label="Als erledigt markieren">✓</button>
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
-      <button type="submit" class="btn-del" title="Löschen">🗑️</button>
+      <button type="submit" class="btn-del" title="Löschen" aria-label="Löschen">🗑️</button>
     </form>
   </div>
   {% endif %}
@@ -344,7 +345,7 @@
     </form>
     <form method="post" action="/a/werkstatt{{ tp }}loeschen/{{ w.id }}"
           data-bestaetigen="{{ ('„' ~ (w.titel or w.text)|truncate(40) ~ '“ löschen?') }}">
-      <button type="submit" class="btn-del" title="Löschen">🗑️</button>
+      <button type="submit" class="btn-del" title="Löschen" aria-label="Löschen">🗑️</button>
     </form>
   </div>
   {% endif %}

@@ -71,7 +71,7 @@
       <div class="aufg-name">{{ a.name }}</div>
       <div class="aufg-gew">{{ a.gewichtung }} Punkte</div>
     </div>
-    <button class="btn-edit-toggle" type="button" data-klick="toggleAufgEdit" data-args='[{{ a.id }}]' title="Umbenennen">✏️</button>
+    <button class="btn-edit-toggle" type="button" data-klick="toggleAufgEdit" data-args='[{{ a.id }}]' title="Umbenennen" aria-label="Umbenennen">✏️</button>
     <form method="post">
       <input type="hidden" name="action" value="toggle">
       <input type="hidden" name="id" value="{{ a.id }}">

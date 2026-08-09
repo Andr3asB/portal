@@ -141,7 +141,8 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
     <div class="sterne-picker" id="sterne-picker">
       {% for i in range(1, 6) %}
       <button type="button" class="stern-btn{% if eigene_bewertung and i <= eigene_bewertung %} aktiv{% endif %}"
-              data-wert="{{ i }}" data-klick="bewerten" data-args='[{{ rezept.id }}, {{ i }}]'>★</button>
+              data-wert="{{ i }}" data-klick="bewerten" data-args='[{{ rezept.id }}, {{ i }}]'
+              aria-label="Mit {{ i }} von 5 Sternen bewerten">★</button>
       {% endfor %}
     </div>
 
@@ -182,12 +183,14 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
        ohne Ausgangswert lässt sich nichts umrechnen, und ein Regler, der
        nichts tut, wäre schlimmer als keiner. #}
     <div class="portionen-wahl" id="portionen-wahl" data-basis="{{ rezept.portionen or '' }}" style="display:none">
-      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[-1]' title="Weniger">−</button>
+      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[-1]' title="Eine Stufe weniger Portionen"
+              aria-label="Eine Stufe weniger Portionen">−</button>
       <div class="portionen-mitte">
         <span class="portionen-zahl" id="portionen-zahl">?</span>
         <span class="portionen-text">Portionen</span>
       </div>
-      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[1]' title="Mehr">+</button>
+      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[1]' title="Eine Stufe mehr Portionen"
+              aria-label="Eine Stufe mehr Portionen">+</button>
       <button class="portionen-zurueck" type="button" id="portionen-zurueck"
               data-klick="portionenZuruecksetzen" style="display:none">zurück auf <span id="portionen-basis"></span></button>
       {# Wunsch #167: wählbare Schrittweite statt sechs Knöpfen – auf dem Handy
@@ -195,11 +198,17 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
       <div class="portionen-schritte" id="portionen-schritte">
         <span class="portionen-schritt-label">Schritt</span>
         <button type="button" class="portionen-schritt aktiv" data-schritt="1"
-                data-klick="portionenSchrittWaehlen" data-args='[1]'>1</button>
+                data-klick="portionenSchrittWaehlen" data-args='[1]'
+                title="Schrittweite: ganze Portion"
+                aria-label="Schrittweite: ganze Portion">1</button>
         <button type="button" class="portionen-schritt" data-schritt="0.25"
-                data-klick="portionenSchrittWaehlen" data-args='[0.25]'>0,25</button>
+                data-klick="portionenSchrittWaehlen" data-args='[0.25]'
+                title="Schrittweite: viertel Portion"
+                aria-label="Schrittweite: viertel Portion">0,25</button>
         <button type="button" class="portionen-schritt" data-schritt="0.1"
-                data-klick="portionenSchrittWaehlen" data-args='[0.1]'>0,1</button>
+                data-klick="portionenSchrittWaehlen" data-args='[0.1]'
+                title="Schrittweite: Zehntel Portion"
+                aria-label="Schrittweite: Zehntel Portion">0,1</button>
       </div>
     </div>
     {% for z in zutaten %}

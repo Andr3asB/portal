@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-08-09 – portal-v173: Wunsch #175 – Icon-Knöpfe haben jetzt Namen
+
+Ein Knopf mit der Aufschrift ✏️ oder 🗑️ liest sich für VoiceOver als
+„Schaltfläche" – mehr nicht. `title` hilft dabei nicht verlässlich und
+erscheint bei Touch ohnehin nie.
+
+Erhoben statt geschätzt: **45 Knöpfe**, deren Beschriftung kein Wort ist.
+Genau einer hatte einen `aria-label` (das Hamburger-Menü). 31 davon trugen
+einen `title`, aus dem sich der Name mechanisch übernehmen liess; die
+restlichen 13 haben von Hand einen bekommen – sieben Pfeile im
+Tierbaukasten, die fünf Sterne der Bewertung („Mit 3 von 5 Sternen
+bewerten"), der Erledigt-Haken der Werkstatt.
+
+### Die Konvention: title und aria-label sagen dasselbe
+
+Wo beides steht, ist der Text identisch. Zwei verschiedene Texte am selben
+Knopf wären eine Einladung, den einen zu pflegen und den anderen zu
+vergessen – **und vergessen wird immer der, den niemand sieht.** Ein Wächter
+prüft die Gleichheit, ein zweiter das blosse Vorhandensein, ein dritter, dass
+niemand mit „Knopf" oder „…" die Prüfung erfüllt und dabei nichts sagt.
+
+Bei der Gelegenheit ein paar Namen verbessert, weil sie als Vorlesetext zu
+knapp waren: Aus „Weniger"/„Mehr" wurde „Eine Stufe weniger/mehr Portionen",
+aus „1"/„0,25"/„0,1" wurde „Schrittweite: ganze/viertel/Zehntel Portion".
+Da `title` mitgeändert wurde, ist auch der Mauszeiger-Hinweis besser.
+
+Das betrifft heute niemanden in der Familie akut – es kostet fast nichts und
+gehört zu einer Oberfläche, die man ernst meint.
+
+3 neue Wächter (je Vorlage), 800 Tests grün.
+
+---
+
 ## 2026-08-09 – portal-v171: Wunsch #176 – das Warten sichtbar machen
 
 Drei Formulare warten mehrere Sekunden auf eine KI-Antwort und gaben dabei

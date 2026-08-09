@@ -184,7 +184,7 @@
       {% if eigenes_buch and not e.storniert and e.art != "start" %}
       <form method="post" action="/a/kassenbuch{{ tp }}eintrag/{{ e.id }}/stornieren"
             data-bestaetigen="{{ ('„' ~ (e.zweck or e.person or (e.art|capitalize)) ~ '“ stornieren? Zählt danach nicht mehr zum Kontostand, bleibt aber im Kassenbuch sichtbar.') }}">
-        <button class="kb-storno-btn" type="submit" title="Stornieren">×</button>
+        <button class="kb-storno-btn" type="submit" title="Stornieren" aria-label="Stornieren">×</button>
       </form>
       {% endif %}
     </div>

@@ -100,7 +100,7 @@
           <div class="mahlzeit-kopf">
             <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
             {% if eintrag %}<span class="mahlzeit-drag-handle" title="Verschieben">⠿</span>{% endif %}
-            <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten">✏️</button>
+            <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
           </div>
           <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}">
             {% if eintrag and eintrag.rezept_name %}

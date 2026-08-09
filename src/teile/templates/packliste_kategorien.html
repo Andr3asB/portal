@@ -71,7 +71,7 @@
     <div class="kat-row">
       <span class="kat-drag-handle" title="Verschieben">⠿</span>
       <span class="kat-name">{{ k.name }}</span>
-      <button class="btn-edit-toggle" type="button" data-klick="toggleKat" data-args='[{{ k.id }}]' title="Umbenennen">✏️</button>
+      <button class="btn-edit-toggle" type="button" data-klick="toggleKat" data-args='[{{ k.id }}]' title="Umbenennen" aria-label="Umbenennen">✏️</button>
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="id" value="{{ k.id }}">

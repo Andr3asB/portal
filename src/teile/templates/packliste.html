@@ -136,7 +136,7 @@ body.packmodus .item-name { font-size:18px; }
 
   <button class="item-edit-toggle" type="button"
           data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
-          title="Bearbeiten">✏️</button>
+          title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
     <form method="post" action="/a/packliste{{ tp }}bearbeiten/{{ item.id }}" class="edit-form">

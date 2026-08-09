@@ -139,13 +139,13 @@
       </div>
       <button class="vokabel-anhoeren-btn{% if v.audio_da %} audio-da{% endif %}" type="button"
               data-klick="wortAnhoeren" data-args='[{{ v.id }}]'
-              title="{{ 'Anhören (Aussprache liegt bereit)' if v.audio_da else 'Anhören (wird beim ersten Mal erzeugt)' }}">🔊</button>
+              title="{{ 'Anhören (Aussprache liegt bereit)' if v.audio_da else 'Anhören (wird beim ersten Mal erzeugt)' }}" aria-label="{{ 'Anhören (Aussprache liegt bereit)' if v.audio_da else 'Anhören (wird beim ersten Mal erzeugt)' }}">🔊</button>
       {# Wunsch #150: Geteilte Vokabeln sind zum Ueben und Anhoeren da, nicht
          zum Aendern - der Knopf entfaellt fuer fremde Eintraege. Die Routen
          pruefen das ohnehin serverseitig (user_id), aber ein Knopf, der zu
          403 fuehrt, waere schlechte Bedienung. #}
       {% if v.user_id == user.id %}
-      <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' title="Bearbeiten">✏️</button>
+      <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
       {% else %}
       <span class="vokabel-edit-btn" title="Von {{ v.besitzer }} geteilt">👥</span>
       {% endif %}
