@@ -1475,6 +1475,20 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Umsortieren per Ziehen (Wunsch #178)
+
+`window.ziehSortierung({griff, eintrag, platzhalter, idAus, speichern})` in
+`base.html` - der gemeinsame Helfer fuer alle neuen Sortierungen.
+
+**Altbestand:** `packliste_kategorien.html` und `einkauf_laeden.html` haben je
+eine eigene, fast wortgleiche Fassung derselben ~120 Zeilen. Sie wurden bei
+#178 bewusst NICHT migriert (funktionieren, und ein Umbau war ohne sichtbaren
+Browser nicht pruefbar). Wer sie anfasst, stellt sie bitte auf den Helfer um.
+
+`packlisten_eintraege.position`: Reihenfolge je Ziel. **Neue Eintraege gehen
+ans Ende** (`MAX(position)+1`) - auf 0 wuerde jeder neue Eintrag die von Hand
+sortierte Liste durcheinanderschieben.
+
 ## Umschalter ohne Seitensprung (Wunsch #171)
 
 Formular mit `data-fetch="funktionsname"` -> der Absende-Verteiler in

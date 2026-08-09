@@ -16,6 +16,20 @@
 .ziel-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
 /* Eingabe */
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+/* Wunsch #178: Zieh-Griff und Platzhalter beim Umsortieren */
+.item-drag-handle {
+  font-size:15px; color:var(--text-2); cursor:grab; touch-action:none;
+  flex-shrink:0; padding:0 2px;
+}
+.item-drag-handle:active { cursor:grabbing; }
+.item-drag-placeholder {
+  border:2px dashed var(--farbe); border-radius:12px; margin-bottom:8px;
+  background:var(--surface-2);
+}
+.filter-reset {
+  background:none; border:none; color:var(--text-2); font-size:13px;
+  text-decoration:underline; cursor:pointer; margin-top:8px; font-family:inherit;
+}
 .btn-neu-toggle, .btn-filter-toggle, .btn-packen-start {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
   color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
@@ -128,6 +142,9 @@ body.packmodus .item-name { font-size:18px; }
   <input class="item-check" type="checkbox"
          data-aendern="toggleGepackt" data-args='[{{ item.id }}]'
          {% if item.gepackt %}checked{% endif %}>
+  {# Wunsch #178: nur bei offenen Einträgen – gepackte stehen in einem eigenen
+     Abschnitt nach Packzeitpunkt, dort wäre Sortieren sinnlos. #}
+  {% if not item.gepackt %}<span class="item-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</span>{% endif %}
   <span class="item-name">{{ item.name }}</span>
 
   {% if item.person_id %}
@@ -201,7 +218,22 @@ body.packmodus .item-name { font-size:18px; }
 
   <div class="top-aktionen">
     <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
     <button type="button" class="btn-packen-start" id="packen-start-btn">🧳 Packen starten</button>
+  </div>
+
+  {# Wunsch #178: Filter nach Person. Bewusst getrennt vom Packmodus - der
+     blendet alles andere aus und führt durch EINEN Packvorgang; hier geht es
+     nur ums Ansehen, mehrere Personen gleichzeitig sind erlaubt. #}
+  <div class="filter-card" id="filter-card">
+    <div class="field-label">Wessen Sachen anzeigen?</div>
+    <div class="btn-row" id="filter-person-row">
+      <button type="button" class="chip-btn" data-value="allgemein">🌐 Allgemein</button>
+      {% for p in personen %}
+      <button type="button" class="chip-btn" data-value="{{ p.id }}">{{ p.name }}</button>
+      {% endfor %}
+    </div>
+    <button type="button" class="filter-reset" id="filter-reset-btn">Filter zurücksetzen</button>
   </div>
 
   <div class="filter-card" id="packen-person-card">
@@ -282,6 +314,69 @@ body.packmodus .item-name { font-size:18px; }
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+
+/* --- Wunsch #178: Filter nach Person ---------------------------------- */
+function packlisteFilter() {
+  const gewaehlt = [...document.querySelectorAll('#filter-person-row .chip-btn.active')]
+    .map(b => b.dataset.value);
+  document.querySelectorAll('.item-card').forEach(karte => {
+    // Leeres data-person heisst "Allgemein" - Sachen, die niemandem
+    // bestimmten gehoeren (Reiseapotheke). Ohne eigenen Knopf dafuer
+    // verschwaenden sie beim Filtern spurlos, obwohl sie fast immer
+    // mitgepackt werden muessen.
+    const person = karte.dataset.person || 'allgemein';
+    karte.style.display = (!gewaehlt.length || gewaehlt.includes(person)) ? '' : 'none';
+  });
+  // Kategorie-Ueberschriften ohne sichtbare Eintraege ausblenden, sonst
+  // stehen leere Abschnitte da und die Liste sieht kaputt aus.
+  document.querySelectorAll('.kat-label').forEach(titel => {
+    let el = titel.nextElementSibling, sichtbar = false;
+    while (el && !el.classList.contains('kat-label')) {
+      if (el.classList.contains('item-card') && el.style.display !== 'none') { sichtbar = true; break; }
+      el = el.nextElementSibling;
+    }
+    titel.style.display = sichtbar ? '' : 'none';
+  });
+}
+
+(function () {
+  const karte = document.getElementById('filter-card');
+  if (!karte) return;
+  const knopf = document.getElementById('filter-toggle-btn');
+  knopf.addEventListener('click', () => {
+    karte.classList.toggle('open');
+    knopf.classList.toggle('aktiv', karte.classList.contains('open'));
+  });
+  document.querySelectorAll('#filter-person-row .chip-btn').forEach(b => {
+    b.addEventListener('click', () => { b.classList.toggle('active'); packlisteFilter(); });
+  });
+  document.getElementById('filter-reset-btn').addEventListener('click', () => {
+    document.querySelectorAll('#filter-person-row .chip-btn.active')
+      .forEach(b => b.classList.remove('active'));
+    packlisteFilter();
+  });
+})();
+
+/* --- Wunsch #178: Umsortieren ------------------------------------------ */
+ziehSortierung({
+  griff:       '.item-drag-handle',
+  eintrag:     '.item-card',
+  platzhalter: 'item-drag-placeholder',
+  idAus:       el => parseInt(el.id.replace('item-', ''), 10),
+  speichern:   reihenfolge => {
+    fetch(`/a/packliste${TP}reorder`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order: reihenfolge}),
+    }).catch(err => {
+      // Laut statt still: Wer glaubt, seine Reihenfolge sei gespeichert,
+      // wundert sich beim naechsten Laden.
+      console.error('Umsortieren fehlgeschlagen', err);
+      alert('Die neue Reihenfolge konnte nicht gespeichert werden.');
+    });
+  },
+});
+
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 

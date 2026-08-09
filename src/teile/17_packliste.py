@@ -139,7 +139,10 @@ def index(token):
             FROM   packlisten_eintraege e
             LEFT JOIN users u ON u.id = e.person_id
             WHERE  e.ziel_id = ? AND e.gepackt = 0
-            ORDER  BY e.name COLLATE NOCASE ASC
+            -- Wunsch #178: eigene Reihenfolge zuerst, Name nur noch als
+            -- Gleichstand-Entscheider (frisch angelegte teilen sich sonst
+            -- dieselbe Position und springen bei jedem Laden umher).
+            ORDER  BY e.position ASC, e.name COLLATE NOCASE ASC
         """, (aktives_ziel_id,)).fetchall()
         gepackte = db.execute("""
             SELECT e.id, e.name, e.kategorie_id, e.person_id, e.gepackt, e.gepackt_am,
@@ -182,9 +185,16 @@ def add(token):
     person_id = to_int(request.form.get("person_id"))
     if person_id is not None and not db.execute("SELECT 1 FROM users WHERE id=?", (person_id,)).fetchone():
         person_id = None
+    # Wunsch #178: ans ENDE der eigenen Reihenfolge, nicht auf Position 0.
+    # Sonst landete jeder neue Eintrag ganz oben und schoebe die von Hand
+    # sortierte Liste jedes Mal durcheinander.
+    naechste = db.execute(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM packlisten_eintraege WHERE ziel_id=?",
+        (ziel_id,)).fetchone()[0]
     db.execute(
-        "INSERT INTO packlisten_eintraege(name,ziel_id,kategorie_id,person_id,erstellt_von) VALUES(?,?,?,?,?)",
-        (name, ziel_id, kategorie_id, person_id, user["id"]),
+        "INSERT INTO packlisten_eintraege(name,ziel_id,kategorie_id,person_id,erstellt_von,position) "
+        "VALUES(?,?,?,?,?,?)",
+        (name, ziel_id, kategorie_id, person_id, user["id"], naechste),
     )
     db.commit()
     return redirect(url_for("packliste_app.index", token=token, ziel=ziel_id))
@@ -328,6 +338,36 @@ def kategorien_reorder(token):
         if kid is None:
             continue
         db.execute("UPDATE packlisten_kategorien SET position=? WHERE id=?", (position, kid))
+    db.commit()
+    return jsonify(ok=True)
+
+
+@bp.route("/a/packliste/reorder", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/packliste/<token>/reorder", methods=["POST"])
+def reorder(token):
+    """Wunsch #178: Eintraege von Hand umsortieren.
+
+    Bewusst OHNE `_darf_verwalten()` - anders als bei Zielen und Kategorien,
+    die allen gehoeren und selten geaendert werden. Die Reihenfolge auf der
+    Packliste ist Arbeitsorganisation waehrend des Packens; wer packen darf,
+    darf auch sortieren.
+
+    Positionen gelten je Ziel. Geschickt wird nur die Reihenfolge der
+    OFFENEN Eintraege - gepackte stehen ohnehin in einem eigenen Abschnitt
+    nach Packzeitpunkt sortiert.
+    """
+    user = _user(token)
+    daten = request.get_json(silent=True) or {}
+    order = daten.get("order", [])
+    if not isinstance(order, list):
+        abort(400)
+
+    db = get_db()
+    for position, eid in enumerate(order):
+        eid = to_int(eid)
+        if eid is None:
+            continue
+        db.execute("UPDATE packlisten_eintraege SET position=? WHERE id=?", (position, eid))
     db.commit()
     return jsonify(ok=True)
 

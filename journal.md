@@ -2,6 +2,66 @@
 
 ---
 
+## 2026-08-09 – portal-v175: Wunsch #178 – Packliste filtern und umsortieren
+
+Zwei Teile, die nur die Liste gemeinsam haben.
+
+### Filter: der Knopf, der leicht gefehlt hätte
+
+Eine Knopfreihe mit allen Personen, mehrere gleichzeitig wählbar – dasselbe
+Muster wie in den Aufgaben. Der wichtige Knopf ist **„🌐 Allgemein"**: Sachen
+ohne Person (Reiseapotheke, Ladekabel) verschwänden sonst spurlos, sobald
+jemand filtert – und ausgerechnet die müssen fast immer mit.
+
+Bewusst getrennt vom vorhandenen **Packmodus**: Der blendet alles andere aus
+und führt durch *einen* Packvorgang. Der Filter dient dem Ansehen.
+
+### Umsortieren: der Fallstrick liegt beim Anlegen
+
+Nicht das Sortieren ist heikel, sondern was mit **neuen** Einträgen passiert.
+Landen sie auf Position 0, schiebt jeder neue Eintrag die von Hand sortierte
+Liste durcheinander – jedes Mal aufs Neue. Sie landen deshalb am Ende, und ein
+Test hält genau das fest.
+
+Die 76 bestehenden Einträge haben bei der Migration einmalig Positionen in
+ihrer bisherigen (alphabetischen) Reihenfolge bekommen – sonst hätten nach dem
+Deploy alle auf 0 gestanden und die Liste wäre willkürlich umgeordnet
+erschienen.
+
+### Keine dritte Kopie der Zieh-Logik
+
+Die Packlisten-Kategorien und die Einkaufsläden haben je eine eigene, fast
+wortgleiche Fassung derselben ~120 Zeilen Drag-Code. Statt einer dritten steht
+jetzt `ziehSortierung()` in `base.html`, parametrisiert über Griff, Eintrag,
+Platzhalter und Speicherfunktion.
+
+**Die beiden bestehenden habe ich bewusst nicht migriert.** Sie funktionieren,
+und ein Umbau wäre ohne sichtbaren Browser nicht prüfbar – das Chrome-Fenster
+ist seit Stunden minimiert. Das ist keine Vorliebe für Duplikate, sondern die
+Abwägung, ein funktionierendes Feature nicht blind anzufassen; die Notiz dazu
+steht im Helfer selbst.
+
+### Zwei Fehler beim Bauen, beide von derselben Sorte
+
+**Einen Klassennamen geraten.** Der Filter suchte `.kategorie-titel` – die
+Klasse heisst `.kat-label`. Ein solcher Fehler fällt nie auf: Der Filter läuft
+fehlerfrei durch und blendet einfach nichts aus.
+
+**Und der Test dagegen bestätigte sich selbst.** Er suchte den Klassennamen in
+der Datei ab `{% block body %}` – der Skriptblock steht dahinter, also fand
+jeder gesuchte Name sich selbst. Auch mit einem frei erfundenen Namen blieb er
+grün. Jetzt sammelt er die Klassennamen aus den `class`-Attributen ausserhalb
+des Skripts; die Gegenprobe fällt.
+
+Das ist heute der vierte Test dieser Art (nach den Kassenbuch-Ereignissen, dem
+Löschen-Panel und der Trefferfläche). Das Muster ist immer dasselbe: **Wenn
+Prüfling und Prüfmassstab aus derselben Datei kommen, muss man sie sauber
+trennen** – sonst misst der Test sich selbst.
+
+13 neue Tests, 868 grün.
+
+---
+
 ## 2026-08-09 – portal-v174: Wunsch #171 – Umschalter ohne Seitensprung
 
 Vier Umschalter luden die ganze Seite neu und sprangen an den Anfang. Die

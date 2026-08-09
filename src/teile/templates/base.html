@@ -457,6 +457,123 @@
 // genau wie beim alten `onsubmit="return ..."`.
 // ===========================================================================
 (function(){
+  /* Wunsch #178: Umsortieren per Ziehen - EINMAL fuer das ganze Portal.
+   *
+   * Die Packlisten-Kategorien und die Einkaufslaeden haben je eine eigene,
+   * fast wortgleiche Fassung dieser rund 120 Zeilen. Eine dritte Kopie waere
+   * genau die Bauart, die in diesem Projekt schon dreimal Aerger gemacht hat.
+   * Neue Sortierungen nehmen deshalb diesen Helfer; die beiden bestehenden
+   * bleiben vorerst, weil sie funktionieren und ein Umbau ohne sichtbaren
+   * Browser nicht pruefbar waere (siehe journal.md, 09.08.2026).
+   *
+   *   ziehSortierung({
+   *     griff:      '.item-drag-handle',   // woran gezogen wird
+   *     eintrag:    '.item-card',          // was bewegt wird
+   *     platzhalter:'item-drag-placeholder',
+   *     idAus:      el => el.id.replace('item-', ''),
+   *     speichern:  reihenfolge => fetch(...),
+   *   });
+   */
+  window.ziehSortierung = function (opt) {
+    let zustand = null;
+
+    function beginn(e) {
+      if (e.button && e.button !== 0) return;
+      e.preventDefault();
+      const griff   = e.currentTarget;
+      const eintrag = griff.closest(opt.eintrag);
+      if (!eintrag) return;
+      griff.setPointerCapture(e.pointerId);
+      zustand = { eintrag, griff, startY: e.clientY, laeuft: false };
+      griff.addEventListener('pointermove', bewegung);
+      griff.addEventListener('pointerup', ende);
+      griff.addEventListener('pointercancel', abbruch);
+    }
+
+    function bewegung(e) {
+      if (!zustand || zustand.griff !== e.currentTarget) return;
+      // Erst ab 8px als Ziehen werten - sonst verrutscht jeder Tipp.
+      if (!zustand.laeuft && Math.abs(e.clientY - zustand.startY) > 8) {
+        zustand.laeuft = true;
+        starte(e);
+      }
+      if (zustand.laeuft) folge(e);
+    }
+
+    function loesen(griff) {
+      griff.removeEventListener('pointermove', bewegung);
+      griff.removeEventListener('pointerup', ende);
+      griff.removeEventListener('pointercancel', abbruch);
+    }
+
+    function ende(e) {
+      if (!zustand || zustand.griff !== e.currentTarget) return;
+      loesen(zustand.griff);
+      if (zustand.laeuft) {
+        const { eintrag, platzhalter, schatten } = zustand;
+        platzhalter.parentNode.insertBefore(eintrag, platzhalter);
+        platzhalter.remove();
+        schatten.remove();
+        eintrag.style.display = '';
+        opt.speichern([...document.querySelectorAll(opt.eintrag)]
+          .filter(el => !el.classList.contains('gepackt'))
+          .map(opt.idAus));
+      }
+      zustand = null;
+    }
+
+    function abbruch(e) {
+      if (!zustand || zustand.griff !== e.currentTarget) return;
+      loesen(zustand.griff);
+      if (zustand.laeuft) {
+        const { eintrag, platzhalter, schatten } = zustand;
+        if (platzhalter?.parentNode) platzhalter.parentNode.insertBefore(eintrag, platzhalter);
+        platzhalter?.remove();
+        schatten?.remove();
+        eintrag.style.display = '';
+      }
+      zustand = null;
+    }
+
+    function starte(e) {
+      const { eintrag } = zustand;
+      const r = eintrag.getBoundingClientRect();
+      const schatten = eintrag.cloneNode(true);
+      schatten.style.cssText = ['position:fixed', 'z-index:1000', 'pointer-events:none',
+        `width:${r.width}px`, `left:${r.left}px`, `top:${r.top}px`,
+        'opacity:.92', 'box-shadow:0 12px 30px rgba(0,0,0,.25)'].join(';');
+      document.body.appendChild(schatten);
+
+      const ph = document.createElement('div');
+      ph.className = opt.platzhalter;
+      ph.style.height = `${r.height}px`;
+      eintrag.parentNode.insertBefore(ph, eintrag.nextSibling);
+      eintrag.style.display = 'none';
+
+      zustand.schatten = schatten;
+      zustand.platzhalter = ph;
+      zustand.abstandY = e.clientY - r.top;
+    }
+
+    function folge(e) {
+      const { eintrag, schatten, platzhalter, abstandY } = zustand;
+      schatten.style.top = `${e.clientY - abstandY}px`;
+      const andere = [...document.querySelectorAll(opt.eintrag)]
+        .filter(el => el !== platzhalter && el !== eintrag && !el.classList.contains('gepackt'));
+      for (const el of andere) {
+        const r = el.getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) {
+          el.parentNode.insertBefore(platzhalter, el);
+          return;
+        }
+      }
+      platzhalter.parentNode.appendChild(platzhalter);
+    }
+
+    document.querySelectorAll(opt.griff).forEach(g =>
+      g.addEventListener('pointerdown', beginn));
+  };
+
   function rufeAuf(el, name, ereignis) {
     const fn = window[name];
     if (typeof fn !== 'function') {

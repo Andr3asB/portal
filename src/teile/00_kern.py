@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS packlisten_eintraege (
   gepackt      INTEGER NOT NULL DEFAULT 0,
   gepackt_am   TEXT,
   erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
-  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL
+  erstellt_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  position     INTEGER NOT NULL DEFAULT 0   -- Wunsch #178: von Hand sortierbar
 );
 CREATE TABLE IF NOT EXISTS packlisten_nutzer_ziel (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -1675,6 +1676,24 @@ def _init_db(app):
             WHERE fester_wochentag IS NOT NULL AND feste_wochentage IS NULL
         """)
         db.commit()
+        # Wunsch #178: Packlisten-Eintraege von Hand sortierbar. Bestehende
+        # Eintraege bekommen einmalig eine Position in ihrer bisherigen
+        # (alphabetischen) Reihenfolge - sonst staenden nach dem Deploy alle
+        # auf 0 und die Liste erschiene willkuerlich umgeordnet.
+        try:
+            db.execute("ALTER TABLE packlisten_eintraege ADD COLUMN "
+                       "position INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+            zeilen = db.execute(
+                "SELECT id FROM packlisten_eintraege ORDER BY ziel_id, name COLLATE NOCASE"
+            ).fetchall()
+            for pos, zeile in enumerate(zeilen):
+                db.execute("UPDATE packlisten_eintraege SET position=? WHERE id=?",
+                           (pos, zeile[0]))
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
         db.executemany(
             "INSERT OR IGNORE INTO apps(slug,name,emoji,beschreibung) VALUES(?,?,?,?)",
             _CORE_APPS,
