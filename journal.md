@@ -2,6 +2,62 @@
 
 ---
 
+## 2026-08-09 – UX-Review aller Seiten: acht Vorschläge in der Werkstatt (#169–#176)
+
+Andis Auftrag: alle Seiten nach modernen UI/UX-Gesichtspunkten für iPhone und
+PC bewerten, Vorschläge in die Werkstatt, gemeinsame Durchsicht, dann Freigabe.
+
+**Eingetragen mit `prioritaet=NULL`** – der stündliche Durchlauf fasst sie
+damit nicht an, bis Andi sie freigibt. Genau dafür wurde die Freigabe-Logik
+gebaut. `user_id=NULL`, weil die Vorschläge von der KI stammen, nicht von
+einem Familienmitglied.
+
+### Methode – und eine Grenze, die dazugehört
+
+Das Chrome-Fenster war während des Reviews **minimiert**; Chrome liefert dann
+Viewport 0×0 und keine brauchbaren Layout-Maße. Statt darauf zu warten, lief
+das Review als statische Analyse aller 44 Vorlagen (CSS-Regeln, Formulare,
+fetch-Muster) plus der Live-Messungen aus den früheren Sitzungen desselben
+Tages (🗑️ 31×23 px, gekocht-Knopf usw. – damals bei sichtbarem Fenster
+gemessen). Ein visueller Durchgang auf echtem iPhone bleibt Andis Part bei
+der gemeinsamen Durchsicht – das ist ohnehin der Plan.
+
+Ein Verdacht hat sich dabei **nicht** bestätigt und wurde deshalb nicht
+eingetragen: Das 10-Sekunden-Polling der Einkaufsliste pausiert bereits bei
+verstecktem Tab (visibilitychange ist implementiert).
+
+### Die acht Vorschläge
+
+| # | Vorschlag | Betrifft |
+|---|---|---|
+| 169 | Tippziele auf 44 px (viele Knöpfe sind 17–33 px hoch) | iPhone |
+| 170 | Eingabefelder auf 16 px – iOS zoomt sonst beim Fokus (24 Klassen in 22 Vorlagen) | iPhone |
+| 171 | Kleine Umschalter ohne Seitensprung (gekocht?, ✓/Prio, Storno, Glocke machen vollen Redirect) | beide |
+| 172 | Dark Mode folgt prefers-color-scheme, Schalter bleibt als Override | beide |
+| 173 | Desktop: max-width statt voller Fensterbreite (.main hat keins) | PC |
+| 174 | :focus-visible-Ring; 21 Vorlagen setzen outline:none ersatzlos | PC |
+| 175 | aria-label für Icon-Knöpfe (3 aria-Attribute im ganzen Portal) | beide |
+| 176 | KI-Importe: Knopf deaktivieren + „Wird gelesen…" während der Wartezeit | beide |
+
+Auffällig: 169/170/174 sind dieselbe Sorte Befund wie #155 und #160 –
+**Konsistenzfragen, die entstehen, wenn jede Vorlage ihre eigenen Regeln
+mitbringt.** Die Vorschläge zielen deshalb jeweils auf EINE globale Regel in
+`base.html` plus Wächter-Test, nicht auf 44 Einzelkorrekturen.
+
+### Nebenbei: der leere-Datei-Fehler
+
+Der erste Einfüge-Versuch scheiterte an meinem eigenen Shell-Konstrukt
+(`cat > a || cat > b <<HEREDOC` – der Heredoc hing am **zweiten** cat, das
+erste wartete auf stdin und schrieb eine leere Datei). Die leere Datei lief
+dann kommentarlos als No-op durch. Der zweite Versuch prüft deshalb zuerst,
+ob schon UX-Wünsche da sind, und bricht sonst ab – nach dem Kassenbuch- und
+dem Sitzungs-Fund die Erinnerung in klein: **ein leeres Ergebnis ist kein
+Beleg, dass nichts zu tun war.**
+
+Kein Code geändert, keine Auslieferung – die Wünsche sind Daten.
+
+---
+
 ## 2026-08-09 – portal-v166: Wunsch #167 – feinere Schritte beim Umrechnen
 
 > „0,1 und 0,25 Schritte müssen irgendwie sinnvoll möglich sein."
