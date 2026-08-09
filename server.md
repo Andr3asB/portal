@@ -1475,6 +1475,20 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Werkstatt-Karte (Wunsch #182)
+
+`.wunsch-actions` steht in einer EIGENEN Zeile (`flex-basis:100%`), nicht als
+Spalte neben dem Text. Grund: Die Spalte hatte `flex-shrink:0` und gab keinen
+Platz her - mit dem 185px breiten Prio-Picker aus #180 blieben auf einem 375er
+iPhone rund 120px fuer den Wunschtext.
+
+`.wunsch-text` ist auf vier Zeilen gedeckelt (`-webkit-line-clamp`). Der
+Deckel faellt bei `.wunsch-card.offen` weg - sonst waere der Text auch
+aufgeklappt gekuerzt und das Aufklappen wirkungslos. Die Klasse `offen` traegt
+die KARTE und folgt dem Detail-Panel; laufen beide auseinander, bleibt der
+Text gekuerzt, ohne dass jemand den Grund sieht.
+`tests/test_werkstatt_ansicht.py` waechtert alles drei.
+
 ## Umsortieren per Ziehen (Wunsch #178)
 
 `window.ziehSortierung({griff, eintrag, platzhalter, idAus, speichern})` in

@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-08-09 – portal-v179: Wunsch #182 – Werkstatt-Karte neu aufgeteilt
+
+> „Die Ansicht sieht nach der Feldanpassung für Prio noch schräger aus als
+> davor. Mach die Ansicht neu."
+
+Wieder eine Folge meiner eigenen Änderung, und diesmal eine, die ich hätte
+kommen sehen müssen: `#180` machte den Prio-Picker breit genug für
+„Zurückgestellt" (185px). Er stand aber **neben** dem Wunschtext, in einer
+Spalte mit `flex-shrink:0` – also gab er keinen Platz her. Auf einem 375er
+iPhone blieben für den Wunsch selbst rund 120px.
+
+Ich habe bei #180 die Breite korrigiert und nicht gefragt, **wohin** diese
+Breite geht. Der Wächter dort prüft seither, dass der Picker breit genug ist –
+er sagt nichts darüber, ob daneben noch etwas Platz hat.
+
+### Zwei Änderungen, kein Breakpoint
+
+**Aktionen in eine eigene Zeile** (`flex-basis:100%`). Die Karte ist ohnehin
+`flex-wrap`, es braucht also keine Medienabfrage: Der Text bekommt die volle
+Breite, die Aktionen sitzen rechtsbündig darunter. Auf dem PC sieht das
+genauso ordentlich aus.
+
+**Vier Zeilen Vorschau** per `line-clamp`. Lange Wünsche – wie dieser hier –
+füllten sonst die halbe Liste. Der vollständige Text steht in der
+Detailansicht, die beim Antippen ohnehin aufklappt.
+
+Der Deckel muss beim Aufklappen **weg**, sonst stünde der Text auch dort
+gekürzt und das Aufklappen brächte nichts. Dafür trägt jetzt die Karte selbst
+die Klasse `offen`, nicht nur das Detail-Panel – und ein Test verlangt, dass
+beide Zustände synchron laufen statt unabhängig umzuschalten.
+
+Dazu ein sichtbarer Pfeil in der Kopfzeile. Dass die Karte aufklappt, musste
+man vorher raten.
+
+### Was ich nicht messen konnte
+
+Das Chrome-Fenster ist weiterhin minimiert, Chrome legt dann kein Layout an –
+Breiten und Höhen sind nicht prüfbar. Verifiziert ist, was ohne Layout geht:
+Pfeil vorhanden, Aktionen stehen im DOM hinter dem Text, Karte und Panel
+schalten synchron auf und zu. Die eigentliche Probe ist dein iPhone.
+
+6 neue Tests, 880 grün.
+
+---
+
 ## 2026-08-09 – portal-v178: Wunsch #181 – mein Fehler von gestern in der Packliste
 
 > „Es gibt einen Fehler, wenn man einen Eintrag ans Ende der liste verschieben

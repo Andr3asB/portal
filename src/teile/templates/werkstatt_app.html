@@ -31,7 +31,21 @@
 }
 .wunsch-text {
   font-size:14px; color:var(--text); word-break:break-word; line-height:1.5;
+  /* Wunsch #182: Lange Wuensche fuellten die halbe Liste. Vier Zeilen als
+     Vorschau; der vollstaendige Text steht in der Detailansicht, die beim
+     Antippen der Karte ohnehin aufklappt. */
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4;
+  overflow:hidden;
 }
+/* Aufgeklappt: Deckel weg - sonst stuende der Text zweimal gekuerzt da. */
+.wunsch-card.offen .wunsch-text {
+  display:block; overflow:visible;
+}
+.wunsch-pfeil {
+  color:var(--text-2); font-size:13px; flex-shrink:0;
+  transition:transform .15s; display:inline-block;
+}
+.wunsch-card.offen .wunsch-pfeil { transform:rotate(90deg); }
 .wunsch-text.secondary { font-size:13px; color:var(--text-2); margin-top:2px; }
 .wunsch-meta {
   font-size:12px; color:var(--text-2); margin-top:6px;
@@ -41,8 +55,14 @@
   display:inline-block; padding:2px 8px; border-radius:10px;
   font-size:11px; font-weight:600; color:#fff; background:#8e8e93;
 }
+/* Wunsch #182: Die Aktionen standen NEBEN dem Text und schrumpften nicht
+   (flex-shrink:0). Seit der Prio-Picker breit genug fuer "Zurueckgestellt"
+   ist (#180), blieb auf dem iPhone kaum Platz fuer den Wunsch selbst - die
+   Karte sah schraeg aus. Jetzt eine eigene Zeile darunter: kein Breakpoint
+   noetig, die Karte bricht ohnehin um (flex-wrap). */
 .wunsch-actions {
-  display:flex; flex-direction:column; gap:4px; flex-shrink:0; align-items:flex-end;
+  display:flex; flex-direction:row; gap:6px; align-items:center;
+  flex-basis:100%; justify-content:flex-end; flex-wrap:wrap;
 }
 .btn-done {
   background:none; border:1.5px solid #34c759; color:#34c759;
@@ -276,6 +296,9 @@
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">
+      {# Wunsch #182: sichtbares Zeichen, dass die Karte aufklappt - vorher
+         musste man es erraten. #}
+      <span class="wunsch-pfeil">›</span>
       <span class="wunsch-id">#{{ w.id }}</span>
       {% if w.prioritaet %}
       <span class="prio-badge" style="background:{{ PRIO_COLORS[w.prioritaet] }}">
@@ -331,6 +354,9 @@
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">
   <div class="wunsch-body" data-klick="toggleWunschDetail" data-args='[{{ w.id }}]'>
     <div class="wunsch-top">
+      {# Wunsch #182: sichtbares Zeichen, dass die Karte aufklappt - vorher
+         musste man es erraten. #}
+      <span class="wunsch-pfeil">›</span>
       <span class="wunsch-id">#{{ w.id }}</span>
     </div>
     {% if w.titel %}
@@ -373,7 +399,13 @@
 // Buttons (Prio, Erledigt, Löschen) liegen als Geschwister außerhalb von
 // .wunsch-body, ihre Klicks lösen den Toggle deshalb nie versehentlich mit aus.
 function toggleWunschDetail(id) {
-  document.getElementById('wunsch-detail-' + id)?.classList.toggle('open');
+  const detail = document.getElementById('wunsch-detail-' + id);
+  if (!detail) return;
+  detail.classList.toggle('open');
+  // Wunsch #182: Die Karte merkt sich den Zustand - daran haengen der
+  // Vier-Zeilen-Deckel und die Drehung des Pfeils.
+  document.getElementById('wunsch-' + id)
+    ?.classList.toggle('offen', detail.classList.contains('open'));
 }
 
 // --- Wunsch #141: Filter -------------------------------------------------
