@@ -62,3 +62,61 @@ def test_keine_vorlage_ersetzt_die_trefferflaeche(datei):
         f"aus base.html. Anderes Pseudo-Element nehmen oder die Flaeche im "
         f"eigenen ::before mit uebernehmen (siehe Wunsch #169)."
     )
+
+
+# --- Wunsch #170/#173/#174: die uebrigen globalen Regeln -------------------
+
+def test_eingabefelder_haben_16px_untergrenze():
+    """iOS zoomt beim Fokus in Felder unter 16px hinein. `max(16px, 1em)`
+    laesst groessere Schrift unberuehrt – ohne das haetten alle Felder
+    portalweit exakt dieselbe Groesse, auch die absichtlich grossen."""
+    glatt = " ".join(BASE.split())
+    assert "input, select, textarea { font-size: max(16px, 1em); }" in glatt
+
+
+@pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)
+def test_keine_vorlage_setzt_schrift_unter_16px_auf_felder(datei):
+    """Eine Vorlagenregel kaeme NACH base.html und gewaenne. Genau so ist der
+    Zustand entstanden, den #170 behebt."""
+    # base.html ist NICHT ausgenommen: seine eigene .wunsch-prio-select stand
+    # auf 15px und schlug die globale Regel genauso wie jede Vorlage
+    # (Klassenselektor gewinnt gegen Element-Selektor). Die globale Regel
+    # selbst nutzt `max(16px, 1em)` und wird vom Muster nicht erfasst.
+    inhalt = datei.read_text(encoding="utf-8")
+    for m in re.finditer(r"\.([\w-]*(?:input|select|textarea|feld)[\w-]*)\s*(?:,[^{]*)?\{([^}]*)\}",
+                         inhalt, re.I):
+        fs = re.search(r"font-size:\s*(\d+)px", m.group(2))
+        assert not (fs and int(fs.group(1)) < 16), (
+            f"{datei.name}: .{m.group(1)} setzt {fs.group(1)}px – "
+            f"iOS zoomt dann beim Antippen hinein (Wunsch #170)."
+        )
+
+
+def test_inhalt_hat_eine_lesebreite():
+    """Ohne max-width laufen Zeilen auf breiten Monitoren ueber die ganze
+    Fensterbreite."""
+    glatt = " ".join(BASE.split())
+    assert "max-width: 720px" in glatt and "margin: 0 auto" in glatt
+
+
+def test_fokus_ring_nur_fuer_tastatur():
+    """Beide Haelften sind noetig: der Ring fuer :focus-visible UND das
+    ausdrueckliche Abschalten fuer Mausklicks – sonst saehen Maus-Nutzer
+    ploetzlich ueberall Rahmen, wo vorher keine waren."""
+    glatt = " ".join(BASE.split())
+    assert ":focus:not(:focus-visible) { outline: none; }" in glatt
+    assert ":focus-visible {" in glatt
+    assert "outline: 2px solid var(--farbe)" in glatt
+
+
+@pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)
+def test_keine_vorlage_erschlaegt_den_fokus_ring(datei):
+    """`outline:none` in einer Vorlage kaeme nach base.html und wuerde den
+    Ring wieder abschalten – 21 Vorlagen taten das vor #174."""
+    inhalt = datei.read_text(encoding="utf-8")
+    if datei.name == "base.html":
+        return
+    assert "outline:none" not in inhalt.replace(" ", ""), (
+        f"{datei.name} setzt outline:none – das erschlaegt den Fokus-Ring aus "
+        f"base.html (Wunsch #174). Der Ring gilt ohnehin nur fuer Tastatur."
+    )

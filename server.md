@@ -1475,6 +1475,29 @@ nicht per `ON DELETE CASCADE` am Nutzer.
 das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
 Fehlerrichtung ist die richtige, die alte war es nicht.
 
+## Globale UI-Regeln in base.html (verpflichtend)
+
+Vier Regeln gelten portalweit und duerfen von keiner Vorlage ueberschrieben
+werden. `tests/test_tippflaeche.py` waechtert alle vier:
+
+| Regel | Wunsch | Warum |
+|---|---|---|
+| `button::before` >= 44x44px | #169 | Tippziele waren 17-33px hoch |
+| `input,select,textarea { font-size: max(16px,1em) }` | #170 | iOS zoomt unter 16px beim Fokus hinein |
+| `.main { max-width:720px; margin:0 auto }` | #173 | Zeilen liefen ueber die ganze Monitorbreite |
+| `:focus-visible` Ring + `:focus:not(:focus-visible){outline:none}` | #174 | Tastaturnutzer sahen nicht, wo sie stehen |
+
+**Achtung Spezifitaet:** Die Schriftregel ist ein ELEMENT-Selektor (0,0,1).
+Jede Klassenregel (`.add-input`, 0,1,0) schlaegt sie, unabhaengig von der
+Reihenfolge - deshalb ist sie nur eine Untergrenze fuer klassenlose Felder,
+und die Vorlagenwerte wurden zusaetzlich auf 16px angehoben. Der Waechter
+prueft die Vorlagen deshalb einzeln, `base.html` eingeschlossen (dessen
+eigene `.wunsch-prio-select` stand auf 15px).
+
+Die zweite Haelfte der Fokus-Regel ist kein Beiwerk: Sie stellt den alten
+Zustand fuer MAUSklicks wieder her. Ohne sie saehen Maus-Nutzer ueberall neue
+Rahmen.
+
 ## Tippfläche (verpflichtend, seit Wunsch #169)
 
 Jeder `button` bekommt in `base.html` per `button::before` eine unsichtbare,

@@ -2,6 +2,60 @@
 
 ---
 
+## 2026-08-09 – portal-v168: Wünsche #170, #173, #174 – drei globale Regeln
+
+Alle drei sind dieselbe Bauart wie #169: **eine Regel in `base.html` statt 44
+Einzelkorrekturen.** Getrennt auszuliefern wäre dreimal derselbe Weg gewesen.
+
+| Wunsch | Regel |
+|---|---|
+| #170 | `input, select, textarea { font-size: max(16px, 1em) }` |
+| #173 | `.main { max-width: 720px; margin: 0 auto }` |
+| #174 | `:focus-visible` Ring + `:focus:not(:focus-visible) { outline: none }` |
+
+### Der Wächter fand sofort, dass meine erste Lösung nicht wirkt
+
+`input, select, textarea { … }` ist ein **Element**-Selektor (Spezifität
+0,0,1). `.add-input { font-size: 15px }` ist ein **Klassen**-Selektor
+(0,1,0) – und Klassen schlagen Elemente, **unabhängig von der Reihenfolge**.
+Die globale Regel hätte also keinen einzigen der 24 Fälle erreicht, die sie
+beheben sollte.
+
+Ohne den Test wäre das durchgegangen: Die Regel steht sichtbar im Quelltext,
+sie sieht richtig aus, und der Beweis des Gegenteils wäre ein iPhone gewesen,
+das weiterhin zoomt – das hätte niemand mir zugeordnet.
+
+Behoben, indem die 23 Werte in 20 Vorlagen auf 16px angehoben wurden; die
+globale Regel bleibt als Untergrenze für alles, was keine eigene Klasse hat.
+`max(16px, 1em)` statt `16px`, damit absichtlich größere Felder groß bleiben.
+
+**Und `base.html` war selbst betroffen:** `.wunsch-prio-select` stand auf
+15px. Mein Wächter nahm base.html anfangs aus – die Datei mit der Regel schien
+über jeden Verdacht erhaben. Sie ist es nicht: Ein Klassenselektor gewinnt
+auch dort. Die Ausnahme ist entfernt, der Wert korrigiert.
+
+### #174: Warum die zweite Hälfte der Regel wichtig ist
+
+`:focus-visible` allein hätte gereicht, um den Ring zu bekommen. Die Zeile
+`:focus:not(:focus-visible) { outline: none }` stellt ausdrücklich den
+**bisherigen Zustand für Mausklicks** wieder her – ohne sie sähen alle, die
+mit der Maus in ein Feld klicken, plötzlich überall Rahmen, wo vorher keine
+waren. Die 24 `outline:none` aus 21 Vorlagen sind entfernt, weil sie den
+Ring sonst überschrieben hätten.
+
+### #173: bewusst nur Schritt 1
+
+720px zentriert, sonst nichts. Der zweite Teil des Vorschlags (Essensplan mit
+zwei Wochen nebeneinander, Rezepte als Raster) ist ein eigener Umbau je Seite
+und gehört nicht in eine Zeile CSS.
+
+Live bestätigt: alle vier Regeln kommen in den ausgelieferten Seiten an.
+Die Wirkungsmessung im Browser steht weiterhin aus (Fenster minimiert).
+
+5 neue Wächter (davon 2 je Vorlage), 646 Tests grün.
+
+---
+
 ## 2026-08-09 – portal-v167: Wunsch #169 – Tippziele auf Fingergröße
 
 Erster freigegebener Wunsch aus dem UX-Review. Andi hat sechs der acht

@@ -148,6 +148,11 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
   immer zur persönlichen Startseite und ist kein Ersatz dafür – keine
   Sackgassen.
+- **Vier globale Regeln in `base.html`** (Tippfläche #169, Feldschrift ≥16px
+  #170, `.main` max-width 720px #173, `:focus-visible`-Ring #174) – keine
+  Vorlage darf sie überschreiben, `tests/test_tippflaeche.py` wächtert alle
+  vier. Merke zur Spezifität: eine Klassenregel in einer Vorlage schlägt die
+  globale Element-Regel immer, unabhängig von der Reihenfolge.
 - **Tippfläche:** jeder `button` hat via `base.html` mindestens 44×44 px
   unsichtbare Trefferfläche (Wunsch #169). Nie ein eigenes
   `button::before`/`::after` in einer Vorlage definieren –

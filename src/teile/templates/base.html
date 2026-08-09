@@ -118,7 +118,31 @@
       padding: 6px calc(12px + var(--sr)) 6px calc(12px + var(--sl));
     }
 
-    .main { padding: 16px; }
+    /* Wunsch #173: Auf breiten Monitoren lief der Inhalt ueber die GESAMTE
+       Fensterbreite - Listenzeilen wurden unlesbar lang, Formulare wirkten
+       verloren. 720px ist die uebliche Lesebreite; auf dem Handy aendert sich
+       nichts, dort ist das Fenster ohnehin schmaler. */
+    .main { padding: 16px; max-width: 720px; margin: 0 auto; }
+
+    /* Wunsch #170: iOS zoomt beim Antippen eines Eingabefeldes automatisch in
+       die Seite hinein, wenn dessen Schrift kleiner als 16px ist - die
+       Ansicht springt und bleibt danach oft gezoomt stehen. 24 Feld-Klassen
+       in 22 Vorlagen lagen bei 12-15px. Statt sie einzeln zu korrigieren
+       (und beim naechsten Formular wieder zu vergessen) hier eine Untergrenze
+       fuer alle. `max()` laesst groessere Schrift unberuehrt. */
+    input, select, textarea { font-size: max(16px, 1em); }
+
+    /* Wunsch #174: Wer am PC mit Tab durch eine Seite geht, sah nicht, wo er
+       steht - 21 Vorlagen setzten `outline:none` ersatzlos. `:focus-visible`
+       greift NUR bei Tastaturbedienung; wer mit der Maus klickt, sieht
+       weiterhin nichts. Deshalb bleibt die erste Regel: sie stellt den alten
+       Zustand fuer Mausklicks ausdruecklich wieder her. */
+    :focus:not(:focus-visible) { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--farbe);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
 
     /* Hamburger-Menü */
     .menu-overlay {
@@ -200,7 +224,7 @@
     }
     .wunsch-prio-select {
       width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
-      padding: 9px 11px; font-size: 15px; font-family: inherit;
+      padding: 9px 11px; font-size: 16px; font-family: inherit;
       background: var(--surface); color: var(--text);
     }
     .btn {
