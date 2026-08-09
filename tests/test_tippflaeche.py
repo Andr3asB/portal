@@ -120,3 +120,39 @@ def test_keine_vorlage_erschlaegt_den_fokus_ring(datei):
         f"{datei.name} setzt outline:none – das erschlaegt den Fokus-Ring aus "
         f"base.html (Wunsch #174). Der Ring gilt ohnehin nur fuer Tastatur."
     )
+
+
+# --- Wunsch #180: der Prio-Picker muss sein laengstes Wort fassen ---------
+
+def test_prio_picker_passt_zur_schriftgroesse():
+    """Folgefehler aus #170: Die Breite von 100px stammte aus der Zeit mit
+    12px-Schrift. Nach der Anhebung auf 16px passte „Zurückgestellt" nicht
+    mehr hinein.
+
+    Der Test bindet die Breite an die laengste Beschriftung – wer die Schrift
+    erneut vergroessert oder eine laengere Priorität einführt, muss auch hier
+    vorbeikommen."""
+    inhalt = (TPL / "werkstatt_app.html").read_text(encoding="utf-8")
+    regel = inhalt[inhalt.index(".prio-select {"):]
+    regel = regel[:regel.index("}")]
+    glatt = " ".join(regel.split())
+
+    schrift = int(re.search(r"font-size:\s*(\d+)px", glatt).group(1))
+    breite  = int(re.search(r"width:\s*(\d+)px", glatt).group(1))
+
+    laengste = max(re.findall(r">([A-Za-zÄÖÜäöüß ]+)</option>", inhalt), key=len)
+    # Grobe Abschaetzung: fette Proportionalschrift ~0,62em je Zeichen,
+    # dazu Innenabstand und Aufklapp-Pfeil.
+    noetig = len(laengste) * schrift * 0.62 + 40
+    assert breite >= noetig, (
+        f".prio-select ist {breite}px breit, braucht aber ~{noetig:.0f}px fuer "
+        f"{laengste!r} bei {schrift}px Schrift (Wunsch #180)."
+    )
+
+
+def test_prio_picker_laeuft_nicht_ueber_die_karte():
+    """Feste Breite ohne Deckel wuerde auf schmalen Geraeten den Wunschtext
+    aus der Karte druecken."""
+    inhalt = (TPL / "werkstatt_app.html").read_text(encoding="utf-8")
+    regel = inhalt[inhalt.index(".prio-select {"):]
+    assert "max-width:100%" in " ".join(regel[:regel.index("}")].split()).replace(" ", "")

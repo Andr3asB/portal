@@ -79,7 +79,12 @@
 1 Dose Tomaten">{{ vorbelegt.zutaten|join('\n') if vorbelegt else '' }}</textarea>
 
       <div class="field-label">Zubereitung (ein Schritt pro Zeile)</div>
-      <textarea class="rezept-textarea" name="anleitung" rows="5"
+      {# Wunsch #179: 5 Zeilen zeigten nur zwei bis drei Schritte gleichzeitig -
+         beim Tippen einer Anleitung verliert man so den Zusammenhang. 14 Zeilen
+         entsprechen etwa einem halben Handybildschirm; groesser waere auf dem
+         Telefon unhandlich, und `resize:vertical` (schon vorhanden) laesst am
+         PC ohnehin jede Groesse zu. #}
+      <textarea class="rezept-textarea" name="anleitung" rows="14"
                 placeholder="Schritt für Schritt, wie es gemacht wird…">{{ vorbelegt.schritte|join('\n') if vorbelegt else '' }}</textarea>
 
       <button class="btn-add" type="submit">{% if bearbeiten %}Änderungen speichern{% else %}+ Rezept speichern{% endif %}</button>

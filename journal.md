@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-08-09 – portal-v177: Wünsche #179 und #180 – zwei kleine, einer davon meiner
+
+### #180: ein Folgefehler meiner eigenen Änderung
+
+> „Der Picker für die Prio ist jetzt mit der Großen schriftart zu schmal.
+> ‚Zurückgestellt' wird nicht mehr sauber dargestellt (am PC)."
+
+Genau richtig beobachtet, und die Ursache steht ein paar Stunden vorher in
+diesem Journal: `#170` hob die Schrift aller Eingabefelder auf 16px, damit iOS
+beim Antippen nicht hineinzoomt. Der Prio-Picker stand bei 12px und hatte ein
+`max-width:100px` – bemessen für 12px. Ich habe die Schrift angehoben und die
+Breite nicht mitgedacht.
+
+Das ist die unangenehme Sorte Fehler: Er entsteht nicht dort, wo man arbeitet,
+sondern eine Datei weiter. Und aufgefallen ist er nicht mir, sondern Andi.
+
+**Der Test bindet die Breite jetzt an die längste Beschriftung**, nicht an
+eine Zahl: Er misst die Schriftgröße aus der Regel, sucht die längste
+Option aus dem Markup und rechnet nach. Wer die Schrift erneut vergrößert
+oder eine längere Priorität einführt, kommt hier zwangsläufig vorbei.
+
+Bei der ersten Rechnung sagte er mir: 170px reichen nicht, es braucht 179.
+Mein Augenmaß hatte 170 geschätzt. Ich bin der Rechnung gefolgt – 185px.
+
+### #179: Zubereitungsfeld
+
+5 Zeilen zeigten zwei bis drei Schritte gleichzeitig; beim Tippen einer
+Anleitung verliert man so den Zusammenhang. Jetzt 14 – etwa ein halber
+Handybildschirm. Größer wäre auf dem Telefon unhandlich, und `resize:vertical`
+war ohnehin schon gesetzt, am PC lässt sich also weiterhin jede Größe
+einstellen.
+
+870 Tests grün.
+
+---
+
 ## 2026-08-09 – portal-v175: Wunsch #178 – Packliste filtern und umsortieren
 
 Zwei Teile, die nur die Liste gemeinsam haben.

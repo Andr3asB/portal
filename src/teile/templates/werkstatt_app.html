@@ -58,7 +58,16 @@
   border:1.5px solid var(--border); border-radius:8px;
   padding:4px 6px; font-size:16px; font-weight:600;
   background:var(--surface-2); color:var(--text);
-  cursor:pointer; max-width:100px;
+  cursor:pointer;
+  /* Wunsch #180: Die 100px stammten aus der Zeit mit 12px-Schrift. Seit
+     Wunsch #170 (mind. 16px, sonst zoomt iOS beim Antippen hinein) passte
+     "Zurueckgestellt" nicht mehr hinein - meine eigene Aenderung, an einer
+     Stelle, die ich nicht mitgedacht habe. 170px reichen fuer das laengste
+     Wort; `max-width:100%` verhindert, dass der Picker auf schmalen Geraeten
+     ueber die Karte hinauslaeuft (.wunsch-body hat min-width:0 und gibt
+     dafuer nach). 185px statt der zunaechst geschaetzten 170 - die Rechnung
+     im Test war strenger als mein Augenmass. */
+  width:185px; max-width:100%;
 }
 .section-label {
   font-size:12px; font-weight:700; color:var(--text-2);
