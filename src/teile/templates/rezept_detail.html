@@ -29,6 +29,14 @@
 .portionen-mitte { display:flex; align-items:baseline; gap:5px; }
 .portionen-zahl { font-size:19px; font-weight:700; }
 .portionen-text { font-size:13px; color:var(--text-2); }
+.portionen-schritte { display:flex; align-items:center; gap:5px; flex-basis:100%; }
+.portionen-schritt-label { font-size:11px; color:var(--text-2); margin-right:2px; }
+.portionen-schritt {
+  border:1px solid var(--border); background:none; color:var(--text-2);
+  border-radius:8px; padding:3px 9px; font-size:12px; font-weight:600;
+  cursor:pointer; font-family:inherit;
+}
+.portionen-schritt.aktiv { border-color:var(--farbe); color:var(--farbe); }
 .portionen-zurueck {
   background:none; border:none; color:var(--text-2); font-size:12px;
   text-decoration:underline; cursor:pointer; padding:2px 0; font-family:inherit;
@@ -182,6 +190,17 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
       <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[1]' title="Mehr">+</button>
       <button class="portionen-zurueck" type="button" id="portionen-zurueck"
               data-klick="portionenZuruecksetzen" style="display:none">zurück auf <span id="portionen-basis"></span></button>
+      {# Wunsch #167: wählbare Schrittweite statt sechs Knöpfen – auf dem Handy
+         wäre eine Reihe aus −0,25 −0,1 +0,1 +0,25 zu voll. #}
+      <div class="portionen-schritte" id="portionen-schritte">
+        <span class="portionen-schritt-label">Schritt</span>
+        <button type="button" class="portionen-schritt aktiv" data-schritt="1"
+                data-klick="portionenSchrittWaehlen" data-args='[1]'>1</button>
+        <button type="button" class="portionen-schritt" data-schritt="0.25"
+                data-klick="portionenSchrittWaehlen" data-args='[0.25]'>0,25</button>
+        <button type="button" class="portionen-schritt" data-schritt="0.1"
+                data-klick="portionenSchrittWaehlen" data-args='[0.1]'>0,1</button>
+      </div>
     </div>
     {% for z in zutaten %}
     {# Wunsch #164: Der Originaltext bleibt im data-Attribut stehen, damit das
@@ -245,6 +264,7 @@ const TP    = {{ tp|tojson }};
  */
 var PORTIONEN_BASIS = null;   /* aus der Rezeptangabe gelesen */
 var PORTIONEN_AKTUELL = null;
+var PORTIONEN_SCHRITT = 1;    /* Wunsch #167: 1 | 0.25 | 0.1 */
 
 function portionenZahlLesen(text) {
   /* "4" -> 4, "8-10" -> 8, "ca. 6 Stueck" -> 6, "" -> null.
@@ -284,11 +304,24 @@ function portionenAnzeigen() {
     (faktor === 1) ? 'none' : '';
 }
 
-function portionenAendern(schritt) {
-  var neu = PORTIONEN_AKTUELL + schritt;
-  if (neu < 1 || neu > 99) return;        /* 0 Portionen ergibt keinen Sinn */
+function portionenAendern(richtung) {
+  /* Wunsch #167: `richtung` ist nur noch +1 oder -1, die Groesse steckt in
+     PORTIONEN_SCHRITT. Gerundet wird nach JEDEM Schritt, sonst summiert sich
+     die Ungenauigkeit von Fliesskommazahlen sichtbar auf:
+     4 + 0.1 + 0.1 ergibt in Javascript 4.200000000000001. */
+  var neu = Math.round((PORTIONEN_AKTUELL + richtung * PORTIONEN_SCHRITT) * 100) / 100;
+  /* Untergrenze ist die Schrittweite selbst: Bei 0,1er-Schritten sind 0,5
+     Portionen sinnvoll (halber Kuchen), bei ganzen Schritten waere 0 unsinnig. */
+  if (neu < PORTIONEN_SCHRITT || neu > 99) return;
   PORTIONEN_AKTUELL = neu;
   portionenAnzeigen();
+}
+
+function portionenSchrittWaehlen(groesse, knopf) {
+  PORTIONEN_SCHRITT = groesse;
+  document.querySelectorAll('.portionen-schritt').forEach(function (b) {
+    b.classList.toggle('aktiv', b === knopf);
+  });
 }
 
 function portionenZuruecksetzen() {

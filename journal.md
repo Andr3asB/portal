@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-08-09 – portal-v166: Wunsch #167 – feinere Schritte beim Umrechnen
+
+> „0,1 und 0,25 Schritte müssen irgendwie sinnvoll möglich sein."
+
+Nachschlag zu #164. Der Wunsch nennt zwei ganz verschiedene Anlässe: ein Kind
+isst mit (halbe Portion), und der Rührkuchen soll in eine etwas grössere Form
+(Faktor 1,25 statt 2). Beides braucht dieselbe Fähigkeit.
+
+### Schrittweite wählen statt sechs Knöpfe
+
+Naheliegend wäre eine Reihe aus −0,25 −0,1 +0,1 +0,25 gewesen. Zusammen mit
+den vorhandenen ± wären das sechs Knöpfe nebeneinander – auf einem Handy zu
+voll, und man muss jedesmal den richtigen treffen. Stattdessen bleiben die
+zwei grossen ± und darunter steht die Schrittweite: **1 · 0,25 · 0,1**.
+
+### Der Fliesskomma-Test war der eigentliche Punkt
+
+`4 + 0.1 + 0.1` ergibt in Javascript `4.200000000000001`. Ohne Gegenmassnahme
+stünde nach ein paar Klicks eine solche Zahl auf dem Bildschirm – und weil
+sie *fast* richtig ist, würde man es beim flüchtigen Hinsehen übersehen.
+
+Deshalb wird nach **jedem** Schritt gerundet, nicht erst bei der Anzeige.
+Live geprüft: zehn 0,1er-Schritte ab 4 ergeben exakt `5`, nicht
+`5,000000000000001`.
+
+### Untergrenze hängt an der Schrittweite
+
+Bei ganzen Schritten ist 1 das Minimum – 0 Portionen ergeben keinen Sinn. Bei
+0,1er-Schritten sind 0,5 Portionen aber durchaus sinnvoll (ein halber Kuchen),
+also ist dort die Schrittweite selbst die Grenze. Eine feste Untergrenze von 1
+hätte die feinen Schritte nach unten gerade dort blockiert, wo sie gebraucht
+werden.
+
+### Live an beiden genannten Fällen
+
+| Fall | Rezept | Ergebnis |
+|---|---|---|
+| Kind isst mit | Gnocchi-Pfanne, 4 → 4,5 | Lauch 2 → 2,25 Stangen |
+| grössere Form | Rührkuchen, 1 → 1,25 | 500 g → 625 g Butter, 8 → 10 Eier |
+
+Zurücksetzen liefert in beiden Fällen exakt die Originalwerte.
+
+506 Tests grün (unverändert – die Änderung ist reines Frontend, geprüft im
+Browser).
+
+---
+
 ## 2026-08-09 – portal-v165: Wunsch #165 – „wann gab es das zuletzt?"
 
 > „Unterhalb der Bewertung soll ein Bereich aufklappbar sein, in dem dann die
