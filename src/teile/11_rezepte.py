@@ -815,14 +815,32 @@ def loeschen(token, rid):
 @bp.route("/a/rezepte/zutat/<int:zid>/einkaufen", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/rezepte/<token>/zutat/<int:zid>/einkaufen", methods=["POST"])
 def zutat_einkaufen(token, zid):
+    """Eine Zutat auf die Einkaufsliste setzen.
+
+    Wunsch #164: Wurde die Portionszahl auf der Rezeptseite umgestellt, schickt
+    das Frontend die UMGERECHNETE Zeile als `text` mit. Ohne das landete
+    stillschweigend die Originalmenge auf der Liste - man sieht "750 g Mehl"
+    und bekommt "500 g Mehl", und zwar ohne jeden Hinweis.
+
+    Der mitgeschickte Text wird bewusst nur als ANZEIGETEXT uebernommen und
+    nicht ausgewertet; die strukturierte Zerlegung in Menge/Einheit/Name ist
+    Wunsch #51 und bleibt zurueckgestellt.
+    """
     user  = _user(token)
     db    = get_db()
     zutat = db.execute("SELECT name FROM rezept_zutaten WHERE id=?", (zid,)).fetchone()
     if not zutat:
         abort(404)
+
+    daten = request.get_json(silent=True) or {}
+    text  = (daten.get("text") or "").strip()[:200]
+    # Leerer oder fehlender Text -> Originalzeile. So funktioniert der Knopf
+    # auch dann noch, wenn das Javascript nichts mitschickt (alte PWA im Cache).
+    name = text or zutat["name"]
+
     db.execute(
         "INSERT INTO einkauf_eintraege(name, kategorie, erstellt_von) VALUES(?,?,?)",
-        (zutat["name"], "Sonstiges", user["id"]),
+        (name, "Sonstiges", user["id"]),
     )
     db.commit()
     return jsonify(ok=True)

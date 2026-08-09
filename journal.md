@@ -2,6 +2,74 @@
 
 ---
 
+## 2026-08-09 – portal-v164: Wunsch #164 – Portionen umrechnen
+
+> „Die Portionen sollen anpassbar sein, da man manchmal ein Rezept für 4 hat,
+> aber 5, 3 oder 10 Portionen braucht."
+
+### Abgrenzung zu einem zurückgestellten Wunsch
+
+Naheliegend wäre gewesen, dafür die Zutaten strukturiert in Menge / Einheit /
+Name zu zerlegen. Genau das ist aber **Wunsch #51 – und der ist
+`zurueckgestellt`.** Also nicht angefasst: Hier wird nichts gespeichert und
+nichts geparst, was über die erste Zahl einer Zeile hinausgeht. Der Regler
+ändert die Anzeige, das Rezept behält seine Originalangabe.
+
+### Erst den echten Bestand ansehen
+
+Statt einen Parser für alle denkbaren Schreibweisen zu bauen, habe ich die 56
+vorhandenen Zutaten ausgezählt:
+
+| Form | Anzahl |
+|---|---|
+| führende Ganzzahl („500 ml Milch") | 45 |
+| Kommazahl („0,5 Zitrone") | 1 |
+| ohne Zahl („Pfeffer") | 10 |
+| Brüche, Bereiche, Punktzahlen | **0** |
+
+Damit deckt ein sehr einfacher Ausdruck den kompletten Bestand ab, und Zeilen
+ohne Zahl bleiben unverändert – was richtig ist, „Salz" skaliert man nach
+Geschmack.
+
+Auch `portionen` ist Freitext: `'4'`, `'8-10'`, `'12'`, `NULL`. Gelesen wird
+die erste Zahl; ohne Zahl erscheint der Regler **gar nicht**. Ein Regler, der
+nichts bewirkt, wäre schlimmer als keiner.
+
+### Der Fund, der den Wunsch erst richtig macht
+
+Der 🛒-Knopf setzt eine Zutat auf die Einkaufsliste – und der Server nahm
+dafür immer den **gespeicherten** Text. Hätte ich nur die Anzeige skaliert,
+sähe man „750 g Mehl" und bekäme „500 g Mehl" auf die Liste. Ohne Hinweis,
+ohne Fehlermeldung, und man merkt es erst im Laden.
+
+Das Frontend schickt deshalb die angezeigte Zeile mit; fehlt sie (alte PWA im
+Cache), gilt weiter die Originalmenge. Der Text wird nur als Anzeigetext
+übernommen und **nicht ausgewertet** – auch hier bleibt #51 unberührt.
+
+Gegengeprobt durch Ignorieren des mitgeschickten Textes: zwei Tests fallen.
+
+### Live an einem echten Rezept
+
+Gnocchi-Pfanne, Basis 4 Portionen:
+
+| | Lauch | Champignons | Rapsöl | Gnocchi |
+|---|---|---|---|---|
+| 4 (Original) | 2 Stangen | 400 g | 7 EL | 1 kg |
+| 6 | 3 | 600 g | 10,5 EL | 1,5 kg |
+| 3 | 1,5 | 300 g | 5,25 EL | 0,75 kg |
+| zurück | 2 | 400 g | 7 EL | 1 kg |
+
+Kein Drift über mehrere Schritte: Gerechnet wird immer aus `data-original`,
+nie aus dem zuletzt angezeigten Wert. Sonst summierten sich Rundungsfehler
+über jeden Klick auf.
+
+Krumme Ergebnisse bleiben krumm (4,5 Eier). Das Portal rechnet ehrlich; runden
+soll der Mensch – das steht so auch in der Hilfe.
+
+9 neue Tests, 500 grün.
+
+---
+
 ## 2026-08-09 – portal-v163: Wunsch #163 – vom Plan direkt ins Rezept
 
 > „Ist ein Rezept aus der DB ausgewählt, dann soll man auch direkt dorthin

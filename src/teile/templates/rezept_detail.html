@@ -16,6 +16,24 @@
   padding:8px 0; border-bottom:1px solid var(--surface-2);
 }
 .zutat-row:last-child { border-bottom:none; }
+/* Wunsch #164: Portionswähler */
+.portionen-wahl {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);
+}
+.portionen-btn {
+  width:34px; height:34px; border:1.5px solid var(--farbe); background:none;
+  color:var(--farbe); border-radius:10px; font-size:18px; font-weight:700;
+  cursor:pointer; line-height:1; flex-shrink:0;
+}
+.portionen-mitte { display:flex; align-items:baseline; gap:5px; }
+.portionen-zahl { font-size:19px; font-weight:700; }
+.portionen-text { font-size:13px; color:var(--text-2); }
+.portionen-zurueck {
+  background:none; border:none; color:var(--text-2); font-size:12px;
+  text-decoration:underline; cursor:pointer; padding:2px 0; font-family:inherit;
+}
+.zutat-name.skaliert { font-weight:600; }
 .zutat-name { flex:1; font-size:15px; color:var(--text); }
 .btn-zutat-kaufen {
   background:none; border:1.5px solid var(--border); border-radius:20px;
@@ -102,9 +120,25 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
   {% if zutaten %}
   <div class="section">
     <div class="section-title">🥕 Zutaten</div>
+    {# Wunsch #164: Nur anzeigen, wenn die Portionsangabe eine Zahl enthält –
+       ohne Ausgangswert lässt sich nichts umrechnen, und ein Regler, der
+       nichts tut, wäre schlimmer als keiner. #}
+    <div class="portionen-wahl" id="portionen-wahl" data-basis="{{ rezept.portionen or '' }}" style="display:none">
+      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[-1]' title="Weniger">−</button>
+      <div class="portionen-mitte">
+        <span class="portionen-zahl" id="portionen-zahl">?</span>
+        <span class="portionen-text">Portionen</span>
+      </div>
+      <button class="portionen-btn" type="button" data-klick="portionenAendern" data-args='[1]' title="Mehr">+</button>
+      <button class="portionen-zurueck" type="button" id="portionen-zurueck"
+              data-klick="portionenZuruecksetzen" style="display:none">zurück auf <span id="portionen-basis"></span></button>
+    </div>
     {% for z in zutaten %}
+    {# Wunsch #164: Der Originaltext bleibt im data-Attribut stehen, damit das
+       Umrechnen immer von der Ausgangsmenge ausgeht und sich Rundungsfehler
+       nicht über mehrere Schritte aufsummieren. #}
     <div class="zutat-row" id="zutat-{{ z.id }}">
-      <span class="zutat-name">{{ z.name }}</span>
+      <span class="zutat-name" data-original="{{ z.name }}">{{ z.name }}</span>
       <button class="btn-zutat-kaufen" type="button" data-klick="zutatEinkaufen" data-args='[{{ z.id }}]'>🛒 Fehlt</button>
     </div>
     {% endfor %}
@@ -146,10 +180,94 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 
+/* --- Wunsch #164: Portionen umrechnen ---------------------------------
+ *
+ * Bewusst nur die FUEHRENDE Menge jeder Zeile, rein zur Anzeige. Die
+ * strukturierte Zerlegung in Menge/Einheit/Name ist Wunsch #51 und
+ * zurueckgestellt - hier wird nichts gespeichert und nichts geparst, was
+ * ueber die erste Zahl hinausgeht.
+ *
+ * Gegen den echten Bestand geprueft (56 Zutaten): 45 beginnen mit einer
+ * Ganzzahl, eine mit einer Kommazahl ("0,5 Zitrone"), zehn haben gar keine
+ * Zahl ("Pfeffer"). Brueche und Bereiche kommen nicht vor. Zeilen ohne
+ * fuehrende Zahl bleiben unveraendert - das ist richtig so, "Salz nach
+ * Geschmack" skaliert nicht.
+ */
+var PORTIONEN_BASIS = null;   /* aus der Rezeptangabe gelesen */
+var PORTIONEN_AKTUELL = null;
+
+function portionenZahlLesen(text) {
+  /* "4" -> 4, "8-10" -> 8, "ca. 6 Stueck" -> 6, "" -> null.
+     Bei einem Bereich die erste Zahl: sie ist die konservative Annahme,
+     und der Nutzer sieht die Originalangabe weiterhin im Kopf der Seite. */
+  var m = String(text || '').match(/\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  var wert = parseFloat(m[0].replace(',', '.'));
+  return (wert > 0) ? wert : null;
+}
+
+function mengeFormatieren(zahl) {
+  /* Auf zwei Nachkommastellen, ohne ueberfluessige Nullen, deutsches Komma.
+     93.75 -> "93,75"   4.0 -> "4"   0.5 -> "0,5" */
+  var gerundet = Math.round(zahl * 100) / 100;
+  return String(gerundet).replace('.', ',');
+}
+
+function zutatSkalieren(original, faktor) {
+  /* Nur die erste Zahl am Zeilenanfang ersetzen. Alles danach - Einheit,
+     Name, Klammern - bleibt Wort fuer Wort stehen. */
+  return String(original).replace(/^(\s*)(\d+(?:[.,]\d+)?)/, function (_, vorn, zahl) {
+    var wert = parseFloat(zahl.replace(',', '.')) * faktor;
+    return vorn + mengeFormatieren(wert);
+  });
+}
+
+function portionenAnzeigen() {
+  var faktor = PORTIONEN_AKTUELL / PORTIONEN_BASIS;
+  document.getElementById('portionen-zahl').textContent = mengeFormatieren(PORTIONEN_AKTUELL);
+  document.querySelectorAll('.zutat-name').forEach(function (el) {
+    var original = el.getAttribute('data-original');
+    el.textContent = (faktor === 1) ? original : zutatSkalieren(original, faktor);
+    el.classList.toggle('skaliert', faktor !== 1);
+  });
+  document.getElementById('portionen-zurueck').style.display =
+    (faktor === 1) ? 'none' : '';
+}
+
+function portionenAendern(schritt) {
+  var neu = PORTIONEN_AKTUELL + schritt;
+  if (neu < 1 || neu > 99) return;        /* 0 Portionen ergibt keinen Sinn */
+  PORTIONEN_AKTUELL = neu;
+  portionenAnzeigen();
+}
+
+function portionenZuruecksetzen() {
+  PORTIONEN_AKTUELL = PORTIONEN_BASIS;
+  portionenAnzeigen();
+}
+
+(function () {
+  var wahl = document.getElementById('portionen-wahl');
+  if (!wahl) return;
+  PORTIONEN_BASIS = portionenZahlLesen(wahl.getAttribute('data-basis'));
+  if (!PORTIONEN_BASIS) return;           /* keine Zahl -> Waehler bleibt aus */
+  PORTIONEN_AKTUELL = PORTIONEN_BASIS;
+  document.getElementById('portionen-basis').textContent = mengeFormatieren(PORTIONEN_BASIS);
+  wahl.style.display = 'flex';
+  portionenAnzeigen();
+})();
+
 function zutatEinkaufen(id, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  fetch(`/a/rezepte${TP}zutat/${id}/einkaufen`, { method: 'POST' })
+  /* Wunsch #164: die aktuell ANGEZEIGTE Zeile mitschicken. Sonst sieht man
+     "750 g Mehl" und bekommt "500 g Mehl" auf die Liste - ohne Hinweis. */
+  const zeile = document.querySelector(`#zutat-${id} .zutat-name`);
+  fetch(`/a/rezepte${TP}zutat/${id}/einkaufen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: zeile ? zeile.textContent.trim() : '' }),
+  })
     .then(r => r.json())
     .then(d => {
       if (d.ok) {

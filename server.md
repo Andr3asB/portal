@@ -2019,6 +2019,11 @@ python -m venv .venv                                   # einmalig
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
   Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
   Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
+- `test_rezept_portionen.py` – Wunsch #164. Prueft NICHT das Umrechnen (das
+  passiert im Browser und ist dort live geprueft), sondern die Stelle, an der
+  es den Server beruehrt: der Einkaufen-Knopf muss die ANGEZEIGTE Menge
+  uebernehmen. Ohne das saehe man "750 g Mehl" und bekaeme "500 g Mehl" -
+  ohne jeden Hinweis.
 - `test_essensplan_gekocht.py` – Wunsch #162. Schwerpunkt ist, was die
   Aufzeichnung UEBERLEBT: Planeintrag ueberschrieben, Planeintrag geloescht -
   Historie bleibt; Rezept geloescht - Historie geht per CASCADE mit.
