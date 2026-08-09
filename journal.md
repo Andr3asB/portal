@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-08-09 – portal-v163: Wunsch #163 – vom Plan direkt ins Rezept
+
+> „Ist ein Rezept aus der DB ausgewählt, dann soll man auch direkt dorthin
+> abspringen können."
+
+Ein kleiner Wunsch mit spürbarer Wirkung: Bisher hiess „was war nochmal in der
+Gnocchi-Pfanne?" App wechseln und das Rezept in der Liste suchen. Jetzt ist der
+Name im Essensplan ein Link.
+
+Zwei Dinge vorher geprüft statt angenommen:
+
+**Kollidiert der Link mit dem Ziehen?** Nein – der Zieh-Anfänger (⠿) ist ein
+eigenes Element, das Drag & Drop hängt nicht am Inhalt der Zelle. Hätte ich
+das nicht nachgesehen, wäre jeder Verschiebeversuch womöglich als Klick auf
+den Link geendet.
+
+**Freitext bekommt keinen Link.** Zu „Pizza vom Lieferdienst" gibt es kein
+Rezept; ein Link dorthin führte ins Leere.
+
+### Der Test geht den Link wirklich
+
+Ein Link, der ins Leere zeigt, fällt im Alltag erst auf, wenn ihn jemand
+antippt. Der Test liest deshalb die Adresse aus der gerenderten Seite und
+**ruft sie auf** – gegengeprobt mit einer erfundenen Rezept-ID: der Test
+fällt.
+
+Dabei noch einmal derselbe Zählfehler wie neulich bei den Kassenbuch-
+Ereignissen: `seite.count("mahlzeit-rezept-link")` ergab 4 statt 1, weil der
+Klassenname auch dreimal im CSS-Block der Seite steht. Gezählt wird jetzt auf
+`class="…"` – also auf das Attribut, nicht auf den Namen.
+
+Live bestätigt: Der Link im Plan zeigt auf `/a/rezepte/8`, und dort steht
+„Gnocchi-Pfanne mit Lauch".
+
+3 neue Tests, 491 grün.
+
+---
+
 ## 2026-08-09 – portal-v162: Wunsch #162 – gekocht abhaken
 
 > „Gekochte Rezepte sollen abgehakt werden können, um zu erfassen wann ein

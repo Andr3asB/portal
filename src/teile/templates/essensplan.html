@@ -46,6 +46,10 @@
   color:var(--text-2); font-family:inherit;
 }
 .gekocht-btn.aktiv { border-color:#34c759; color:#34c759; }
+/* Wunsch #163: Sprung zum Rezept - als Link erkennbar, ohne die Zeile zu
+   verunstalten (die Unterstreichung erst beim Antippen/Hovern). */
+.mahlzeit-rezept-link { color:inherit; text-decoration:none; }
+.mahlzeit-rezept-link:hover, .mahlzeit-rezept-link:active { text-decoration:underline; }
 .mahlzeit-kopf { display:flex; align-items:center; gap:8px; }
 .mahlzeit-label {
   font-size:11px; font-weight:700; color:var(--text-2);
@@ -100,7 +104,11 @@
           </div>
           <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}">
             {% if eintrag and eintrag.rezept_name %}
-              🍲 {{ eintrag.rezept_name }}
+              {# Wunsch #163: direkt zum Rezept. Der Zieh-Anfasser (⠿) ist ein
+                 eigenes Element, ein Link im Inhalt kommt ihm nicht in die
+                 Quere. #}
+              <a class="mahlzeit-rezept-link" href="/a/rezepte{{ tp }}{{ eintrag.rezept_id }}"
+                 title="Rezept öffnen">🍲 {{ eintrag.rezept_name }}</a>
             {% elif eintrag and eintrag.text %}
               {{ eintrag.text }}
             {% else %}

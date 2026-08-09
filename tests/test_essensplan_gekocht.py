@@ -160,3 +160,52 @@ def test_zustand_ist_in_der_liste_sichtbar(client, db, plan):
     _umschalten(client, token)
     nachher = client.get(f"/a/essensplan/{token}/").get_data(as_text=True)
     assert "gekocht-btn aktiv" in nachher
+
+
+# --- Wunsch #163: vom Plan direkt ins Rezept -------------------------------
+
+def test_rezept_im_plan_ist_verlinkt(client, db, plan):
+    """Der Weg dorthin war vorher: App wechseln, Rezept in der Liste suchen.
+
+    Gezaehlt wird auf das ATTRIBUT `class="..."`, nicht auf den blossen
+    Klassennamen - der steht auch dreimal im CSS-Block der Seite, und eine
+    Zaehlung darauf ergaebe stumm 4 statt 1.
+    """
+    seite = client.get(
+        f"/a/essensplan/{plan['tokens']['TestAdmin']}/").get_data(as_text=True)
+    assert seite.count('class="mahlzeit-rezept-link"') == 1
+    assert f'href="/a/rezepte' in seite
+
+
+def test_der_link_fuehrt_zu_einer_echten_seite(client, db, plan):
+    """Ein Link, der ins Leere zeigt, faellt im Alltag erst auf, wenn ihn
+    jemand antippt - deshalb hier einmal wirklich hingehen."""
+    import re
+    from teile.kern import token_lookup, new_token
+
+    seite = client.get(
+        f"/a/essensplan/{plan['tokens']['TestAdmin']}/").get_data(as_text=True)
+    treffer = re.search(r'class="mahlzeit-rezept-link" href="([^"]+)"', seite)
+    assert treffer, "kein Rezept-Link gefunden"
+    assert treffer.group(1).endswith(str(plan["rid"]))
+
+    # Der Essensplan-Token gilt nicht fuer die Rezepte-App - fuer den Abruf
+    # den passenden Grant anlegen.
+    v = db["verbindung"]
+    with client.application.app_context():
+        app_id = v.execute("SELECT id FROM apps WHERE slug='rezepte'").fetchone()["id"]
+        rezept_token = new_token()
+        v.execute("INSERT OR IGNORE INTO grants(user_id, app_id, token_lookup) "
+                  "VALUES(?,?,?)",
+                  (db["familie"]["TestAdmin"]["id"], app_id, token_lookup(rezept_token)))
+    v.commit()
+    assert client.get(f"/a/rezepte/{rezept_token}/{plan['rid']}").status_code == 200
+
+
+def test_freitext_bekommt_keinen_link(client, db, plan):
+    """Zu „Pizza vom Lieferdienst" gibt es kein Rezept - ein Link dorthin
+    wuerde ins Leere fuehren."""
+    seite = client.get(
+        f"/a/essensplan/{plan['tokens']['TestAdmin']}/").get_data(as_text=True)
+    assert seite.count('class="mahlzeit-rezept-link"') == 1
+    assert "Pizza vom Lieferdienst" in seite
