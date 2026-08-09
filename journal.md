@@ -2,6 +2,63 @@
 
 ---
 
+## 2026-08-09 – portal-v162: Wunsch #162 – gekocht abhaken
+
+> „Gekochte Rezepte sollen abgehakt werden können, um zu erfassen wann ein
+> Rezept aus der DB gekocht wurde."
+
+### Die Entscheidung, die alles andere bestimmt
+
+Ein Häkchen auf `essensplan_eintraege` wäre der naheliegende Weg gewesen – und
+falsch. Ein Planeintrag wird überschrieben, per Drag & Drop verschoben (#35)
+und irgendwann gelöscht. Hinge die Aufzeichnung daran, wäre sie genau dann
+weg, wenn sie interessant wird: „Wann hatten wir zuletzt Linsen?" fragt man
+Monate später, nicht in derselben Woche.
+
+Deshalb eine eigene Tabelle `rezept_gekocht`, die am **Rezept** hängt. Der
+Wunsch sagt es selbst: „wann ein **Rezept aus der DB** gekocht wurde". Drei
+Tests halten fest, dass die Aufzeichnung ein Überschreiben und ein Löschen des
+Planeintrags übersteht – und einer, dass sie beim Löschen des *Rezepts* sehr
+wohl mitgeht, sonst blieben Waisen zurück.
+
+Freitext-Einträge („Pizza vom Lieferdienst") bekommen keinen Haken. Es gäbe
+kein Rezept, an dem sich etwas merken liesse; ein Haken, der nichts festhält,
+wäre schlimmer als keiner.
+
+### Zum dritten Mal dieselbe Undichtigkeit – jetzt umgedreht
+
+Die Tests fielen sofort über `UNIQUE(tag, mahlzeit)`: `essensplan_eintraege`
+und `rezepte` überlebten das Leeren der Testdatenbank, weil sie nicht per
+CASCADE am Nutzer hängen. Dasselbe Muster wie bei den Geburtstagen (#145) und
+den Wünschen (#161).
+
+Dreimal derselbe Fehler heisst, die Bauart ist schuld: `conftest.py` zählte
+auf, **was geleert wird**. Jede neue Tabelle musste man nachtragen, und vergass
+man es, lief der Bestand still mit. Jetzt zählt es auf, **was stehen bleibt**
+(die Seed-Tabellen) und leert alles andere. Vergisst man dort etwas, fehlen
+Stammdaten und die Tests schlagen sofort und laut fehl – die richtige
+Fehlerrichtung.
+
+### Ein Test, der von der Undichtigkeit lebte
+
+Nach der Umstellung fiel `test_jede_aktion_zeigt_auf_eine_vorhandene_funktion`
+mit `assert 20 > 20`. Er zählt geprüfte `data-klick`-Attribute und verlangte
+mehr als 20 – erreicht hatte er das nur, weil die Seiten **Datenreste anderer
+Tests** mitrenderten und dadurch ein paar Handler mehr zeigten.
+
+Die Schwelle war also von genau dem Leck abhängig, das ich gerade geschlossen
+hatte. Auf sauberer Datenbank sind es deterministisch 20; die Schwelle steht
+jetzt bei 15 (sie soll nur ein kaputtes Suchmuster abfangen, das 0–2 fände)
+mitsamt der Erklärung, warum sie gesenkt wurde.
+
+Live an einem echten Planeintrag geprüft (09.08. abends, Rezept 8): Klick
+setzt den Vermerk mit Zeitstempel, zweiter Klick nimmt ihn zurück. Endzustand
+unverändert.
+
+13 neue Tests, 488 grün.
+
+---
+
 ## 2026-08-09 – portal-v161: Wunsch #166 – Rückfragen melden sich
 
 > „Wird eine Rückfrageaktion eingetragen, dann soll eine Pushbenachrichtigung

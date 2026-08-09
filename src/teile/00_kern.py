@@ -220,6 +220,23 @@ CREATE TABLE IF NOT EXISTS essensplan_eintraege (
   erstellt     TEXT    NOT NULL DEFAULT (datetime('now')),
   UNIQUE(tag, mahlzeit)
 );
+-- Wunsch #162: Wann wurde ein Rezept tatsaechlich gekocht? Bewusst eine
+-- EIGENE Tabelle statt eines Haekchens auf essensplan_eintraege: Ein
+-- Planeintrag wird ueberschrieben, verschoben (Wunsch #35) und irgendwann
+-- geloescht - die Historie muss das ueberleben, und Wunsch #165 will sie
+-- spaeter je Rezept anzeigen. Deshalb haengt sie am REZEPT, nicht am Plan.
+-- Nur Rezepte aus der Datenbank, kein Freitext: "wann ein Rezept aus der DB
+-- gekocht wurde" (O-Ton) laesst sich fuer "Pizza" als Freitext nicht sinnvoll
+-- fuehren.
+CREATE TABLE IF NOT EXISTS rezept_gekocht (
+  id           INTEGER PRIMARY KEY,
+  rezept_id    INTEGER NOT NULL REFERENCES rezepte(id) ON DELETE CASCADE,
+  tag          TEXT    NOT NULL,          -- Tag des Essensplans (YYYY-MM-DD)
+  mahlzeit     TEXT    NOT NULL,
+  markiert_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  markiert_am  TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(rezept_id, tag, mahlzeit)
+);
 CREATE TABLE IF NOT EXISTS einkauf_kategorien (
   id       INTEGER PRIMARY KEY,
   name     TEXT    NOT NULL UNIQUE,

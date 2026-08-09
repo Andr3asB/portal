@@ -68,20 +68,33 @@ def db(app):
     verbindung.row_factory = sqlite3.Row
     verbindung.execute("PRAGMA foreign_keys=ON")
 
-    # Nur die Tabellen leeren, die Tests befüllen – Schema und Seed-Daten
-    # (Apps, Kategorien, Standardaufgaben) bleiben stehen.
-    verbindung.execute("DELETE FROM grants")
-    # Wunsch #145: Geburtstage haengen NICHT per CASCADE am Nutzer (sie
-    # gehoeren der Familie, nicht dem Eintragenden) - ohne dieses Leeren
-    # bliebe der Bestand zwischen Tests stehen und liesse Zaehlungen driften.
-    verbindung.execute("DELETE FROM geburtstage")
-    # Wunsch #161: dasselbe Problem bei den Wuenschen - `wuensche.user_id` ist
-    # ON DELETE SET NULL, ein Wunsch ueberlebt das Leeren der Nutzer also und
-    # sammelte sich bisher ueber alle Tests hinweg an. Aufgefallen erst, als
-    # ein Test die wunsch_aktionen GLOBAL zaehlte statt je Wunsch: dort standen
-    # 4 statt 0. Das Leeren nimmt die Aktionen per CASCADE gleich mit.
-    verbindung.execute("DELETE FROM wuensche")
-    verbindung.execute("DELETE FROM users")
+    # Umgekehrte Logik seit Wunsch #162: NICHT aufzaehlen, was geleert wird,
+    # sondern was STEHEN BLEIBT. Die alte Liste (grants, geburtstage,
+    # wuensche, users) musste bei jeder neuen Tabelle nachgezogen werden, und
+    # vergass man es, lief der Bestand still ueber alle Tests hinweg mit:
+    # erst fielen Zaehlungen daneben (#145 Geburtstage), dann zaehlte ein Test
+    # global statt je Wunsch (#161), dann kollidierte ein UNIQUE(tag, mahlzeit)
+    # im Essensplan (#162). Immer derselbe Fehler, dreimal neu gelernt.
+    #
+    # Der Grund ist jedesmal: die Tabelle haengt nicht per ON DELETE CASCADE
+    # am Nutzer. Wer das vergisst, merkt es nicht - Tests werden dadurch nicht
+    # rot, sondern unzuverlaessig.
+    #
+    # Vergisst man umgekehrt eine SEED-Tabelle hier einzutragen, fehlen die
+    # Stammdaten und die Tests schlagen sofort und laut fehl. Diese
+    # Fehlerrichtung ist die richtige.
+    BLEIBT = {
+        "apps", "einkauf_kategorien", "einkauf_laeden", "geholfen_aufgaben",
+        "ki_konfiguration", "ki_stimmen", "packlisten_kategorien",
+        "vokabel_sprachen", "sqlite_sequence",
+    }
+    tabellen = [r[0] for r in verbindung.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+    verbindung.execute("PRAGMA foreign_keys=OFF")
+    for name in tabellen:
+        if name not in BLEIBT:
+            verbindung.execute(f"DELETE FROM {name}")
+    verbindung.execute("PRAGMA foreign_keys=ON")
     verbindung.commit()
 
     with app.app_context():

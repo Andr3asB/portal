@@ -37,6 +37,15 @@
 }
 .mahlzeit-slot:first-of-type { border-top:none; padding-top:0; }
 .mahlzeit-slot.drop-target { background:var(--surface-2); border-radius:8px; }
+/* Wunsch #162: gekocht-Haken */
+.mahlzeit-inhalt.ist-gekocht { opacity:.72; }
+.gekocht-form { margin-top:4px; }
+.gekocht-btn {
+  background:none; border:1px solid var(--border); border-radius:8px;
+  padding:3px 9px; font-size:11px; font-weight:600; cursor:pointer;
+  color:var(--text-2); font-family:inherit;
+}
+.gekocht-btn.aktiv { border-color:#34c759; color:#34c759; }
 .mahlzeit-kopf { display:flex; align-items:center; gap:8px; }
 .mahlzeit-label {
   font-size:11px; font-weight:700; color:var(--text-2);
@@ -89,7 +98,7 @@
             {% if eintrag %}<span class="mahlzeit-drag-handle" title="Verschieben">⠿</span>{% endif %}
             <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten">✏️</button>
           </div>
-          <div class="mahlzeit-inhalt">
+          <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}">
             {% if eintrag and eintrag.rezept_name %}
               🍲 {{ eintrag.rezept_name }}
             {% elif eintrag and eintrag.text %}
@@ -98,6 +107,20 @@
               <span class="tag-leer">–</span>
             {% endif %}
           </div>
+
+          {# Wunsch #162: Haken nur bei Rezepten aus der Datenbank – für einen
+             Freitext-Eintrag lässt sich nicht führen, wann welches Rezept
+             gekocht wurde. #}
+          {% if eintrag and eintrag.rezept_id %}
+          <form class="gekocht-form" method="post" action="/a/essensplan{{ tp }}gekocht">
+            <input type="hidden" name="tag" value="{{ tag.iso }}">
+            <input type="hidden" name="mahlzeit" value="{{ mahlzeit }}">
+            <button class="gekocht-btn{% if eintrag.gekocht %} aktiv{% endif %}" type="submit"
+                    title="{{ 'Als nicht gekocht markieren' if eintrag.gekocht else 'Als gekocht markieren' }}">
+              {% if eintrag.gekocht %}✅ gekocht{% else %}⬜ gekocht?{% endif %}
+            </button>
+          </form>
+          {% endif %}
 
           <div class="tag-edit-panel" id="tag-edit-{{ slot_id }}">
             <form method="post" action="/a/essensplan{{ tp }}eintrag">

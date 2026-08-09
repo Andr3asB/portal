@@ -197,7 +197,14 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
             if not re.search(r"(function\s+%s\s*\(|window\.%s\s*=)" % (name, name), seite):
                 fehler.append(f"{tokenfrei[0]}: '{name}' ist nirgends definiert")
 
-    assert geprueft > 20, f"nur {geprueft} Aktionen geprüft – Filter zu eng?"
+    # Die Schwelle sichert nur ab, dass der Filter oben nicht ins Leere greift
+    # (ein kaputtes Muster faende 0-2). Sie lag frueher bei ">20" und wurde mit
+    # Wunsch #162 auf ">=15" gesenkt: Bis dahin leerte conftest die
+    # Testdatenbank nur teilweise, die Seiten rendersten deshalb Datenreste
+    # anderer Tests mit - und damit ein paar Handler mehr. Der Test hing also
+    # an genau der Undichtigkeit, die dort behoben wurde. Auf einer sauberen
+    # Datenbank sind es deterministisch 20.
+    assert geprueft >= 15, f"nur {geprueft} Aktionen geprüft – Filter zu eng?"
     assert not fehler, "\n  ".join([""] + sorted(set(fehler)))
 
 

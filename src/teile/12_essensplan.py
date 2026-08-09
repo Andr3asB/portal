@@ -43,9 +43,19 @@ def index(token):
         LEFT JOIN rezepte r ON r.id = e.rezept_id
         WHERE  e.tag BETWEEN ? AND ?
     """, (tage_daten[0].isoformat(), tage_daten[-1].isoformat())).fetchall()
+    # Wunsch #162: Welche Slots sind als gekocht markiert? Eine Abfrage fuer
+    # die ganzen zwei Wochen statt einer je Slot (das waeren 28).
+    gekocht = {
+        (g["tag"], g["mahlzeit"])
+        for g in db.execute(
+            "SELECT tag, mahlzeit FROM rezept_gekocht WHERE tag BETWEEN ? AND ?",
+            (tage_daten[0].isoformat(), tage_daten[-1].isoformat()))
+    }
     eintraege_map = {}
     for r in rows:
-        eintraege_map.setdefault(r["tag"], {})[r["mahlzeit"]] = r
+        zeile = dict(r)
+        zeile["gekocht"] = (r["tag"], r["mahlzeit"]) in gekocht
+        eintraege_map.setdefault(r["tag"], {})[r["mahlzeit"]] = zeile
 
     rezepte = db.execute(
         "SELECT id, name FROM rezepte ORDER BY name COLLATE NOCASE"
@@ -109,6 +119,47 @@ def eintrag_speichern(token):
                 text=excluded.text,
                 erstellt_von=excluded.erstellt_von
         """, (tag, mahlzeit, rezept_id, text, user["id"]))
+    db.commit()
+    return redirect(url_for("essensplan_app.index", token=token))
+
+
+@bp.route("/a/essensplan/gekocht", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/essensplan/<token>/gekocht", methods=["POST"])
+def gekocht_umschalten(token):
+    """Wunsch #162: Einen Planeintrag als gekocht markieren - oder doch nicht.
+
+    Umschalter statt Einbahnstrasse: Ein Haken, den man nicht mehr wegnimmt,
+    ist bei einem Versehen aergerlich. Weil die Historie am Rezept haengt und
+    nicht am Plan, ist das Zuruecknehmen hier ein echtes Loeschen - anders als
+    im Kassenbuch geht es nicht um Buchfuehrung, sondern um eine Notiz.
+
+    Nur fuer Eintraege MIT Rezept: "wann ein Rezept aus der DB gekocht wurde"
+    laesst sich fuer einen Freitext-Eintrag nicht fuehren. Die Oberflaeche
+    zeigt den Haken deshalb auch nur dort.
+    """
+    user = _user(token)
+    tag      = (request.form.get("tag") or "").strip()
+    mahlzeit = (request.form.get("mahlzeit") or "").strip()
+    if mahlzeit not in MAHLZEITEN or not tag:
+        abort(400)
+
+    db = get_db()
+    eintrag = db.execute(
+        "SELECT rezept_id FROM essensplan_eintraege WHERE tag=? AND mahlzeit=?",
+        (tag, mahlzeit)).fetchone()
+    if not eintrag or not eintrag["rezept_id"]:
+        abort(404)
+    rid = eintrag["rezept_id"]
+
+    schon_da = db.execute(
+        "SELECT id FROM rezept_gekocht WHERE rezept_id=? AND tag=? AND mahlzeit=?",
+        (rid, tag, mahlzeit)).fetchone()
+    if schon_da:
+        db.execute("DELETE FROM rezept_gekocht WHERE id=?", (schon_da["id"],))
+    else:
+        db.execute(
+            "INSERT INTO rezept_gekocht(rezept_id, tag, mahlzeit, markiert_von) "
+            "VALUES(?,?,?,?)", (rid, tag, mahlzeit, user["id"]))
     db.commit()
     return redirect(url_for("essensplan_app.index", token=token))
 

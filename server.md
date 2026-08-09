@@ -1427,6 +1427,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
 | `vokabel_kapitel_freigabe` | kapitel_id (FK vokabel_kapitel, cascade), user_id (FK users, cascade – WER es zusaetzlich sehen darf), erstellt; PK(kapitel_id, user_id) – Wunsch #150. Geteilt wird das KAPITEL, nicht die Vokabel: spaeter hinzugefuegte Vokabeln wandern automatisch mit. Eigentuemer bleibt `vokabel_kapitel.user_id` |
+| `rezept_gekocht` | id, rezept_id (FK rezepte, CASCADE), tag, mahlzeit, markiert_von (FK users, SET NULL), markiert_am; UNIQUE(rezept_id, tag, mahlzeit) – Wunsch #162. BEWUSST eine eigene Tabelle statt eines Haekchens auf essensplan_eintraege: ein Planeintrag wird ueberschrieben, verschoben (#35) und geloescht, die Historie muss das ueberleben. Haengt am REZEPT, nicht am Plan; Freitext-Eintraege koennen deshalb nicht abgehakt werden |
 | `wunsch_aktionen` | id, wunsch_id (FK wuensche, CASCADE), art ('frage'/'antwort'/'plan'/'umsetzung'/'notiz'), text, user_id (FK users, SET NULL), erstellt – Wunsch #161: Verlauf je Wunsch. `wuensche.umsetzung` BLEIBT daneben bestehen, sie traegt die Abschluesse von ~150 alten Wuenschen, die es als Aktion nie geben wird. `manage.py wunsch_erledigt` schreibt ab #161 beides |
 | `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
 
@@ -1457,13 +1458,22 @@ Andere Apps: `/a/<slug>/<token>/`.
 
 ## Testdatenbank leeren (conftest.py)
 
-`db` leert `grants`, `geburtstage`, `wuensche` und `users` und verlaesst sich
-sonst auf `ON DELETE CASCADE` von `users`. **Wer eine Tabelle anlegt, deren
-Fremdschluessel auf `users` NICHT cascadet, muss sie hier eintragen** -
-`wuensche.user_id` ist `ON DELETE SET NULL`, Wuensche ueberlebten das Leeren
-deshalb und sammelten sich ueber alle Tests hinweg an (gefunden bei #161, als
-ein Test `wunsch_aktionen` global zaehlte: 4 statt 0). Solche Lecks machen
-keinen Test rot, sie machen Tests unzuverlaessig.
+Seit Wunsch #162 **umgekehrt**: Die Fixture zaehlt nicht mehr auf, was geleert
+wird, sondern was STEHEN BLEIBT (`BLEIBT` = die Seed-Tabellen: apps,
+einkauf_kategorien, einkauf_laeden, geholfen_aufgaben, ki_konfiguration,
+ki_stimmen, packlisten_kategorien, vokabel_sprachen). Alles andere wird
+geleert.
+
+Grund: Die alte Aufzaehlung musste bei jeder neuen Tabelle nachgezogen werden,
+und wer es vergass, merkte nichts - der Bestand lief still ueber alle Tests
+hinweg mit. Dreimal passiert: Geburtstage (#145, Zaehlungen drifteten),
+Wuensche (#161, ein global zaehlender Test sah 4 statt 0), Essensplan (#162,
+UNIQUE(tag, mahlzeit) kollidierte). Immer derselbe Grund: die Tabelle haengt
+nicht per `ON DELETE CASCADE` am Nutzer.
+
+**Wer eine neue SEED-Tabelle anlegt, traegt sie in `BLEIBT` ein.** Vergisst man
+das, fehlen die Stammdaten und die Tests schlagen sofort und laut fehl - diese
+Fehlerrichtung ist die richtige, die alte war es nicht.
 
 ## Lösch-Symbol (verpflichtend, seit Wunsch #160)
 
@@ -2009,6 +2019,9 @@ python -m venv .venv                                   # einmalig
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die
   Storno-Spalten an. Wer eine Bearbeiten-Route ergaenzt, bekommt im
   Fehlertext gesagt, dass das Protokoll dann eine dritte Ereignisart braucht.
+- `test_essensplan_gekocht.py` – Wunsch #162. Schwerpunkt ist, was die
+  Aufzeichnung UEBERLEBT: Planeintrag ueberschrieben, Planeintrag geloescht -
+  Historie bleibt; Rezept geloescht - Historie geht per CASCADE mit.
 - `test_werkstatt_ticket.py` – Wuensche #161 und #166. Zu #166: die Meldung
   geht NUR bei art='frage' raus und NIE an den Verfasser - beides eigene
   Tests, weil beides im Alltag nicht auffiele (zu viele Meldungen entwerten
