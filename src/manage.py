@@ -11,6 +11,7 @@ Aufruf im Container:
   docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung"
   docker exec portal python manage.py titel_nachtragen 5
   docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"
+  docker exec portal python manage.py wunsch_neu tvb "Kurzer Titel" "Der ganze Wunschtext"
   docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
@@ -471,6 +472,37 @@ def cmd_listapps(_):
     db.close()
 
 
+def cmd_wunsch_neu(args):
+    """Einen Wunsch von der Kommandozeile anlegen - IMMER unpriorisiert.
+
+        docker exec portal python manage.py wunsch_neu tvb "Titel" "Text"
+
+    Warum ohne Prioritaet, und zwar ohne Schalter dafuer: Der stuendliche
+    Lauf (Wunsch #157) arbeitet alle Wuensche ab, die eine Prioritaet ausser
+    'zurueckgestellt' tragen. Ein Befehl, der Wuensche anlegen UND
+    priorisieren koennte, waere damit eine Maschine, die sich selbst Arbeit
+    auftraegt und sie eine Stunde spaeter ausfuehrt. Prioritaeten vergibt
+    ein Mensch, hier und sonst auch (Wunsch #152).
+
+    Der Titel wird mitgegeben statt von der KI geholt: Wer einen Wunsch von
+    hier aus anlegt, hat ihn gerade formuliert und weiss besser als ein
+    Modell, worum es geht.
+    """
+    if len(args) < 3:
+        sys.exit('Aufruf: wunsch_neu <app-slug> "<titel>" "<text>"')
+    app_slug, titel, text = args[0], args[1], args[2]
+    db = connect()
+    if not db.execute("SELECT 1 FROM apps WHERE slug=?", (app_slug,)).fetchone():
+        sys.exit(f"App-Slug '{app_slug}' gibt es nicht.")
+    wid = db.execute(
+        "INSERT INTO wuensche(text, titel, app_slug, prioritaet) "
+        "VALUES(?,?,?,NULL) RETURNING id",
+        (text, titel[:80], app_slug)).fetchone()["id"]
+    db.commit()
+    db.close()
+    print(f"#{wid} angelegt (ohne Prioritaet): {titel[:60]}")
+
+
 def cmd_wunsch_aktion(args):
     """Eine Aktion an einen Wunsch haengen - von der Kommandozeile aus.
 
@@ -527,7 +559,8 @@ def cmd_titel_nachtragen(args):
     Aufruf:
         docker exec portal python manage.py titel_nachtragen        # zaehlt nur
         docker exec portal python manage.py titel_nachtragen 5
-  docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"      # die 5 aeltesten
+  docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"
+  docker exec portal python manage.py wunsch_neu tvb "Kurzer Titel" "Der ganze Wunschtext"      # die 5 aeltesten
         docker exec portal python manage.py titel_nachtragen alle
 
     Kostet echte Tokens aus dem Kontingent des jeweiligen Urhebers (rund 160
@@ -614,6 +647,7 @@ CMDS = {
     "wunsch_erledigt": cmd_wunsch_erledigt,
     "titel_nachtragen": cmd_titel_nachtragen,
     "wunsch_aktion":   cmd_wunsch_aktion,
+    "wunsch_neu":      cmd_wunsch_neu,
     "backlog":         cmd_backlog,
     "ki_modell":       cmd_ki_modell,
     "ki_stimme":       cmd_ki_stimme,

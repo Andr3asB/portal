@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v187: Verlaufs-Abzeichen auf der Wunschkarte, manage.py wunsch_aktion)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v189: manage.py wunsch_neu, TVB-Datenquellen vor dem handball.net-Relaunch geprueft)*
 
 ## Host
 
@@ -503,6 +503,15 @@ teile/
                        [anzahl|alle]` - ohne Argument wird nur gezaehlt, weil
                        der Lauf echte Tokens aus dem Kontingent des Urhebers
                        kostet (~160-320 je Wunsch, gemessen).
+  manage.py          – wunsch_neu <app> "<titel>" "<text>" legt einen Wunsch
+                       an, IMMER ohne Prioritaet und bewusst ohne Schalter
+                       dafuer: der stuendliche Lauf (#157) arbeitet alles ab,
+                       was eine Prioritaet ausser 'zurueckgestellt' traegt -
+                       ein Befehl, der beides koennte, wuerde sich selbst
+                       beauftragen. wunsch_aktion <id> <art> "<text>" haengt
+                       eine Aktion an (bei art=frage mit demselben Push wie
+                       ueber die Oberflaeche, #166). Beide in
+                       tests/test_manage_wunsch_befehle.py gewaechtert.
   05_werkstatt_app.py- /a/werkstatt/<token>/ Uebersicht aller Wuensche.
                        verlauf_stand(liste) sagt, was auf die EINGEKLAPPTE
                        Karte gehoert: Anzahl der Aktionen und ob eine

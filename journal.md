@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-08-10 – portal-v189: Wunsch #189 – handball.net-Relaunch, und was daraus folgt
+
+> „Es soll geprüft werden, was sich aus dieser Newsinfo von Handball.net
+> ableiten lässt und welche Aufgaben zur Anpassung der TVB App entstehen.
+> Alle Anpassungen sollen als unpriorisierte Wünsche in der Werkstatt landen."
+
+### Zuerst gemessen, dann abgeleitet
+
+Die Ankündigung ist vage („Mitte August", „neues Design und zahlreiche neue
+Funktionen", Grundlage Handball360). Bevor ich daraus Aufgaben ableite, habe
+ich den Ist-Zustand geprüft – **alle vier Datenquellen der App sind heute
+intakt**:
+
+| Quelle | Art | Stand 10.08. |
+|---|---|---|
+| `/a/sportdata/1/widgets/…` | undokumentiertes JSON | antwortet vollständig |
+| Vereinsseite (HTML) | Auslesen über CSS-Klassen | 18 Mannschaften, erneuert 09.08. |
+| Mannschafts-Tabellenseite (HTML) | Auslesen der Liga-ID | trägt |
+| `hpi.handball-bundesliga.de` | undokumentiertes JSON | antwortet |
+
+**Mein erster Probelauf war falsch gebaut** und meldete alle vier als leer:
+Ich habe auf einen `data`-Schlüssel geprüft, den die Antworten gar nicht
+haben. Beinahe hätte ich einen Ausfall gemeldet, den es nicht gibt. Erst der
+Blick in die Rohantwort zeigte: `table` steht auf 18 Mannschaften mit 0:0 –
+die Saison hat schlicht noch nicht begonnen.
+
+### Vier Wünsche, unpriorisiert
+
+- **#190** – Das Veralten der Mannschaftsliste sichtbar machen. Das ist die
+  brüchigste Stelle: Die Regex hängt an CSS-Klassennamen (`list-item-title`),
+  und „neues Design" heisst neues Markup. Heute fängt der Code den Ausfall ab
+  und lässt den alten Stand stehen – richtig, aber völlig still.
+- **#191** – Nach dem Relaunch alle vier Quellen nachprüfen; dabei die Frage,
+  ob Handball360 die heute **zwei getrennten Vereinsobjekte** zusammenführt.
+- **#192** – Spielerstatistiken direkt statt über die HPI-Umleitung (die nur
+  Spieler mit Einsatz kennt, nur die 1. Bundesliga, und 400 KB für 22 Spieler
+  lädt).
+- **#193** – Mannschaftsliste per API statt HTML.
+
+**Bewusst nicht eingetragen:** Live-Ticker. Die Ankündigung nennt sie, aber
+als Bestand, nicht als Neuerung.
+
+### Ein neuer Weg, der vorher fehlte
+
+Wünsche liessen sich nur über die Weboberfläche anlegen – von hier aus gar
+nicht. Also `manage.py wunsch_neu <app> "<titel>" "<text>"`, Geschwister von
+`wunsch_aktion` aus der letzten Sitzung.
+
+**Der Befehl kann keine Priorität setzen, und zwar bewusst ohne Schalter
+dafür.** Der stündliche Lauf (#157) arbeitet alles ab, was eine Priorität
+ausser `zurueckgestellt` trägt. Ein Befehl, der Wünsche anlegen *und*
+priorisieren könnte, wäre eine Maschine, die sich selbst Arbeit aufträgt und
+sie eine Stunde später ausführt. Zwei Tests wachen darüber: einer über das
+Ergebnis, einer über die Quelle.
+
+### Ein Test war ein Blindgänger
+
+Meine erste Fassung von „es gibt keinen Weg, doch zu priorisieren" enthielt
+ein `pytest.raises(SystemExit)` um ein `raise SystemExit` herum, das der Test
+selbst auslöste – grün, egal was `manage.py` tut. Ersetzt durch eine Prüfung
+der zusammengesetzten SQL-Anweisung. Acht Injektionen, acht Treffer.
+
+Keine Hilfe-Änderung: `wunsch_neu` ist Werkzeug für mich, keine Funktion für
+die Familie.
+
+---
+
 ## 2026-08-10 – portal-v187: Der Verlauf war unsichtbar, und meine Rückfrage stand am falschen Ort
 
 > „Die Rückfragen sollen doch als Aktion am Wunsch sichtbar dokumentiert sein.
