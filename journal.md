@@ -2,6 +2,94 @@
 
 ---
 
+## 2026-08-10 – portal-v192: Wunsch #194 – unregelmäßige Verben
+
+> „Es soll einen Spezialmodus geben für unregelmäßige Verben im Englischen:
+> Infinitiv, simple past, Perfect und Deutsch. Beim Lernen soll man auswählen
+> können, welche Kombinationen man lernen will. Der Bildupload für neue
+> unregelmäßige Verben soll auch möglich sein."
+
+Ausser der Reihe gebaut, auf Zuruf.
+
+### Zwei Spalten statt einer eigenen Tabelle
+
+`vokabeln.simple_past` und `vokabeln.perfect`, beide optional. Ein Eintrag
+**ist** ein unregelmäßiges Verb, wenn beide gefüllt sind; `fremd` trägt dann
+den Infinitiv.
+
+Eine eigene Verbtabelle wäre die naheliegende Modellierung gewesen und die
+teurere: Kapitel, Freigaben (#150), Sessions, Versuche, Aussprache und
+Statistik hängen alle an `vokabeln` – das hätte sich alles verdoppelt.
+
+**Kein Typ-Merker.** Eine Spalte „ist_verb" wäre eine zweite Wahrheit neben
+den Feldern und könnte von ihnen abweichen. Stattdessen gilt: **beide Formen
+oder keine.** Ein halb ausgefülltes Paar wird verworfen – beim Anlegen, beim
+Bearbeiten und beim Foto-Import. Sonst gäbe es Einträge, die als Verb gelten
+und im Training eine leere Antwort erwarten.
+
+### Die Kombinationen sind der Modus
+
+Sechs Abfrageformen zur Auswahl. Mindestens ein Kreuz schaltet das Training
+auf Verben um – **es braucht deshalb keinen zusätzlichen Hauptschalter**, der
+dieselbe Aussage ein zweites Mal trifft. Ohne Kreuz bleibt alles wie bisher.
+
+Mehrere Kreuze heissen: jedes Verb mehrfach, aus jeder gewählten Richtung.
+Genau das ist der Sinn der Auswahl.
+
+### Der Trainer kann jetzt mehrere Felder
+
+Bisher: ein Eingabefeld, Richtung gewürfelt. Jetzt bringt jede Aufgabe ihre
+Felder selbst mit. `felderBauen()` vereinheitlicht beide Fälle – danach hat
+jede Aufgabe eine Liste erwarteter Antworten, und die Prüfung kennt nur noch
+diesen einen Fall. Ohne diese Vereinheitlichung stünden zwei Prüfpfade
+nebeneinander, von denen einer irgendwann vergessen wird.
+
+**Nur ganz richtig zählt.** Wer zwei von drei Formen kann, kann das Verb noch
+nicht – es geht zurück in die Warteschlange. Falsche Felder bekommen ihre
+Lösung einzeln darunter.
+
+Der Fortschritt zählt **verschiedene Vokabeln**, nicht Aufgaben: Bei zwei
+angekreuzten Richtungen stünde sonst „0 von 20", obwohl es zehn Verben sind.
+
+### Zwei bestehende Wächter haben mich korrigiert
+
+- **`test_emoji`**: 🔤 hatte keine lokale Twemoji-Grafik und wäre unter
+  Linux/Chrome leer geblieben. Nachgeholt.
+- **`test_tippflaeche`**: Meine Klasse `.verb-feldlabel` enthielt „feld" und
+  wurde als Eingabefeld unter 16px gemeldet. Der Wächter hatte recht in der
+  Sache – die Klasse *heisst* wie ein Feld, ist aber die Beschriftung
+  darüber. Umbenannt in `.verb-formlabel`.
+
+### 16 Fehler eingebaut, 15 rot – und der eine grüne war lehrreich
+
+Blind waren drei Tests: Der Filter für unbekannte Abfrageformen wurde nur
+über `verb_aufgaben` geprüft, das ein zweites Mal siebt; die Formenzeile in
+der Liste wurde am Wort statt am Element gesucht (die Wörter stehen auch im
+Bearbeiten-Formular); und die beiden neuen Formularfelder wurden nie
+angesehen, weil der Test seinen POST selbst schickt.
+
+Der 16. blieb grün und **das ist richtig so**: Den SQL-Filter zu entfernen
+ändert nichts Beobachtbares, weil `verb_aufgaben()` Nicht-Verben ohnehin
+überspringt. Er ist eine Abkürzung, keine Sicherung – das steht jetzt als
+Kommentar daneben, damit ihn niemand für eine hält.
+
+### Live geprüft, mit Wegwerf-Daten
+
+Drei Einträge unter eigener Marke angelegt, geprüft, gelöscht: 2 Formenzeilen
+in der Liste (die normale Vokabel hat keine), 4 Aufgaben aus 2 Verben × 2
+Richtungen, Feldbeschriftungen Infinitiv/simple past/Perfect, keine normale
+Vokabel im Verbtraining – und ohne Kreuz umgekehrt: normale Vokabel da, null
+Verbaufgaben. Danach 0 Rückstände.
+
+**Nebenbei gelernt:** Mein Live-Skript bekam auf jeden POST ein 403. Der
+CSRF-Riegel (#140, Stufe 2) steht auf „scharf" und will eine eigene Herkunft
+sehen – `live_pruefung.py` macht nur GETs und ist deshalb nie darüber
+gestolpert.
+
+1045 Tests grün.
+
+---
+
 ## 2026-08-10 – portal-v190: Wunsch #188 – Tokenverbrauch am Wunsch
 
 > „Die zusätzlich erhobenen Daten, wie der Tokenverbrauch geschätzt und/oder

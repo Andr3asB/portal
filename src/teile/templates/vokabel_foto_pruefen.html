@@ -26,6 +26,8 @@
   background:var(--surface); color:var(--text);
 }
 .paar-input:focus { border-color:var(--farbe); }
+.verb-spalten { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.verb-spalten .paar-input { width:100%; box-sizing:border-box; }
 .btn-speichern {
   margin-top:16px; width:100%; background:var(--farbe); color:#fff; border:none;
   border-radius:10px; padding:12px 0; font-size:15px; font-weight:600; cursor:pointer;
@@ -37,7 +39,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">✓ Vokabeln prüfen</div>
+<div class="nav-title">✓ {{ "Verben" if verbmodus else "Vokabeln" }} prüfen</div>
 <div class="nav-sub">{{ paare|length }} erkannt · {{ sprache.name }}</div>
 {% endblock %}
 
@@ -72,12 +74,23 @@ function paarVerwerfen(box) {
     <div class="paar-row" id="paar-{{ loop.index0 }}">
       <input class="paar-check" type="checkbox" name="behalten" value="{{ loop.index0 }}"
              checked data-aendern="paarVerwerfen">
+      {% if verbmodus %}
+      {# Wunsch #194: Vier Felder je Zeile. Sie stehen untereinander statt
+         nebeneinander - vier Eingaben auf 375px waeren je 70px breit. #}
+      <div class="verb-spalten">
+        <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Infinitiv">
+        <input class="paar-input" type="text" name="simple_past" value="{{ p.simple_past }}" placeholder="simple past">
+        <input class="paar-input" type="text" name="perfect" value="{{ p.perfect }}" placeholder="Perfect">
+        <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
+      </div>
+      {% else %}
       <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Fremdsprache">
       <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
+      {% endif %}
     </div>
     {% endfor %}
 
-    <button type="submit" class="btn-speichern">{{ paare|length }} Vokabeln übernehmen</button>
+    <button type="submit" class="btn-speichern">{{ paare|length }} {{ "Verben" if verbmodus else "Vokabeln" }} übernehmen</button>
   </form>
 </main>
 {% endblock %}

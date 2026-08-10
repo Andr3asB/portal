@@ -29,3 +29,8 @@ sys.modules.setdefault("teile.werkstatt", _werkstatt)
 # wie eine aus der Weboberflaeche.
 _werkstatt_app = importlib.import_module("teile.05_werkstatt_app")
 sys.modules.setdefault("teile.werkstatt_app", _werkstatt_app)
+
+# 16_vokabeln als 'teile.vokabeln' (Wunsch #194) - die Abfrageformen und der
+# Aufgabenbau werden von den Tests direkt geprueft, ohne Umweg ueber HTTP.
+_vokabeln = importlib.import_module("teile.16_vokabeln")
+sys.modules.setdefault("teile.vokabeln", _vokabeln)

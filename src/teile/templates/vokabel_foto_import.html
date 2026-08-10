@@ -32,6 +32,15 @@
   font-size:13px; margin-bottom:12px;
 }
 .import-hinweis { color:var(--text-2); font-size:13px; margin-top:10px; }
+.verb-schalter {
+  display:flex; align-items:flex-start; gap:10px; margin-top:14px;
+  background:var(--surface-2); border:1.5px solid var(--border);
+  border-radius:12px; padding:11px 14px; font-size:14px;
+  line-height:1.4; cursor:pointer;
+}
+.verb-schalter input { margin:2px 0 0; flex-shrink:0; }
+.verb-schalter span { color:var(--text-2); font-size:12px; }
+.verb-schalter strong { color:var(--text); font-size:14px; font-weight:600; }
 .import-lade { display:none; text-align:center; color:var(--text-2); font-size:14px; margin-top:14px; }
 .empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
 {% endblock %}
@@ -65,11 +74,21 @@
       </div>
       <input type="hidden" name="sprache_id" id="sprache-id" value="{{ sprachen[0].id }}" required>
 
-      <div class="field-label">Foto der Vokabelliste</div>
+      {# Wunsch #194: Dieselbe Seite liest wahlweise eine Vokabelliste oder
+         eine Verbtabelle - die KI bekommt dafür zwei getrennte Anweisungen. #}
+      <label class="verb-schalter">
+        <input type="checkbox" name="verbmodus" value="1">
+        <span>
+          <strong>Tabelle unregelmäßiger Verben</strong><br>
+          Vier Spalten: Infinitiv, simple past, Perfect, Deutsch
+        </span>
+      </label>
+
+      <div class="field-label">Foto</div>
       <input class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" required>
 
       <button class="btn-add" type="submit">Vokabeln erkennen</button>
-      <div class="import-lade" id="import-lade">⏳ Foto wird gelesen und Vokabeln erkannt…</div>
+      <div class="import-lade" id="import-lade">⏳ Foto wird gelesen …</div>
       <div class="import-hinweis">Funktioniert am besten bei gut lesbaren, nicht zu vollen Seiten. Das Ergebnis kannst du vor dem Speichern noch prüfen und anpassen.</div>
     </form>
   </div>

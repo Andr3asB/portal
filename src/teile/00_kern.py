@@ -1593,6 +1593,21 @@ def _init_db(app):
                 db.commit()
             except sqlite3.OperationalError:
                 pass
+        # Wunsch #194: Unregelmaessige Verben. Bewusst zwei Spalten an
+        # `vokabeln` statt einer eigenen Tabelle: Kapitel, Freigaben,
+        # Sessions, Versuche, Aussprache und Statistik haengen alle an
+        # `vokabeln` - eine zweite Tabelle haette das alles verdoppelt.
+        # Ein Eintrag IST ein unregelmaessiges Verb, wenn beide Spalten
+        # gefuellt sind; `fremd` traegt dann den Infinitiv.
+        for col, definition in [
+            ("simple_past", "TEXT"),
+            ("perfect",     "TEXT"),
+        ]:
+            try:
+                db.execute(f"ALTER TABLE vokabeln ADD COLUMN {col} {definition}")
+                db.commit()
+            except sqlite3.OperationalError:
+                pass
         db.execute(
             "UPDATE wuensche SET erledigt_am=erstellt WHERE erledigt=1 AND erledigt_am IS NULL"
         )

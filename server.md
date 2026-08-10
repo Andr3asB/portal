@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v190: Wunsch #188 Tokenverbrauch je Wunsch)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v192: Wunsch #194 unregelmaessige Verben)*
 
 ## Host
 
@@ -503,6 +503,26 @@ teile/
                        [anzahl|alle]` - ohne Argument wird nur gezaehlt, weil
                        der Lauf echte Tokens aus dem Kontingent des Urhebers
                        kostet (~160-320 je Wunsch, gemessen).
+  16_vokabeln.py     – /a/vokabeln/<token>/ ... Wunsch #194: unregelmaessige
+                       Verben. Zwei OPTIONALE Spalten an `vokabeln`
+                       (simple_past, perfect) statt einer eigenen Tabelle -
+                       Kapitel, Freigaben, Sessions, Versuche, Aussprache und
+                       Statistik haengen alle an `vokabeln`. Ein Eintrag IST
+                       ein Verb, wenn BEIDE gefuellt sind (`_IST_VERB`);
+                       `fremd` ist dann der Infinitiv. Kein Typ-Merker - der
+                       waere eine zweite Wahrheit neben den Feldern. Halbe
+                       Paare werden ueberall verworfen (_verbformen_lesen(),
+                       Foto-Import), sonst gaebe es im Training eine Frage
+                       ohne Antwort. VERB_ABFRAGEN definiert die sechs
+                       waehlbaren Richtungen; mindestens eine angekreuzte
+                       schaltet das Training auf Verben um - deshalb gibt es
+                       KEINEN zusaetzlichen Hauptschalter. verb_aufgaben()
+                       baut je Verb und Richtung EINE Aufgabe. Der
+                       SQL-Filter im Lernstart ist nur eine Abkuerzung, die
+                       Korrektheit kommt aus verb_aufgaben(). Foto-Import:
+                       eigener Prompt (_verben_per_ki) statt eines Schalters
+                       im Vokabel-Prompt - ein Modell, das beide Vorlagen
+                       gleichzeitig erklaert bekommt, liefert Mischformen.
   manage.py          – wunsch_erledigt <id> "<umsetzung>" [tokens] - das
                        dritte Argument ist der Tokenverbrauch der Umsetzung
                        (Wunsch #188), NACH der Umsetzung eingetragen, nicht

@@ -23,6 +23,14 @@
   margin-top:24px; width:100%; background:var(--farbe); color:#fff; border:none;
   border-radius:12px; padding:13px 0; font-size:16px; font-weight:600; cursor:pointer;
 }
+.verb-hinweis { font-size:13px; color:var(--text-2); line-height:1.5; margin-bottom:10px; }
+.verb-liste { display:flex; flex-direction:column; gap:6px; }
+.verb-chip {
+  display:flex; align-items:center; gap:10px; background:var(--surface-2);
+  border:1.5px solid var(--border); border-radius:12px;
+  padding:11px 14px; font-size:15px; cursor:pointer;
+}
+.verb-chip input { margin:0; flex-shrink:0; }
 .empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
 {% endblock %}
 
@@ -57,6 +65,25 @@
       {# Wunsch #150: Fremde Kapitel sind auswaehlbar, aber erkennbar - sonst
          waere unklar, wessen Vokabeln man gerade uebt. #}
       <label class="kapitel-chip"><input type="checkbox" name="kapitel_ids" value="{{ k.id }}" class="kapitel-einzel" disabled> {{ k.name }}{% if k.geteilt_von %} <span style="color:var(--text-2); font-size:12px">· von {{ k.geteilt_von }}</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+
+    {# Wunsch #194: Der Spezialmodus fuer unregelmaessige Verben. Mindestens
+       ein Kreuz schaltet das Training um - deshalb braucht es keinen
+       zusaetzlichen Hauptschalter, der dasselbe noch einmal sagt. #}
+    <div class="form-label">Unregelmäßige Verben</div>
+    <div class="verb-hinweis">
+      Kreuze eine oder mehrere Abfrageformen an – dann übt das Training
+      <strong>nur unregelmäßige Verben</strong>, in genau diesen Richtungen.
+      Ohne Kreuz läuft alles wie bisher.
+    </div>
+    <div class="verb-liste">
+      {% for schluessel, form in verb_abfragen.items() %}
+      <label class="verb-chip">
+        <input type="checkbox" name="verb_formen" value="{{ schluessel }}"
+               {% if schluessel in verb_standard %}checked{% endif %}>
+        {{ form[0] }}
+      </label>
       {% endfor %}
     </div>
 

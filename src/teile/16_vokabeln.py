@@ -44,6 +44,63 @@ _FOTO_MAX_BYTES = 8 * 1024 * 1024  # 8 MB - Handyfotos passen bequem, schuetzt v
 _FOTO_MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic"}
 _MAX_OCR_PAARE = 60
 
+# Wunsch #194: Unregelmaessige Verben. Ein Eintrag IST ein unregelmaessiges
+# Verb, wenn `simple_past` UND `perfect` gefuellt sind - `fremd` traegt dann
+# den Infinitiv. Kein eigener Typ-Merker: Der waere eine zweite Wahrheit
+# neben den Feldern und koennte von ihnen abweichen.
+_IST_VERB = "COALESCE(v.simple_past,'') <> '' AND COALESCE(v.perfect,'') <> ''"
+
+# Die waehlbaren Abfrageformen. Reihenfolge = Anzeigereihenfolge.
+# Aufbau: schluessel -> (Beschriftung, Frage-Feld, [Antwort-Felder])
+VERB_ABFRAGEN = {
+    "deutsch_alle":      ("Deutsch → alle drei Formen",
+                          "deutsch", ["fremd", "simple_past", "perfect"]),
+    "infinitiv_formen":  ("Infinitiv → simple past + Perfect",
+                          "fremd", ["simple_past", "perfect"]),
+    "infinitiv_deutsch": ("Infinitiv → Deutsch",      "fremd",       ["deutsch"]),
+    "deutsch_infinitiv": ("Deutsch → Infinitiv",      "deutsch",     ["fremd"]),
+    "past_infinitiv":    ("simple past → Infinitiv",  "simple_past", ["fremd"]),
+    "perfect_infinitiv": ("Perfect → Infinitiv",      "perfect",     ["fremd"]),
+}
+# Voreinstellung auf der Lernseite: die beiden Formen, die in der Schule
+# tatsaechlich abgefragt werden.
+VERB_ABFRAGEN_STANDARD = ["deutsch_alle", "infinitiv_formen"]
+
+FELD_LABELS = {
+    "fremd":       "Infinitiv",
+    "simple_past": "simple past",
+    "perfect":     "Perfect",
+    "deutsch":     "Deutsch",
+}
+
+
+def verb_aufgaben(zeilen, formen):
+    """Aus Verb-Zeilen und gewaehlten Abfrageformen die Trainingsaufgaben.
+
+    Je Verb und je gewaehlter Form EINE Aufgabe - wer "Deutsch → alle drei"
+    und "Infinitiv → simple past + Perfect" ankreuzt, bekommt jedes Verb
+    zweimal, aus zwei Richtungen. Genau das ist der Sinn der Auswahl.
+
+    Uebersprungen wird eine Form, deren Fragefeld leer ist - sonst stuende
+    im Training eine Frage ohne Wort.
+    """
+    aufgaben = []
+    for z in zeilen:
+        for schluessel in formen:
+            if schluessel not in VERB_ABFRAGEN:
+                continue
+            label, frage_feld, antwort_felder = VERB_ABFRAGEN[schluessel]
+            frage_wort = (z[frage_feld] or "").strip()
+            felder = [{"label": FELD_LABELS[f], "erwartet": (z[f] or "").strip()}
+                      for f in antwort_felder if (z[f] or "").strip()]
+            if not frage_wort or not felder:
+                continue
+            aufgaben.append({
+                "id": z["id"], "form": schluessel, "richtung": label,
+                "frage": frage_wort, "felder": felder,
+            })
+    return aufgaben
+
 bp  = Blueprint("vokabeln_app", __name__)
 APP = "vokabeln"
 
@@ -202,6 +259,20 @@ def _zugaengliche_sprachen(db, user_id):
     """, {"uid": user_id}).fetchall()
 
 
+def _verbformen_lesen():
+    """simple past und Perfect aus dem Formular - oder (None, None).
+
+    Nur BEIDE zusammen ergeben ein unregelmaessiges Verb. Ein halb
+    ausgefuelltes Paar wird verworfen statt halb gespeichert: Sonst gaebe es
+    Eintraege, die im Verbtraining als Verb gelten und dort eine leere
+    Antwort erwarten."""
+    past    = (request.form.get("simple_past") or "").strip()
+    perfect = (request.form.get("perfect") or "").strip()
+    if past and perfect:
+        return past, perfect
+    return None, None
+
+
 def _kapitel_ids_setzen(db, vokabel_id, user_id, kapitel_ids):
     db.execute("DELETE FROM vokabel_kapitel_zuordnung WHERE vokabel_id=?", (vokabel_id,))
     for kid in kapitel_ids:
@@ -274,6 +345,52 @@ def _vokabeln_per_ki(user_id, sprache_name, mime, bild_b64):
     return paare
 
 
+def _verben_per_ki(user_id, mime, bild_b64):
+    """Wunsch #194: OCR einer Tabelle unregelmaessiger Verben (vier Spalten).
+
+    Eigener Aufruf statt eines Schalters in `_vokabeln_per_ki`: Der Prompt
+    beschreibt eine voellig andere Vorlage (Verbtabelle statt Vokabelliste),
+    und ein Modell, das beides gleichzeitig erklaert bekommt, liefert
+    zuverlaessig Mischformen.
+    """
+    system = (
+        "Du liest ein Foto einer Tabelle unregelmaessiger englischer Verben "
+        "(Schulheft, Buchseite) und extrahierst die Zeilen. Antworte "
+        'AUSSCHLIESSLICH mit einem JSON-Array der Form [{"fremd": "...", '
+        '"simple_past": "...", "perfect": "...", "deutsch": "..."}, ...]. '
+        '"fremd" ist der Infinitiv (ohne "to"), "simple_past" die zweite '
+        'Form, "perfect" die dritte Form (past participle), "deutsch" die '
+        "deutsche Bedeutung. Gibt es zu einer Form mehrere Varianten, nimm "
+        "die erste. Ignoriere Ueberschriften, Seitenzahlen und Nummerierung. "
+        "Keine Erklaerung, kein Markdown, kein Codeblock."
+    )
+    antwort = ki_anfrage(
+        user_id, "vokabeln_ocr", system,
+        "Extrahiere alle Verben mit ihren drei Formen und der Bedeutung.",
+        max_tokens=4000, bilder=[(mime, bild_b64)],
+    )
+    bereinigt = antwort.strip()
+    if bereinigt.startswith("```"):
+        bereinigt = bereinigt.strip("`")
+        if bereinigt.lower().startswith("json"):
+            bereinigt = bereinigt[4:]
+    daten = json.loads(bereinigt)
+    if not isinstance(daten, list):
+        raise ValueError("KI hat kein Array geliefert")
+    verben = []
+    for eintrag in daten[:_MAX_OCR_PAARE]:
+        e = eintrag or {}
+        zeile = {feld: str(e.get(feld) or "").strip()
+                 for feld in ("fremd", "simple_past", "perfect", "deutsch")}
+        # Alle vier oder gar nicht: Eine Zeile ohne dritte Form waere im
+        # Verbtraining eine Frage ohne Antwort.
+        if all(zeile.values()):
+            verben.append(zeile)
+    if not verben:
+        raise ValueError("KI hat keine Verben erkannt")
+    return verben
+
+
 @bp.route("/a/vokabeln/", defaults={"token": None})
 @bp.route("/a/vokabeln/<token>/")
 def index(token):
@@ -283,7 +400,8 @@ def index(token):
     sprachen = _eigene_sprachen(db, user["id"])
     kapitel  = _eigene_kapitel(db, user["id"])
     vokabeln = db.execute("""
-        SELECT v.id, v.fremd, v.deutsch, v.sprache_id, s.name AS sprache_name,
+        SELECT v.id, v.fremd, v.deutsch, v.simple_past, v.perfect,
+               v.sprache_id, s.name AS sprache_name,
                v.user_id, (SELECT u.name FROM users u WHERE u.id = v.user_id) AS besitzer,
                (SELECT GROUP_CONCAT(z.kapitel_id) FROM vokabel_kapitel_zuordnung z
                 WHERE z.vokabel_id = v.id) AS kapitel_ids,
@@ -317,11 +435,13 @@ def neu(token):
     deutsch    = request.form.get("deutsch", "").strip()
     sprache_id = to_int(request.form.get("sprache_id"))
     kapitel_ids = [to_int(k) for k in request.form.getlist("kapitel_ids")]
+    simple_past, perfect = _verbformen_lesen()
 
     if fremd and deutsch and sprache_id and _sprache_erlaubt(db, user["id"], sprache_id):
         cur = db.execute(
-            "INSERT INTO vokabeln(user_id, sprache_id, fremd, deutsch) VALUES(?,?,?,?)",
-            (user["id"], sprache_id, fremd, deutsch),
+            "INSERT INTO vokabeln(user_id, sprache_id, fremd, deutsch, simple_past, perfect) "
+            "VALUES(?,?,?,?,?,?)",
+            (user["id"], sprache_id, fremd, deutsch, simple_past, perfect),
         )
         _kapitel_ids_setzen(db, cur.lastrowid, user["id"], kapitel_ids)
         db.commit()
@@ -343,10 +463,13 @@ def bearbeiten(token, vid):
     sprache_id = to_int(request.form.get("sprache_id"))
     kapitel_ids = [to_int(k) for k in request.form.getlist("kapitel_ids")]
 
+    simple_past, perfect = _verbformen_lesen()
+
     if fremd and deutsch and sprache_id and _sprache_erlaubt(db, user["id"], sprache_id):
         db.execute(
-            "UPDATE vokabeln SET fremd=?, deutsch=?, sprache_id=? WHERE id=?",
-            (fremd, deutsch, sprache_id, vid),
+            "UPDATE vokabeln SET fremd=?, deutsch=?, sprache_id=?, "
+            "simple_past=?, perfect=? WHERE id=?",
+            (fremd, deutsch, sprache_id, simple_past, perfect, vid),
         )
         _kapitel_ids_setzen(db, vid, user["id"], kapitel_ids)
         db.commit()
@@ -484,7 +607,8 @@ def lernen(token):
     sprachen = _zugaengliche_sprachen(db, user["id"])
     kapitel  = _zugaengliche_kapitel(db, user["id"])
     return render_template("vokabel_lernen.html",
-        user=user, token=token, farbe=user["farbe"], sprachen=sprachen, kapitel=kapitel)
+        user=user, token=token, farbe=user["farbe"], sprachen=sprachen, kapitel=kapitel,
+        verb_abfragen=VERB_ABFRAGEN, verb_standard=VERB_ABFRAGEN_STANDARD)
 
 
 @bp.route("/a/vokabeln/lernen/start", defaults={"token": None}, methods=["POST"])
@@ -505,11 +629,27 @@ def lernen_start(token):
     # Wunsch #150: ueberall die gemeinsame Sichtbarkeitsregel statt user_id -
     # sonst waere ein geteiltes Kapitel zwar auswaehlbar, das Training aber
     # leer.
+    # Wunsch #194: Mindestens eine angekreuzte Abfrageform schaltet das
+    # Training auf unregelmaessige Verben um - der "Spezialmodus" aus dem
+    # Wunsch. Ohne Kreuz bleibt alles wie bisher. Ein zusaetzlicher
+    # Hauptschalter waere ein Bedienelement mehr fuer dieselbe Aussage.
+    verb_formen = [f for f in request.form.getlist("verb_formen")
+                   if f in VERB_ABFRAGEN]
+    nur_verben = bool(verb_formen)
+    # Der SQL-Filter ist eine Abkuerzung, KEINE Sicherung: Die Korrektheit
+    # kommt aus verb_aufgaben(), das jede Zeile ohne beide Formen ohnehin
+    # ueberspringt. Er verhindert nur, dass 500 normale Vokabeln geladen
+    # werden, um sie danach wegzuwerfen. (Ihn zu entfernen aendert deshalb
+    # kein Testergebnis - absichtlich geprueft.)
+    verb_filter = f" AND {_IST_VERB}" if nur_verben else ""
+    spalten = ("v.id, v.fremd, v.deutsch, v.simple_past, v.perfect"
+               if nur_verben else "v.id, v.fremd, v.deutsch")
+
     p = {"uid": user["id"], "sid": sprache_id}
     if alle_gewaehlt:
         vokabeln = db.execute(f"""
-            SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
-            WHERE  v.sprache_id = :sid AND {_VOKABEL_SICHTBAR}
+            SELECT {spalten} FROM vokabeln v
+            WHERE  v.sprache_id = :sid AND {_VOKABEL_SICHTBAR}{verb_filter}
         """, p).fetchall()
     else:
         gefunden = {}
@@ -517,19 +657,19 @@ def lernen_start(token):
             # "Ohne Kapitel" bleibt bewusst auf EIGENE Vokabeln beschraenkt:
             # Geteilt wird immer ein Kapitel, eine kapitellose fremde Vokabel
             # kann es also gar nicht geben.
-            for r in db.execute("""
-                SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
-                WHERE v.user_id = :uid AND v.sprache_id = :sid
+            for r in db.execute(f"""
+                SELECT {spalten} FROM vokabeln v
+                WHERE v.user_id = :uid AND v.sprache_id = :sid{verb_filter}
                   AND NOT EXISTS (SELECT 1 FROM vokabel_kapitel_zuordnung z WHERE z.vokabel_id=v.id)
             """, p).fetchall():
                 gefunden[r[0]] = r
         for kid in kapitel_ids:
             if not _kapitel_zugaenglich(db, user["id"], kid):
                 continue
-            for r in db.execute("""
-                SELECT v.id, v.fremd, v.deutsch FROM vokabeln v
+            for r in db.execute(f"""
+                SELECT {spalten} FROM vokabeln v
                 JOIN vokabel_kapitel_zuordnung z ON z.vokabel_id = v.id
-                WHERE v.sprache_id = :sid AND z.kapitel_id = :kid
+                WHERE v.sprache_id = :sid AND z.kapitel_id = :kid{verb_filter}
             """, {"sid": sprache_id, "kid": kid}).fetchall():
                 gefunden[r[0]] = r
         vokabeln = list(gefunden.values())
@@ -547,18 +687,26 @@ def lernen_start(token):
     )
     session_id = cur.lastrowid
 
-    if not vokabeln:
+    if nur_verben:
+        aufgaben = verb_aufgaben(vokabeln, verb_formen)
+    else:
+        # Ohne Verbmodus bleibt die Aufgabe wie bisher: EIN Feld, Richtung
+        # wuerfelt das Training selbst.
+        aufgaben = [{"id": v["id"], "fremd": v["fremd"], "deutsch": v["deutsch"]}
+                    for v in vokabeln]
+
+    if not aufgaben:
         db.execute("UPDATE vokabel_sessions SET beendet=datetime('now') WHERE id=?", (session_id,))
         db.commit()
         return render_template("vokabel_training.html",
-            user=user, token=token, farbe=user["farbe"], session_id=session_id, vokabeln=[])
+            user=user, token=token, farbe=user["farbe"], session_id=session_id,
+            vokabeln=[], verbmodus=nur_verben)
 
     db.commit()
-    aufgaben = [{"id": v[0], "fremd": v[1], "deutsch": v[2]} for v in vokabeln]
     random.shuffle(aufgaben)
     return render_template("vokabel_training.html",
         user=user, token=token, farbe=user["farbe"],
-        session_id=session_id, vokabeln=aufgaben)
+        session_id=session_id, vokabeln=aufgaben, verbmodus=nur_verben)
 
 
 @bp.route("/a/vokabeln/versuch", defaults={"token": None}, methods=["POST"])
@@ -752,18 +900,27 @@ def foto_import(token):
     if len(rohdaten) > _FOTO_MAX_BYTES:
         return _fehler("Das Foto ist zu groß (maximal 8 MB).")
 
+    # Wunsch #194: Dieselbe Seite liest wahlweise eine Vokabelliste oder eine
+    # Verbtabelle - mit zwei getrennten Prompts (siehe _verben_per_ki).
+    verbmodus = bool(request.form.get("verbmodus"))
+    b64 = base64.b64encode(rohdaten).decode()
     try:
-        paare = _vokabeln_per_ki(user["id"], sprache["name"], mime, base64.b64encode(rohdaten).decode())
+        if verbmodus:
+            paare = _verben_per_ki(user["id"], mime, b64)
+        else:
+            paare = _vokabeln_per_ki(user["id"], sprache["name"], mime, b64)
     except KiLimitError:
         return _fehler(
             "Monatliches KI-Kontingent aufgebraucht – bitte später erneut versuchen "
             "oder die Vokabeln manuell eintragen.")
     except Exception:
-        return _fehler("Auf dem Foto konnten keine Vokabeln erkannt werden.")
+        return _fehler("Auf dem Foto konnten keine Verben erkannt werden."
+                       if verbmodus else
+                       "Auf dem Foto konnten keine Vokabeln erkannt werden.")
 
     return render_template("vokabel_foto_pruefen.html",
         user=user, token=token, farbe=user["farbe"],
-        sprache=sprache, kapitel=kapitel, paare=paare)
+        sprache=sprache, kapitel=kapitel, paare=paare, verbmodus=verbmodus)
 
 
 @bp.route("/a/vokabeln/foto-import/speichern", defaults={"token": None}, methods=["POST"])
@@ -779,6 +936,15 @@ def foto_import_speichern(token):
     fremde   = request.form.getlist("fremd")
     deutsche = request.form.getlist("deutsch")
     behalten = {to_int(i) for i in request.form.getlist("behalten")}
+    # Wunsch #194: Im Verbmodus kommen zwei Listen mehr mit. Sie sind gleich
+    # lang wie `fremde`, weil das Pruefformular je Zeile alle Felder rendert -
+    # `_spalte()` faengt trotzdem ab, wenn nicht: eine zu kurze Liste soll die
+    # ganze Uebernahme nicht mit einem IndexError abbrechen.
+    pasts    = request.form.getlist("simple_past")
+    perfects = request.form.getlist("perfect")
+
+    def _spalte(liste, i):
+        return liste[i].strip() if i < len(liste) else ""
 
     for i, (fremd, deutsch) in enumerate(zip(fremde, deutsche)):
         if i not in behalten:
@@ -786,9 +952,13 @@ def foto_import_speichern(token):
         fremd, deutsch = fremd.strip(), deutsch.strip()
         if not fremd or not deutsch:
             continue
+        past, perfect = _spalte(pasts, i), _spalte(perfects, i)
+        if not (past and perfect):
+            past = perfect = None
         cur = db.execute(
-            "INSERT INTO vokabeln(user_id, sprache_id, fremd, deutsch) VALUES(?,?,?,?)",
-            (user["id"], sprache_id, fremd, deutsch),
+            "INSERT INTO vokabeln(user_id, sprache_id, fremd, deutsch, simple_past, perfect) "
+            "VALUES(?,?,?,?,?,?)",
+            (user["id"], sprache_id, fremd, deutsch, past, perfect),
         )
         _kapitel_ids_setzen(db, cur.lastrowid, user["id"], kapitel_ids)
     db.commit()

@@ -55,6 +55,11 @@
 .vokabel-row { display:flex; align-items:center; gap:10px; }
 .vokabel-text { flex:1; min-width:0; font-size:15px; }
 .vokabel-fremd { font-weight:600; }
+.vokabel-formen { font-size:13px; color:var(--text-2); margin-top:2px; }
+.verb-hinweis { font-size:12px; color:var(--text-2); margin:-2px 0 6px; line-height:1.45; }
+.verb-felder { display:flex; gap:10px; }
+.verb-felder > div { flex:1; min-width:0; }
+.verb-formlabel { font-size:11px; color:var(--text-2); margin-bottom:4px; }
 .vokabel-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
 .vokabel-edit-btn, .vokabel-anhoeren-btn {
   background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2); flex-shrink:0;
@@ -113,6 +118,22 @@
       <div class="form-label">Deutsch</div>
       <input class="form-input" type="text" name="deutsch" required autocomplete="off">
 
+      {# Wunsch #194: Unregelmäßige Verben. Beide Formen oder keine - ein
+         halb ausgefülltes Paar wird serverseitig verworfen, damit es im
+         Verbtraining keine Frage mit leerer Antwort gibt. #}
+      <div class="form-label">Unregelmäßiges Verb (optional)</div>
+      <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
+      <div class="verb-felder">
+        <div>
+          <div class="verb-formlabel">simple past</div>
+          <input class="form-input" type="text" name="simple_past" value="" autocomplete="off">
+        </div>
+        <div>
+          <div class="verb-formlabel">Perfect</div>
+          <input class="form-input" type="text" name="perfect" value="" autocomplete="off">
+        </div>
+      </div>
+
       {% if kapitel %}
       <div class="form-label">Kapitel (optional, mehrere möglich)</div>
       <div class="chip-row">
@@ -131,10 +152,15 @@
          placeholder="🔍 Vokabel suchen…" autocomplete="off">
 
   {% for v in vokabeln %}
-  <div class="vokabel-item" data-suche="{{ (v.fremd ~ ' ' ~ v.deutsch)|lower }}">
+  <div class="vokabel-item" data-suche="{{ (v.fremd ~ ' ' ~ v.deutsch ~ ' ' ~ (v.simple_past or '') ~ ' ' ~ (v.perfect or ''))|lower }}">
     <div class="vokabel-row">
       <div class="vokabel-text">
         <span class="vokabel-fremd">{{ v.fremd }}</span> – {{ v.deutsch }}
+        {# Wunsch #194: Am Kürzel sieht man ohne Aufklappen, dass ein Wort im
+           Verbtraining mitläuft. #}
+        {% if v.simple_past and v.perfect %}
+        <div class="vokabel-formen">🔤 {{ v.simple_past }} · {{ v.perfect }}</div>
+        {% endif %}
         <div class="vokabel-meta">{{ v.sprache_name }}{% if v.kapitel_namen %} · {{ v.kapitel_namen }}{% endif %}</div>
       </div>
       <button class="vokabel-anhoeren-btn{% if v.audio_da %} audio-da{% endif %}" type="button"
@@ -168,6 +194,22 @@
 
         <div class="form-label">Deutsch</div>
         <input class="form-input" type="text" name="deutsch" value="{{ v.deutsch }}" required autocomplete="off">
+
+        {# Wunsch #194: Unregelmäßige Verben. Beide Formen oder keine - ein
+           halb ausgefülltes Paar wird serverseitig verworfen, damit es im
+           Verbtraining keine Frage mit leerer Antwort gibt. #}
+        <div class="form-label">Unregelmäßiges Verb (optional)</div>
+        <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
+        <div class="verb-felder">
+          <div>
+            <div class="verb-formlabel">simple past</div>
+            <input class="form-input" type="text" name="simple_past" value="{{ v.simple_past or '' }}" autocomplete="off">
+          </div>
+          <div>
+            <div class="verb-formlabel">Perfect</div>
+            <input class="form-input" type="text" name="perfect" value="{{ v.perfect or '' }}" autocomplete="off">
+          </div>
+        </div>
 
         {% if kapitel %}
         {% set eigene_kapitel_ids = (v.kapitel_ids or '').split(',') %}

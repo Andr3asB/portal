@@ -17,7 +17,14 @@
 .frage-input:focus { border-color:var(--farbe); }
 .frage-input.richtig { border-color:#34c759; }
 .frage-input.falsch { border-color:#ff3b30; }
+.antwort-zeile { margin-top:10px; text-align:left; }
+.antwort-zeile:first-child { margin-top:0; }
+.antwort-label {
+  font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  letter-spacing:.5px; margin-bottom:4px;
+}
 .feedback { margin-top:14px; font-size:15px; font-weight:600; min-height:22px; }
+.feedback .loesung { display:block; font-weight:500; font-size:14px; margin-top:4px; }
 .feedback.richtig { color:#34c759; }
 .feedback.falsch { color:#ff3b30; }
 .btn-anhoeren {
@@ -56,7 +63,9 @@
   <div class="frage-card">
     <div class="frage-richtung" id="frage-richtung"></div>
     <div class="frage-wort" id="frage-wort"></div>
-    <input class="frage-input" id="frage-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    {# Wunsch #194: Ein Verb wird mit mehreren Formen auf einmal abgefragt -
+       die Felder entstehen deshalb je Aufgabe, nicht fest im Markup. #}
+    <div id="antwort-felder"></div>
     <div class="feedback" id="feedback"></div>
     <button class="btn-anhoeren" id="anhoeren-btn" type="button" data-klick="wortAnhoeren">🔊 Anhören</button>
     <button class="btn-antworten" id="antworten-btn">Antworten</button>
@@ -85,6 +94,10 @@ const TP    = {{ tp|tojson }};
 const SESSION_ID = {{ session_id }};
 let queue = {{ vokabeln|tojson }};
 const gesamt = queue.length;
+// Im Verbmodus steht ein Verb mehrfach in der Warteschlange (eine Aufgabe je
+// gewählter Abfrageform). Gezählt wird, was gelernt ist - also die Zahl der
+// verschiedenen Vokabeln, nicht die der Aufgaben.
+const verschiedene = new Set(queue.map(a => a.id)).size;
 let erledigt = new Set();
 let aktuelle = null;
 let beendet = false;
@@ -93,22 +106,61 @@ function normalisieren(s) {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+// Wunsch #194: Im Verbmodus bringt jede Aufgabe ihre Felder selbst mit
+// (`felder`), im normalen Modus würfelt das Training die Richtung wie
+// bisher. `felderBauen` vereinheitlicht beides: danach hat JEDE Aufgabe eine
+// Liste erwarteter Antworten, und die Prüfung kennt nur noch diesen Fall.
+function felderBauen(aufgabe) {
+  if (aufgabe.felder) {
+    return {frage: aufgabe.frage, richtung: aufgabe.richtung, felder: aufgabe.felder};
+  }
+  const fremdZuDeutsch = Math.random() < 0.5;
+  return {
+    frage: fremdZuDeutsch ? aufgabe.fremd : aufgabe.deutsch,
+    richtung: fremdZuDeutsch ? 'Was heißt das auf Deutsch?'
+                             : 'Wie heißt das in der Fremdsprache?',
+    felder: [{label: '', erwartet: fremdZuDeutsch ? aufgabe.deutsch : aufgabe.fremd}],
+  };
+}
+
 function naechsteFrage() {
   if (queue.length === 0) {
     zeigeEnde();
     return;
   }
   aktuelle = queue.shift();
-  aktuelle.richtung = Math.random() < 0.5 ? 'fremd_zu_deutsch' : 'deutsch_zu_fremd';
-  const gezeigt = aktuelle.richtung === 'fremd_zu_deutsch' ? aktuelle.fremd : aktuelle.deutsch;
-  document.getElementById('frage-richtung').textContent =
-    aktuelle.richtung === 'fremd_zu_deutsch' ? 'Was heißt das auf Deutsch?' : 'Wie heißt das in der Fremdsprache?';
-  document.getElementById('frage-wort').textContent = gezeigt;
-  const input = document.getElementById('frage-input');
-  input.value = '';
-  input.className = 'frage-input';
-  input.disabled = false;
-  input.focus();
+  aktuelle.gestellt = felderBauen(aktuelle);
+
+  document.getElementById('frage-richtung').textContent = aktuelle.gestellt.richtung;
+  document.getElementById('frage-wort').textContent = aktuelle.gestellt.frage;
+
+  const behaelter = document.getElementById('antwort-felder');
+  behaelter.textContent = '';
+  aktuelle.gestellt.felder.forEach((feld, i) => {
+    const zeile = document.createElement('div');
+    zeile.className = 'antwort-zeile';
+    if (feld.label) {
+      const beschriftung = document.createElement('div');
+      beschriftung.className = 'antwort-label';
+      // textContent statt innerHTML - die Regel gilt hier ohne Ausnahme,
+      // auch wenn die Beschriftung aus einer festen Liste kommt.
+      beschriftung.textContent = feld.label;
+      zeile.appendChild(beschriftung);
+    }
+    const eingabe = document.createElement('input');
+    eingabe.className = 'frage-input';
+    eingabe.type = 'text';
+    eingabe.autocomplete = 'off';
+    eingabe.autocapitalize = 'off';
+    eingabe.spellcheck = false;
+    eingabe.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('antworten-btn').click();
+    });
+    zeile.appendChild(eingabe);
+    behaelter.appendChild(zeile);
+  });
+  behaelter.querySelector('input')?.focus();
+
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('anhoeren-btn').classList.remove('sichtbar');
@@ -119,24 +171,40 @@ function naechsteFrage() {
 
 function aktualisiereFortschritt() {
   document.getElementById('fortschritt').textContent =
-    `${erledigt.size} von ${gesamt} gelernt`;
+    `${erledigt.size} von ${verschiedene} gelernt`;
 }
 
 function pruefen() {
-  const input = document.getElementById('frage-input');
-  const erwartetRoh = aktuelle.richtung === 'fremd_zu_deutsch' ? aktuelle.deutsch : aktuelle.fremd;
-  const richtig = normalisieren(input.value) === normalisieren(erwartetRoh) && input.value.trim() !== '';
+  const eingaben = [...document.querySelectorAll('#antwort-felder input')];
+  const felder = aktuelle.gestellt.felder;
+  // Nur ganz richtig zählt: Wer zwei von drei Formen kann, kann das Verb
+  // noch nicht - es kommt zurück in die Warteschlange.
+  const einzeln = eingaben.map((eingabe, i) =>
+    normalisieren(eingabe.value) === normalisieren(felder[i].erwartet)
+    && eingabe.value.trim() !== '');
+  const richtig = einzeln.every(Boolean);
 
-  input.disabled = true;
-  input.className = 'frage-input ' + (richtig ? 'richtig' : 'falsch');
+  eingaben.forEach((eingabe, i) => {
+    eingabe.disabled = true;
+    eingabe.className = 'frage-input ' + (einzeln[i] ? 'richtig' : 'falsch');
+  });
+
   const feedback = document.getElementById('feedback');
+  feedback.textContent = '';
   if (richtig) {
     feedback.textContent = '✅ Richtig!';
     feedback.className = 'feedback richtig';
     erledigt.add(aktuelle.id);
   } else {
-    feedback.textContent = `❌ Richtig wäre: ${erwartetRoh}`;
     feedback.className = 'feedback falsch';
+    feedback.textContent = '❌ Richtig wäre:';
+    felder.forEach((feld, i) => {
+      if (einzeln[i]) return;
+      const zeile = document.createElement('span');
+      zeile.className = 'loesung';
+      zeile.textContent = (feld.label ? feld.label + ': ' : '') + feld.erwartet;
+      feedback.appendChild(zeile);
+    });
     queue.push(aktuelle);
   }
 
@@ -183,15 +251,12 @@ async function wortAnhoeren() {
   anhoerenAudio.play().catch(err => console.warn('Aussprache konnte nicht abgespielt werden:', err));
 }
 
-document.getElementById('frage-input')?.addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('antworten-btn').click();
-});
-
 function zeigeEnde() {
   document.querySelector('.frage-card').style.display = 'none';
   document.getElementById('beenden-btn').style.display = 'none';
   document.getElementById('ende-card').style.display = 'block';
-  document.getElementById('ende-text').textContent = `Geschafft! ${gesamt} Vokabel${gesamt !== 1 ? 'n' : ''} gelernt.`;
+  document.getElementById('ende-text').textContent =
+    `Geschafft! ${verschiedene} Vokabel${verschiedene !== 1 ? 'n' : ''} gelernt.`;
   sitzungBeenden();
 }
 
