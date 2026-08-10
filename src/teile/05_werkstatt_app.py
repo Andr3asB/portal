@@ -104,7 +104,7 @@ def index(token):
         urheber_ids=_urheber_ids(db),
         prios_vorhanden=prios_vorhanden, prio_labels=_PRIO_LABELS,
         apps_vorhanden=apps_vorhanden, urheber_vorhanden=urheber_vorhanden,
-        ersatz_titel=ersatz_titel,
+        ersatz_titel=ersatz_titel, verlauf_stand=verlauf_stand,
     )
 
 
@@ -193,6 +193,30 @@ def _aktionen_je_wunsch(db):
     """):
         aus.setdefault(r["wunsch_id"], []).append(dict(r))
     return aus
+
+
+def verlauf_stand(liste):
+    """Was von einem Verlauf auf der EINGEKLAPPTEN Karte stehen muss.
+
+    Der Verlauf steckte bisher vollstaendig in der Detailansicht - man musste
+    jede Karte einzeln antippen, um zu sehen, ob ueberhaupt etwas darin
+    steht. Bei knapp 190 Wuenschen heisst das: Eine Rueckfrage, die auf eine
+    Antwort wartet, ist praktisch unsichtbar.
+
+    "Offen" ist eine Rueckfrage, auf die KEINE Antwort mehr folgt. Es zaehlt
+    also die Reihenfolge, nicht die blosse Anwesenheit einer Antwort: Wer auf
+    eine alte Frage geantwortet hat und danach eine neue stellt, hat wieder
+    eine offene.
+
+    Gibt {'anzahl': int, 'offene_frage': bool} zurueck.
+    """
+    offen = False
+    for a in liste or []:
+        if a["art"] == "frage":
+            offen = True
+        elif a["art"] == "antwort":
+            offen = False
+    return {"anzahl": len(liste or []), "offene_frage": offen}
 
 
 def _urheber_ids(db):

@@ -25,6 +25,13 @@
   font-size:11px; font-weight:700; color:#fff;
   border-radius:8px; padding:2px 8px; flex-shrink:0;
 }
+.verlauf-badge {
+  font-size:11px; font-weight:600; padding:2px 7px; border-radius:8px;
+  background:var(--surface-2); color:var(--text-2); white-space:nowrap;
+}
+/* Eine wartende Rueckfrage ist kein Zaehlwert, sondern eine Aufforderung -
+   sie traegt deshalb Farbe, alles andere bleibt grau. */
+.verlauf-badge.wartet { background:#e8a33d; color:#fff; }
 .wunsch-titel {
   font-size:15px; font-weight:700; color:var(--text); margin-bottom:4px;
   line-height:1.3;
@@ -308,6 +315,15 @@
         {{ PRIO_LABELS[w.prioritaet] }}
       </span>
       {% endif %}
+      {# Der Verlauf steckte vollstaendig in der Detailansicht: Man musste
+         jede Karte einzeln antippen, um zu sehen, ob ueberhaupt etwas darin
+         steht. Eine wartende Rueckfrage war damit unsichtbar. #}
+      {% set stand = verlauf_stand(aktionen.get(w.id)) %}
+      {% if stand.offene_frage %}
+      <span class="verlauf-badge wartet">❓ Rückfrage offen</span>
+      {% elif stand.anzahl %}
+      <span class="verlauf-badge">💬 {{ stand.anzahl }}</span>
+      {% endif %}
     </div>
     {# Wunsch #187: Keine Karte ohne Ueberschrift. Steht kein KI-Titel da,
        tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man
@@ -364,6 +380,15 @@
          musste man es erraten. #}
       <span class="wunsch-pfeil">›</span>
       <span class="wunsch-id">#{{ w.id }}</span>
+      {# Der Verlauf steckte vollstaendig in der Detailansicht: Man musste
+         jede Karte einzeln antippen, um zu sehen, ob ueberhaupt etwas darin
+         steht. Eine wartende Rueckfrage war damit unsichtbar. #}
+      {% set stand = verlauf_stand(aktionen.get(w.id)) %}
+      {% if stand.offene_frage %}
+      <span class="verlauf-badge wartet">❓ Rückfrage offen</span>
+      {% elif stand.anzahl %}
+      <span class="verlauf-badge">💬 {{ stand.anzahl }}</span>
+      {% endif %}
     </div>
     {# Wunsch #187: Keine Karte ohne Ueberschrift. Steht kein KI-Titel da,
        tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man

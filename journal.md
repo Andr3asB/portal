@@ -2,6 +2,70 @@
 
 ---
 
+## 2026-08-10 – portal-v187: Der Verlauf war unsichtbar, und meine Rückfrage stand am falschen Ort
+
+> „Die Rückfragen sollen doch als Aktion am Wunsch sichtbar dokumentiert sein.
+> Ich sehe die Rückfrage aber nicht und ich kann auch nicht erkennen, ob es
+> eine eingeklappte Aktion gibt, bis ich drauf klicke."
+
+Zwei Fehler auf einmal, und der erste ist meiner.
+
+### Mein Fehler: die Rückfrage stand nur im Chat
+
+Wunsch #161 hat die Werkstatt zum Ticketsystem gemacht, damit genau das nicht
+passiert: Plan, Rückfrage, Antwort und Umsetzung stehen **am Wunsch**, nicht
+in einem Verlauf, den ausser mir niemand hat. Meine Rückfrage zu #188 habe
+ich trotzdem nur im Chat gestellt – zweimal, in zwei Läufen.
+
+Der Grund ist banal und deshalb wichtig: Es gab von der Kommandozeile aus
+keinen Weg, eine Aktion einzutragen. Die Weboberfläche kann es, ich nicht.
+Also `manage.py wunsch_aktion <id> <art> "<text>"`, mit derselben
+Push-Benachrichtigung wie über die Oberfläche (#166) – eine Rückfrage, die
+niemanden erreicht, ist so gut wie nicht gestellt.
+
+Die Rückfrage zu #188 steht jetzt dort, wo sie hingehört, und hat einen Push
+ausgelöst.
+
+### Der Fehler im Portal: ein Verlauf, den man nur durch Antippen findet
+
+Der Verlauf steckte vollständig in der aufklappbaren Detailansicht. Bei 190
+Karten heisst „man kann nachsehen" praktisch „niemand sieht es". Jetzt trägt
+die eingeklappte Karte ein Abzeichen:
+
+| Zustand | Abzeichen |
+|---|---|
+| nichts im Verlauf | keins |
+| Einträge vorhanden | `💬 3`, grau |
+| Rückfrage wartet | `❓ Rückfrage offen`, orange |
+
+Ein Abzeichen an *jeder* Karte wäre so nutzlos wie gar keins – deshalb bleibt
+die Karte ohne Verlauf leer. Und die wartende Rückfrage ist kein Zählwert,
+sondern eine Aufforderung; sie trägt als Einzige Farbe.
+
+### Die Regel, die man leicht falsch baut
+
+„Offen" ist eine Rückfrage, auf die **keine Antwort mehr folgt** – es zählt
+die Reihenfolge, nicht die blosse Anwesenheit einer Antwort irgendwo im
+Verlauf. Wer auf eine alte Frage geantwortet hat und danach eine neue stellt,
+hat wieder eine offene. Und eine Notiz oder ein Plan beendet nichts: Sonst
+gälte jede Frage als beantwortet, sobald irgendjemand irgendetwas
+dazuschreibt.
+
+Beide Fehlformen habe ich absichtlich eingebaut, beide werden rot. Sieben
+Injektionen, sieben Treffer – darunter der Fall, der sonst unbemerkt bliebe:
+das Abzeichen des falschen Wunsches auf allen Karten.
+
+### Live geprüft
+
+Alle 19 Seiten 200. Genau eine Karte zeigt „Rückfrage offen" (#188), 24
+Wünsche tragen ein Abzeichen. 998 Tests grün.
+
+**Live verändert:** ein echter Datensatz, absichtlich – die Rückfrage an
+Wunsch #188. Das ist kein Testeintrag, sondern der eigentliche Zweck; sie
+bleibt stehen.
+
+---
+
 ## 2026-08-10 – portal-v184/v185: Wünsche #187 und #186
 
 ### #187 – keine Wunsch-Karte ohne Überschrift

@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v185: Wuensche #187 Wunsch-Ueberschriften, #186 stehende Kopfzeile)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v187: Verlaufs-Abzeichen auf der Wunschkarte, manage.py wunsch_aktion)*
 
 ## Host
 
@@ -503,6 +503,15 @@ teile/
                        [anzahl|alle]` - ohne Argument wird nur gezaehlt, weil
                        der Lauf echte Tokens aus dem Kontingent des Urhebers
                        kostet (~160-320 je Wunsch, gemessen).
+  05_werkstatt_app.py- /a/werkstatt/<token>/ Uebersicht aller Wuensche.
+                       verlauf_stand(liste) sagt, was auf die EINGEKLAPPTE
+                       Karte gehoert: Anzahl der Aktionen und ob eine
+                       Rueckfrage offen ist. "Offen" heisst: auf die 'frage'
+                       folgt keine 'antwort' - es zaehlt die REIHENFOLGE, nicht
+                       das Vorkommen (eine neue Frage nach einer alten Antwort
+                       ist wieder offen; 'notiz'/'plan' beenden nichts).
+                       Vorher steckte der ganze Verlauf in der Detailansicht,
+                       eine wartende Rueckfrage war bei ~190 Karten unsichtbar.
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,

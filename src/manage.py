@@ -10,6 +10,7 @@ Aufruf im Container:
   docker exec portal python manage.py listwuensche
   docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung"
   docker exec portal python manage.py titel_nachtragen 5
+  docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"
   docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
@@ -470,6 +471,52 @@ def cmd_listapps(_):
     db.close()
 
 
+def cmd_wunsch_aktion(args):
+    """Eine Aktion an einen Wunsch haengen - von der Kommandozeile aus.
+
+        docker exec portal python manage.py wunsch_aktion 188 frage "Woher..."
+        docker exec portal python manage.py wunsch_aktion 188 notiz "..." --wer 1
+
+    Warum es das gibt: Rueckfragen sollen laut Wunsch #161 AM WUNSCH stehen,
+    nicht in einem Chatverlauf, den ausser mir niemand hat. Ohne diesen Befehl
+    landete jede Rueckfrage, die beim Arbeiten entsteht, ausserhalb des
+    Systems - genau die Luecke, die #161 schliessen wollte.
+
+    Bei art='frage' geht dieselbe Push-Benachrichtigung raus wie ueber die
+    Weboberflaeche (Wunsch #166). Sonst waere eine Rueckfrage von hier aus
+    still, und still ist so gut wie gar nicht gestellt.
+    """
+    if len(args) < 3:
+        sys.exit('Aufruf: wunsch_aktion <wunsch-id> <art> "<text>" [--wer <user-id>]')
+    wid, art, text = args[0], args[1], args[2]
+    wer = None
+    if "--wer" in args:
+        wer = int(args[args.index("--wer") + 1])
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from app import app
+    from teile.kern import get_db, push_send
+
+    with app.app_context():
+        db = get_db()
+        from teile.werkstatt_app import AKTIONS_ARTEN, _admins_benachrichtigen
+        if art not in AKTIONS_ARTEN:
+            sys.exit(f"Unbekannte Art '{art}'. Erlaubt: {', '.join(AKTIONS_ARTEN)}")
+        if not db.execute("SELECT 1 FROM wuensche WHERE id=?", (wid,)).fetchone():
+            sys.exit(f"Wunsch #{wid} gibt es nicht.")
+        db.execute(
+            "INSERT INTO wunsch_aktionen(wunsch_id, art, text, user_id) VALUES(?,?,?,?)",
+            (wid, art, text[:2000], wer))
+        db.commit()
+        print(f"#{wid}: {AKTIONS_ARTEN[art][0]} {AKTIONS_ARTEN[art][1]} eingetragen.")
+        if art == "frage":
+            # Absender ist hier niemand aus der Familie - `id` -1 sorgt dafuer,
+            # dass die Ausschlussbedingung ("nicht an den Fragesteller selbst")
+            # niemanden trifft und ALLE Admins die Frage bekommen.
+            _admins_benachrichtigen(db, {"id": -1, "name": "Claude"}, int(wid), text)
+            print("  Push an die Admins ausgeloest.")
+
+
 def cmd_titel_nachtragen(args):
     """Wunsch #187: Ueberschriften fuer Wuensche nachtragen, die keine haben.
 
@@ -479,7 +526,8 @@ def cmd_titel_nachtragen(args):
 
     Aufruf:
         docker exec portal python manage.py titel_nachtragen        # zaehlt nur
-        docker exec portal python manage.py titel_nachtragen 5      # die 5 aeltesten
+        docker exec portal python manage.py titel_nachtragen 5
+  docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"      # die 5 aeltesten
         docker exec portal python manage.py titel_nachtragen alle
 
     Kostet echte Tokens aus dem Kontingent des jeweiligen Urhebers (rund 160
@@ -565,6 +613,7 @@ CMDS = {
     "listtodos":       cmd_listtodos,
     "wunsch_erledigt": cmd_wunsch_erledigt,
     "titel_nachtragen": cmd_titel_nachtragen,
+    "wunsch_aktion":   cmd_wunsch_aktion,
     "backlog":         cmd_backlog,
     "ki_modell":       cmd_ki_modell,
     "ki_stimme":       cmd_ki_stimme,

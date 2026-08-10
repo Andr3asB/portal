@@ -22,3 +22,10 @@ sys.modules.setdefault("teile.rezepte", _rezepte)
 # aus demselben Modul, in dem der KI-Titel entsteht.
 _werkstatt = importlib.import_module("teile.02_werkstatt")
 sys.modules.setdefault("teile.werkstatt", _werkstatt)
+
+# 05_werkstatt_app als 'teile.werkstatt_app' - `manage.py wunsch_aktion`
+# benutzt AKTIONS_ARTEN und _admins_benachrichtigen von dort, damit eine
+# Rueckfrage von der Kommandozeile genau dieselbe Push-Nachricht ausloest
+# wie eine aus der Weboberflaeche.
+_werkstatt_app = importlib.import_module("teile.05_werkstatt_app")
+sys.modules.setdefault("teile.werkstatt_app", _werkstatt_app)
