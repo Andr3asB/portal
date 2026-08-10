@@ -170,6 +170,25 @@
       border-radius: 4px;
     }
 
+    /* Wunsch #196: Nach unten ziehen laedt neu.
+       `overscroll-behavior-y: contain` schaltet das browsereigene
+       Pull-to-Refresh ab - sonst gaebe es auf dem iPhone im Browser ZWEI
+       Gesten uebereinander (und in der installierten PWA gar keine, was der
+       eigentliche Anlass war). So verhaelt sich beides gleich. */
+    body { overscroll-behavior-y: contain; }
+    .ptr-anzeige {
+      position: fixed; left: 50%; top: calc(var(--st) + 4px);
+      transform: translate(-50%, -120%);
+      z-index: 150;
+      background: var(--surface); color: var(--text-2);
+      border: 1.5px solid var(--border); border-radius: 20px;
+      padding: 7px 16px; font-size: 13px; font-weight: 600;
+      box-shadow: 0 2px 8px var(--shadow);
+      pointer-events: none; opacity: 0;
+    }
+    .ptr-anzeige.sichtbar { opacity: 1; }
+    .ptr-anzeige.laedt { transform: translate(-50%, 0); }
+
     /* Hamburger-Menü */
     .menu-overlay {
       display: none; position: fixed; inset: 0; z-index: 200;
@@ -285,6 +304,8 @@
 <body class="{{ 'dark' if dm == 1 else ('auto' if dm == 2 else '') }}">
 
 <!-- App-Header mit Navigation -->
+<div class="ptr-anzeige" id="ptr-anzeige" aria-hidden="true">Zum Neuladen ziehen</div>
+
 <header class="app-header">
   <div class="nav-bar">
     {% block nav_left %}
@@ -709,6 +730,78 @@
       delete k.dataset.vorher;
     });
   });
+
+  // --- Wunsch #196: Nach unten ziehen laedt die Seite neu -----------------
+  //
+  // Bewusst ein RICHTIGES Neuladen und kein Nachladen des Inhalts per fetch:
+  // Jede App bringt eigene Skripte mit, die beim Laden ihre Listener setzen
+  // (Suchfelder, Filter, Sortierung). Tauschte man nur das <main> aus, waeren
+  // die danach still tot - in 19 Apps, ohne dass irgendwo etwas rot wird.
+  //
+  // "Ohne den Fokus zu verlieren" (Wunsch) heisst hier: die Blaetterstelle
+  // bleibt. Sie wird vor dem Neuladen weggeschrieben und danach wieder
+  // hergestellt. Der Tastaturfokus in einem Eingabefeld ueberlebt ein
+  // Neuladen prinzipbedingt nicht - das waere nur mit dem Austausch-Weg
+  // oben zu haben, und der Preis dafuer ist zu hoch.
+  var PTR_SCHWELLE = 70;     // px, ab hier loest das Loslassen aus
+  var PTR_SPEICHER = 'ptr-blaetterstelle';
+
+  (function ptrEinrichten() {
+    var anzeige = document.getElementById('ptr-anzeige');
+    if (!anzeige || !('ontouchstart' in window)) return;
+    var startY = null, zieht = false;
+
+    document.addEventListener('touchstart', function(e) {
+      // Nur wenn die Seite schon ganz oben steht - sonst waere jedes
+      // Hochwischen in einer langen Liste ein Neuladeversuch.
+      startY = (window.scrollY <= 0 && e.touches.length === 1)
+        ? e.touches[0].clientY : null;
+      zieht = false;
+    }, {passive: true});
+
+    document.addEventListener('touchmove', function(e) {
+      if (startY === null) return;
+      var strecke = e.touches[0].clientY - startY;
+      if (strecke <= 0) { anzeige.classList.remove('sichtbar', 'laedt'); zieht = false; return; }
+      zieht = true;
+      anzeige.classList.add('sichtbar');
+      anzeige.textContent = strecke >= PTR_SCHWELLE ? 'Loslassen zum Neuladen' : 'Zum Neuladen ziehen';
+      // Nicht linear mitziehen, sondern gedaempft - so fuehlt sich die
+      // Schwelle als Widerstand an, statt als harte Grenze.
+      var weg = Math.min(strecke * 0.5, PTR_SCHWELLE);
+      anzeige.style.transform = 'translate(-50%, ' + (weg - 60) + 'px)';
+    }, {passive: true});
+
+    document.addEventListener('touchend', function() {
+      if (startY === null) return;
+      var ausloesen = zieht &&
+        anzeige.textContent === 'Loslassen zum Neuladen';
+      startY = null; zieht = false;
+      if (!ausloesen) {
+        anzeige.classList.remove('sichtbar', 'laedt');
+        anzeige.style.transform = '';
+        return;
+      }
+      anzeige.textContent = 'Wird neu geladen …';
+      anzeige.style.transform = '';
+      anzeige.classList.add('sichtbar', 'laedt');
+      try { sessionStorage.setItem(PTR_SPEICHER, String(window.scrollY)); } catch (e) {}
+      location.reload();
+    }, {passive: true});
+  })();
+
+  // Blaetterstelle nach dem Neuladen wiederherstellen. Der Schluessel wird
+  // sofort entfernt: Er gilt fuer GENAU dieses eine Neuladen, sonst spraenge
+  // die Seite auch beim naechsten normalen Aufruf an dieselbe Stelle.
+  (function ptrStelleZurueck() {
+    var wert = null;
+    try {
+      wert = sessionStorage.getItem(PTR_SPEICHER);
+      sessionStorage.removeItem(PTR_SPEICHER);
+    } catch (e) { return; }
+    if (wert === null) return;
+    window.scrollTo(0, parseInt(wert, 10) || 0);
+  })();
 
   // Kleinkram, der früher als Ausdruck direkt im Attribut stand.
   window.nachObenScrollen  = function() { window.scrollTo({top: 0, behavior: 'smooth'}); };

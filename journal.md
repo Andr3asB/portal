@@ -2,6 +2,83 @@
 
 ---
 
+## 2026-08-10 – portal-v194/v195: Wünsche #196 und #195
+
+### #196 – nach unten ziehen lädt neu
+
+> „Nach unten ziehen der Seite soll die Daten der aktuellen Seite neu laden,
+> ohne den Fokus zu verlieren."
+
+Vier Zeilen CSS, ein Skriptblock in `base.html`, damit sofort in allen 19
+Apps.
+
+**Ein echtes Neuladen, kein Nachladen per fetch.** Das wäre die elegantere
+Lösung gewesen und die falsche: Jede App bringt eigene Skripte mit, die beim
+Laden ihre Listener setzen – Suchfelder, Filter, Sortierung. Tauschte man nur
+das `<main>` aus, wären die danach still tot. In 19 Apps, ohne dass irgendwo
+etwas rot wird.
+
+**„Ohne den Fokus zu verlieren"** heisst hier: die Blätterstelle bleibt. Sie
+wird vor dem Neuladen weggeschrieben und danach wiederhergestellt – und der
+Merker sofort gelöscht, sonst spränge auch der nächste normale Aufruf an
+dieselbe Stelle. Der Tastaturfokus in einem Eingabefeld überlebt ein
+Neuladen prinzipbedingt nicht; das ginge nur über den fetch-Weg oben.
+
+`overscroll-behavior-y: contain` schaltet die browsereigene Geste ab. Sonst
+gäbe es im Browser zwei übereinander – und in der installierten PWA, wo der
+Anlass liegt, gar keine.
+
+**Was ich nicht prüfen konnte: die Geste selbst.** Dafür braucht es einen
+Finger auf einem Touchgerät. Geprüft ist, dass die Bausteine überall
+ankommen und die Regeln stimmen, die man beim Nachbauen falsch macht.
+
+### #195 – Verbfelder nur dort, wo es sie gibt
+
+> „Unregelmäßige Verben gibt es nur im englischen (afaik), dann könnte man
+> den Teil doch in anderen Sprachen ausblenden oder sogar in Englisch
+> einklappen."
+
+Beides gemacht: ausblenden bei anderen Sprachen, einklappen bei Englisch.
+An drei Stellen – Vokabelformular, Lernseite, Foto-Import.
+
+**Das Ausblenden im Browser ist Bequemlichkeit, keine Regel.** Ein POST mit
+`simple_past` an einer lateinischen Vokabel wird auf dem Server verworfen –
+sonst hätte eine lateinische Vokabel ein „simple past", sobald jemand eine
+alte Seite im Speicher hat. Dasselbe beim Sprachwechsel im Bearbeiten-
+Formular: Die Formen gehörten zur alten Sprache und gehen mit.
+
+**Versteckte Häkchen werden entfernt, nicht nur unsichtbar gemacht.** Ein
+gesetztes, unsichtbares `verb_formen` würde beim Absenden mitgeschickt – das
+Training liefe im Verbmodus, und niemand sähe warum.
+
+**Eine Annahme von mir war falsch.** Im Kommentar stand „es gibt heute genau
+zwei Sprachen". Live sind es **fünf**: Englisch, Latein, Dänisch,
+Italienisch, Französisch. Bei vieren davon sind die Felder jetzt weg – und
+weil Dänisch alphabetisch vorn steht, ist die Voreinstellung im Formular
+eine Sprache *ohne* Verbfelder. Der Wunsch wirkt also deutlich stärker als
+ich beim Bauen dachte. Kommentar korrigiert.
+
+### Zwei Wächter waren blind – einer seit Monaten
+
+- **`test_ziehen_neuladen`**: Mein Test auf `overscroll-behavior-y` fand die
+  Zeichenkette auch in meinem eigenen Erklärkommentar darüber. Prüft jetzt
+  die CSS-Regel.
+- **`test_kopfleiste`**: `test_kein_knopf_zwischen_header_und_main` hat
+  **nie etwas geprüft**, seit die Kopfzeile nur noch in `base.html` steht:
+  Die Vorlagen haben `<main`, aber kein `</header>`; `base.html` umgekehrt.
+  Der Test kehrte immer sofort zurück. Aufgefallen erst, als eine absichtlich
+  eingebaute Verletzung grün blieb. Er prüft jetzt den Bereich zwischen
+  `{% block body %}` und `<main>` – in der heutigen Struktur dieselbe
+  Aussage.
+
+Ausserdem hat zum **vierten Mal** ein Erklärkommentar von mir einen Wächter
+ausgelöst (`<main>` im JS-Kommentar). Diesmal habe ich den Wächter
+abgedichtet statt den Kommentar umzuschreiben.
+
+26 Injektionen über beide Wünsche, alle rot. 1119 Tests grün.
+
+---
+
 ## 2026-08-10 – portal-v192: Wunsch #194 – unregelmäßige Verben
 
 > „Es soll einen Spezialmodus geben für unregelmäßige Verben im Englischen:

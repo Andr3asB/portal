@@ -76,7 +76,7 @@
 
       {# Wunsch #194: Dieselbe Seite liest wahlweise eine Vokabelliste oder
          eine Verbtabelle - die KI bekommt dafür zwei getrennte Anweisungen. #}
-      <label class="verb-schalter">
+      <label class="verb-schalter" data-verb-block>
         <input type="checkbox" name="verbmodus" value="1">
         <span>
           <strong>Tabelle unregelmäßiger Verben</strong><br>
@@ -99,11 +99,25 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+// Wunsch #195: Der Verbschalter gilt nur fuer Sprachen mit Stammformen.
+const VERB_SPRACHEN = {{ verb_sprachen|tojson }};
+
+function verbSchalterZeigen(spracheId) {
+  const passt = VERB_SPRACHEN.includes(parseInt(spracheId, 10));
+  document.querySelectorAll('[data-verb-block]').forEach(el => { el.hidden = !passt; });
+  if (!passt) {
+    document.querySelectorAll('input[name="verbmodus"]').forEach(cb => { cb.checked = false; });
+  }
+}
+
 function spracheWaehlen(btn) {
   document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');
   document.getElementById('sprache-id').value = btn.dataset.spracheId;
+  verbSchalterZeigen(btn.dataset.spracheId);
 }
+
+verbSchalterZeigen(document.getElementById('sprache-id')?.value);
 
 document.getElementById('foto-form')?.addEventListener('submit', () => {
   document.getElementById('import-lade').style.display = 'block';

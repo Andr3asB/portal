@@ -56,7 +56,19 @@
 .vokabel-text { flex:1; min-width:0; font-size:15px; }
 .vokabel-fremd { font-weight:600; }
 .vokabel-formen { font-size:13px; color:var(--text-2); margin-top:2px; }
-.verb-hinweis { font-size:12px; color:var(--text-2); margin:-2px 0 6px; line-height:1.45; }
+.verb-block {
+  margin-top:14px; background:var(--surface-2); border:1.5px solid var(--border);
+  border-radius:12px; padding:10px 12px;
+}
+.verb-block[hidden] { display:none; }
+.verb-block > summary {
+  cursor:pointer; font-size:13px; font-weight:600; color:var(--text-2);
+  list-style:none;
+}
+.verb-block > summary::-webkit-details-marker { display:none; }
+.verb-block > summary::before { content:"› "; display:inline-block; transition:transform .15s; }
+.verb-block[open] > summary::before { content:"⌄ "; }
+.verb-hinweis { font-size:12px; color:var(--text-2); margin:8px 0 6px; line-height:1.45; }
 .verb-felder { display:flex; gap:10px; }
 .verb-felder > div { flex:1; min-width:0; }
 .verb-formlabel { font-size:11px; color:var(--text-2); margin-bottom:4px; }
@@ -120,19 +132,24 @@
 
       {# Wunsch #194: Unregelmäßige Verben. Beide Formen oder keine - ein
          halb ausgefülltes Paar wird serverseitig verworfen, damit es im
-         Verbtraining keine Frage mit leerer Antwort gibt. #}
-      <div class="form-label">Unregelmäßiges Verb (optional)</div>
-      <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
-      <div class="verb-felder">
-        <div>
-          <div class="verb-formlabel">simple past</div>
-          <input class="form-input" type="text" name="simple_past" value="" autocomplete="off">
+         Verbtraining keine Frage mit leerer Antwort gibt.
+         Wunsch #195: eingeklappt, und nur bei Sprachen, die Stammformen
+         kennen - `data-verb-block` blendet das Skript unten je nach
+         gewählter Sprache ein oder aus. #}
+      <details class="verb-block" data-verb-block>
+        <summary>🔤 Unregelmäßiges Verb (optional)</summary>
+        <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
+        <div class="verb-felder">
+          <div>
+            <div class="verb-formlabel">simple past</div>
+            <input class="form-input" type="text" name="simple_past" value="" autocomplete="off">
+          </div>
+          <div>
+            <div class="verb-formlabel">Perfect</div>
+            <input class="form-input" type="text" name="perfect" value="" autocomplete="off">
+          </div>
         </div>
-        <div>
-          <div class="verb-formlabel">Perfect</div>
-          <input class="form-input" type="text" name="perfect" value="" autocomplete="off">
-        </div>
-      </div>
+      </details>
 
       {% if kapitel %}
       <div class="form-label">Kapitel (optional, mehrere möglich)</div>
@@ -195,21 +212,23 @@
         <div class="form-label">Deutsch</div>
         <input class="form-input" type="text" name="deutsch" value="{{ v.deutsch }}" required autocomplete="off">
 
-        {# Wunsch #194: Unregelmäßige Verben. Beide Formen oder keine - ein
-           halb ausgefülltes Paar wird serverseitig verworfen, damit es im
-           Verbtraining keine Frage mit leerer Antwort gibt. #}
-        <div class="form-label">Unregelmäßiges Verb (optional)</div>
-        <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
-        <div class="verb-felder">
-          <div>
-            <div class="verb-formlabel">simple past</div>
-            <input class="form-input" type="text" name="simple_past" value="{{ v.simple_past or '' }}" autocomplete="off">
+        {# Wunsch #194/#195: siehe oben. Beim Bearbeiten steht der Block
+           OFFEN, wenn schon Formen drinstehen - sonst sähe es aus, als wären
+           sie weg. #}
+        <details class="verb-block" data-verb-block{% if v.simple_past and v.perfect %} open{% endif %}>
+          <summary>🔤 Unregelmäßiges Verb (optional)</summary>
+          <div class="verb-hinweis">Nur ausfüllen, wenn beide Formen bekannt sind – dann taucht das Wort im Verbtraining auf.</div>
+          <div class="verb-felder">
+            <div>
+              <div class="verb-formlabel">simple past</div>
+              <input class="form-input" type="text" name="simple_past" value="{{ v.simple_past or '' }}" autocomplete="off">
+            </div>
+            <div>
+              <div class="verb-formlabel">Perfect</div>
+              <input class="form-input" type="text" name="perfect" value="{{ v.perfect or '' }}" autocomplete="off">
+            </div>
           </div>
-          <div>
-            <div class="verb-formlabel">Perfect</div>
-            <input class="form-input" type="text" name="perfect" value="{{ v.perfect or '' }}" autocomplete="off">
-          </div>
-        </div>
+        </details>
 
         {% if kapitel %}
         {% set eigene_kapitel_ids = (v.kapitel_ids or '').split(',') %}
@@ -251,13 +270,37 @@ const TOKEN = {{ (token or '')|tojson }};
 const TP    = {{ tp|tojson }};
 const SPRACHE_STORAGE_KEY = 'vokabeln_letzte_sprache_' + TOKEN;
 
+// Wunsch #195: Stammformen gibt es nur im Englischen. Der Block haengt
+// deshalb an der gewaehlten Sprache - beim Laden und bei jedem Wechsel.
+const VERB_SPRACHEN = {{ verb_sprachen|tojson }};
+
+function verbBlockZeigen(bereich, spracheId) {
+  const block = bereich.querySelector('[data-verb-block]');
+  if (!block) return;
+  const passt = VERB_SPRACHEN.includes(parseInt(spracheId, 10));
+  block.hidden = !passt;
+  // Felder einer unpassenden Sprache leeren: Sonst schickte ein Wechsel von
+  // Englisch auf Latein die schon getippten Formen trotzdem mit. Der Server
+  // verwirft sie zwar auch, aber ein unsichtbares Feld mit Inhalt ist eine
+  // Falle fuer den naechsten, der hier etwas aendert.
+  if (!passt) block.querySelectorAll('input').forEach(f => { f.value = ''; });
+}
+
 function spracheWaehlen(btn, gruppe) {
   document.getElementById(gruppe === 'neu' ? 'neu-sprache-chips' : ('edit-sprache-chips-' + gruppe.split('-')[1]))
     .querySelectorAll('.sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');
   document.getElementById(gruppe === 'neu' ? 'neu-sprache-id' : (gruppe + '-sprache-id')).value = btn.dataset.spracheId;
   if (gruppe === 'neu') localStorage.setItem(SPRACHE_STORAGE_KEY, btn.dataset.spracheId);
+  verbBlockZeigen(btn.closest('form'), btn.dataset.spracheId);
 }
+
+// Beim Laden einmal fuer jedes Formular - die zuletzt gewaehlte Sprache
+// kommt aus dem Speicher, der Block muss dazu passen.
+document.querySelectorAll('form').forEach(f => {
+  const id = f.querySelector('input[name="sprache_id"]');
+  if (id) verbBlockZeigen(f, id.value);
+});
 
 document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
   const card = document.getElementById('neu-form-card');

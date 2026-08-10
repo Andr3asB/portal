@@ -43,11 +43,35 @@ def test_keine_knoepfe_am_header(datei):
 @pytest.mark.parametrize("datei", VORLAGEN, ids=lambda p: p.name)
 def test_kein_knopf_zwischen_header_und_main(datei):
     """Zwischen `</header>` und `<main>` darf keine Schaltfläche stehen –
-    dort landete sie optisch wieder am farbigen Band."""
+    dort landete sie optisch wieder am farbigen Band.
+
+    **Dieser Test war lange vacuous.** Seit die Kopfzeile nur noch in
+    base.html steht, enthaelt KEINE Vorlage beide Marken: die Vorlagen haben
+    `<main`, aber kein `</header>`; base.html umgekehrt. Der Test kehrte
+    also immer sofort zurueck, ohne etwas zu pruefen - aufgefallen erst, als
+    eine absichtlich eingebaute Verletzung gruen blieb.
+
+    Er prueft jetzt, was in der heutigen Struktur dasselbe bedeutet: In einer
+    Vorlage darf zwischen `{% block body %}` und ihrem `<main>` keine
+    Schaltflaeche stehen. Genau dort saesse sie optisch am farbigen Band.
+    """
+    # Auch JS- und CSS-Kommentare herausschneiden, nicht nur Jinja-
+    # Kommentare: Ein Erklaerkommentar in base.html, der das Wort `<main>`
+    # nennt, liess diesen Waechter sonst anschlagen. VIERTER Fall dieser Art
+    # im Projekt (header_extra, button::before, data-fetch) - Beispiele in
+    # Kommentaren sind kein Markup.
     inhalt = re.sub(r"\{#.*?#\}", "", datei.read_text(encoding="utf-8"), flags=re.S)
-    if "</header>" not in inhalt or "<main" not in inhalt:
+    inhalt = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.S)
+    inhalt = re.sub(r"^\s*//.*$", "", inhalt, flags=re.M)
+    if "<main" not in inhalt:
         return
-    dazwischen = inhalt.split("</header>", 1)[1].split("<main", 1)[0]
+    if "</header>" in inhalt:
+        vorher = inhalt.split("</header>", 1)[1]
+    elif "{% block body %}" in inhalt:
+        vorher = inhalt.split("{% block body %}", 1)[1]
+    else:
+        return
+    dazwischen = vorher.split("<main", 1)[0]
     assert not re.search(r"<(button|a)\b", dazwischen), (
         f"{datei.name} hat eine Schaltfläche zwischen </header> und <main>."
     )

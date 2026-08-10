@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v192: Wunsch #194 unregelmaessige Verben)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v195: Wuensche #196 Ziehen zum Neuladen, #195 Verbfelder nur bei Englisch)*
 
 ## Host
 
@@ -523,6 +523,16 @@ teile/
                        eigener Prompt (_verben_per_ki) statt eines Schalters
                        im Vokabel-Prompt - ein Modell, das beide Vorlagen
                        gleichzeitig erklaert bekommt, liefert Mischformen.
+                       Wunsch #195: SPRACHEN_MIT_VERBFORMEN = {"Englisch"} -
+                       nur dort werden die Felder ueberhaupt angezeigt (und
+                       auch da eingeklappt, <details>). Live gibt es FUENF
+                       Sprachen, die Voreinstellung im Formular ist
+                       Daenisch - der Block ist also meistens weg. Das
+                       Ausblenden im Browser ist Bequemlichkeit:
+                       _verbformen_lesen(db, sprache_id) und der Foto-Import
+                       verwerfen Formen an einer Sprache ohne Stammformen
+                       serverseitig, auch beim Sprachwechsel im
+                       Bearbeiten-Formular.
   manage.py          – wunsch_erledigt <id> "<umsetzung>" [tokens] - das
                        dritte Argument ist der Tokenverbrauch der Umsetzung
                        (Wunsch #188), NACH der Umsetzung eingetragen, nicht
@@ -1695,6 +1705,7 @@ werden. `tests/test_tippflaeche.py` waechtert die ersten vier,
 | `.main { max-width:720px; margin:0 auto }` | #173 | Zeilen liefen ueber die ganze Monitorbreite |
 | `:focus-visible` Ring + `:focus:not(:focus-visible){outline:none}` | #174 | Tastaturnutzer sahen nicht, wo sie stehen |
 | `.app-header { position:sticky; top:0; z-index:100 }` + `html { scroll-padding-top }` | #186 | Navigation war auf langen Seiten nicht erreichbar |
+| `body { overscroll-behavior-y: contain }` + Ziehgeste in base.html | #196 | in der installierten PWA gab es kein Neuladen |
 
 **Zur fuenften gehoert das `scroll-padding-top` untrennbar dazu.** Ohne es
 landet jedes Sprungziel (`#wunsch-<id>` aus #171, `#gb-<id>`, die

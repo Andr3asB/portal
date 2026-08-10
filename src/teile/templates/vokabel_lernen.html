@@ -71,13 +71,13 @@
     {# Wunsch #194: Der Spezialmodus fuer unregelmaessige Verben. Mindestens
        ein Kreuz schaltet das Training um - deshalb braucht es keinen
        zusaetzlichen Hauptschalter, der dasselbe noch einmal sagt. #}
-    <div class="form-label">Unregelmäßige Verben</div>
-    <div class="verb-hinweis">
+    <div class="form-label" data-verb-block>Unregelmäßige Verben</div>
+    <div class="verb-hinweis" data-verb-block>
       Kreuze eine oder mehrere Abfrageformen an – dann übt das Training
       <strong>nur unregelmäßige Verben</strong>, in genau diesen Richtungen.
       Ohne Kreuz läuft alles wie bisher.
     </div>
-    <div class="verb-liste">
+    <div class="verb-liste" data-verb-block>
       {% for schluessel, form in verb_abfragen.items() %}
       <label class="verb-chip">
         <input type="checkbox" name="verb_formen" value="{{ schluessel }}"
@@ -95,11 +95,28 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+// Wunsch #195: Stammformen gibt es nur im Englischen - der ganze Abschnitt
+// verschwindet bei anderen Sprachen. Die Haekchen werden dabei entfernt,
+// nicht nur versteckt: Ein unsichtbares, gesetztes Haekchen wuerde das
+// Training auf Verben umschalten, ohne dass man saehe, warum.
+const VERB_SPRACHEN = {{ verb_sprachen|tojson }};
+
+function verbAbschnittZeigen(spracheId) {
+  const passt = VERB_SPRACHEN.includes(parseInt(spracheId, 10));
+  document.querySelectorAll('[data-verb-block]').forEach(el => { el.hidden = !passt; });
+  if (!passt) {
+    document.querySelectorAll('input[name="verb_formen"]').forEach(cb => { cb.checked = false; });
+  }
+}
+
 function spracheWaehlen(btn) {
   document.querySelectorAll('#sprache-chips .sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');
   document.getElementById('sprache-id').value = btn.dataset.spracheId;
+  verbAbschnittZeigen(btn.dataset.spracheId);
 }
+
+verbAbschnittZeigen(document.getElementById('sprache-id')?.value);
 
 function alleUmschalten(alleCheckbox) {
   document.querySelectorAll('.kapitel-einzel').forEach(cb => {

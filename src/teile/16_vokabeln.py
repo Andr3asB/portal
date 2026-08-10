@@ -66,6 +66,33 @@ VERB_ABFRAGEN = {
 # tatsaechlich abgefragt werden.
 VERB_ABFRAGEN_STANDARD = ["deutsch_alle", "infinitiv_formen"]
 
+# Wunsch #195: Unregelmaessige Verben in diesem Sinn (drei Stammformen, die
+# man auswendig lernt) gibt es nur im Englischen. In allen anderen Sprachen
+# waeren die Felder Ballast - sie werden dort gar nicht erst angezeigt.
+#
+# Eine Namensliste und keine Datenbankspalte: Eine Spalte ohne Bedien-
+# oberflaeche waere genauso unsichtbar wie diese Zeile, nur schwerer zu
+# finden. Kommt eine weitere Sprache mit Stammformen dazu, ist es ein Wort
+# mehr - und `test_die_sprache_gibt_es_wirklich` faellt auf, wenn "Englisch"
+# umbenannt wird.
+#
+# Der Unterschied ist groesser als er klingt: Auf dem Server stehen (Stand
+# 10.08.2026) FUENF Sprachen - Englisch, Latein, Daenisch, Italienisch,
+# Franzoesisch. Bei vieren davon sind die Verbfelder jetzt weg, und in der
+# Vokabelliste ist Daenisch die erste Sprache, also die Voreinstellung.
+SPRACHEN_MIT_VERBFORMEN = {"Englisch"}
+
+
+def sprachen_mit_verbformen(db):
+    """IDs der Sprachen, bei denen die Verbfelder ueberhaupt Sinn ergeben."""
+    if not SPRACHEN_MIT_VERBFORMEN:
+        return []
+    platzhalter = ",".join("?" * len(SPRACHEN_MIT_VERBFORMEN))
+    return [r["id"] for r in db.execute(
+        f"SELECT id FROM vokabel_sprachen WHERE name IN ({platzhalter})",
+        tuple(SPRACHEN_MIT_VERBFORMEN))]
+
+
 FELD_LABELS = {
     "fremd":       "Infinitiv",
     "simple_past": "simple past",
@@ -259,13 +286,19 @@ def _zugaengliche_sprachen(db, user_id):
     """, {"uid": user_id}).fetchall()
 
 
-def _verbformen_lesen():
+def _verbformen_lesen(db=None, sprache_id=None):
     """simple past und Perfect aus dem Formular - oder (None, None).
 
     Nur BEIDE zusammen ergeben ein unregelmaessiges Verb. Ein halb
     ausgefuelltes Paar wird verworfen statt halb gespeichert: Sonst gaebe es
     Eintraege, die im Verbtraining als Verb gelten und dort eine leere
     Antwort erwarten."""
+    # Wunsch #195: Bei einer Sprache ohne Stammformen werden die Felder gar
+    # nicht angezeigt - ein trotzdem mitgeschickter Wert (alte Seite im
+    # Speicher, selbstgebauter POST) wird hier verworfen. Sonst haette eine
+    # lateinische Vokabel ein "simple past".
+    if db is not None and sprache_id not in sprachen_mit_verbformen(db):
+        return None, None
     past    = (request.form.get("simple_past") or "").strip()
     perfect = (request.form.get("perfect") or "").strip()
     if past and perfect:
@@ -423,7 +456,8 @@ def index(token):
         v["audio_da"] = os.path.exists(_audio_pfad(v["sprache_id"], v["fremd"]))
     return render_template("vokabeln.html",
         user=user, token=token, farbe=user["farbe"],
-        sprachen=sprachen, kapitel=kapitel, vokabeln=vokabeln)
+        sprachen=sprachen, kapitel=kapitel, vokabeln=vokabeln,
+        verb_sprachen=sprachen_mit_verbformen(db))
 
 
 @bp.route("/a/vokabeln/neu", defaults={"token": None}, methods=["POST"])
@@ -435,7 +469,7 @@ def neu(token):
     deutsch    = request.form.get("deutsch", "").strip()
     sprache_id = to_int(request.form.get("sprache_id"))
     kapitel_ids = [to_int(k) for k in request.form.getlist("kapitel_ids")]
-    simple_past, perfect = _verbformen_lesen()
+    simple_past, perfect = _verbformen_lesen(db, sprache_id)
 
     if fremd and deutsch and sprache_id and _sprache_erlaubt(db, user["id"], sprache_id):
         cur = db.execute(
@@ -463,7 +497,7 @@ def bearbeiten(token, vid):
     sprache_id = to_int(request.form.get("sprache_id"))
     kapitel_ids = [to_int(k) for k in request.form.getlist("kapitel_ids")]
 
-    simple_past, perfect = _verbformen_lesen()
+    simple_past, perfect = _verbformen_lesen(db, sprache_id)
 
     if fremd and deutsch and sprache_id and _sprache_erlaubt(db, user["id"], sprache_id):
         db.execute(
@@ -608,7 +642,8 @@ def lernen(token):
     kapitel  = _zugaengliche_kapitel(db, user["id"])
     return render_template("vokabel_lernen.html",
         user=user, token=token, farbe=user["farbe"], sprachen=sprachen, kapitel=kapitel,
-        verb_abfragen=VERB_ABFRAGEN, verb_standard=VERB_ABFRAGEN_STANDARD)
+        verb_abfragen=VERB_ABFRAGEN, verb_standard=VERB_ABFRAGEN_STANDARD,
+        verb_sprachen=sprachen_mit_verbformen(db))
 
 
 @bp.route("/a/vokabeln/lernen/start", defaults={"token": None}, methods=["POST"])
@@ -875,12 +910,14 @@ def foto_import(token):
     if request.method == "GET":
         return render_template("vokabel_foto_import.html",
             user=user, token=token, farbe=user["farbe"],
-            sprachen=sprachen, fehler=None)
+            sprachen=sprachen, fehler=None,
+            verb_sprachen=sprachen_mit_verbformen(db))
 
     def _fehler(text):
         return render_template("vokabel_foto_import.html",
             user=user, token=token, farbe=user["farbe"],
-            sprachen=sprachen, fehler=text)
+            sprachen=sprachen, fehler=text,
+            verb_sprachen=sprachen_mit_verbformen(db))
 
     sprache_id = to_int(request.form.get("sprache_id"))
     sprache = next((s for s in sprachen if s["id"] == sprache_id), None)
@@ -942,6 +979,7 @@ def foto_import_speichern(token):
     # ganze Uebernahme nicht mit einem IndexError abbrechen.
     pasts    = request.form.getlist("simple_past")
     perfects = request.form.getlist("perfect")
+    verb_sprachen = sprachen_mit_verbformen(db)
 
     def _spalte(liste, i):
         return liste[i].strip() if i < len(liste) else ""
@@ -953,7 +991,7 @@ def foto_import_speichern(token):
         if not fremd or not deutsch:
             continue
         past, perfect = _spalte(pasts, i), _spalte(perfects, i)
-        if not (past and perfect):
+        if not (past and perfect) or sprache_id not in verb_sprachen:
             past = perfect = None
         cur = db.execute(
             "INSERT INTO vokabeln(user_id, sprache_id, fremd, deutsch, simple_past, perfect) "
