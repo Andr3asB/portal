@@ -88,12 +88,29 @@
     }
 
     /* App-Header */
+    /* Wunsch #186: Die Kopfzeile bleibt beim Scrollen stehen. Zur Wahl stand
+       ein "Nach oben"-Knopf wie auf der Hilfeseite; die mitlaufende Leiste ist
+       die heute uebliche Loesung und die bessere: Sie kostet keinen zusaetz-
+       lichen Tipp, haelt ausser dem Weg nach oben auch ⌂ und das ☰-Menue
+       erreichbar - und zeigt nebenbei durchgehend, in welcher App man ist.
+       Ein Knopf unten rechts kann nur eines davon.
+       z-index 100 liegt bewusst UNTER dem Hamburger-Overlay (200) und dem
+       ✨-Dialog (300) - eine Kopfzeile, die ueber dem eigenen Menue liegt,
+       waere ein seltsamer Anblick. */
     .app-header {
       background: var(--farbe);
       color: #fff;
       padding-top: calc(var(--st) + 6px);
       padding-bottom: 6px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.18);
     }
+    /* Sonst verschwindet jedes Sprungziel (#wunsch-123, die Hilfe-Kapitel,
+       #gb-…) unter der stehenden Leiste. Der Wert ist die Kopfhoehe:
+       Statusleiste + 6 + 46 Mindesthoehe + 6, plus etwas Luft. */
+    html { scroll-padding-top: calc(var(--st) + 66px); }
     .nav-bar {
       display: flex;
       align-items: center;

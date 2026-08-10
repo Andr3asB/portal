@@ -20,6 +20,10 @@ Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 from flask import Blueprint, render_template, request, redirect, url_for, abort
 from teile.kern import (get_db, grant as check_grant, to_int, push_send,
                         antwort_oder_weiter, WUNSCH_PRIORITAETEN)
+# Wunsch #187: Ersatz-Ueberschrift aus dem Wunschtext. Sie steht in
+# 02_werkstatt.py, wo auch der KI-Titel entsteht - zwei Regeln fuer dieselbe
+# Ueberschrift an zwei Orten waeren genau das Duplikat, das auseinanderlaeuft.
+from teile.werkstatt import ersatz_titel
 
 bp  = Blueprint("werkstatt_app", __name__)
 APP = "werkstatt"
@@ -100,6 +104,7 @@ def index(token):
         urheber_ids=_urheber_ids(db),
         prios_vorhanden=prios_vorhanden, prio_labels=_PRIO_LABELS,
         apps_vorhanden=apps_vorhanden, urheber_vorhanden=urheber_vorhanden,
+        ersatz_titel=ersatz_titel,
     )
 
 

@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v182: Wuensche #185/#184 Rezeptliste - Anlegezeile und Kategorie-Symbol)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v185: Wuensche #187 Wunsch-Ueberschriften, #186 stehende Kopfzeile)*
 
 ## Host
 
@@ -489,6 +489,20 @@ teile/
                        Loeschen VOR dem confirm()-Dialog geprueft, damit
                        nicht erst gefragt wird und die Aktion dann doch
                        nicht geht)
+  02_werkstatt.py    – POST /wunsch, der Eingang fuer alle ✨-Wuensche.
+                       Wunsch #161: KI-Ueberschrift im Hintergrund-Thread.
+                       Wunsch #187: ersatz_titel() leitet aus dem ersten Satz
+                       eine Ueberschrift ab, falls kein KI-Titel da ist -
+                       ANZEIGEWERT, nicht gespeichert (ein echter Titel
+                       gewinnt sofort, es gibt kein Provisorium in der DB).
+                       Trennt bewusst NICHT am Doppelpunkt: "UI: Die Knoepfe
+                       …" ergaebe sonst die Ueberschrift "UI". 05_werkstatt_
+                       app.py zieht die Funktion ueber den Alias
+                       `teile.werkstatt` (teile/__init__.py).
+                       Nachtragen im Bestand: `manage.py titel_nachtragen
+                       [anzahl|alle]` - ohne Argument wird nur gezaehlt, weil
+                       der Lauf echte Tokens aus dem Kontingent des Urhebers
+                       kostet (~160-320 je Wunsch, gemessen).
   11_rezepte.py      – /a/rezepte/<token>/ Lieblingsrezepte (Zutaten in
                        rezept_zutaten, Zubereitungsschritte einzeln in
                        rezept_schritte, Portionen als rezepte.portionen,
@@ -1624,8 +1638,9 @@ Zwei Fallen, beide gewaechtert in `tests/test_arbeitet_anzeige.py`:
 
 ## Globale UI-Regeln in base.html (verpflichtend)
 
-Vier Regeln gelten portalweit und duerfen von keiner Vorlage ueberschrieben
-werden. `tests/test_tippflaeche.py` waechtert alle vier:
+Fuenf Regeln gelten portalweit und duerfen von keiner Vorlage ueberschrieben
+werden. `tests/test_tippflaeche.py` waechtert die ersten vier,
+`tests/test_kopfzeile_bleibt.py` die fuenfte:
 
 | Regel | Wunsch | Warum |
 |---|---|---|
@@ -1633,6 +1648,14 @@ werden. `tests/test_tippflaeche.py` waechtert alle vier:
 | `input,select,textarea { font-size: max(16px,1em) }` | #170 | iOS zoomt unter 16px beim Fokus hinein |
 | `.main { max-width:720px; margin:0 auto }` | #173 | Zeilen liefen ueber die ganze Monitorbreite |
 | `:focus-visible` Ring + `:focus:not(:focus-visible){outline:none}` | #174 | Tastaturnutzer sahen nicht, wo sie stehen |
+| `.app-header { position:sticky; top:0; z-index:100 }` + `html { scroll-padding-top }` | #186 | Navigation war auf langen Seiten nicht erreichbar |
+
+**Zur fuenften gehoert das `scroll-padding-top` untrennbar dazu.** Ohne es
+landet jedes Sprungziel (`#wunsch-<id>` aus #171, `#gb-<id>`, die
+Hilfe-Kapitel) UNTER der stehenden Leiste: Die Navigation waere erreichbar
+und das Ziel dafuer unsichtbar. Ein zu kleiner Wert ist schlimmer als gar
+keiner - es sieht dann fast richtig aus. `z-index: 100` liegt bewusst unter
+dem Hamburger-Overlay (200) und dem ✨-Dialog (300).
 
 **Achtung Spezifitaet:** Die Schriftregel ist ein ELEMENT-Selektor (0,0,1).
 Jede Klassenregel (`.add-input`, 0,1,0) schlaegt sie, unabhaengig von der

@@ -33,6 +33,38 @@ _TITEL_SYSTEM = (
     "Punkt am Ende, hoechstens 60 Zeichen."
 )
 _TITEL_MAX = 80
+_ERSATZ_MAX = 60
+
+
+def ersatz_titel(text: str) -> str:
+    """Wunsch #187: Eine Überschrift aus dem Text selbst, ohne KI.
+
+    Der KI-Titel ist besser, aber er ist nicht garantiert: Er entsteht in
+    einem Hintergrund-Thread, braucht ein bekanntes Konto (anonyme Wünsche
+    haben keins), ein Kontingent und eine erreichbare Gegenstelle. Fällt
+    davon etwas aus, stand die Karte bisher ganz ohne Überschrift da.
+
+    Deshalb ist dies KEINE gespeicherte Zweitüberschrift, sondern ein
+    Anzeigewert: Trägt die KI später doch einen Titel nach, gewinnt er
+    sofort, ohne dass irgendwo ein Provisorium aufzuräumen wäre.
+
+    Genommen wird der erste Satz - er ist bei einem Wunsch fast immer die
+    Kernaussage; der Rest ist Begründung.
+
+    Der Doppelpunkt trennt hier bewusst NICHT: Wünsche beginnen oft mit einer
+    Einordnung ("UI: Die Knöpfe hängen am Header"), und "UI" wäre als
+    Überschrift schlechter als gar keine.
+    """
+    text = " ".join((text or "").split())
+    if not text:
+        return ""
+    satz = re.split(r"(?<=[.!?])\s", text, maxsplit=1)[0]
+    if len(satz) > _ERSATZ_MAX:
+        # Nicht mitten im Wort abschneiden - sonst steht da "Die Ansicht sieht
+        # nach der Feldanpa…".
+        gekuerzt = satz[:_ERSATZ_MAX].rsplit(" ", 1)[0] or satz[:_ERSATZ_MAX]
+        return gekuerzt.rstrip(" ,;-") + " …"
+    return satz.rstrip(" .")
 
 
 def _titel_nachtragen(app, wunsch_id: int, user_id: int, text: str):

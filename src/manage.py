@@ -9,6 +9,7 @@ Aufruf im Container:
   docker exec portal python manage.py listusers
   docker exec portal python manage.py listwuensche
   docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung"
+  docker exec portal python manage.py titel_nachtragen 5
   docker exec portal python manage.py ki_modell rezepte_import "anthropic/claude-haiku-4.5"
   docker exec portal python manage.py ki_stimme Latein "google/gemini-3.1-flash-tts-preview" "Kore"
   docker exec portal python manage.py listki
@@ -469,6 +470,91 @@ def cmd_listapps(_):
     db.close()
 
 
+def cmd_titel_nachtragen(args):
+    """Wunsch #187: Ueberschriften fuer Wuensche nachtragen, die keine haben.
+
+    Seit Wunsch #161 bekommt jeder NEUE Wunsch beim Anlegen eine KI-
+    Ueberschrift. Aeltere haben keine - das Feature gab es damals nicht.
+    Dieser Befehl holt sie nach.
+
+    Aufruf:
+        docker exec portal python manage.py titel_nachtragen        # zaehlt nur
+        docker exec portal python manage.py titel_nachtragen 5      # die 5 aeltesten
+        docker exec portal python manage.py titel_nachtragen alle
+
+    Kostet echte Tokens aus dem Kontingent des jeweiligen Urhebers (rund 160
+    je Wunsch, gemessen). Deshalb passiert ohne Zahl NICHTS ausser Zaehlen -
+    ein Befehl, der beim ersten Aufruf ein Viertel des Monatskontingents
+    verbraucht, waere eine Falle.
+
+    Einzige Stelle, an der manage.py die App-Module benutzt: die KI-Anfrage
+    steckt in teile/00_kern.py und braucht einen Flask-Kontext. Sie hier
+    nachzubauen hiesse, Modellwahl, Kontingentpruefung und Protokollierung zu
+    duplizieren - genau das, was der Rest dieser Datei aus gutem Grund meidet.
+    """
+    db = connect()
+    offen = db.execute(
+        "SELECT id, text, user_id, erledigt FROM wuensche "
+        "WHERE (titel IS NULL OR titel='') AND user_id IS NOT NULL "
+        # Offene zuerst: Wer nur einen Teil nachtraegt, will die Ueberschriften
+        # dort, wo er noch liest. Erledigte Wuensche sieht man selten wieder.
+        "ORDER BY erledigt ASC, id ASC"
+    ).fetchall()
+    print(f"Ohne Ueberschrift: {len(offen)} "
+          f"({sum(1 for r in offen if not r['erledigt'])} davon offen)")
+    if not args:
+        print("Zum Nachtragen eine Anzahl angeben, z. B. "
+              "'titel_nachtragen 5' oder 'titel_nachtragen alle'.")
+        db.close()
+        return
+
+    if args[0] == "alle":
+        ziel = offen
+    else:
+        try:
+            ziel = offen[:int(args[0])]
+        except ValueError:
+            sys.exit("Anzahl muss eine Zahl sein oder 'alle'.")
+    db.close()
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from app import app
+    from teile.kern import ki_anfrage
+    from teile.werkstatt import _TITEL_SYSTEM, _TITEL_MAX
+
+    geschafft = 0
+    with app.app_context():
+        vorher = _tokens_bisher(app)
+        for r in ziel:
+            try:
+                titel = ki_anfrage(r["user_id"], "wunsch_titel", _TITEL_SYSTEM,
+                                   r["text"][:2000], max_tokens=40)
+            except Exception as fehler:
+                print(f"  #{r['id']}: uebersprungen ({fehler})")
+                continue
+            titel = " ".join((titel or "").split()).strip("\"'„“»« ")[:_TITEL_MAX]
+            if not titel:
+                continue
+            from teile.kern import get_db as _db
+            # Nur setzen, wenn immer noch keiner da ist - dieselbe Regel wie im
+            # Hintergrund-Thread: ein von Hand vergebener Titel hat Vorrang.
+            _db().execute(
+                "UPDATE wuensche SET titel=? WHERE id=? AND (titel IS NULL OR titel='')",
+                (titel, r["id"]))
+            _db().commit()
+            geschafft += 1
+            print(f"  #{r['id']}: {titel}")
+        verbraucht = _tokens_bisher(app) - vorher
+    print(f"{geschafft} Ueberschriften nachgetragen, {verbraucht} Tokens verbraucht.")
+
+
+def _tokens_bisher(app) -> int:
+    from teile.kern import get_db as _db
+    return _db().execute(
+        "SELECT COALESCE(SUM(tokens),0) FROM ki_nutzung WHERE feature='wunsch_titel'"
+    ).fetchone()[0]
+
+
 CMDS = {
     "createadmin":     cmd_createadmin,
     "adduser":         cmd_adduser,
@@ -478,6 +564,7 @@ CMDS = {
     "listwuensche":    cmd_listwuensche,
     "listtodos":       cmd_listtodos,
     "wunsch_erledigt": cmd_wunsch_erledigt,
+    "titel_nachtragen": cmd_titel_nachtragen,
     "backlog":         cmd_backlog,
     "ki_modell":       cmd_ki_modell,
     "ki_stimme":       cmd_ki_stimme,

@@ -2,6 +2,94 @@
 
 ---
 
+## 2026-08-10 – portal-v184/v185: Wünsche #187 und #186
+
+### #187 – keine Wunsch-Karte ohne Überschrift
+
+Erst nachgezählt, dann gebaut. Von 187 Wünschen hatten **140 keine
+Überschrift – und alle 140 sind älter als Wunsch #161**, der die KI-Über-
+schrift eingeführt hat. Seit #162 hat ausnahmslos jeder Wunsch eine. Die
+Vergabe war also nie kaputt; es war eine Lücke im Bestand.
+
+Trotzdem ist „bekommt beim Anlegen eine Überschrift" **keine Zusage**: Der
+Titel entsteht in einem Hintergrund-Thread, braucht ein bekanntes Konto
+(anonyme Wünsche haben keins), ein Kontingent und eine erreichbare
+Gegenstelle. Fällt davon etwas aus, stand die Karte bisher nackt da.
+
+Zwei Teile:
+
+**`ersatz_titel()`** leitet eine Überschrift aus dem ersten Satz ab –
+bewusst als **Anzeigewert, nicht gespeichert**. Trägt die KI später doch
+etwas nach, gewinnt es sofort; es gibt kein Provisorium in der Datenbank,
+das jemand später für einen echten Titel hält. Blasser dargestellt, damit man
+den abgeschnittenen Satz nicht für eine Formulierung hält.
+
+**`manage.py titel_nachtragen`** holt echte KI-Titel für den Altbestand,
+offene Wünsche zuerst. Ohne Zahl passiert nichts ausser Zählen: Der Befehl
+kostet echte Tokens aus dem Kontingent des Urhebers, und einer, der beim
+ersten Aufruf ein Drittel des Monatsbudgets verbraucht, wäre eine Falle.
+
+Nachgetragen habe ich nur die **drei offenen** Alt-Wünsche (#51, #130, #139)
+– 951 Tokens. Die restlichen 137 sind alle längst erledigt; ~34k Tokens für
+Überschriften an Wünschen, die niemand mehr liest, ist Andis Entscheidung,
+nicht meine.
+
+**Ein Testfehler, der ein echter Entwurfsfehler war:** Die erste Fassung
+trennte auch am Doppelpunkt. Aus „UI: Die Knöpfe hängen am Header" (so
+beginnt Wunsch #155 wörtlich) wurde damit die Überschrift „UI" – schlechter
+als gar keine. Wünsche fangen oft mit einer Einordnung an; die Aussage steht
+dahinter.
+
+### #186 – die Kopfzeile bleibt stehen
+
+Zur Wahl standen ein „Nach oben"-Knopf und eine mitlaufende Leiste. Gewählt:
+**sticky**. Ein Knopf unten rechts bringt einen nach oben – die Leiste hält
+ausserdem ⌂, den Seitentitel und das ☰-Menü dauerhaft erreichbar, kostet
+keinen zusätzlichen Tipp und zeigt nebenbei durchgehend, in welcher App man
+ist. Ein schwebender Pfeil ist die Lösung aus der Zeit, als `position:
+sticky` noch nicht überall trug.
+
+Vier Zeilen in `base.html` – und damit sofort in allen 19 Apps.
+
+**Der Teil, den man dabei übersieht: Sprungziele.** Die Werkstatt springt auf
+`#wunsch-<id>` (#171), die Geburtstage auf `#gb-<id>`, die Hilfe auf ihre
+Kapitel. Ohne `scroll-padding-top` landet jedes davon **unter** der stehenden
+Leiste: Navigation erreichbar, Ziel unsichtbar. Ein eigener Test verlangt
+deshalb nicht nur, dass der Abstand da ist, sondern dass er mindestens so
+hoch ist wie der Kopf – ein zu kleiner Wert ist schlimmer als keiner, weil
+es dann fast richtig aussieht.
+
+`z-index: 100` liegt bewusst unter dem Hamburger-Overlay (200) und dem
+✨-Dialog (300).
+
+### Elf Fehler eingebaut, zwei Tests waren blind
+
+- **„Schnitt mitten im Wort" blieb grün.** Der Test riet an konkreten
+  Wortenden herum („endet nicht auf 'ab' oder 'dar'") statt die Eigenschaft
+  zu prüfen: hinter dem behaltenen Stück muss im Original ein Leerzeichen
+  stehen.
+- **„Wunschtext verschwindet" blieb grün.** Der Satz steht auch in der
+  aufklappbaren Detailansicht – gesucht wurde nur der Satz, nicht das
+  Element.
+
+Beide nachgeschärft, danach schlagen alle elf an.
+
+### #188 nicht angefasst
+
+„Die zusätzlich erhobenen Daten, wie der Tokenverbrauch geschätzt und/oder
+real sollen in den Details der Wünsche sichtbar sein." Der Portal-Verbrauch
+je Wunsch wäre die Titelgenerierung – 160 bis 320 Tokens, offensichtlich
+nicht gemeint. Gemeint ist vermutlich der Aufwand der Umsetzung, und den
+erhebt heute nichts: weder die Schätzung noch der tatsächliche Verbrauch
+einer Arbeitssitzung liegen irgendwo. Rückfrage gestellt statt geraten.
+
+### Live geprüft
+
+Alle 19 Seiten 200. Werkstatt: 187 Karten, 187 Überschriften, 140 davon
+abgeleitet, **keine ohne**. 985 Tests grün.
+
+---
+
 ## 2026-08-10 – portal-v182: Wünsche #185 und #184 – Rezeptliste
 
 Beide betreffen den Kopf derselben Seite, deshalb ein Paket – abgehakt wurde

@@ -29,6 +29,9 @@
   font-size:15px; font-weight:700; color:var(--text); margin-bottom:4px;
   line-height:1.3;
 }
+/* Wunsch #187: die abgeleitete Ueberschrift ist sichtbar zweite Wahl -
+   sonst haelt man den abgeschnittenen ersten Satz fuer eine Formulierung. */
+.wunsch-titel.ersatz { font-weight:600; color:var(--text-2); }
 .wunsch-text {
   font-size:14px; color:var(--text); word-break:break-word; line-height:1.5;
   /* Wunsch #182: Lange Wuensche fuellten die halbe Liste. Vier Zeilen als
@@ -306,12 +309,15 @@
       </span>
       {% endif %}
     </div>
+    {# Wunsch #187: Keine Karte ohne Ueberschrift. Steht kein KI-Titel da,
+       tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man
+       sieht, dass sie nur der erste Satz ist und keine Formulierung. #}
     {% if w.titel %}
       <div class="wunsch-titel">{{ w.titel }}</div>
-      <div class="wunsch-text secondary">{{ w.text }}</div>
     {% else %}
-      <div class="wunsch-text">{{ w.text }}</div>
+      <div class="wunsch-titel ersatz">{{ ersatz_titel(w.text) }}</div>
     {% endif %}
+    <div class="wunsch-text secondary">{{ w.text }}</div>
     <div class="wunsch-meta">
       {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}
@@ -359,12 +365,15 @@
       <span class="wunsch-pfeil">›</span>
       <span class="wunsch-id">#{{ w.id }}</span>
     </div>
+    {# Wunsch #187: Keine Karte ohne Ueberschrift. Steht kein KI-Titel da,
+       tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man
+       sieht, dass sie nur der erste Satz ist und keine Formulierung. #}
     {% if w.titel %}
       <div class="wunsch-titel">{{ w.titel }}</div>
-      <div class="wunsch-text secondary">{{ w.text }}</div>
     {% else %}
-      <div class="wunsch-text">{{ w.text }}</div>
+      <div class="wunsch-titel ersatz">{{ ersatz_titel(w.text) }}</div>
     {% endif %}
+    <div class="wunsch-text secondary">{{ w.text }}</div>
     <div class="wunsch-meta">
       {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}

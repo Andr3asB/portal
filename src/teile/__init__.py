@@ -16,3 +16,9 @@ sys.modules.setdefault("teile.todo", _todo)
 # Duplikat, die irgendwann auseinanderlaeuft.
 _rezepte = importlib.import_module("teile.11_rezepte")
 sys.modules.setdefault("teile.rezepte", _rezepte)
+
+# 02_werkstatt als 'teile.werkstatt' verfügbar machen (Wunsch #187) - die
+# Werkstatt-App (05) zeigt die Wünsche an und braucht die Ersatz-Überschrift
+# aus demselben Modul, in dem der KI-Titel entsteht.
+_werkstatt = importlib.import_module("teile.02_werkstatt")
+sys.modules.setdefault("teile.werkstatt", _werkstatt)
