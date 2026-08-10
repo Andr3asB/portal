@@ -4,15 +4,26 @@
 
 {% block extra_styles %}
 .header-title { font-size:22px; font-weight:700; }
+/* Wunsch #185: Die drei Anlegewege standen als drei volle Zeilen unter-
+   einander und schoben die Rezeptliste auf einem iPhone unter die Falz.
+   Jetzt eine Zeile. Bewusst KEIN Aufklappen (der Wunsch stellte es frei):
+   Es kostete einen zusaetzlichen Tipp und wuerde beide Importwege
+   verstecken - sie waren bisher sichtbar, und wer sie sucht, sucht sie
+   selten. Sichtbar und schmal schlaegt versteckt und breit. */
+.anlegen-zeile { display:flex; gap:8px; margin-bottom:16px; }
 .btn-neues-rezept {
-  display:block; text-align:center; background:var(--farbe); color:#fff;
-  border-radius:12px; padding:12px 16px; font-size:15px; font-weight:600;
-  text-decoration:none; margin-bottom:8px;
+  flex:1 1 auto; min-width:0;
+  display:flex; align-items:center; justify-content:center; min-height:44px;
+  text-align:center; background:var(--farbe); color:#fff;
+  border-radius:12px; padding:10px 12px; font-size:15px; font-weight:600;
+  text-decoration:none;
 }
 .btn-importieren {
-  display:block; text-align:center; background:none; color:var(--farbe);
-  border:1.5px solid var(--farbe); border-radius:12px; padding:10px 16px;
-  font-size:14px; font-weight:600; text-decoration:none; margin-bottom:16px;
+  flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center; min-height:44px;
+  text-align:center; background:none; color:var(--farbe);
+  border:1.5px solid var(--farbe); border-radius:12px; padding:10px 12px;
+  font-size:14px; font-weight:600; text-decoration:none; white-space:nowrap;
 }
 .rezept-card {
   background:var(--surface); border-radius:14px; padding:14px 16px;
@@ -52,9 +63,13 @@
 {% block body %}
 <main class="main">
 
-  <a class="btn-neues-rezept" href="/a/rezepte{{ tp }}neu">+ Neues Rezept</a>
-  <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren">🔗 Aus URL importieren</a>
-  <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren-bild">📷 Bild importieren</a>
+  <div class="anlegen-zeile">
+    <a class="btn-neues-rezept" href="/a/rezepte{{ tp }}neu">+ Neues Rezept</a>
+    <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren"
+       title="Aus URL importieren" aria-label="Aus URL importieren">🔗 URL</a>
+    <a class="btn-importieren" href="/a/rezepte{{ tp }}importieren-bild"
+       title="Aus Bild importieren" aria-label="Aus Bild importieren">📷 Bild</a>
+  </div>
 
   {% if rezepte %}
     <div class="rezept-filter-row" id="rezept-filter-row">
@@ -72,7 +87,8 @@
        data-suche="{{ (r.name ~ ' ' ~ (r.zutaten_text or ''))|lower }}"
        data-kategorie="{{ r.kategorie or '' }}"
        data-gewuenscht="{{ '1' if r.eigener_wunsch else '0' }}">
-      <span class="rezept-emoji">🍲</span>
+      {# Wunsch #184: Kochen 🍳, Backen 🍰, ohne Kategorie weiterhin 🍲. #}
+      <span class="rezept-emoji" aria-hidden="true">{{ symbol(r.kategorie) }}</span>
       <div>
         <div class="rezept-name">{{ r.name }}{% if r.kategorie and r.kategorie in kategorien %} <span style="font-size:13px;color:var(--text-2)">{{ kategorien[r.kategorie] }}</span>{% endif %}</div>
         <div class="rezept-meta">

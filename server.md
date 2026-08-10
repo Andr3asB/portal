@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-09 (portal-v181: Wunsch #183 KI-Verbrauch und OpenRouter-Guthaben)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v182: Wuensche #185/#184 Rezeptliste - Anlegezeile und Kategorie-Symbol)*
 
 ## Host
 
@@ -495,6 +495,23 @@ teile/
                        Kategorie 'kochen'/'backen' als rezepte.kategorie –
                        Wunsch #55, KATEGORIEN-Dict + _clean_kategorie() als
                        einzige Quelle der gültigen Werte);
+                       Wunsch #184: kategorie_symbol() ordnet der Kategorie
+                       ihr Listensymbol zu (kochen 🍳, backen 🍰, ohne
+                       Kategorie 🍲 - bewusst NICHT 'im Zweifel kochen',
+                       sonst sieht man der Liste die fehlende Einordnung
+                       nicht mehr an). 12_essensplan.py importiert die
+                       Funktion ueber den Alias `teile.rezepte`
+                       (teile/__init__.py) - dieselben Rezepte duerfen nicht
+                       je nach Seite ein anderes Zeichen tragen. Die Zeichen
+                       sind dieselben wie in den KATEGORIEN-Labels; ein Test
+                       haelt beide zusammen.
+                       Wunsch #185: die drei Anlegewege stehen in rezepte.html
+                       als eine Flex-Zeile (.anlegen-zeile) statt als drei
+                       Blockzeilen. Bewusst OHNE Aufklappen - das haette zwei
+                       bisher sichtbare Wege versteckt. Die Knoepfe sind <a>,
+                       nicht <button>: die globale 44px-Regel aus base.html
+                       (#169) greift bei ihnen NICHT, min-height steht an der
+                       Klasse.
                        /neu (GET+POST, Wunsch #48: eigene Unterseite statt
                        dauerhaft sichtbarem Formular auf der Übersicht);
                        /importieren (GET+POST): Rezept per URL – JSON-LD

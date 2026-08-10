@@ -13,6 +13,10 @@ from datetime import date, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import (get_db, grant as check_grant, to_int,
                         antwort_oder_weiter)
+# Wunsch #184: Das Symbol vor einem Rezept haengt an dessen Kategorie. Der
+# Essensplan zeigt dieselben Rezepte - stuende hier weiter ein fester Topf,
+# haette dasselbe Rezept je nach Seite ein anderes Zeichen.
+from teile.rezepte import kategorie_symbol
 
 bp  = Blueprint("essensplan_app", __name__)
 APP = "essensplan"
@@ -39,7 +43,8 @@ def index(token):
 
     db   = get_db()
     rows = db.execute("""
-        SELECT e.tag, e.mahlzeit, e.text, r.id AS rezept_id, r.name AS rezept_name
+        SELECT e.tag, e.mahlzeit, e.text, r.id AS rezept_id, r.name AS rezept_name,
+               r.kategorie AS rezept_kategorie
         FROM   essensplan_eintraege e
         LEFT JOIN rezepte r ON r.id = e.rezept_id
         WHERE  e.tag BETWEEN ? AND ?
@@ -89,6 +94,7 @@ def index(token):
         tage=tage, vergangene_tage=vergangene_tage, aktuelle_rest=aktuelle_rest,
         naechste_woche=naechste_woche,
         rezepte=rezepte, mahlzeiten=MAHLZEITEN, mahlzeit_labels=MAHLZEIT_LABELS,
+        symbol=kategorie_symbol,
     )
 
 

@@ -7,8 +7,27 @@ Aufzeichnung genau dann weg, wenn sie interessant wird. Wunsch #165 will sie
 später je Rezept auflisten.
 
 Deshalb prüfen die Tests vor allem, was die Aufzeichnung **überlebt**.
+
+Die Tage sind BEWUSST relativ zu heute berechnet. Mit festen Datumsangaben
+(urspruenglich 2026-08-05/06) liefen fuenf dieser Tests fuenf Tage spaeter
+still auf: Der Essensplan zeigt nur die laufende und die kommende Woche, und
+sobald das feste Datum aus dem Fenster faellt, steht der Eintrag nicht mehr
+auf der Seite. Der Test wurde dann nicht falsch - er prueste nichts mehr.
 """
+from datetime import date, timedelta
+
 import pytest
+
+from teile.kern import heute_lokal
+
+# Heute liegt immer im angezeigten Fenster (laufende + kommende Woche), morgen
+# und uebermorgen ebenfalls - auch sonntags, weil dann die naechste Woche
+# mitlaeuft. `heute_lokal()` liefert einen ISO-String, deshalb der Umweg ueber
+# fromisoformat fuer die Tage danach.
+_HEUTE           = date.fromisoformat(heute_lokal())
+TAG_REZEPT       = _HEUTE.isoformat()
+TAG_FREITEXT     = (_HEUTE + timedelta(days=1)).isoformat()
+TAG_OHNE_EINTRAG = (_HEUTE + timedelta(days=2)).isoformat()
 
 
 @pytest.fixture()
@@ -31,15 +50,16 @@ def plan(app, db):
         "INSERT INTO rezepte(name) VALUES('Linsen mit Spätzle') RETURNING id"
     ).fetchone()["id"]
     v.execute("INSERT INTO essensplan_eintraege(tag, mahlzeit, rezept_id, erstellt_von) "
-              "VALUES('2026-08-05','abend',?,?)", (rid, familie["TestAdmin"]["id"]))
+              "VALUES(?,'abend',?,?)", (TAG_REZEPT, rid, familie["TestAdmin"]["id"]))
     v.execute("INSERT INTO essensplan_eintraege(tag, mahlzeit, text, erstellt_von) "
-              "VALUES('2026-08-06','abend','Pizza vom Lieferdienst',?)",
-              (familie["TestAdmin"]["id"],))
+              "VALUES(?,'abend','Pizza vom Lieferdienst',?)",
+              (TAG_FREITEXT, familie["TestAdmin"]["id"]))
     v.commit()
     return {"tokens": tokens, "rid": rid}
 
 
-def _umschalten(client, token, tag="2026-08-05", mahlzeit="abend"):
+def _umschalten(client, token, tag=None, mahlzeit="abend"):
+    tag = tag or TAG_REZEPT
     return client.post(f"/a/essensplan/{token}/gekocht",
                        data={"tag": tag, "mahlzeit": mahlzeit})
 
@@ -58,7 +78,7 @@ def test_abhaken_erfasst_den_zeitpunkt(client, db, plan):
     _umschalten(client, plan["tokens"]["TestAdmin"])
     zeilen = _eintraege(db, plan["rid"])
     assert len(zeilen) == 1
-    assert zeilen[0]["tag"] == "2026-08-05"
+    assert zeilen[0]["tag"] == TAG_REZEPT
     assert zeilen[0]["markiert_am"], "ohne Zeitstempel waere die ganze Erfassung wertlos"
     assert zeilen[0]["markiert_von"] == db["familie"]["TestAdmin"]["id"]
 
@@ -92,7 +112,7 @@ def test_geaenderter_planeintrag_loescht_die_historie_nicht(client, db, plan):
     _umschalten(client, token)
     db["verbindung"].execute(
         "UPDATE essensplan_eintraege SET rezept_id=NULL, text='Doch Pizza' "
-        "WHERE tag='2026-08-05' AND mahlzeit='abend'")
+        "WHERE tag=? AND mahlzeit='abend'", (TAG_REZEPT,))
     db["verbindung"].commit()
     assert len(_eintraege(db, plan["rid"])) == 1
 
@@ -102,7 +122,7 @@ def test_geloeschter_planeintrag_loescht_die_historie_nicht(client, db, plan):
     _umschalten(client, token)
     v = db["verbindung"]
     v.execute("PRAGMA foreign_keys=ON")
-    v.execute("DELETE FROM essensplan_eintraege WHERE tag='2026-08-05'")
+    v.execute("DELETE FROM essensplan_eintraege WHERE tag=?", (TAG_REZEPT,))
     v.commit()
     assert len(_eintraege(db, plan["rid"])) == 1
 
@@ -124,14 +144,14 @@ def test_geloeschtes_rezept_raeumt_die_historie_ab(client, db, plan):
 def test_freitext_kann_nicht_abgehakt_werden(client, db, plan):
     """„wann ein Rezept aus der DB gekocht wurde" – für „Pizza vom
     Lieferdienst" gibt es kein Rezept, an dem das hängen könnte."""
-    antwort = _umschalten(client, plan["tokens"]["TestAdmin"], tag="2026-08-06")
+    antwort = _umschalten(client, plan["tokens"]["TestAdmin"], tag=TAG_FREITEXT)
     assert antwort.status_code == 404
     assert _eintraege(db) == []
 
 
 def test_leerer_slot_geht_nicht(client, db, plan):
     assert _umschalten(client, plan["tokens"]["TestAdmin"],
-                       tag="2026-08-07").status_code == 404
+                       tag=TAG_OHNE_EINTRAG).status_code == 404
 
 
 def test_unbekannte_mahlzeit_wird_abgelehnt(client, db, plan):

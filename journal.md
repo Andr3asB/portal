@@ -2,6 +2,80 @@
 
 ---
 
+## 2026-08-10 – portal-v182: Wünsche #185 und #184 – Rezeptliste
+
+Beide betreffen den Kopf derselben Seite, deshalb ein Paket – abgehakt wurde
+jeder für sich.
+
+### Vorher: fünf Tests waren über Nacht rot geworden
+
+Ohne dass jemand etwas geändert hätte. `test_essensplan_gekocht.py` legte
+seine Planeinträge auf die festen Tage 05./06.08.2026. Der Essensplan zeigt
+laufende plus kommende Woche – am 10.08. fiel der 05.08. aus dem Fenster, die
+Einträge standen nicht mehr auf der Seite, fünf Prüfungen fanden nichts mehr.
+
+Der Test wurde dabei nicht *falsch*, er prüfte **nichts mehr**. Das ist der
+unangenehmere Fall: Zwischen dem 05.08. und heute hätte jede Regression im
+Abhaken unbemerkt durchgehen können, solange die Assertions noch zufällig
+zutrafen. Die Tage werden jetzt aus `heute_lokal()` gerechnet. Gegenprobe: ein
+Datum weit ausserhalb des Fensters eingesetzt – genau diese fünf werden rot.
+
+### #185 – drei Anlegewege in eine Zeile
+
+„+ Neues Rezept", „🔗 Aus URL importieren" und „📷 Bild importieren" standen
+als drei volle Blockzeilen übereinander, zusammen rund 130px, bevor das erste
+Rezept kam.
+
+Der Wunsch stellte frei, die beiden Importe hinter dem Neu-Knopf zu
+verstecken. Dagegen entschieden: Das kostete einen zusätzlichen Tipp und
+würde zwei bisher sichtbare Wege unsichtbar machen. Wer selten importiert,
+findet den Weg dann gar nicht mehr – Platz gespart, Funktion verloren.
+Stattdessen eine Flex-Zeile: der Hauptknopf `flex:1`, die beiden Importe
+`flex:0 0 auto` mit kurzen Beschriftungen („🔗 URL", „📷 Bild"). Eine Zeile
+statt drei, alles sichtbar, kein Zustand.
+
+Die Knöpfe sind `<a>`, keine `<button>` – die globale 44px-Tippfläche aus
+`base.html` (#169) greift bei ihnen **nicht**. `min-height:44px` steht
+deshalb an der Klasse, und ein Test wacht darüber.
+
+### #184 – das Symbol folgt der Kategorie
+
+Kein neues Datenfeld nötig: `rezepte.kategorie` ist seit #55 genau `kochen`
+oder `backen`. Es fehlte nur die Zuordnung – 🍳 bzw. 🍰, dieselben Zeichen wie
+auf den Filter-Chips. Zwei verschiedene Symbole für dieselbe Sache müsste man
+erst lernen; ein Test hält beide zusammen.
+
+Ohne Kategorie bleibt der neutrale Topf 🍲. Bewusst nicht „im Zweifel
+kochen": Dann sähe man der Liste nicht mehr an, wo die Einordnung fehlt.
+
+**Der Essensplan zeigt dieselben Rezepte** und musste mit – sonst trüge
+derselbe Kirschkuchen auf der einen Seite 🍰 und auf der anderen 🍲. Die
+Zuordnung liegt in `11_rezepte.py`, `12_essensplan.py` importiert sie über
+`teile.rezepte` (neuer Alias in `teile/__init__.py`, wie `teile.kern` und
+`teile.todo`). Eine zweite Kopie wäre genau das Duplikat, das irgendwann
+auseinanderläuft.
+
+### Neun Fehler eingebaut, neun wurden rot
+
+Diesmal ohne blinden Fleck – anders als gestern. Der Test, der am ehesten
+selbstzufrieden geworden wäre, prüft nicht „steht 🍰 irgendwo auf der Seite"
+(bei drei Rezepten stehen alle drei Zeichen dort), sondern sammelt die Paare
+*(Symbol, Name)* ein und vergleicht die Zuordnung.
+
+Ein eigener Test hält ausserdem fest, dass die **Kopfzeile** der App weiter
+🍲 Rezepte heisst – das ist das Symbol der App, nicht das eines Rezepts. Ohne
+diese Abgrenzung hätte ein späterer Aufräumer beides für denselben Fehler
+gehalten.
+
+### Live geprüft
+
+Alle 19 Seiten 200. Die Rezeptliste zeigt echte Zahlen: 5 Rezepte mit 🍳,
+4 mit 🍰, keines ohne Kategorie. Anlegezeile: drei Links in einer Zeile.
+Im Essensplan steht in diesen zwei Wochen gerade kein Rezept, der Fall ist
+dort nur durch den Test belegt. 921 Tests grün, keine echten Daten angefasst.
+
+---
+
 ## 2026-08-09 – portal-v180/v181: Wunsch #183 – KI-Verbrauch und Guthaben sichtbar
 
 > „Es soll eine Übersicht geben, in der man pro Benutzer die verbrauchten

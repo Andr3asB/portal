@@ -69,6 +69,18 @@ APP = "rezepte"
 
 KATEGORIEN = {"kochen": "🍳 Kochen", "backen": "🍰 Backen"}
 
+# Wunsch #184: Das Symbol vor einem Rezept folgt der Kategorie. Es ist
+# absichtlich DASSELBE Zeichen wie im Kategorie-Label darueber - zwei
+# verschiedene Symbole fuer dieselbe Sache muesste man erst lernen.
+# Ohne Kategorie bleibt der neutrale Topf; er heisst hier "unbekannt",
+# nicht "kochen", damit man den Unterschied auf der Seite noch sieht.
+KATEGORIE_SYMBOL = {"kochen": "🍳", "backen": "🍰"}
+SYMBOL_OHNE_KATEGORIE = "🍲"
+
+
+def kategorie_symbol(wert) -> str:
+    return KATEGORIE_SYMBOL.get(wert or "", SYMBOL_OHNE_KATEGORIE)
+
 # Wunsch #97: Foto-Import - gleiche Grenzen/MIME-Zuordnung wie beim
 # Vokabeln-Foto-Import (16_vokabeln.py), bewusst dupliziert statt
 # cross-importiert (kleine Konstanten, kein gemeinsames Modul dafür noetig).
@@ -491,7 +503,8 @@ def index(token):
         ORDER  BY r.name COLLATE NOCASE
     """, (user["id"],)).fetchall()
     return render_template("rezepte.html",
-        user=user, token=token, farbe=user["farbe"], rezepte=rezepte, kategorien=KATEGORIEN)
+        user=user, token=token, farbe=user["farbe"], rezepte=rezepte,
+        kategorien=KATEGORIEN, symbol=kategorie_symbol)
 
 
 @bp.route("/a/rezepte/neu", defaults={"token": None}, methods=["GET", "POST"])

@@ -108,7 +108,7 @@
                  eigenes Element, ein Link im Inhalt kommt ihm nicht in die
                  Quere. #}
               <a class="mahlzeit-rezept-link" href="/a/rezepte{{ tp }}{{ eintrag.rezept_id }}"
-                 title="Rezept öffnen">🍲 {{ eintrag.rezept_name }}</a>
+                 title="Rezept öffnen">{{ symbol(eintrag.rezept_kategorie) }} {{ eintrag.rezept_name }}</a>
             {% elif eintrag and eintrag.text %}
               {{ eintrag.text }}
             {% else %}
