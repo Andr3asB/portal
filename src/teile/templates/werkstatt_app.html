@@ -196,6 +196,16 @@
     <div class="detail-value">{{ w.erledigt_am|de_datum }}</div>
   </div>
   {% endif %}
+  {# Wunsch #188: Aufwand der Umsetzung, NACH der Umsetzung eingetragen.
+     Nur zeigen, wenn eine Zahl da ist: Bei allen Wuenschen von vor #188 ist
+     die Spalte leer, und eine Zeile "Tokenverbrauch: -" an 190 Karten waere
+     Rauschen. #}
+  {% if w.tokens is not none %}
+  <div>
+    <div class="detail-label">Tokenverbrauch</div>
+    <div class="detail-value">{{ "{:,}".format(w.tokens).replace(",", ".") }}</div>
+  </div>
+  {% endif %}
   <div>
     <div class="detail-label">Umsetzung</div>
     <div class="detail-value{% if not w.umsetzung %} muted{% endif %}">{{ w.umsetzung or "Noch nicht dokumentiert." }}</div>

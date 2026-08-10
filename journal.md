@@ -2,6 +2,54 @@
 
 ---
 
+## 2026-08-10 – portal-v190: Wunsch #188 – Tokenverbrauch am Wunsch
+
+> „Die zusätzlich erhobenen Daten, wie der Tokenverbrauch geschätzt und/oder
+> real sollen in den Details der Wünsche sichtbar sein."
+
+Der Wunsch lag zwei Läufe lang liegen, weil er von Daten sprach, die es nicht
+gab: Je Wunsch misst das Portal nur die KI-Überschrift (160–320 Tokens), und
+die war offensichtlich nicht gemeint. Rückfrage am Wunsch, Andis Antwort:
+
+> „Ok, dann sollte nur der Tokenverbrauch nach der Umsetzung dokumentiert
+> sein"
+
+Damit fällt die Hälfte des ursprünglichen Wortlauts weg – kein „geschätzt",
+kein Wert vorab. Genau deshalb war die Rückfrage richtig: Geraten hätte ich
+vermutlich beides gebaut, und die Vorab-Schätzung wäre eine Zahl gewesen, die
+niemand braucht und die dauerhaft danebenliegt.
+
+### Eine Spalte, ein Argument, eine Zeile
+
+`wuensche.tokens` (INTEGER, NULL), gesetzt als drittes Argument von
+`manage.py wunsch_erledigt <id> "<umsetzung>" <tokens>`, angezeigt in der
+Detailansicht.
+
+**NULL heisst „nicht erfasst", 0 heisst null.** Der Unterschied ist der
+ganze Punkt: An ~190 Wünschen von vor heute gibt es keine Zahl, und dort
+bleibt die Zeile weg. Hätte ich `{% if w.tokens %}` geschrieben, wäre eine
+echte 0 (etwa bei einer reinen Doku-Änderung) wie „nicht erfasst" behandelt
+worden – ein eigener Test hält beides auseinander.
+
+**COALESCE beim Schreiben:** Wer einen Wunsch später noch einmal abhakt, um
+die Umsetzung zu ergänzen, soll die Zahl nicht verlieren.
+
+**Unsinn bricht ab, statt still zu verschwinden.** „vielleicht 35k" als
+`tokens` würde sonst als „nicht erfasst" durchgehen, und niemand wüsste
+warum. Tausenderpunkte sind dagegen erlaubt – „35.000" ist die Schreibweise,
+in der die Zahl im Bericht steht.
+
+Zehn Injektionen, zehn Treffer.
+
+### Ehrlich zur Herkunft der Zahl
+
+Das Portal misst sie nicht. Sie kommt von mir, nach getaner Arbeit, und ist
+gut begründet, aber keine Messung. Die Hilfe sagt das so.
+
+**Dieser Wunsch ist der erste mit einer Zahl** – 38.000 Tokens.
+
+---
+
 ## 2026-08-10 – portal-v189: Wunsch #189 – handball.net-Relaunch, und was daraus folgt
 
 > „Es soll geprüft werden, was sich aus dieser Newsinfo von Handball.net

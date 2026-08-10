@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v189: manage.py wunsch_neu, TVB-Datenquellen vor dem handball.net-Relaunch geprueft)*
+*Letzte Aktualisierung: 2026-08-10 (portal-v190: Wunsch #188 Tokenverbrauch je Wunsch)*
 
 ## Host
 
@@ -503,6 +503,14 @@ teile/
                        [anzahl|alle]` - ohne Argument wird nur gezaehlt, weil
                        der Lauf echte Tokens aus dem Kontingent des Urhebers
                        kostet (~160-320 je Wunsch, gemessen).
+  manage.py          – wunsch_erledigt <id> "<umsetzung>" [tokens] - das
+                       dritte Argument ist der Tokenverbrauch der Umsetzung
+                       (Wunsch #188), NACH der Umsetzung eingetragen, nicht
+                       vorab geschaetzt. wuensche.tokens: NULL = nicht
+                       erfasst, 0 = wirklich null. Die Detailansicht laesst
+                       die Zeile bei NULL weg; in der Vorlage steht deshalb
+                       `is not none`, nicht `if w.tokens` - sonst
+                       verschwaende eine echte 0.
   manage.py          – wunsch_neu <app> "<titel>" "<text>" legt einen Wunsch
                        an, IMMER ohne Prioritaet und bewusst ohne Schalter
                        dafuer: der stuendliche Lauf (#157) arbeitet alles ab,

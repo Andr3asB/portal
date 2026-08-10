@@ -54,7 +54,7 @@ _PRIO_ORDER = """
 
 _SELECT = """
     SELECT w.id, w.text, w.titel, w.prioritaet, w.app_slug, w.ansicht,
-           w.erstellt, w.erledigt, w.erledigt_am, w.umsetzung,
+           w.erstellt, w.erledigt, w.erledigt_am, w.umsetzung, w.tokens,
            u.name AS urheber_name, u.farbe AS urheber_farbe
     FROM   wuensche w
     LEFT JOIN users u ON u.id = w.user_id

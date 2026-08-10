@@ -1581,6 +1581,12 @@ def _init_db(app):
             ("erledigt_am", "DATETIME"),
             ("ansicht",     "TEXT"),
             ("umsetzung",   "TEXT"),  # Wunsch #101: was genau umgesetzt wurde
+            # Wunsch #188: Tokenverbrauch der Umsetzung, NACH der Umsetzung
+            # eingetragen. Bewusst kein Schaetzwert vorab - Andi: "dann sollte
+            # nur der Tokenverbrauch nach der Umsetzung dokumentiert sein".
+            # NULL heisst "nicht erfasst" und ist bei allen Wuenschen von vor
+            # diesem Punkt der Normalfall; 0 waere eine Luege.
+            ("tokens",      "INTEGER"),
         ]:
             try:
                 db.execute(f"ALTER TABLE wuensche ADD COLUMN {col} {definition}")

@@ -8,7 +8,7 @@ Aufruf im Container:
   docker exec portal python manage.py grant 1 todo
   docker exec portal python manage.py listusers
   docker exec portal python manage.py listwuensche
-  docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung"
+  docker exec portal python manage.py wunsch_erledigt 101 "Beschreibung der Umsetzung" 35000
   docker exec portal python manage.py titel_nachtragen 5
   docker exec portal python manage.py wunsch_aktion 188 frage "Woher kommen die Zahlen?"
   docker exec portal python manage.py wunsch_neu tvb "Kurzer Titel" "Der ganze Wunschtext"
@@ -247,16 +247,32 @@ def cmd_listtodos(_):
 def cmd_wunsch_erledigt(args):
     """Wunsch #101: die Umsetzung (was genau implementiert wurde) wird als
     zweites Argument mitgegeben und in der Werkstatt-App beim Anklicken des
-    Wunsches angezeigt - deshalb ab jetzt bei jedem Abschluss mitgeben."""
+    Wunsches angezeigt - deshalb ab jetzt bei jedem Abschluss mitgeben.
+
+    Wunsch #188: als drittes Argument der Tokenverbrauch der Umsetzung.
+    NACH der Umsetzung, nicht vorher geschaetzt - so hat Andi es entschieden.
+    Weggelassen bleibt die Spalte NULL ("nicht erfasst"); eine 0 waere eine
+    Behauptung, kein fehlender Wert.
+
+        wunsch_erledigt 188 "Umsetzung ..." 35000
+    """
     if not args:
-        sys.exit('Verwendung: wunsch_erledigt <id> ["Beschreibung der Umsetzung"]')
+        sys.exit('Verwendung: wunsch_erledigt <id> ["Umsetzung"] [tokens]')
     db = connect()
     wid = int(args[0])
     umsetzung = args[1] if len(args) > 1 else None
+    tokens = None
+    if len(args) > 2 and args[2].strip():
+        try:
+            tokens = int(args[2].replace(".", "").replace("_", ""))
+        except ValueError:
+            sys.exit(f"Tokenzahl '{args[2]}' ist keine Zahl.")
+        if tokens < 0:
+            sys.exit("Tokenzahl kann nicht negativ sein.")
     db.execute(
         "UPDATE wuensche SET erledigt=1, erledigt_am=CURRENT_TIMESTAMP, "
-        "umsetzung=COALESCE(?, umsetzung) WHERE id=?",
-        (umsetzung, wid),
+        "umsetzung=COALESCE(?, umsetzung), tokens=COALESCE(?, tokens) WHERE id=?",
+        (umsetzung, tokens, wid),
     )
     # Wunsch #161: derselbe Text zusaetzlich als Aktion, damit der Verlauf
     # eines Wunsches vollstaendig ist. Die Spalte `umsetzung` bleibt daneben
@@ -270,7 +286,8 @@ def cmd_wunsch_erledigt(args):
         )
     db.commit()
     db.close()
-    print(f"Wunsch #{args[0]} als erledigt markiert.")
+    print(f"Wunsch #{args[0]} als erledigt markiert."
+          + (f" Tokenverbrauch: {tokens}." if tokens is not None else ""))
 
 
 def cmd_backlog(_):
