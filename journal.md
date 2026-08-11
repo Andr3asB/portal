@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-08-12 – Stündlicher Wunsch-Durchlauf (#157) wieder eingeschaltet
+
+Der Auftrag aus dem 08.08. war weg – wie damals angekündigt, denn er lebt nur
+in der Sitzung, in der er angelegt wurde. Jetzt wieder da, wieder um **:23**,
+mit denselben Grenzen: **nur diese Sitzung, höchstens sieben Tage.** Kein
+Portal-Code geändert, keine Auslieferung.
+
+### Neu: `scripts/wunsch_lauf_check.py` statt SQL im Auftragstext
+
+Der Lauf fragte bisher mit einer SQL-Zeile im Prompt nach Arbeit. Die musste
+durch zwei Anführungszeichen-Ebenen (PowerShell → SSH → `docker exec`) und war
+genau deshalb die zerbrechlichste Stelle des Ganzen. Die Abfrage steht jetzt in
+einer Datei und wird über stdin in den Container geschoben:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker exec -i portal python -" < scripts/wunsch_lauf_check.py
+```
+
+Nur lesend. Sie beantwortet eine Frage – gibt es Arbeit? – und trennt dabei
+drei Dinge, die vorher in einem Topf lagen:
+
+| Kategorie | Heisst |
+|---|---|
+| **ANTWORTEN** | Andi hat auf eine Rückfrage geantwortet (jüngste `antwort` neuer als jüngste `frage`) – hat Vorrang, hier wartet jemand |
+| **FREIGEGEBEN** | offen, Priorität gesetzt und nicht `zurueckgestellt` |
+| **WARTET** | Rückfrage gestellt, keine Antwort – nicht anfassen, **nicht dieselbe Frage nochmal stellen** |
+
+Die dritte Kategorie ist der eigentliche Zugewinn. Ein Wunsch, an dem eine
+unbeantwortete Rückfrage hängt, sah für den alten Lauf aus wie jeder andere
+freigegebene Wunsch – stündlich. Ohne die Trennung stellt die Automatik
+irgendwann dieselbe Frage zum vierten Mal, und jede davon löst einen Push aus.
+
+Die erste Zeile ist ein Zähler (`ARBEIT: n`), damit der Lauf bei 0 mit einer
+Zeile antworten kann, statt einen Bericht zu schreiben. Wünsche ohne Priorität
+(NULL) zählen weiter **nicht** als freigegeben, `zurueckgestellt` bleibt
+unantastbar (#61/#152).
+
+Stand beim Einschalten: 2 freigegebene Wünsche (#202 `hoch`, #201 `mittel`),
+keine offenen Fragen.
+
+---
+
 ## 2026-08-11 – portal-v206: Backup repariert (Sicherheitsaudit, Folgearbeiten)
 
 Aus dem Audit vom selben Tag. Betrifft nur `util/`, das Portal selbst ist

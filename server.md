@@ -2497,3 +2497,27 @@ docker exec portal python manage.py listtodos
 docker exec portal python manage.py wunsch_erledigt <id> ["Beschreibung der Umsetzung"]
 docker exec portal python manage.py backlog
 ```
+
+## Stündlicher Wunsch-Durchlauf (#157)
+
+Ein wiederkehrender Claude-Auftrag, jede Stunde um **:23**. Er **lebt nur in
+der Claude-Sitzung**, in der er angelegt wurde, und läuft spätestens nach
+sieben Tagen ab – wenn nichts mehr passiert, ist das die erste Erklärung.
+Neu einschalten: Auftrag mit demselben Text wieder anlegen (Fassung im
+Journal, 12.08.2026).
+
+Was ansteht, beantwortet ein reines Leseskript – **kein SQL im Auftragstext**,
+das musste sonst durch PowerShell, SSH und `docker exec` hindurch:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker exec -i portal python -" < scripts/wunsch_lauf_check.py
+```
+
+Erste Zeile ist `ARBEIT: n`; bei 0 antwortet der Lauf mit einer Zeile und tut
+sonst nichts. Danach drei getrennte Listen: **ANTWORTEN** (Andi hat auf eine
+Rückfrage geantwortet – Vorrang), **FREIGEGEBEN** (offen, Priorität gesetzt und
+nicht `zurueckgestellt`), **WARTET** (Rückfrage offen – nicht anfassen und
+nicht nochmal fragen, jede Frage löst einen Push aus).
+
+Ohne Priorität (NULL) heisst **nicht** freigegeben, `zurueckgestellt` ist
+unantastbar (#61/#152) – die Priorität setzt ausschliesslich ein Mensch.
