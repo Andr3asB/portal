@@ -60,7 +60,6 @@
   margin-top:14px; background:var(--surface-2); border:1.5px solid var(--border);
   border-radius:12px; padding:10px 12px;
 }
-.verb-block[hidden] { display:none; }
 .verb-block > summary {
   cursor:pointer; font-size:13px; font-weight:600; color:var(--text-2);
   list-style:none;
@@ -286,7 +285,18 @@ function verbBlockZeigen(bereich, spracheId) {
   if (!passt) block.querySelectorAll('input').forEach(f => { f.value = ''; });
 }
 
-function spracheWaehlen(btn, gruppe) {
+// Wunsch #200: Die Parameter standen in der falschen Reihenfolge. Der
+// Verteiler in base.html ruft `fn.apply(el, args.concat([el, ereignis]))` -
+// die Werte aus `data-args` kommen ZUERST, das Element danach. Mit der alten
+// Signatur (btn, gruppe) landete der String "neu" in `btn` und das Element in
+// `gruppe`; die erste Zeile warf dann `gruppe.split is not a function`, und
+// der Klick auf einen Sprach-Chip tat gar nichts.
+//
+// Aufgefallen ist es erst jetzt, weil das Formular die zuletzt benutzte
+// Sprache ohnehin vorwaehlt (ueber den direkten Aufruf weiter unten, der die
+// richtige Reihenfolge hatte). Wer immer dieselbe Sprache nahm, brauchte den
+// Chip nie - bis mit Wunsch #195 die Voreinstellung eine andere wurde.
+function spracheWaehlen(gruppe, btn) {
   document.getElementById(gruppe === 'neu' ? 'neu-sprache-chips' : ('edit-sprache-chips-' + gruppe.split('-')[1]))
     .querySelectorAll('.sprache-chip').forEach(c => c.classList.remove('aktiv'));
   btn.classList.add('aktiv');
@@ -310,7 +320,7 @@ document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
     const gemerkt = localStorage.getItem(SPRACHE_STORAGE_KEY);
     const chips = document.querySelectorAll('#neu-sprache-chips .sprache-chip');
     let ziel = [...chips].find(c => c.dataset.spracheId === gemerkt) || chips[0];
-    if (ziel) spracheWaehlen(ziel, 'neu');
+    if (ziel) spracheWaehlen('neu', ziel);
     document.getElementById('neu-fremd')?.focus();
   }
 });

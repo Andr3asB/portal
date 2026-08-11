@@ -67,6 +67,16 @@
       color: var(--text);
     }
 
+    /* Wunsch #199: `hidden` muss staerker sein als eine Klassenregel.
+       Das Attribut setzt in der Browser-Standardformatierung `display:none`
+       - eine Klasse mit eigenem `display` (etwa `display:flex`) schlaegt das
+       muehelos. Genau so blieb der Verbmodus bei Daenisch sichtbar, obwohl
+       er auf `hidden` stand; die Beschriftung darueber verschwand, weil sie
+       kein eigenes `display` hatte, und uebrig blieb eine Liste ohne
+       Ueberschrift und ohne Abstand (Wuensche #197/#198).
+       Dieselbe Spezifitaetsfalle wie bei der Schriftgroesse in #170. */
+    [hidden] { display: none !important; }
+
     /* Wunsch #169: Tippflaeche auf Fingergroesse. Viele Knoepfe sind optisch
        klein (17-33px hoch, live gemessen). Statt 44 Vorlagen umzubauen,
        bekommt JEDER button eine unsichtbare, zentrierte Trefferflaeche von

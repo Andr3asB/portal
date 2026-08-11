@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-10 (portal-v195: Wuensche #196 Ziehen zum Neuladen, #195 Verbfelder nur bei Englisch)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v197: #200 Sprachwahl repariert, #197/#198/#199 hidden-Spezifitaet)*
 
 ## Host
 
@@ -1706,6 +1706,15 @@ werden. `tests/test_tippflaeche.py` waechtert die ersten vier,
 | `:focus-visible` Ring + `:focus:not(:focus-visible){outline:none}` | #174 | Tastaturnutzer sahen nicht, wo sie stehen |
 | `.app-header { position:sticky; top:0; z-index:100 }` + `html { scroll-padding-top }` | #186 | Navigation war auf langen Seiten nicht erreichbar |
 | `body { overscroll-behavior-y: contain }` + Ziehgeste in base.html | #196 | in der installierten PWA gab es kein Neuladen |
+| `[hidden] { display: none !important }` | #199 | eine Klasse mit eigenem `display` schlug das Attribut |
+
+**Aufrufkonvention des Verteilers (Wunsch #200):**
+`fn.apply(el, args.concat([el, ereignis]))` - die Werte aus `data-args`
+kommen ZUERST, dann das Element, dann das Ereignis. Eine Funktion, deren
+erster Parameter ein Element ist, darf also KEIN `data-args` bekommen.
+`tests/test_verteiler_argumente.py` waechtert das ueber alle Vorlagen; der
+Fehler war in vokabeln.html monatelang unsichtbar, weil das Formular die
+Sprache selbst vorwaehlte und der Chip nie gebraucht wurde.
 
 **Zur fuenften gehoert das `scroll-padding-top` untrennbar dazu.** Ohne es
 landet jedes Sprungziel (`#wunsch-<id>` aus #171, `#gb-<id>`, die

@@ -23,6 +23,12 @@
   margin-top:24px; width:100%; background:var(--farbe); color:#fff; border:none;
   border-radius:12px; padding:13px 0; font-size:16px; font-weight:600; cursor:pointer;
 }
+/* Wunsch #197/#198: Die Verbauswahl ist keine weitere Zeile wie "Sprache"
+   oder "Kapitel" - sie schaltet den ganzen Trainingsmodus um. Sie bekommt
+   deshalb eine sichtbare Trennung statt nur des ueblichen 16px-Abstands. */
+.form-label.abschnitt {
+  margin-top:26px; padding-top:18px; border-top:1px solid var(--border);
+}
 .verb-hinweis { font-size:13px; color:var(--text-2); line-height:1.5; margin-bottom:10px; }
 .verb-liste { display:flex; flex-direction:column; gap:6px; }
 .verb-chip {
@@ -71,7 +77,7 @@
     {# Wunsch #194: Der Spezialmodus fuer unregelmaessige Verben. Mindestens
        ein Kreuz schaltet das Training um - deshalb braucht es keinen
        zusaetzlichen Hauptschalter, der dasselbe noch einmal sagt. #}
-    <div class="form-label" data-verb-block>Unregelmäßige Verben</div>
+    <div class="form-label abschnitt" data-verb-block>Unregelmäßige Verben</div>
     <div class="verb-hinweis" data-verb-block>
       Kreuze eine oder mehrere Abfrageformen an – dann übt das Training
       <strong>nur unregelmäßige Verben</strong>, in genau diesen Richtungen.

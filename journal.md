@@ -2,6 +2,75 @@
 
 ---
 
+## 2026-08-11 – portal-v197: Wünsche #200, #197, #198, #199
+
+Vier Meldungen aus einer Nacht, alle Vokabeln – und nur **zwei** Ursachen.
+
+### #200 – der Sprach-Chip tat gar nichts
+
+> „Beim Vokabeln eintragen kann ich nicht mehr auf Englisch umschalten"
+
+Der Verteiler in `base.html` ruft `fn.apply(el, args.concat([el, ereignis]))`:
+**erst die Werte aus `data-args`, dann das Element.** Der Chip trug
+`data-args='["neu"]'`, die Funktion hiess `spracheWaehlen(btn, gruppe)`. Damit
+landete der String `"neu"` in `btn` und das Element in `gruppe`, und die erste
+Zeile warf `gruppe.split is not a function`.
+
+**Der Fehler war älter als die Meldung.** Das Formular wählt die zuletzt
+benutzte Sprache selbst vor – über einen direkten Aufruf, der die richtige
+Reihenfolge hatte. Wer immer dieselbe Sprache nahm, brauchte den Chip nie.
+Erst als mit #195 die Voreinstellung eine andere wurde (Dänisch steht
+alphabetisch vorn), wurde das Umschalten nötig – und ging nicht.
+
+Das ist die unangenehme Sorte Fehler: nicht neu eingebaut, sondern durch eine
+harmlose Änderung *erreichbar* geworden.
+
+Der neue Wächter prüft die Klasse, nicht den Einzelfall: Wird eine Funktion
+mit `data-args` aufgerufen, darf ihr erster Parameter kein Element sein –
+erkennbar an `.classList`, `.dataset`, `.closest()`, `.value`. Ein Name oder
+eine Zahl aus `data-args` hat das alles nicht.
+
+### #197, #198, #199 – eine Ursache, drei Blickwinkel
+
+> „Da ist kein Abstand zwischen der Sprachwahl und den Abfragemodi."
+> „Da ist kein Abstand zwischen der Kapitelwahl und dem Abfragemodus."
+> „Bei Dänisch ist der Abfragemodus für Englisch noch sichtbar."
+
+`hidden` setzt in der Standardformatierung des Browsers `display:none` – und
+**eine Klassenregel mit eigenem `display` schlägt das mühelos**:
+
+| Element | Regel | `hidden` wirkt? |
+|---|---|---|
+| Überschrift | `.form-label` (kein `display`) | ja, verschwindet |
+| Hinweis | `.verb-hinweis` (kein `display`) | ja |
+| Auswahlliste | `.verb-liste { display:flex }` | **nein** |
+| Foto-Schalter | `.verb-schalter { display:flex }` | **nein** |
+
+Bei Dänisch verschwanden also Überschrift und Hinweis, die Liste blieb – eine
+Auswahl ohne Titel, direkt an der Kapitelwahl klebend. „Kein Abstand" und
+„noch sichtbar" sind derselbe Fehler von zwei Seiten.
+
+**Dieselbe Spezifitätsfalle wie bei der Schriftgröße in #170**, und dieselbe
+Lehre: Die Lösung gehört nach `base.html` und gilt portalweit —
+`[hidden] { display: none !important; }`. Die Einzelregel, die ich bei #195
+in `vokabeln.html` geschrieben hatte, ist damit weg; ein Wächter verlangt,
+dass keine Vorlage `[hidden]` selbst regelt.
+
+Dazu der Abstand, den Andi zweimal angemahnt hat: Die Verbauswahl ist keine
+weitere Zeile wie „Sprache" oder „Kapitel" – sie schaltet den ganzen
+Trainingsmodus um. Sie bekommt jetzt eine Trennlinie und mehr Luft, ebenso
+der Schalter im Foto-Import.
+
+### Zehn Injektionen, zehn rot
+
+Darunter die beiden, die man beim Reparieren übersieht: die Signatur drehen
+und den direkten Aufruf vergessen – und `!important` weglassen, was genau den
+Ausgangszustand wiederherstellt.
+
+1176 Tests grün.
+
+---
+
 ## 2026-08-10 – portal-v194/v195: Wünsche #196 und #195
 
 ### #196 – nach unten ziehen lädt neu
