@@ -1,6 +1,18 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-11 (portal-v204: Wunsch #208 Permissions-Policy - Sicherheitsaudit #203-208 abgeschlossen)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v206: Backup repariert - Live-DB nicht mehr im Archiv, Wiederherstellung laeuft ueber die Snapshots, siehe unten)*
+
+## ⚠️ Wiederherstellung aus einem Backup (geaendert mit v206)
+
+Die Backup-Tarballs auf dem NAS enthalten **keine `./portal.db` mehr**. Die
+Datenbank liegt darin unter `./snapshots/portal-<zeitstempel>.db` - den
+**neuesten** davon nach `/data/portal.db` kopieren, dann `portal` neu starten.
+
+Grund: `tar` las die Live-Datenbank, waehrend das Portal hineinschrieb. Das
+brach an drei von sechs Naechten mit `tar exit 1` ab (07./08./10.08.2026) und
+lieferte auch an den uebrigen keine garantiert konsistente Datei. Die
+Snapshots daneben entstehen ueber `sqlite3.Connection.backup()` und sind
+WAL-korrekt in sich stimmig. Details im journal.md, 11.08.2026.
 
 ## Host
 

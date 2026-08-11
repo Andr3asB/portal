@@ -41,3 +41,9 @@ playwright-report/
 screenshots/
 dumps/
 *.har
+
+# ── Sicherheitsberichte – bleiben lokal ─────────────────────────────────
+# Enthalten unbehobene Schwachstellen samt Ausnutzungspfad. Auch ein
+# privates Repo ist dafür der falsche Ort: der Bericht ist eine Anleitung,
+# solange die Findings offen sind. Entscheidung von Andi, 11.08.2026.
+SECURITY_REVIEW.md

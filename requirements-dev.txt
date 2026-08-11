@@ -11,6 +11,13 @@
 #   .venv/Scripts/python -m pytest tests/ -q
 -r src/requirements.txt
 pytest==8.4.2
+# Sicherheitsaudit 11.08.2026: CVE-Abgleich der Laufzeit-Abhaengigkeiten.
+# Gegen den ECHTEN Produktionsstand pruefen, nicht gegen die lokale .venv -
+# die kann abweichen:
+#   ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
+#   .venv/Scripts/python -m pip_audit -r freeze.txt
+# Stand 11.08.2026: keine bekannten Schwachstellen in allen 40 Paketen.
+pip-audit==2.10.1
 # Wunsch #143: nur zum ERZEUGEN eines Test-Barcodes. Im Betrieb wird gelesen
 # (zxing-cpp), nicht erzeugt - deshalb bewusst nicht in src/requirements.txt.
 python-barcode==0.16.1

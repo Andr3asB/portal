@@ -16,8 +16,15 @@ gelesen. Sie ersetzt das manuelle Übergeben des Bauplans.
 2. `server.md` – aktueller Zustand des Systems.
 3. `journal.md` – was zuletzt passiert ist und warum.
 
-Wenn `server.md` und `journal.md` noch nicht existieren: erste Sitzung.
-Am Ende von Meilenstein 1 anlegen.
+`server.md` und `journal.md` sind beide groß (~2.500 bzw. ~9.000 Zeilen,
+neuester Journal-Eintrag oben). Nicht am Stück lesen – `journal.md` von oben
+für den letzten Stand, in `server.md` gezielt per Grep in den Abschnitt
+springen, der zur Aufgabe passt („Bekannte Issues", „Code-Struktur",
+„Deployment-Ablauf", die Test-Liste).
+
+Dazu, wenn ein Umbau in Stufen ausgeliefert wird: `pruefplan.md` – Andis
+Handprüfung je Stufe (echtes Gerät, echter Browser, echter iFrame,
+installierte PWA). Nur was ein Skript prinzipiell nicht sehen kann.
 
 ## Harte Grenzen (Kurzfassung)
 
@@ -71,20 +78,81 @@ ssh -p 2222 claude@10.0.0.100 "docker compose -p familienportal ps"
 # Logs ansehen
 ssh -p 2222 claude@10.0.0.100 "docker compose -p familienportal logs --tail=50 portal"
 
-# Paket ausliefern (von diesem Rechner aus)
-scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
-
 # Zertifikat prüfen
 openssl s_client -connect portal.16schwaben.de:443 -servername portal.16schwaben.de </dev/null 2>/dev/null | openssl x509 -noout -dates
-
-# E2E-Tests (ad hoc mit Playwright, von diesem Rechner aus – tests/ ist aktuell
-# nur ein leeres Verzeichnis, es existiert noch keine feste Suite)
-python -m playwright test tests/
 
 # manage.py im Container – Nutzer/Apps/Grants anlegen, Backlog einsehen
 docker exec portal python manage.py listusers
 docker exec portal python manage.py backlog
 ```
+
+Auslieferung ist ein Dreischritt (Paket bauen → hochladen → entpacken +
+`--build`), die vollständige Fassung mit allen `--exclude` steht in
+`server.md`, Abschnitt „Deployment-Ablauf". Zwei Punkte, die dort leicht
+untergehen:
+
+- **Code-Änderungen brauchen `--build`, nicht `restart`.** Templates und
+  Python-Dateien sind ins Image eingebacken.
+- **Caddyfile-Änderungen brauchen `docker compose up -d --force-recreate
+  caddy`** – die Datei ist als einzelne Datei bind-gemountet, ein
+  Reload/Restart greift dort nicht.
+
+Versionsnummern in `deploy/` zählen hoch und werden nie überschrieben; die
+höchste vorhandene `portal-vN.tar.gz` ist der letzte ausgelieferte Stand.
+
+## Tests
+
+Die Suite ist **pytest, nicht Playwright**, und läuft komplett offline gegen
+eine Wegwerf-Datenbank – kein laufendes Portal, kein Netz, kein Container
+nötig. `tests/conftest.py` baut je Test eine frische DB samt kleiner Familie
+(Admin, Kind, Elternteil) und setzt `DB_PATH`/`TOKEN_KEY`/… in der Umgebung,
+bevor `app` importiert wird. Die App wird **einmal** importiert
+(session-scope – Flask-Blueprints lassen sich nicht zweimal registrieren),
+die DB pro Test neu (function-scope).
+
+```bash
+# Einrichten (einmalig)
+python -m venv .venv
+.venv/Scripts/pip install -r requirements-dev.txt     # Windows
+.venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
+
+# Alles (dauert wenige Sekunden)
+.venv/Scripts/python -m pytest tests/ -q
+
+# Eine Datei, ein einzelner Test, ein Muster über alle Dateien
+.venv/Scripts/python -m pytest tests/test_grant.py -q
+.venv/Scripts/python -m pytest tests/test_grant.py::test_token_gilt_nur_fuer_seine_app -q
+.venv/Scripts/python -m pytest tests/ -k kontingent -q
+```
+
+`pytest` steht bewusst nur in `requirements-dev.txt`; `src/requirements.txt`
+beschreibt die Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts
+Test-Werkzeug hineinschreiben.
+
+**Ein großer Teil der Suite sind Konventions-Wächter, keine Funktionstests.**
+`test_tippflaeche.py`, `test_aria_labels.py`, `test_loeschen_symbol.py`,
+`test_kopfleiste.py`, `test_emoji.py` und `test_csp.py` lesen die Vorlagen im
+Quelltext und schlagen an, wenn eine neue Vorlage gegen eine der
+UI-Konventionen weiter unten verstößt. Schlägt einer davon an, ist die
+Vorlage falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
+gegenprüfen, dass er auch wirklich auslöst (absichtlichen Fehler einbauen) –
+ein Wächter, der nicht anschlagen kann, ist schlimmer als keiner.
+
+`server.md` beschreibt am Ende jede Testdatei einzeln mitsamt dem Fehler, den
+sie gefunden hat – dort nachsehen, bevor ein bestehender Test angefasst wird.
+
+## Prüfung gegen das laufende Portal
+
+```bash
+python scripts/live_pruefung.py            # als erster Admin
+python scripts/live_pruefung.py Friederike
+```
+
+Ruft jede App eines Nutzers über HTTPS auf. **Nie wieder ad hoc mit `curl`
+prüfen:** Seit dem Sitzungs-Umbau stellt jeder Aufruf ohne Cookie eine neue,
+nie ablaufende Sitzung aus – das hatte 808 Zugänge in der Datenbank
+hinterlassen (journal.md, 08.08.2026). Das Skript legt genau **eine** Sitzung
+an (Kennung `geraet='PRUEFUNG'`) und löscht sie im `finally` wieder.
 
 ## Architektur (Überblick)
 
@@ -139,10 +207,14 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
   Nutzerdaten eingesetzt werden.
 - Jede Route prüft `grant()` zuerst; destruktive Aktionen zusätzlich
   `is_admin`/Owner-Check.
-- Jedes echte (nicht reversible) Löschen fragt vorher per `confirm()` nach
-  (`|tojson|forceescape` im `onsubmit`-Attribut, siehe `server.md`
-  „Sicherheitskonventionen"); reversible Toggles (aktiv/inaktiv, Grant-Entzug)
-  brauchen keine Abfrage.
+- Jedes echte (nicht reversible) Löschen fragt vorher per `confirm()` nach –
+  seit Wunsch #142 (CSP) über das Attribut `data-bestaetigen="Frage?"` am
+  Formular, das ein zentraler Verteiler in `base.html` auswertet. **Kein
+  `onsubmit`/`onclick` mehr** (`test_csp.py::test_keine_inline_handler_mehr`
+  lässt kein neues Inline-Attribut durch; beim Entwickeln steht
+  `CSP_MODUS=aus`, ein neuer Inline-Handler fiele dort sonst nicht auf und
+  der Knopf reagierte erst im Betrieb nicht). Reversible Toggles
+  (aktiv/inaktiv, Grant-Entzug) brauchen keine Abfrage.
 
 **UI-Konventionen (verbindlich, aus Nutzer-Feedback, nicht in `bauplan.md`):**
 - Jede Unterseite braucht einen eigenen Zurück-Link. Der ⌂-Heimknopf führt
@@ -208,7 +280,7 @@ Konfigurationsvorlagen für `.claude/` auf diesem Rechner.
 
 - `src/` – Quellcode des Portals (wird nach `/srv/familienportal/src` ausgeliefert)
 - `deploy/` – versionierte Auslieferungspakete (`portal-v1.tar.gz`, …), nie überschreiben
-- `tests/` – Playwright/pytest-Tests, laufen von diesem Rechner aus
+- `tests/` – pytest-Suite, läuft offline gegen eine Wegwerf-DB (siehe „Tests")
 - `scripts/` – Werkzeuge gegen das LAUFENDE Portal, ebenfalls von diesem
   Rechner aus. `live_pruefung.py` ruft jede App eines Nutzers über HTTPS auf
   und legt dafür **eine** Sitzung an, die es im `finally` wieder löscht –
@@ -216,7 +288,31 @@ Konfigurationsvorlagen für `.claude/` auf diesem Rechner.
   in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026)
 - `.claude/` – aktive Berechtigungen und Guardrail-Hook, **nicht ändern**
 
+## Wünsche abschließen
+
+Das Werkstatt-Backlog ist die Auftragsliste. Ein Wunsch gilt erst als fertig,
+wenn er im Container abgehakt ist – nicht schon, wenn der Code läuft:
+
+```bash
+docker exec portal python manage.py wunsch_erledigt <id> "was genau umgesetzt wurde" [tokens]
+docker exec portal python manage.py wunsch_aktion <id> frage "Rückfrage an Andi"
+docker exec portal python manage.py wunsch_neu <app> "<titel>" "<text>"
+```
+
+- Das **zweite Argument** (`umsetzung`) ist Pflichtstoff, nicht Kür: es
+  landet in der Detailansicht der Werkstatt-App und ist das, was Andi später
+  liest. Über die Web-UI lässt es sich nicht setzen.
+- Das **dritte Argument** ist der Tokenverbrauch der Umsetzung – **nachher**
+  eingetragen, nicht vorab geschätzt. `NULL` heißt „nicht erfasst", `0` heißt
+  „wirklich null".
+- **Rückfragen gehören an den Wunsch**, nicht nur in den Chat:
+  `wunsch_aktion <id> frage "…"` schickt denselben Push wie die Oberfläche.
+- `wunsch_neu` legt bewusst **nie** eine Priorität an – der stündliche Lauf
+  (#157) arbeitet alles ab, was eine Priorität außer `zurueckgestellt` trägt;
+  ein Befehl, der beides könnte, würde sich selbst beauftragen.
+
 ## Gitignore
 
-`.gitignore` ist bereits aktiv (aus `gitignore` im Repo-Root übernommen).
-Bei Änderungen an den Ausschlussregeln beide Dateien synchron halten.
+`.gitignore` ist die einzige Ausschlussdatei im Repo und aktiv. (Frühere
+Fassungen dieser Datei erwähnten eine zweite Datei `gitignore` im Repo-Root,
+die synchron zu halten sei – die gibt es nicht mehr.)

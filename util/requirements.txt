@@ -1,1 +1,17 @@
-requests>=2.31
+# Exakte Versionen, gleiche Begruendung wie in src/requirements.txt (Wunsch
+# #135) - hier nachgezogen beim Sicherheitsaudit am 11.08.2026, wo auffiel,
+# dass nur die App gepinnt war und der util-Container weiterhin mit ">="
+# baute. Ein "docker compose up --build util" konnte damit jederzeit neue
+# Versionen einziehen, ungefragt und unbemerkt.
+#
+# Werte = exakter Stand aus dem laufenden util-Container (`pip freeze`),
+# ein Rebuild aendert also funktional nichts. cert_watcher.py ist der einzige
+# Nutzer von requests; certifi/charset-normalizer/idna/urllib3 kommen
+# transitiv mit und stehen deshalb ebenfalls hier.
+#
+# Geprueft mit pip-audit (11.08.2026): keine bekannten Schwachstellen.
+requests==2.34.2
+certifi==2026.7.22
+charset-normalizer==3.4.9
+idna==3.18
+urllib3==2.7.0

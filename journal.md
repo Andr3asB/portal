@@ -2,6 +2,113 @@
 
 ---
 
+## 2026-08-11 – portal-v206: Backup repariert (Sicherheitsaudit, Folgearbeiten)
+
+Aus dem Audit vom selben Tag. Betrifft nur `util/`, das Portal selbst ist
+unverändert.
+
+### Die Backups waren seit einer Woche unzuverlässig – und niemand sah es
+
+`docker logs util` zeigte für den 07., 08. und 10.08. jeweils
+`Backup fehlgeschlagen: tar exit 1` – **drei von sechs Nächten**. Gefunden
+erst bei den Audit-Folgearbeiten, weil ich die Logs im Audit selbst nur mit
+`wc -c` gezählt und nie gelesen hatte (bewusst, wegen der Redaktionsregel für
+Tokens – aber es hat eine Woche kaputter Backups gekostet).
+
+**Ursache, im Container reproduziert:** `tar: .: file changed as we read it`.
+Es ist das VERZEICHNIS `/data`, dessen mtime sich ändert, wenn SQLite seine
+`-wal`/`-shm`-Dateien anlegt oder entfernt – nicht die Datenbankdatei selbst.
+Deshalb sprunghaft: es hängt davon ab, ob im ~10-Sekunden-Fenster ein
+Checkpoint fällt. Drei lokale Reproduktionsversuche (In-place-Schreiben,
+wachsende Datei, mtime-Änderung) schlugen fehl; unter MSYS/NTFS verhält sich
+GNU tar 1.35 anders als unter Linux/ext4, trotz identischer Versionsnummer.
+Erst der echte Lauf im Container zeigte es.
+
+**Drei Änderungen an `util/backup.py`:**
+
+1. **Live-DB fliegt aus dem Archiv.** Vorher `db_snapshot.take()`
+   (`sqlite3.Connection.backup()`, WAL-korrekt), dann
+   `tar --exclude=./portal.db*`. Der Ausschluss trifft nur die oberste Ebene,
+   `./snapshots/portal-*.db` bleibt drin (lokal mit einem Testbaum
+   verifiziert). Findet sich hinterher kein Snapshot, bricht der Lauf hart ab –
+   ein Tarball ohne Datenbank darf nie unbemerkt durchgehen.
+   **Folge für die Wiederherstellung:** Die DB liegt jetzt unter
+   `./snapshots/portal-<zeitstempel>.db`, den NEUESTEN nehmen. Ein
+   `./portal.db` gibt es im Archiv nicht mehr. Steht als Blockkommentar oben
+   in `backup.py`.
+2. **Exit 1 ≠ Exit 2.** GNU tar meldet mit 1 nur Warnungen, mit 2 einen echten
+   Fehler; `backup.py` warf beides in einen Topf und meldete deshalb
+   Totalausfall, obwohl der Datenstrom vollständig übertragen war. Jetzt wird
+   eine 1 sichtbar protokolliert und verwirft nichts mehr.
+3. **Schreiben und Rotieren in EINEM Remote-Befehl** statt zwei
+   SSH-Verbindungen (siehe nächster Abschnitt).
+
+### Der Stolperstein des Tages: Härtung auf dem NAS war nicht aktiv
+
+Andi hatte den NAS-Schlüssel in `authorized_keys` auf einen erzwungenen
+Befehl festlegen wollen (`command="…",restrict`, NV-3 aus dem Audit). Ich
+hatte `backup.py` daraufhin so gebaut, dass es **gar keinen** Remote-Befehl
+mehr mitschickt – der erzwungene sollte ja ohnehin gewinnen.
+
+Der erste Testlauf schlug fehl:
+
+```
+/bin/bash: line 1: syntax error near unexpected token `)'
+tar: -: Wrote only 2048 of 10240 bytes
+tar: Child returned status 141
+```
+
+Ohne Remote-Befehl öffnet `ssh` eine **Login-Shell**, und die las den
+gzip-Strom als Shell-Eingabe. Das kann nur passieren, wenn `command=` NICHT
+greift – die Härtung war also nicht aktiv (vermutlich steht die alte,
+unbeschränkte Zeile noch darüber; `sshd` nimmt die erste passende). Danach
+mit einem `ls` auf dem NAS gegengeprüft: geht durch, der Schlüssel hat
+weiterhin volle Shell.
+
+**Lehre, die im Code steht:** `_REMOTE_CMD` wird jetzt wieder mitgeschickt,
+obwohl er bei aktiver Härtung wirkungslos ist. Ist sie aktiv, gewinnt der
+erzwungene Befehl; ist sie es nicht, trägt unserer das Backup allein. Diese
+Datei darf nicht davon abhängen, dass eine Einstellung auf einem fremden
+Gerät vorhanden und korrekt ist – prüfen kann sie es nicht.
+Rotation hängt am selben Befehl statt in einer zweiten Verbindung: Bei
+aktivem `command=` würde eine zweite Verbindung nur ein weiteres, leeres
+Archiv anlegen und damit die 7er-Rotation auffressen.
+
+### Zwei kleinere Reparaturen
+
+- **`stderr.decode()` ohne `errors=`** warf einen `UnicodeDecodeError`, als
+  die Gegenseite Binäres zurückspiegelte – und ersetzte damit die eigentliche
+  Fehlermeldung genau dann, wenn man sie am dringendsten braucht. Jetzt
+  `errors="replace"`.
+- **`util/requirements.txt` war ungepinnt** (`requests>=2.31`). Im Audit
+  übersehen, weil nur `src/requirements.txt` geprüft wurde. Jetzt exakt auf
+  den laufenden Stand gepinnt (requests 2.34.2 + vier transitive), ein
+  Rebuild ändert damit funktional nichts. Vor dem Rebuild geprüft, danach
+  gegengeprüft: identische Versionen.
+
+### Getestet
+
+`docker compose up -d --build util`, dann Backup manuell ausgelöst. Ergebnis
+auf dem NAS gegengeprüft:
+
+- `gzip -t` → OK
+- 24 konsistente Snapshots im Archiv
+- Live-DB im Archiv: 0 Treffer (wie gewollt)
+- Neuester Snapshot im Archiv = der unmittelbar davor gezogene
+- Rotation griff, 7 Tarballs stehen
+
+### Offen, gehört Andi
+
+- **`authorized_keys` auf dem NAS** – die alte unbeschränkte Zeile entfernen,
+  sonst ist die Härtung wirkungslos (Wunsch #211).
+- **Die Backups liegen dort mit `-rwxrwxrwx`** (world-readable, ACL). Sie
+  enthalten die komplette Familiendatenbank. Ebenfalls #211.
+- **Verwaiste `-wal`/`-shm` in `/data/snapshots/`**: `db_snapshot._prune()`
+  greift per `glob("portal-*.db")` und lässt die Begleiter liegen; ~56 Dateien
+  vom 07./08.08. werden seither in jedem Backup mitgeschleppt. Eigener Wunsch.
+
+---
+
 ## 2026-08-11 – portal-v204: Wunsch #208 – Permissions-Policy ergänzt
 
 Letzter der sechs Befunde aus dem Sicherheitsaudit vom 11.08. (#203-208, alle
