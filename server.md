@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-11 (portal-v202: Wunsch #206 - KI-Kontingentpruefung atomar)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v204: Wunsch #208 Permissions-Policy - Sicherheitsaudit #203-208 abgeschlossen)*
 
 ## Host
 

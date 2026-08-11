@@ -2,6 +2,64 @@
 
 ---
 
+## 2026-08-11 – portal-v204: Wunsch #208 – Permissions-Policy ergänzt
+
+Letzter der sechs Befunde aus dem Sicherheitsaudit vom 11.08. (#203-208, alle
+priorisiert und jetzt abgearbeitet).
+
+### Nur die Hälfte des Befunds umgesetzt, absichtlich
+
+Der Befund nannte zwei fehlende Header. Umgesetzt ist nur einer:
+
+- **Permissions-Policy** – sofort und risikolos ergänzt. Ohne ihn darf
+  grundsätzlich jede eingebettete oder eingeschleuste Ressource Kamera,
+  Mikrofon, Standort, Zahlungs-API anfragen. Das Portal braucht keine davon
+  (Fotos laufen über den normalen Datei-Upload-Dialog, nicht über
+  `getUserMedia`) – deshalb pauschal gesperrt: `camera`, `microphone`,
+  `geolocation`, `payment`, `usb`, dazu ein paar unstrittige Ergänzungen
+  (`magnetometer`, `gyroscope`, `accelerometer`, `midi`) und
+  `interest-cohort`/`browsing-topics` gegen Googles FLoC/Topics-Tracking.
+- **Cross-Origin-Opener-Policy/-Resource-Policy fehlen weiterhin, mit
+  Absicht.** Der Befund selbst warnte davor: Beide könnten das Einbetten im
+  Home-Assistant-iFrame (Kiosk-Bildschirm im Esszimmer) stören, falls HA
+  selbst Cross-Origin-Fensterzugriff braucht – das lässt sich nur an einem
+  echten Gerät prüfen, nicht von diesem Rechner aus. Ein eigener Test hält
+  den Verzicht fest, damit eine spätere Ergänzung eine bewusste Entscheidung
+  bleibt und nicht als Kopiervorlage von einer Checkliste passiert.
+
+### Ein Test, der sich beim ersten Versuch selbst gebissen hat
+
+Zum wiederholten Mal in diesem Projekt: Der erste Test auf „COOP/CORP fehlen
+noch" suchte die Zeichenkette `"Cross-Origin-Opener-Policy"` – und fand sie
+im eigenen erklärenden Kommentar direkt darüber. Geprüft wird jetzt die echte
+Header-**Zeile** (Kommentarzeilen vorher herausgefiltert), nicht jedes
+Vorkommen des Namens.
+
+### Vier Injektionen, alle rot
+
+Darunter der Fall, der am meisten zählt: `camera=(self)` statt `camera=()`
+– die Direktive steht zwar noch da, sperrt aber nichts mehr. Ein Test, der
+nur auf das Vorkommen von `camera=` geprüft hätte, wäre daran vorbeigelaufen.
+
+### Live geprüft
+
+`docker compose up -d --force-recreate caddy` (ein reines `--build`/Neustart
+reicht bei einer bind-gemounteten Einzeldatei nicht, siehe server.md,
+Bekannte Issues). Danach per `curl -sI` bestätigt: der neue Header korrekt
+gesetzt, alle bisherigen (Referrer-Policy, HSTS) unverändert vorhanden.
+1217 Tests grün.
+
+### Damit ist der Sicherheitsaudit vom 11.08. abgeschlossen
+
+Sechs Befunde (#203-208), sechs Behebungen, sieben Auslieferungen (v198-v204).
+Zwei Dinge bewusst nicht vollständig geschlossen und im Code/Journal
+begründet: das DNS-Rebinding-Pinning beim Web-Push-Endpunkt (#203, technisch
+nicht ohne Nachbau von pywebpush möglich) und COOP/CORP (#208, braucht einen
+Test am echten Kiosk-Gerät). Beides steht dort, wo es hingehört, statt
+stillschweigend zu fehlen.
+
+---
+
 ## 2026-08-11 – portal-v202: Wunsch #206 – KI-Kontingentprüfung atomar gemacht
 
 Letzter fachlicher Befund aus dem Sicherheitsaudit vom 11.08. (offen bleibt
