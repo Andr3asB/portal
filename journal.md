@@ -101,8 +101,16 @@ auf dem NAS gegengeprüft:
 
 - **`authorized_keys` auf dem NAS** – die alte unbeschränkte Zeile entfernen,
   sonst ist die Härtung wirkungslos (Wunsch #211).
-- **Die Backups liegen dort mit `-rwxrwxrwx`** (world-readable, ACL). Sie
-  enthalten die komplette Familiendatenbank. Ebenfalls #211.
+- ~~**Die Backups liegen dort mit `-rwxrwxrwx`** (world-readable, ACL).~~
+  **ZURÜCKGEZOGEN, war ein Fehlschluss meinerseits.** Andi hat klargestellt:
+  Der Zugriff anderer NAS-Nutzer wird über die grafische Oberfläche geregelt,
+  und genau das zeigte das `+` in `-rwxrwxrwx+` schon an – es steht für
+  erweiterte ACLs, und die sind auf solchen Systemen maßgeblich. Die
+  POSIX-Bits daneben sind dann nur noch die grobe Rückfallansicht. Ich hatte
+  die Bits gelesen und die ACL ignoriert, obwohl das Zeichen dafür direkt
+  danebenstand. **Merke für künftige Prüfungen: Bei einem `+` am Ende der
+  Rechte sagen die neun Zeichen davor nicht mehr die Wahrheit – dann `getfacl`
+  fragen statt `ls -l` deuten.**
 - **Verwaiste `-wal`/`-shm` in `/data/snapshots/`**: `db_snapshot._prune()`
   greift per `glob("portal-*.db")` und lässt die Begleiter liegen; ~56 Dateien
   vom 07./08.08. werden seither in jedem Backup mitgeschleppt. Eigener Wunsch.
