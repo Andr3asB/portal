@@ -31,6 +31,12 @@ gesammelt als JSON in `dicebear_optionen`, um das Tier-Schema nicht mit
 fachfremden Spalten zu überladen.
 
 Jeder Nutzer sieht nur seine eigene Galerie, keine gemeinsame Pinnwand.
+
+Wunsch #201: Neben dem Mülleimer steht ein ✏️. Es lädt die gespeicherte Figur
+zurück in denselben Assistenten (Schritt 3) und schaltet das Formular auf die
+Route `bearbeiten/<id>` um - es gibt also kein zweites Formular, das mit dem
+ersten synchron gehalten werden müsste. Auch die Kategorie lässt sich dabei
+wechseln, deshalb schreibt das Bearbeiten immer ALLE Spalten (siehe _SPALTEN).
 """
 import json
 import re
@@ -194,6 +200,72 @@ def vorschau_mensch(token):
     return jsonify(ok=True, svg=_mensch_svg_rendern(optionen))
 
 
+# ---------------------------------------------------------------------------
+# Anlegen und Bearbeiten teilen sich eine Lesefunktion (Wunsch #201)
+# ---------------------------------------------------------------------------
+
+# Reihenfolge egal, aber EINE Liste: Anlegen und Bearbeiten schreiben beide
+# ALLE diese Spalten. Sonst bliebe beim Wechsel Mensch->Tier das alte
+# `dicebear_optionen` stehen und die Galerie zeichnete weiter den Avatar.
+_SPALTEN = ("tier_typ", "koerper_farbe", "muster", "muster_farbe",
+            "accessoire", "koerperbau", "dicebear_optionen", "name")
+
+
+def _kreation_aus_form(form):
+    """Formular -> vollständiger Spaltensatz, oder None bei unbekanntem Typ.
+
+    Warum gemeinsam für Anlegen und Bearbeiten (Wunsch #201): Zwei Kopien
+    derselben Prüfung laufen auseinander, und die Kopie, die zuerst vergessen
+    wird, ist die im selteneren Weg - hier also im Bearbeiten. Dann liesse
+    sich per Bearbeiten speichern, was beim Anlegen abgelehnt wird.
+    """
+    tier_typ = form.get("tier_typ", "")
+    if tier_typ not in ALLE_TYPEN:
+        return None
+    name = form.get("name", "").strip()[:40] or None
+
+    if tier_typ == "mensch":
+        return {
+            "tier_typ": tier_typ, "name": name,
+            "dicebear_optionen": json.dumps(_mensch_optionen_lesen(form)),
+            # Die Tier-Spalten auf ihre Vorgabe zurück statt sie stehen zu
+            # lassen: eine Mensch-Figur hat kein Muster und keinen Körperbau.
+            "koerper_farbe": "#e8b04b", "muster": None, "muster_farbe": None,
+            "accessoire": None, "koerperbau": 50,
+        }
+
+    muster = form.get("muster", "keins")
+    if muster not in MUSTER:
+        muster = "keins"
+    accessoire_liste = [a for a in form.get("accessoire", "").split(",") if a in ACCESSOIRES]
+    return {
+        "tier_typ": tier_typ, "name": name,
+        "dicebear_optionen": None,
+        "koerper_farbe": _clean_farbe(form.get("koerper_farbe"), "#e8b04b"),
+        "muster": None if muster == "keins" else muster,
+        "muster_farbe": _clean_farbe(form.get("muster_farbe"), "#ffffff") if muster != "keins" else None,
+        "accessoire": ",".join(accessoire_liste) or None,
+        "koerperbau": _clean_koerperbau(form.get("koerperbau")),
+    }
+
+
+def _figur_fuer_js(k):
+    """Eine gespeicherte Figur so, wie das Bearbeiten-Formular sie braucht.
+
+    Geht als JSON in die Seite und wird per `.value`/`classList` eingesetzt -
+    nie per innerHTML, `name` ist Nutzertext."""
+    return {
+        "tier_typ": k["tier_typ"],
+        "name": k["name"] or "",
+        "koerper_farbe": k["koerper_farbe"],
+        "muster": k["muster"] or "keins",
+        "muster_farbe": k["muster_farbe"] or "#ffffff",
+        "accessoire": k["accessoire"] or "",
+        "koerperbau": k["koerperbau"],
+        "mensch": json.loads(k["dicebear_optionen"]) if k["dicebear_optionen"] else None,
+    }
+
+
 @bp.route("/a/tierbaukasten/", defaults={"token": None})
 @bp.route("/a/tierbaukasten/<token>/")
 def index(token):
@@ -213,6 +285,7 @@ def index(token):
         user=user, token=token, farbe=user["farbe"],
         kategorien=KATEGORIEN, tiere=TIERE, muster=MUSTER, accessoires=ACCESSOIRES,
         eigene=eigene, mensch_svgs=mensch_svgs,
+        figuren={k["id"]: _figur_fuer_js(k) for k in eigene},
         mensch_frisur=MENSCH_FRISUR, mensch_augen=MENSCH_AUGEN, mensch_augenbrauen=MENSCH_AUGENBRAUEN,
         mensch_mund=MENSCH_MUND, mensch_bart=MENSCH_BART, mensch_kleidung=MENSCH_KLEIDUNG,
         mensch_accessoire=MENSCH_ACCESSOIRE, mensch_haut=MENSCH_HAUT, mensch_haarfarben=MENSCH_HAARFARBEN,
@@ -226,41 +299,45 @@ def speichern(token):
     user = check_grant(token, APP)
     if not user:
         abort(403)
-    tier_typ = request.form.get("tier_typ", "")
-    if tier_typ not in ALLE_TYPEN:
+    werte = _kreation_aus_form(request.form)
+    if werte is None:
         return redirect(url_for("tierbaukasten_app.index", token=token))
-    name = request.form.get("name", "").strip()[:40] or None
     db = get_db()
-
-    if tier_typ == "mensch":
-        optionen = _mensch_optionen_lesen(request.form)
-        db.execute(
-            """INSERT INTO tierbaukasten_kreationen(user_id, tier_typ, dicebear_optionen, name)
-               VALUES (?,?,?,?)""",
-            (user["id"], tier_typ, json.dumps(optionen), name),
-        )
-        db.commit()
-        return redirect(url_for("tierbaukasten_app.index", token=token))
-
-    koerper_farbe = _clean_farbe(request.form.get("koerper_farbe"), "#e8b04b")
-    muster        = request.form.get("muster", "keins")
-    if muster not in MUSTER:
-        muster = "keins"
-    muster_farbe  = _clean_farbe(request.form.get("muster_farbe"), "#ffffff") if muster != "keins" else None
-    accessoire_roh = request.form.get("accessoire", "")
-    accessoire_liste = [a for a in accessoire_roh.split(",") if a in ACCESSOIRES]
-    accessoire = ",".join(accessoire_liste) or None
-    koerperbau = _clean_koerperbau(request.form.get("koerperbau"))
-
     db.execute(
-        """INSERT INTO tierbaukasten_kreationen
-           (user_id, tier_typ, koerper_farbe, muster, muster_farbe, accessoire, koerperbau, name)
-           VALUES (?,?,?,?,?,?,?,?)""",
-        (user["id"], tier_typ, koerper_farbe,
-         None if muster == "keins" else muster, muster_farbe,
-         accessoire, koerperbau, name),
+        f"""INSERT INTO tierbaukasten_kreationen(user_id, {", ".join(_SPALTEN)})
+            VALUES ({", ".join("?" * (len(_SPALTEN) + 1))})""",
+        (user["id"], *(werte[s] for s in _SPALTEN)),
     )
     db.commit()
+    return redirect(url_for("tierbaukasten_app.index", token=token))
+
+
+@bp.route("/a/tierbaukasten/bearbeiten/<int:kid>", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/tierbaukasten/<token>/bearbeiten/<int:kid>", methods=["POST"])
+def bearbeiten(token, kid):
+    """Wunsch #201: eine gespeicherte Figur ändern statt löschen und neu bauen.
+
+    `erstellt` wird bewusst nicht angefasst - die Galerie sortiert danach, und
+    eine Figur soll beim Nachbessern nicht nach vorne springen.
+    """
+    user = check_grant(token, APP)
+    if not user:
+        abort(403)
+    db  = get_db()
+    # Jeder sieht nur seine eigene Galerie - eine fremde Figur ist kein
+    # "nicht gefunden", sondern ein Zugriff auf etwas, das einem nicht gehört.
+    if not db.execute("SELECT 1 FROM tierbaukasten_kreationen WHERE id=? AND user_id=?",
+                      (kid, user["id"])).fetchone():
+        abort(403)
+    werte = _kreation_aus_form(request.form)
+    if werte is not None:
+        db.execute(
+            f"""UPDATE tierbaukasten_kreationen
+                SET {", ".join(s + "=?" for s in _SPALTEN)}
+                WHERE id=? AND user_id=?""",
+            (*(werte[s] for s in _SPALTEN), kid, user["id"]),
+        )
+        db.commit()
     return redirect(url_for("tierbaukasten_app.index", token=token))
 
 

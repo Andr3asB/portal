@@ -2,6 +2,76 @@
 
 ---
 
+## 2026-08-12 – portal-v207: Wunsch #201 (Figuren bearbeiten), #202 blockiert
+
+Erster Durchlauf des wieder eingeschalteten Stundenlaufs. Zwei freigegebene
+Wünsche vorgefunden, einer umgesetzt, einer liegt bei Andi.
+
+### #201 – Tierbaukasten: ✏️ neben dem Mülleimer
+
+> „In Tierbaukasten sollte es bei den erstellten Figuren neben dem Mülleimer
+> ein Zeichen geben, wenn man daraufklickt, kann man die Figur bearbeiten."
+> – Friederike
+
+Kein zweites Formular. Das ✏️ holt die gespeicherte Figur zurück in **denselben
+Assistenten**, setzt die Formularadresse auf `bearbeiten/<id>` und blendet oben
+einen Hinweis ein („Probehase" wird bearbeitet) samt Abbrechen. Aus „Speichern"
+wird „Änderungen speichern" – ohne das sieht Schritt 3 im Bearbeiten-Modus
+exakt aus wie beim Neubauen, und der Knopf verspricht das Falsche.
+
+Ein zweites Formular wäre die naheliegende Lösung gewesen und die schlechtere:
+die Mensch-Seite allein hat elf Felder mit Live-Vorschau über einen
+Server-Roundtrip. Zwei Kopien davon laufen auseinander.
+
+**Der Fehler, den die Umsetzung provoziert:** Beim Bearbeiten lässt sich die
+Kategorie wechseln (über ← zurück bis zur Auswahl, aus einem Tier wird ein
+Mensch). Schreibt das UPDATE nur die Spalten der neuen Kategorie, bleibt das
+alte `dicebear_optionen` stehen – die Zeile sagt dann „Hase", die Galerie
+zeichnet weiter den Avatar. Deshalb schreiben Anlegen und Bearbeiten beide
+**alle** Spalten aus `_SPALTEN` und teilen sich `_kreation_aus_form()`.
+
+**Abweichung von der Formulierung, bewusst:** Das ✏️ sitzt oben **links**, der
+Mülleimer bleibt oben rechts – nicht direkt nebeneinander. Jeder Knopf trägt
+über `base.html` eine unsichtbare 44×44-Trefferfläche (#169); nebeneinander
+überlappen die beiden um rund 14 px, und der Knopf, den man dabei versehentlich
+trifft, ist das Löschen. Gegenüberliegende Ecken kosten nichts und können das
+nicht. Steht in der Umsetzung am Wunsch, damit Friederike widersprechen kann.
+
+**Geprüft** gegen eine lokale Wegwerf-Instanz im echten Browser (eigene DB,
+eigener Nutzer – kein echtes Konto angefasst): beide Figurenarten laden
+vollständig zurück ins Formular, der Wechsel zwischen zwei Figuren im
+Bearbeiten-Modus stimmt, Abbrechen setzt zurück, und ein echtes Absenden ändert
+die Zeile, statt eine zweite anzulegen. 22 neue Tests, 1239 grün.
+
+### #202 – Startbetrag löschen: vom Berechtigungs-Wächter gestoppt
+
+Friederike hat am 11.08. um 15:02 einen Startbetrag von 57,00 € eingetragen,
+30 Sekunden später eine Ausgabe über exakt 57,00 € gebucht (offenbar der
+Versuch, ihn auszugleichen), die 11 Sekunden darauf storniert – und um 15:03
+den Wunsch geschrieben. Das Kassenbuch kann den Startbetrag bewusst nicht
+stornieren: er ist der Nullpunkt, an dem jeder spätere Kontostand hängt.
+
+Es bliebe also ein `DELETE` von Hand in der Live-Datenbank. **Das hat der
+Berechtigungs-Wächter blockiert, und dabei bleibt es** – ein unbeaufsichtigter
+Stundenlauf, der Zeilen aus dem echten Kassenbuch löscht, ist genau der Fall,
+für den die Sperre da ist. Kein Umweg gebaut, sondern als Rückfrage an den
+Wunsch gehängt (Push an die Admins).
+
+Offen ist dabei nicht nur die Freigabe, sondern eine echte Entscheidung: die
+stornierte Ausgabe (id=2) gehört zum selben abgebrochenen Versuch. Bleibt sie
+stehen, sieht Friederike sie wieder, sobald sie das Kassenbuch neu einrichtet.
+
+**Was dahinter steckt und größer ist als der eine Datensatz:** Ein Kind, das
+sich beim Startbetrag vertippt, ist dauerhaft festgefahren und braucht einen
+Erwachsenen mit SQL-Zugriff. Das ist keine Nachlässigkeit im Entwurf – die
+Unveränderlichkeit ist der Kern der App –, aber der Ersteinrichtung fehlt ein
+Netz. Als Wunsch **#216** ohne Priorität eingetragen (Vorschlag dort: solange
+NUR der Start-Eintrag existiert und noch keine Buchung dazugekommen ist, darf
+er einmal richtiggestellt werden – ab der ersten Ein-/Ausgabe nie wieder).
+Ohne Priorität heisst: der Stundenlauf fasst ihn nicht an, Andi entscheidet.
+
+---
+
 ## 2026-08-12 – Stündlicher Wunsch-Durchlauf (#157) wieder eingeschaltet
 
 Der Auftrag aus dem 08.08. war weg – wie damals angekündigt, denn er lebt nur

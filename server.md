@@ -801,7 +801,16 @@ teile/
                        `dicebear_optionen`; /vorschau-mensch (POST, JSON)
                        liefert bei jeder Änderung ein frisch gerendertes
                        SVG für die Live-Vorschau. /speichern (POST),
-                       /loeschen/<id> (POST, nur eigene Kreationen). Jeder
+                       /bearbeiten/<id> (POST, Wunsch #201 – holt die Figur
+                       zurück in denselben Assistenten statt ein zweites
+                       Formular aufzumachen; fremde Figur = 403, `erstellt`
+                       bleibt stehen, weil die Galerie danach sortiert),
+                       /loeschen/<id> (POST, nur eigene Kreationen).
+                       Anlegen und Bearbeiten teilen sich `_kreation_aus_form()`
+                       und schreiben beide ALLE Spalten aus `_SPALTEN` – sonst
+                       überlebte beim Wechsel Mensch→Tier das alte
+                       `dicebear_optionen` und die Galerie zeichnete weiter den
+                       Avatar zu einer Zeile, die Tier sagt. Jeder
                        Nutzer sieht nur seine eigene Galerie. Galerie-Vorschau
                        (Macro figur_vorschau) rendert jede Kreation ueber
                        eigenen suffixierten Clip-Pfad (`suffix='-'~kreation.id`),
@@ -2341,6 +2350,13 @@ python -m venv .venv                                   # einmalig
   Bearbeiten lehnen dasselbe ab" laeuft ueber das VERHALTEN beider Endpunkte -
   die erste Fassung fragte nur ab, ob es einen gemeinsamen Helfer GIBT, und
   waere gruen geblieben, waehrend eine zweite Kopie abweicht.
+- `test_tierbaukasten_bearbeiten.py` – Wunsch #201. Derselbe Aufbau wie bei den
+  Geburtstagen, plus der Fall, den nur diese App hat: der Kategoriewechsel muss
+  die Spalten der alten Kategorie raeumen. Beim Gegenprobieren (Spalte
+  `dicebear_optionen` aus `_SPALTEN` entfernt) schlagen genau die zwei
+  Wechsel-Tests an - der Rest bliebe gruen, weil eine Tier-Figur die Spalte
+  ohnehin nie anfasst. Die Grenzpruefung laeuft auch hier ueber das VERHALTEN
+  beider Endpunkte, nicht ueber die Existenz eines gemeinsamen Helfers.
 - `test_kassenbuch_unveraenderlich.py` – Wunsch #156. Erzwingt die Zusage, auf
   der die Vollstaendigkeit des Pruefprotokolls beruht: genau DREI schreibende
   Routen (ueber url_map), kein DELETE, und das einzige UPDATE fasst nur die

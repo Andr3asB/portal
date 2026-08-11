@@ -293,6 +293,23 @@ input[type="text"].rezept-input {
   position:absolute; top:4px; right:4px; background:var(--surface-2); border:none;
   border-radius:50%; width:26px; height:26px; color:#ff3b30; font-size:15px; cursor:pointer;
 }
+.btn-bearbeiten-tier {
+  position:absolute; top:4px; left:4px; background:var(--surface-2); border:none;
+  border-radius:50%; width:26px; height:26px; font-size:14px; cursor:pointer;
+}
+/* Wunsch #201: sichtbarer Hinweis, dass gerade eine vorhandene Figur geändert
+   wird - sonst sieht Schritt 3 im Bearbeiten-Modus genauso aus wie beim
+   Neubauen, und "Speichern" legt gefühlt eine zweite Figur an. */
+.bearbeiten-hinweis {
+  display:none; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--chip-bg); border-radius:12px; padding:10px 12px; margin-bottom:12px;
+  font-size:14px; font-weight:600;
+}
+.bearbeiten-hinweis.an { display:flex; }
+.btn-abbrechen {
+  background:var(--surface-2); border:1.5px solid var(--border); border-radius:10px;
+  padding:8px 12px; font-size:14px; font-weight:600; color:var(--text); cursor:pointer;
+}
 .empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
 {% endblock %}
 
@@ -306,6 +323,13 @@ input[type="text"].rezept-input {
 
   <div class="section">
     <form method="post" action="/a/tierbaukasten{{ tp }}speichern" id="baukasten-form">
+
+      <!-- Wunsch #201: nur im Bearbeiten-Modus sichtbar, in JEDEM Schritt -
+           auch wenn man zurückgeht, um die Tierart zu wechseln. -->
+      <div class="bearbeiten-hinweis" id="bearbeiten-hinweis">
+        <span id="bearbeiten-hinweis-text">Figur wird bearbeitet</span>
+        <button type="button" class="btn-abbrechen" id="bearbeiten-abbrechen">Abbrechen</button>
+      </div>
 
       <!-- Schritt 1: Kategorie -->
       <div class="schritt" id="schritt-1" data-schritt="1">
@@ -558,6 +582,8 @@ input[type="text"].rezept-input {
         </svg>
         {% endif %}
         {% if k.name %}<div class="galerie-name">{{ k.name }}</div>{% endif %}
+        <button type="button" class="btn-bearbeiten-tier figur-bearbeiten" data-id="{{ k.id }}"
+                title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
         <form method="post" action="/a/tierbaukasten{{ tp }}loeschen/{{ k.id }}"
               data-bestaetigen="{{ ('„' ~ (k.name or tiere.get(k.tier_typ, kategorien.get(k.tier_typ, k.tier_typ))) ~ '“ löschen?') }}">
           <button type="submit" class="btn-loeschen-tier" title="Löschen" aria-label="Löschen">🗑️</button>
@@ -755,6 +781,81 @@ input[type="text"].rezept-input {
       })
       .catch(() => {});
   }
+
+  // ---------------------------------------------------------------
+  // Wunsch #201: gespeicherte Figur zurueck in den Assistenten holen
+  // ---------------------------------------------------------------
+  const FIGUREN = {{ figuren|tojson }};
+  const speichernKnopf = form.querySelector('.btn-add');
+  const hinweis = document.getElementById('bearbeiten-hinweis');
+
+  function menschWertSetzen(feld, wert) {
+    const feldEl = document.querySelector(`[name="mensch_${feld}"]`);
+    if (!feldEl || wert == null) return;
+    feldEl.value = wert;
+    // Schwatch und Chip fuehren denselben Wert wie das versteckte Feld - ohne
+    // das Umhaengen von .active zeigte die Auswahl weiter auf die Vorgabe.
+    document.querySelectorAll(`.mensch-swatch[data-feld="${feld}"], .mensch-chip[data-feld="${feld}"]`)
+      .forEach(b => b.classList.toggle('active', b.dataset.value === wert));
+  }
+
+  function figurLaden(id) {
+    const f = FIGUREN[id];
+    if (!f) return;
+    form.action = `/a/tierbaukasten${TP}bearbeiten/${id}`;
+    kategorie = (f.tier_typ === 'mensch') ? 'mensch' : 'tier';
+    tierTyp = f.tier_typ;
+    document.getElementById('tier_typ-hidden').value = f.tier_typ;
+    form.querySelector('[name="name"]').value = f.name;
+
+    if (f.mensch) {
+      Object.keys(f.mensch).forEach(feld => menschWertSetzen(feld, f.mensch[feld]));
+    } else {
+      document.getElementById('koerper_farbe').value = f.koerper_farbe;
+      svgRoot.style.setProperty('--koerper-farbe', f.koerper_farbe);
+      document.getElementById('muster_farbe').value = f.muster_farbe;
+      svgRoot.style.setProperty('--muster-farbe', f.muster_farbe);
+      musterWert = f.muster;
+      document.getElementById('muster-hidden').value = musterWert;
+      document.querySelectorAll('.muster-chip').forEach(
+        b => b.classList.toggle('active', b.dataset.value === musterWert));
+      document.getElementById('koerperbau').value = f.koerperbau;
+      svgRoot.style.setProperty('--koerperbau-scale',
+        (0.82 + (f.koerperbau / 100) * 0.36).toFixed(3));
+      document.getElementById('accessoire-hidden').value = f.accessoire;
+      const gewaehlt = f.accessoire.split(',').filter(Boolean);
+      document.querySelectorAll('.accessoire-chip').forEach(
+        b => b.classList.toggle('active', gewaehlt.includes(b.dataset.value)));
+      ansicht = 'vorne';
+    }
+
+    // Die Schritte 1 und 2 mitziehen: wer beim Bearbeiten zurueckgeht, um die
+    // Tierart zu wechseln, findet sonst eine leere Auswahl und einen
+    // gesperrten Weiter-Pfeil vor.
+    document.querySelectorAll('.kategorie-karte-wahl').forEach(
+      k => k.classList.toggle('active', k.dataset.kat === kategorie));
+    document.querySelectorAll('.tier-chip').forEach(
+      b => b.classList.toggle('active', b.dataset.value === tierTyp));
+    document.getElementById('pfeil-1-weiter').disabled = false;
+    if (kategorie === 'tier') document.getElementById('pfeil-2-weiter').disabled = false;
+
+    speichernKnopf.textContent = '✏️ Änderungen speichern';
+    document.getElementById('bearbeiten-hinweis-text').textContent =
+      f.name ? `„${f.name}“ wird bearbeitet` : 'Figur wird bearbeitet';
+    hinweis.classList.add('an');
+    zeigeSchritt3FuerKategorie();
+    zeigeSchritt(3);
+    form.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  document.querySelectorAll('.figur-bearbeiten').forEach(
+    btn => btn.addEventListener('click', () => figurLaden(btn.dataset.id)));
+
+  // Abbrechen laedt die Seite neu statt jeden Vorgabewert hier ein zweites
+  // Mal aufzuzaehlen - eine zweite Liste der Vorgaben liefe irgendwann
+  // auseinander, und der Unterschied faellt niemandem auf.
+  document.getElementById('bearbeiten-abbrechen')
+    .addEventListener('click', () => window.location.reload());
 
   zeigeSchritt(1);
 })();
