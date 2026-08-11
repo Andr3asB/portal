@@ -61,6 +61,22 @@ def app(tmp_path_factory, token_key):
     return modul.app
 
 
+@pytest.fixture(autouse=True)
+def _rate_limit_zuruecksetzen():
+    """Wunsch #207: rate_ueberschritten() haelt ihren Zustand in einem
+    Modul-Dict in teile.kern - das bleibt sonst ueber die GANZE Testsitzung
+    hinweg bestehen (das Modul wird nur einmal importiert), nicht nur
+    innerhalb eines Tests. Ohne dieses Zuruecksetzen haetten die ersten paar
+    hundert Tests, die /wunsch oder /csp-bericht aufrufen, das Kontingent
+    fuer alle SPAETEREN Tests im selben Lauf schon verbraucht - dieselbe
+    Lehre wie bei der Datenbank, die `db` unten aus demselben Grund vor jedem
+    Test leert."""
+    from teile.kern import _RATE_TREFFER
+    _RATE_TREFFER.clear()
+    yield
+    _RATE_TREFFER.clear()
+
+
 @pytest.fixture()
 def db(app):
     """Leert die Datenbank und legt die Testfamilie an. Läuft vor jedem Test."""

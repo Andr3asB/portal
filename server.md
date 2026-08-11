@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-11 (portal-v198: Wunsch #203, SSRF ueber Web-Push geschlossen)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v200: Wuensche #204/#207/#205 - Identitaetspflicht, Ratenbegrenzung, Log-Saeuberung)*
 
 ## Host
 
@@ -498,7 +498,23 @@ teile/
                        DNS-Rebinding-Pinning beim Push-Weg - pywebpush loest
                        selbst auf, das Pinning aus 11_rezepte.py laesst sich
                        nicht uebernehmen ohne pywebpush nachzubauen.
+  00_kern.py         – rate_ueberschritten()/client_ip() (Wunsch #207,
+                       Sicherheitsaudit 11.08.2026): gleitendes Fenster im
+                       Speicher, keine externe Abhaengigkeit, bewusst NICHT
+                       global angewendet (haette die Offline-Warteschlange der
+                       Einkaufsliste treffen koennen) - nur an /wunsch (8/min)
+                       und /csp-bericht (30/min). client_ip() liest
+                       X-Forwarded-For, weil portal nur hinter Caddy haengt
+                       und request.remote_addr sonst immer Caddys Bridge-IP
+                       zeigt. _RATE_TREFFER (Modul-Dict) wird in
+                       tests/conftest.py per autouse-Fixture vor jedem Test
+                       geleert, sonst teilen sich alle Tests im selben Lauf
+                       ein Kontingent.
   02_werkstatt.py    – POST /wunsch, der Eingang fuer alle ✨-Wuensche.
+                       Wunsch #204 (Sicherheitsaudit 11.08.2026): ohne Token
+                       UND ohne Sitzungs-Cookie jetzt 403 statt eines anonym
+                       gespeicherten Wunsches - echte Anonymitaet
+                       (user_id NULL) gibt es seither nicht mehr.
                        Wunsch #161: KI-Ueberschrift im Hintergrund-Thread.
                        Wunsch #187: ersatz_titel() leitet aus dem ersten Satz
                        eine Ueberschrift ab, falls kein KI-Titel da ist -
@@ -1042,7 +1058,13 @@ teile/
                        Stufe 3 ein Cookie autorisiert - solange jede Anfrage
                        noch ihren Pfad-Token traegt, kann er nichts
                        kaputtmachen.
-  21_csp.py          – Content-Security-Policy mit Nonce (Wunsch #142).
+  21_csp.py          – Content-Security-Policy mit Nonce (Wunsch #142). Wunsch
+                       #205 (Sicherheitsaudit 11.08.2026): _log_sicher()
+                       entfernt Steuerzeichen aus den drei gemeldeten Feldern
+                       vor dem Loggen - sonst liess sich per eingebettetem
+                       Zeilenumbruch eine gefaelschte, eigenstaendig
+                       aussehende Log-Zeile einschleusen (der Endpunkt ist
+                       absichtlich unauthentifiziert, siehe bericht()).
                        Die CSP steht seit Stufe 5 HIER und nicht mehr im
                        Caddyfile: das Nonce muss je Anfrage neu erzeugt und in
                        dieselbe Antwort geschrieben werden, in der es auch in

@@ -67,10 +67,16 @@ def test_eltern_ohne_adminrecht_koennen_keine_prioritaet_setzen(client, db, zuga
     assert _prio_von(db, "E1") is None
 
 
-def test_anonymer_wunsch_bekommt_keine_prioritaet(client, db):
-    """Ohne Token gibt es keinen Nutzer und damit auch kein Adminrecht."""
-    _einreichen(client, "X1", None, "sehr_hoch")
-    assert _prio_von(db, "X1") is None
+def test_ohne_erkennbare_identitaet_gibt_es_gar_keinen_wunsch_mehr(client, db):
+    """Bis Wunsch #204 (Sicherheitsaudit 11.08.2026) landete ein Wunsch ganz
+    ohne Token/Cookie trotzdem in der Datenbank, nur ohne Prioritaet - "ein
+    anonymer Wunsch ist besser als ein verlorener". Das oeffnete /wunsch aber
+    fuer JEDEN im Internet, ganz ohne jeden Anmeldeversuch. Seit #204 gibt es
+    diesen Fall nicht mehr: ohne Identitaet 403, und nichts wird gespeichert."""
+    antwort = _einreichen(client, "X1", None, "sehr_hoch")
+    assert antwort.status_code == 403
+    assert db["verbindung"].execute(
+        "SELECT COUNT(*) c FROM wuensche WHERE text='X1'").fetchone()["c"] == 0
 
 
 # --- Der Wunsch geht trotzdem nie verloren ---------------------------------

@@ -2,6 +2,95 @@
 
 ---
 
+## 2026-08-11 – portal-v200: Wünsche #204, #207, #205 – drei Befunde, eine Auslieferung
+
+Zweiter Block aus dem eigenen Sicherheitsaudit vom 11.08. Alle drei hängen
+zusammen: #204 und #205 sind beide unauthentifizierte, öffentlich erreichbare
+Schreib-/Log-Endpunkte, #207 (Ratenbegrenzung) ist die gemeinsame Ergänzung
+für beide - deshalb in einem Paket.
+
+### #204 – POST /wunsch verlangt jetzt eine erkennbare Identität
+
+Ein fehlendes oder ungültiges Token führte bisher NICHT zu 403, sondern zu
+einem anonym gespeicherten Wunsch (`user_id NULL`) – bewusst so gebaut ("ein
+anonymer Wunsch ist besser als ein verlorener"), aber ohne jede Prüfung, ob
+der Aufrufer überhaupt schon einmal irgendeine App geöffnet hat. Erreichbar
+war die Route ohne jede Anmeldung: `/` liefert öffentlich (Status 200)
+`denied.html` aus.
+
+Jetzt: ohne Token UND ohne Sitzungs-Cookie → 403, nichts wird gespeichert.
+Für die eigentliche Zielgruppe ändert sich nichts – wer die ✨-Schaltfläche
+überhaupt sieht, hat grant() für irgendeine App bereits durchlaufen und damit
+spätestens seit Wunsch #140 (Stufe 1) ein Sitzungs-Cookie. Nebeneffekt, der im
+Code jetzt auch so benannt ist: eine echte Anonymität (`user_id NULL`) gibt es
+seither gar nicht mehr – jeder gespeicherte Wunsch hat einen Urheber.
+
+**Ein bestehender Test testete plötzlich das Falsche.**
+`test_anonymer_wunsch_bekommt_keine_prioritaet` schickte bewusst `token=None`
+und erwartete: gespeichert, nur ohne Priorität. Das ist jetzt der Fall, den es
+nicht mehr geben soll – umbenannt und umgeschrieben auf die neue Erwartung
+(403, nichts gespeichert). Die Umbenennung sagt sofort, warum sich der Test
+geändert hat, nicht nur, dass er es tat.
+
+### #207 – ein gemeinsamer Rate-Limiter, gezielt eingesetzt
+
+`rate_ueberschritten()` in `00_kern.py`: gleitendes Fenster im Speicher, kein
+externer Dienst (ein Worker, siehe server.md). Bewusst NICHT global
+angewendet – eine pauschale Bremse hätte die Offline-Warteschlange der
+Einkaufsliste treffen können, die POSTs stundenlang aufhebt und dann in einer
+Salve nachspielt (dieselbe Überlegung wie beim CSRF-Riegel). Eingesetzt nur an
+den zwei konkret betroffenen, unauthentifizierten Routen: `/wunsch`
+(8/Minute) und `/csp-bericht` (30/Minute – großzügiger, weil eine Seite mit
+mehreren blockierten Ressourcen mehrere ECHTE Meldungen auf einmal schickt).
+
+**Die Falle beim "je Adresse":** portal hängt nur im internen Bridge-Netz,
+jede Anfrage kommt technisch von Caddys eigener Bridge-IP. Ohne
+`X-Forwarded-For` auszuwerten, wäre die Bremse "je Adresse" in Wahrheit
+"insgesamt" gewesen – ein einzelner Angreifer hätte das Kontingent der ganzen
+Familie mitverbraucht. `client_ip()` liest den Header, mit derselben
+Begründung wie `X-Forwarded-Proto` im CSRF-Riegel (Caddy ist der einzig
+mögliche Absender).
+
+**Geteilter Zustand über die ganze Testsitzung hinweg** – der eigentliche
+Stolperstein beim Bauen. `_RATE_TREFFER` ist ein Modul-Dict; ohne Reset hätte
+das Kontingent für die ersten paar hundert Tests, die `/wunsch` oder
+`/csp-bericht` aufrufen, für ALLE späteren Tests im selben Lauf schon
+verbraucht ausgesehen – vier Tests in bestehenden Dateien scheiterten genau
+so, bevor eine autouse-Fixture in `conftest.py` das Kontingent vor jedem Test
+zurücksetzt (dieselbe Lehre wie bei der Datenbank, die `db` aus demselben
+Grund vor jedem Test leert).
+
+### #205 – keine gefälschten Log-Zeilen mehr
+
+`/csp-bericht` ist absichtlich unauthentifiziert (Browser-Meldungen tragen
+weder Cookie noch Origin) – das bleibt so. Die drei gemeldeten Felder wurden
+bisher nur auf Länge gekürzt, nicht auf Steuerzeichen geprüft, bevor sie in
+eine Log-Zeile geschrieben wurden. Ein eingebetteter Zeilenumbruch konnte
+damit eine zusätzliche, frei erfundene Zeile einschleusen, die wie eine ECHTE
+Meldung aussieht – z. B. eine gefälschte `CSRF-Verdacht:`-Zeile.
+`_log_sicher()` ersetzt Steuerzeichen jetzt durch ein Leerzeichen.
+
+**Getestet wurde der Log-Handler, nicht die Funktion isoliert** – ein Test,
+der nur `_log_sicher()` direkt aufruft, wäre grün geblieben, selbst wenn der
+Aufruf in `bericht()` sie vergessen hätte. Die Tests hören stattdessen den
+echten Logger ab und prüfen die tatsächlich geschriebene Zeile.
+
+### 15 Injektionen über drei Befunde, alle rot
+
+Darunter zwei, die beim ersten Durchlauf tatsächlich grün blieben und
+korrigiert werden mussten – nicht bei diesem Befund, sondern als
+Bestandsaufnahme: kein einziger der neuen Tests blieb am Ende unentdeckt
+blind.
+
+### Live geprüft, mit Wegwerf-Daten
+
+Ohne Identität → 403, nichts gespeichert. Mit echter Sitzung → 200,
+gespeichert und wieder gelöscht. Eine `/csp-bericht`-Meldung mit
+eingebettetem `CSRF-Verdacht:`-Zeilenumbruch → im echten Container-Log landet
+alles in EINER Zeile, keine gefälschte zweite. 1204 Tests grün.
+
+---
+
 ## 2026-08-11 – portal-v198: Wunsch #203 – SSRF über Web-Push geschlossen
 
 Erster von sechs Befunden aus dem eigenen Sicherheitsaudit vom 11.08. (#203-208,

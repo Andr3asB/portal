@@ -1,4 +1,4 @@
-import sqlite3, secrets, logging, base64, hashlib, hmac
+import sqlite3, secrets, logging, base64, hashlib, hmac, threading, time
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -1004,6 +1004,57 @@ def bereinige_erfuellte_rezeptwuensche(db):
 # (Wunsch #140, Stufe 6, Pruefpunkt S6-06) die Zustellung je Geraet einzeln
 # ausgab.
 PUSH_TTL = 86400
+
+
+# Wunsch #207 (Sicherheitsaudit 11.08.2026): Es gab im gesamten Portal keine
+# Ratenbegrenzung - unkritisch fuer die allermeisten Routen (echte Nutzer
+# klicken langsam), aber ein eigenstaendiges Risiko dort, wo eine Route OHNE
+# Anmeldung erreichbar ist (POST /wunsch, POST /csp-bericht, siehe #204/#205).
+# Bewusst NICHT als Bibliothek (Flask-Limiter waere die schwerere Loesung fuer
+# ein Ein-Worker-Setup) und bewusst NICHT ueberall angewendet: eine pauschale,
+# globale Bremse haette die Offline-Warteschlange der Einkaufsliste treffen
+# koennen, die POSTs stundenlang aufhebt und dann in einer Salve nachspielt
+# (siehe 20_csrf.py, gleiche Ueberlegung dort). Dieser Helfer wird deshalb
+# gezielt an den beiden konkret betroffenen, unauthentifizierten Routen
+# eingesetzt, nicht global.
+_RATE_SPERRE = threading.Lock()
+_RATE_TREFFER: dict = {}   # {(schluessel, client_ip): [zeitstempel, ...]}
+
+
+def client_ip() -> str:
+    """Echte Herkunftsadresse hinter Caddy.
+
+    portal ist ausschliesslich ueber das interne Bridge-Netz von Caddy
+    erreichbar (server.md, Abschnitt Stack) - kein anderer Absender kann
+    X-Forwarded-For faelschen. Ohne diese Zeile zeigt request.remote_addr
+    immer Caddys eigene Bridge-IP, egal wer wirklich anfragt - eine
+    Ratenbegrenzung darauf wuerfe die ganze Familie (und jeden Angreifer) in
+    denselben gemeinsamen Eimer."""
+    weitergeleitet = request.headers.get("X-Forwarded-For", "")
+    if weitergeleitet:
+        return weitergeleitet.split(",")[0].strip()
+    return request.remote_addr or "unbekannt"
+
+
+def rate_ueberschritten(schluessel: str, max_anfragen: int, fenster_sekunden: int) -> bool:
+    """Gleitendes Fenster je (schluessel, Client-Adresse), im Speicher - ein
+    Worker (server.md), also reicht das ohne externen Dienst. Traegt den
+    Aufruf immer ein und meldet True, wenn danach mehr als max_anfragen
+    innerhalb der letzten fenster_sekunden stehen."""
+    voll = (schluessel, client_ip())
+    jetzt = time.monotonic()
+    with _RATE_SPERRE:
+        treffer = _RATE_TREFFER.setdefault(voll, [])
+        treffer[:] = [t for t in treffer if jetzt - t < fenster_sekunden]
+        treffer.append(jetzt)
+        # Der Container laeuft monatelang durch (server.md) - ohne irgendeine
+        # Grenze wuerde fuer jede je gesehene Adresse ein Eintrag liegen
+        # bleiben. Ein simples Zuruecksetzen bei zu vielen Schluesseln ist
+        # kein Sicherheitsproblem (es erlaubt kurzzeitig wieder mehr), nur ein
+        # Speicher-Sicherheitsventil.
+        if len(_RATE_TREFFER) > 5000:
+            _RATE_TREFFER.clear()
+        return len(treffer) > max_anfragen
 
 
 # Wunsch #127 (SSRF beim Rezept-Import) + #203 (Sicherheitsaudit 11.08.2026,

@@ -40,11 +40,18 @@ Der Beobachtungsmodus ist hier mehr wert als beim CSRF-Riegel: Ein übersehener
 Inline-Handler fällt sonst erst auf, wenn jemand den betreffenden Knopf
 drückt – und das kann Wochen dauern.
 """
+import re
 import secrets
 
 from flask import current_app, g, request, Blueprint
 # Flask 3 reicht Markup nicht mehr durch - es kommt aus markupsafe.
 from markupsafe import Markup
+from teile.kern import rate_ueberschritten
+
+# Wunsch #205 (Sicherheitsaudit 11.08.2026): Steuerzeichen aus den drei
+# gemeldeten Feldern entfernen, bevor sie in eine Log-Zeile eingesetzt
+# werden - siehe bericht() weiter unten.
+_STEUERZEICHEN = re.compile(r"[\r\n\x00-\x1f]+")
 
 bp = Blueprint("csp", __name__)
 
@@ -98,6 +105,18 @@ def _streng(nonce: str, melden: bool = False) -> str:
     return regel
 
 
+def _log_sicher(wert, laenge: int) -> str:
+    """Ein gemeldetes Feld log-tauglich machen.
+
+    Wunsch #205 (Sicherheitsaudit 11.08.2026): Der Endpunkt ist absichtlich
+    unauthentifiziert (siehe bericht()) - jeder kann also beliebigen Text mit
+    eingebetteten Zeilenumbruechen einschicken. Ohne dieses Saeubern liesse
+    sich damit eine zusaetzliche, frei erfundene Log-Zeile einschleusen, die
+    wie eine ECHTE Meldung aussieht (z. B. eine gefaelschte "CSRF-Verdacht:"-
+    Zeile) - Log-Faelschung durch reine Zeichenketten-Formatierung."""
+    return _STEUERZEICHEN.sub(" ", str(wert if wert is not None else "?"))[:laenge]
+
+
 @bp.route(_MELDEZIEL, methods=["POST"])
 def bericht():
     """Nimmt die Verstoßmeldungen des Browsers entgegen.
@@ -107,16 +126,25 @@ def bericht():
     wäre eine verlorene Meldung. Geschrieben wird nichts – nur protokolliert.
     Der Endpunkt ist deshalb auch von der CSRF-Prüfung ausgenommen (siehe
     `20_csrf.py`); er ändert keine Daten, es gibt nichts zu fälschen.
+
+    Wunsch #207 (Sicherheitsaudit 11.08.2026): Gerade WEIL unauthentifiziert
+    und ohne CSRF-Schutz, braucht die Route eine eigene Bremse - sonst liesse
+    sich das Log beliebig fluten. 30/Minute laesst Raum fuer eine Seite, die
+    mehrere Ressourcen gleichzeitig blockiert bekommt (mehrere echte Meldungen
+    auf einen Seitenaufruf), haelt aber eine gezielte Flut in Grenzen.
     """
+    if rate_ueberschritten("csp-bericht", max_anfragen=30, fenster_sekunden=60):
+        return "", 429
+
     daten = request.get_json(silent=True, force=True) or {}
     meldung = daten.get("csp-report", daten)
     current_app.logger.warning(
         # Ein Wort zum Greppen: "CSP-Verstoss".
         "CSP-Verstoss: %s in %s (Zeile %s) – Regel: %s",
-        str(meldung.get("blocked-uri", "?"))[:120],
-        str(meldung.get("document-uri", "?"))[:120],
-        meldung.get("line-number", "?"),
-        str(meldung.get("violated-directive", "?"))[:80],
+        _log_sicher(meldung.get("blocked-uri"), 120),
+        _log_sicher(meldung.get("document-uri"), 120),
+        _log_sicher(meldung.get("line-number"), 10),
+        _log_sicher(meldung.get("violated-directive"), 80),
     )
     return "", 204
 

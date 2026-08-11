@@ -2,8 +2,21 @@
 ✨ Verbesserungswünsche – gemeinsamer Endpunkt für alle Apps.
 
 POST /wunsch  { text, app, token, pfad, prioritaet }
-  → Speichert Wunsch; token identifiziert den Nutzer (beliebige App).
-  → Ohne gültigen Token: anonymer Eintrag.
+  → Speichert Wunsch; token identifiziert den Nutzer (beliebige App), oder -
+    auf token-freien Seiten - das Sitzungs-Cookie.
+  → Wunsch #204 (Sicherheitsaudit 11.08.2026): Vorher wurde OHNE erkennbare
+    Identität (weder Token noch Cookie) trotzdem gespeichert, nur ohne
+    Urheber ("ein anonymer Wunsch ist besser als ein verlorener"). Das gibt
+    es nicht mehr - seither 403 ohne Identität, und jeder gespeicherte Wunsch
+    hat damit IMMER einen echten Urheber. Die ✨-Schaltfläche steht nur
+    Nutzern zur Verfügung, die grant() für IRGENDEINE App bereits durchlaufen
+    haben - und die haben spätestens dann ein Sitzungs-Cookie (Wunsch #140,
+    Stufe 1 stellt es bei jeder erfolgreichen Token-Auflösung aus). Für sie
+    ändert sich nichts. Betroffen ist nur der Fall, den es vorher gab: jeder
+    Aufrufer im Internet, ganz ohne Anmeldeversuch - "/" liefert öffentlich
+    denied.html mit Status 200 aus, von dort liess sich der Endpunkt ohne
+    jede Hürde erreichen.
+  → Wunsch #207: zusätzlich auf 8 Anfragen/Minute je Adresse begrenzt.
   → prioritaet (Wunsch #152) wird NUR von einem Admin übernommen und nur,
     wenn sie in WUNSCH_PRIORITAETEN steht. Bei allen anderen bleibt sie NULL
     wie bisher – die Prüfung steht hier serverseitig und nicht bloß im
@@ -19,7 +32,7 @@ import threading
 
 from flask import Blueprint, current_app, request, jsonify
 from teile.kern import (get_db, token_lookup, aktueller_nutzer, new_db,
-                        ki_anfrage, WUNSCH_PRIORITAETEN)
+                        ki_anfrage, WUNSCH_PRIORITAETEN, rate_ueberschritten)
 
 bp = Blueprint("werkstatt", __name__)
 
@@ -121,6 +134,14 @@ def _ansicht_aus_pfad(pfad):
 
 @bp.route("/wunsch", methods=["POST"])
 def wunsch():
+    # Wunsch #207 (Sicherheitsaudit 11.08.2026): eng gefasst, weil die Route
+    # bis zur naechsten Zeile noch fuer JEDEN ohne jede Identitaet erreichbar
+    # ist. 8 Anfragen/Minute je Adresse laesst normalem Gebrauch (auch
+    # mehrere schnell hintereinander eingetragene Wuensche) Luft, haelt aber
+    # eine Flut in Grenzen.
+    if rate_ueberschritten("wunsch-anlegen", max_anfragen=8, fenster_sekunden=60):
+        return jsonify(ok=False, error="Zu viele Anfragen"), 429
+
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     if not text:
@@ -133,11 +154,16 @@ def wunsch():
     db = get_db()
 
     # Nutzer über beliebiges gültiges Token ermitteln - oder, auf token-freien
-    # Seiten (Wunsch #140, Stufe 4), über das Sitzungs-Cookie. Ohne Nutzer wird
-    # der Wunsch bewusst trotzdem gespeichert, nur ohne Urheber: ein anonymer
-    # Wunsch ist besser als ein verlorener.
+    # Seiten (Wunsch #140, Stufe 4), über das Sitzungs-Cookie.
     row = aktueller_nutzer(token)
-    user_id = row["id"] if row else None
+    # Wunsch #204: OHNE jede erkennbare Identitaet (weder Token noch Cookie)
+    # kein Eintrag mehr - siehe Docstring oben. Damit gibt es die vorherige
+    # echte Anonymitaet (user_id NULL) nicht mehr: Wer den Wunsch abschickt,
+    # ist ab jetzt IMMER jemand, der schon einmal erfolgreich eine App
+    # geoeffnet hat, also immer bekannt.
+    if not row:
+        return jsonify(ok=False, error="Nicht angemeldet"), 403
+    user_id = row["id"]
 
     # Wunsch #152: Nur Admins duerfen beim Anlegen priorisieren. Ein
     # unbekannter oder unerlaubter Wert wird still zu NULL - der Wunsch geht
