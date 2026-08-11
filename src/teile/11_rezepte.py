@@ -58,6 +58,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, abort,
 from teile.kern import (
     get_db, grant as check_grant, to_int, ki_anfrage, KiLimitError, KiFehler,
     bereinige_erfuellte_rezeptwuensche,
+    ist_oeffentliche_url as _ist_oeffentliche_url,
+    ip_ist_oeffentlich as _ip_ist_oeffentlich,
 )
 
 MAX_REZEPT_WUENSCHE = 5
@@ -132,34 +134,11 @@ class _TextExtractor(HTMLParser):
                 self.text_parts.append(stripped)
 
 
-def _ist_oeffentliche_url(url: str) -> bool:
-    """SSRF-Schutz: nur http/https, und die Ziel-IP darf nicht intern/privat sein."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return False
-    try:
-        infos = socket.getaddrinfo(parsed.hostname, None)
-    except socket.gaierror:
-        return False
-    if not infos:
-        return False
-    for info in infos:
-        try:
-            ip = ipaddress.ip_address(info[4][0].split("%")[0])
-        except ValueError:
-            return False
-        if not _ip_ist_oeffentlich(ip):
-            return False
-    return True
-
-
-def _ip_ist_oeffentlich(ip) -> bool:
-    """Alles, was nicht eindeutig im oeffentlichen Internet liegt, ist tabu.
-
-    Wunsch #127: `is_global` statt einer Aufzaehlung einzelner Kategorien -
-    die alte Liste (private/loopback/link_local/reserved/multicast) liess
-    z. B. 100.64.0.0/10 (Carrier-Grade-NAT) und 0.0.0.0/8 durch."""
-    return bool(ip.is_global) and not ip.is_multicast
+# Wunsch #203 (Sicherheitsaudit 11.08.2026): _ist_oeffentliche_url() und
+# _ip_ist_oeffentlich() sind nach teile/00_kern.py umgezogen, weil 07_push.py
+# dieselbe Pruefung fuer Web-Push-Endpunkte braucht - der Import oben bindet
+# die Namen unveraendert wieder hier an, damit an dieser Datei sonst nichts
+# angepasst werden muss.
 
 
 class _RohantwortDurchreichen(urllib.request.HTTPErrorProcessor):

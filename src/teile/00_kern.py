@@ -1006,6 +1006,44 @@ def bereinige_erfuellte_rezeptwuensche(db):
 PUSH_TTL = 86400
 
 
+# Wunsch #127 (SSRF beim Rezept-Import) + #203 (Sicherheitsaudit 11.08.2026,
+# dieselbe Luecke beim Web-Push-Endpunkt): Wer eine vom Nutzer gelieferte
+# Adresse selbst aufruft, darf NIE eine interne/private Ziel-IP erreichen.
+# Ursprünglich nur in 11_rezepte.py, jetzt hier, damit 07_push.py dieselbe
+# Pruefung nutzt statt einer zweiten, moeglicherweise abweichenden Kopie.
+def ist_oeffentliche_url(url: str) -> bool:
+    """SSRF-Schutz: nur http/https, und die Ziel-IP darf nicht intern/privat sein."""
+    from urllib.parse import urlparse
+    import socket, ipaddress
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, None)
+    except socket.gaierror:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        except ValueError:
+            return False
+        if not ip_ist_oeffentlich(ip):
+            return False
+    return True
+
+
+def ip_ist_oeffentlich(ip) -> bool:
+    """Alles, was nicht eindeutig im oeffentlichen Internet liegt, ist tabu.
+
+    Wunsch #127: `is_global` statt einer Aufzaehlung einzelner Kategorien -
+    die alte Liste (private/loopback/link_local/reserved/multicast) liess
+    z. B. 100.64.0.0/10 (Carrier-Grade-NAT) und 0.0.0.0/8 durch."""
+    return bool(ip.is_global) and not ip.is_multicast
+
+
 def push_send(user_id: int, title: str, body: str,
               app_slug: str = "", url: str = "", dedup_key: str = ""):
     """Push-Benachrichtigung an alle Geräte von user_id. Nicht-blockierend (Thread)."""

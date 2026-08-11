@@ -6,7 +6,8 @@ POST /push/subscribe         → {"subscription":{...}, "token":"...", "geraet":
 POST /push/unsubscribe       → {"endpoint":"...", "token":"..."}
 """
 from flask import Blueprint, jsonify, request, current_app, abort
-from teile.kern import get_db, grant as check_grant, token_lookup, aktueller_nutzer
+from teile.kern import (get_db, grant as check_grant, token_lookup, aktueller_nutzer,
+                        ist_oeffentliche_url)
 
 bp = Blueprint("push", __name__)
 
@@ -33,6 +34,21 @@ def subscribe():
     # Wunsch #140, Stufe 4: Der Token darf fehlen (token-freie Seite), die
     # Abo-Daten nicht - ohne sie gäbe es nichts zu speichern.
     if not (endpoint and p256dh and auth):
+        return jsonify(ok=False, error="Ungültige Anfrage"), 400
+
+    # Wunsch #203 (Sicherheitsaudit 11.08.2026): `endpoint` kommt vollstaendig
+    # vom Client - ohne diese Pruefung koennte er auf eine interne Adresse
+    # zeigen (z. B. einen anderen Container im Bridge-Netz), und push_send()
+    # wuerde spaeter serverseitig dorthin POSTen, ausgeloest durch ein ganz
+    # gewoehnliches Ereignis (neue Aufgabe, Rueckfrage, Geburtstag). Dieselbe
+    # Pruefung wie beim Rezept-Import (Wunsch #127), nur hier ohne DNS-
+    # Rebinding-Pinning: Push-Zustellungen laufen ausschliesslich ueber die
+    # `pywebpush`-Bibliothek, die die IP selbst zum Zeitpunkt des Versands
+    # aufloest - das Pinning aus 11_rezepte.py laesst sich hier nicht
+    # wiederverwenden, ohne pywebpush selbst zu veraendern. Die Pruefung HIER,
+    # beim Registrieren, schliesst trotzdem den eigentlichen Weg: ohne sie
+    # kaeme eine interne Adresse gar nicht erst in die Datenbank.
+    if not ist_oeffentliche_url(endpoint):
         return jsonify(ok=False, error="Ungültige Anfrage"), 400
 
     # Nutzer über irgendein gültiges Token oder das Sitzungs-Cookie

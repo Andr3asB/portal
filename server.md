@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-11 (portal-v197: #200 Sprachwahl repariert, #197/#198/#199 hidden-Spezifitaet)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v198: Wunsch #203, SSRF ueber Web-Push geschlossen)*
 
 ## Host
 
@@ -489,6 +489,15 @@ teile/
                        Loeschen VOR dem confirm()-Dialog geprueft, damit
                        nicht erst gefragt wird und die Aktion dann doch
                        nicht geht)
+  00_kern.py         – ist_oeffentliche_url()/ip_ist_oeffentlich() (Wunsch
+                       #127, umgezogen hierher mit #203): SSRF-Schutz fuer
+                       JEDE vom Client vorgegebene Ziel-URL, die der Server
+                       selbst aufruft. 11_rezepte.py importiert die alten
+                       Namen zurueck, 07_push.py prueft `endpoint` beim
+                       Registrieren (POST /push/subscribe) damit. KEIN
+                       DNS-Rebinding-Pinning beim Push-Weg - pywebpush loest
+                       selbst auf, das Pinning aus 11_rezepte.py laesst sich
+                       nicht uebernehmen ohne pywebpush nachzubauen.
   02_werkstatt.py    – POST /wunsch, der Eingang fuer alle ✨-Wuensche.
                        Wunsch #161: KI-Ueberschrift im Hintergrund-Thread.
                        Wunsch #187: ersatz_titel() leitet aus dem ersten Satz

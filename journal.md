@@ -2,6 +2,54 @@
 
 ---
 
+## 2026-08-11 – portal-v198: Wunsch #203 – SSRF über Web-Push geschlossen
+
+Erster von sechs Befunden aus dem eigenen Sicherheitsaudit vom 11.08. (#203-208,
+alle priorisiert). `POST /push/subscribe` übernahm `subscription.endpoint`
+ungeprüft aus dem JSON-Body; `push_send()` ruft später `pywebpush.webpush()`
+mit genau dieser Adresse auf – ein serverseitiger POST an eine Adresse, die
+vollständig vom Client vorgegeben war. Dieselbe Fehlerklasse wie Wunsch #127
+(Rezept-Import), nur an einer zweiten Stelle, die die dortige Prüfung nie
+durchlief.
+
+### Die Prüfung ist umgezogen, nicht verdoppelt
+
+`_ist_oeffentliche_url()`/`_ip_ist_oeffentlich()` standen bisher nur in
+`11_rezepte.py`. Eine zweite, eigene Kopie in `07_push.py` hätte irgendwann
+auseinanderlaufen können – stattdessen liegen beide jetzt (ohne führenden
+Unterstrich, weil jetzt öffentlich genutzt) in `00_kern.py` als
+`ist_oeffentliche_url()`/`ip_ist_oeffentlich()`. `11_rezepte.py` importiert sie
+unter dem alten Namen zurück – an der Datei selbst ändert sich sonst nichts.
+
+### Eine ehrliche Lücke bleibt
+
+Der Rezept-Import pinnt zusätzlich die IP-Adresse der eigentlichen Verbindung
+gegen DNS-Rebinding (Wunsch #127, zweite Lücke). Das lässt sich hier nicht
+übernehmen: Push-Zustellungen laufen über `pywebpush`, das die Adresse selbst
+zum Zeitpunkt des Versands auflöst – ein Pinning würde ein Nachbauen der
+gesamten HTTP-Schicht von `pywebpush` bedeuten. Die Prüfung beim Registrieren
+schließt trotzdem den eigentlichen Weg: Eine interne Adresse kommt gar nicht
+erst in die Datenbank. Das steht als Kommentar im Code, damit es niemand für
+vollständig geschlossen hält.
+
+### Zehn Tests, drei bewusste Fehler
+
+Multicast-Adressen sind in Pythons `ipaddress`-Modul `is_global=True`
+(nachgemessen: `224.0.0.1` UND `ff05::1`) – ohne den zusätzlichen
+`is_multicast`-Ausschluss kämen sie durch. Ein erster Testlauf ließ genau
+diesen Fehler grün durch, weil kein Test ihn gezielt prüfte; nachgetragen.
+Alle drei Injektionen (Prüfung im Endpunkt entfernt, Multicast durchgelassen,
+Schema-Prüfung entfernt) schlagen jetzt an.
+
+### Live geprüft, mit Wegwerf-Daten
+
+Zwei Registrierungsversuche über die echte Herkunfts-Prüfung (Origin-Header,
+wie im CSRF-Riegel verlangt): `http://172.30.0.10:2020/...` → 400, verworfen;
+`https://fcm.googleapis.com/...` (echte DNS-Auflösung) → 200, gespeichert und
+danach wieder gelöscht. 1186 Tests grün.
+
+---
+
 ## 2026-08-11 – portal-v197: Wünsche #200, #197, #198, #199
 
 Vier Meldungen aus einer Nacht, alle Vokabeln – und nur **zwei** Ursachen.
