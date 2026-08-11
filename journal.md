@@ -2,6 +2,82 @@
 
 ---
 
+## 2026-08-11 – portal-v202: Wunsch #206 – KI-Kontingentprüfung atomar gemacht
+
+Letzter fachlicher Befund aus dem Sicherheitsaudit vom 11.08. (offen bleibt
+nur noch #208, reine Härtung).
+
+### Die Lücke
+
+`ki_anfrage()` und `ki_text_zu_sprache()` prüften das Monatskontingent VOR
+dem kostenpflichtigen Aufruf und schrieben den tatsächlichen Verbrauch erst
+NACH einer erfolgreichen Antwort – dazwischen liegt ein Netzwerk-Roundtrip zu
+OpenRouter von bis zu 30 Sekunden. Der Container läuft mit mehreren Threads:
+mehrere gleichzeitige Anfragen desselben Nutzers sahen alle denselben, noch
+niedrigen Stand, bestanden alle die Prüfung, und erst danach schrieb jede
+ihren Verbrauch – das Kontingent liess sich damit um ein Vielfaches
+überschreiten. Da alle KI-Funktionen dasselbe OpenRouter-Konto teilen
+(Wunsch #183), ist das echtes Geld.
+
+### Reservieren, nicht sperren
+
+Der naheliegende erste Gedanke – eine Transaktion über die GANZE Funktion,
+inklusive Netzwerkaufruf – wäre falsch gewesen: SQLite kennt nur eine
+Schreibsperre fürs ganze Datenbankfile. Eine Sperre über 30 Sekunden Wartezeit
+auf OpenRouter hätte in dieser Zeit JEDE andere Schreibaktion im gesamten
+Portal blockiert – ein Todo abhaken, ein Wunsch eintragen, alles.
+
+Reserviert wird deshalb nur die kurze Prüfung+Einfügung, in einer eigenen,
+kurzen Transaktion (`BEGIN IMMEDIATE` auf `new_db()`, nicht `g.db`) –
+Millisekunden, nicht Sekunden. Der Netzwerkaufruf liegt bewusst ausserhalb
+jeder Transaktion. `_kontingent_reservieren()`/`_kontingent_freigeben()`/
+`_kontingent_korrigieren()` sind eine gemeinsame Stelle für beide Kontingente
+(`ki_nutzung`/tokens UND `ki_tts_nutzung`/zeichen) – zwei getrennte Kopien
+hätten irgendwann auseinanderlaufen können.
+
+**Reserviert wird mit `max_tokens`, nicht dem (noch unbekannten) echten
+Verbrauch** – bei `ki_anfrage()` ist das eine Obergrenze, meist deutlich über
+dem tatsächlichen Preis, korrigiert nach der Antwort. Bei
+`ki_text_zu_sprache()` ist `len(text)` dagegen schon der ENDGÜLTIGE Wert (TTS
+wird exakt pro Zeichen abgerechnet) – keine Korrektur nötig, die verwaiste
+`_tts_nutzung_protokollieren()` ist entfallen.
+
+**Eine bewusste Nebenwirkung:** Eine Anfrage kann jetzt knapp abgelehnt
+werden, obwohl der tatsächliche Verbrauch noch gereicht hätte – `max_tokens`
+ist eine Obergrenze, kein Preis. Der Tausch ist Absicht: lieber gelegentlich
+zu vorsichtig als das Kontingent per paralleler Anfragen umgehbar zu lassen.
+
+### Der Test, der die alte Lücke wirklich beweist
+
+Ein rein sequenzieller Test hätte auch die ALTE, verwundbare Reihenfolge
+nicht von der neuen unterschieden – beide bestehen "eine Anfrage nach der
+anderen" anstandslos. Der entscheidende Test schickt deshalb 20 echte Python-
+Threads gleichzeitig los (mit `threading.Barrier`, damit sie so gleichzeitig
+wie möglich starten), je 30 Tokens gegen ein Limit von 100 anfordernd –
+Platz für genau 3. Mit der alten Prüf-dann-schreib-Reihenfolge wären deutlich
+mehr als 3 durchgekommen; mit der neuen sind es exakt 3, und die Summe der
+tatsächlich reservierten Tokens bleibt unter dem Limit.
+
+Vier Injektionen, eine davon blieb beim ersten Anlauf grün: Mein erster Test
+auf "Fehlversuch gibt die Reservierung frei" warf einen generischen
+`RuntimeError`, der nur den EINEN der beiden Fehlerzweige in `ki_anfrage()`
+traf (`except Exception`), nicht den anderen (`except
+urllib.error.HTTPError`) – ein entferntes Freigeben im HTTPError-Zweig blieb
+unentdeckt. Ein zweiter, gezielter Test mit echtem `HTTPError` nachgetragen;
+danach schlagen alle vier Fehler an.
+
+### Live geprüft, ohne einen einzigen echten OpenRouter-Aufruf
+
+Reservieren/Korrigieren/Freigeben direkt gegen die echte Datenbank geprüft –
+keine der drei Operationen ruft OpenRouter auf, sie testen nur die Buchhaltung.
+Danach dieselbe 20-Threads-Race gegen die echte Datenbank, unter einer eigenen
+Merkmal-Kennung (`ZZ-PRUEFUNG-206`): alle 20 sauber verbucht, keine
+SQLite-Sperrfehler unter echter Nebenläufigkeit, danach vollständig entfernt
+– `ki_nutzung` zählt exakt so viele Zeilen wie vor der Prüfung. 1212 Tests
+grün.
+
+---
+
 ## 2026-08-11 – portal-v200: Wünsche #204, #207, #205 – drei Befunde, eine Auslieferung
 
 Zweiter Block aus dem eigenen Sicherheitsaudit vom 11.08. Alle drei hängen

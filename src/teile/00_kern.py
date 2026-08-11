@@ -1231,6 +1231,80 @@ def tts_eingabe(text: str, sprache_name: str) -> str:
     return f"Sprich auf {name}: {text}"
 
 
+# Wunsch #206 (Sicherheitsaudit 11.08.2026): Prüfung UND Reservierung eines
+# Kontingents in EINER atomaren Transaktion, gemeinsam für ki_nutzung/tokens
+# UND ki_tts_nutzung/zeichen - ohne diese eine Stelle hätte jede der beiden
+# Kopien denselben Fehler unabhängig voneinander reparieren müssen.
+#
+# Vorher: Prüfung ("verbraucht >= limit") und Protokollierung lagen zeitlich
+# durch einen Netzwerk-Roundtrip zu OpenRouter getrennt (bis zu 30 Sekunden).
+# Mehrere gleichzeitige Anfragen desselben Nutzers (zwei Tabs, ein Skript mit
+# demselben Token - der Container läuft mit mehreren Threads, siehe
+# server.md) sahen dabei alle denselben, noch niedrigen Stand, bestanden alle
+# die Prüfung, und erst danach schrieb jede ihren Verbrauch - das Kontingent
+# liess sich damit um ein Vielfaches überschreiten. Da alle KI-Funktionen
+# dasselbe OpenRouter-Konto teilen (Wunsch #183), ist das echtes Geld.
+#
+# Die Lösung reserviert NUR die kurze Prüfung+Einfügung in einer Transaktion
+# (BEGIN IMMEDIATE - SQLite serialisiert das gegen jede andere gleichzeitige
+# Reservierung). Der eigentliche Netzwerkaufruf liegt bewusst AUSSERHALB
+# jeder Transaktion: SQLite kennt nur eine Schreibsperre fürs ganze
+# Datenbankfile - hielte die Reservierung diese Sperre über die ganze
+# Wartezeit auf OpenRouter, wäre in dieser Zeit JEDE andere Schreibaktion im
+# gesamten Portal blockiert (ein Todo abhaken, ein Wunsch eintragen, alles).
+#
+# Reserviert wird deshalb mit `menge` als vorläufigem Wert - bei ki_anfrage()
+# ist das `max_tokens` (die vom Aufrufer ohnehin gewählte Obergrenze, nicht
+# der erst nach der Antwort bekannte echte Verbrauch), bei
+# ki_text_zu_sprache() ist es `len(text)`, und das ist dort schon der
+# ENDGÜLTIGE Wert (TTS wird exakt pro Zeichen abgerechnet, keine Korrektur
+# nötig). `tabelle`/`spalte` sind an beiden Aufrufstellen feste, im Code
+# vorgegebene Werte - nie Nutzereingabe -, das Zusammensetzen der SQL-Anweisung
+# daraus ist deshalb unbedenklich.
+#
+# Eine Nebenwirkung, die bewusst in Kauf genommen wird: Bei ki_anfrage() kann
+# eine Anfrage jetzt abgelehnt werden, obwohl der TATSÄCHLICHE Verbrauch noch
+# gereicht hätte (max_tokens ist eine Obergrenze, meist deutlich über dem
+# echten Verbrauch). Der Tausch ist bewusst - lieber gelegentlich zu
+# vorsichtig als das Kontingent per paralleler Anfragen umgehbar zu lassen.
+def _kontingent_reservieren(tabelle: str, spalte: str, user_id: int, limit_spalte: str,
+                            limit_default: int, menge: int, feature: str) -> int:
+    """Atomar prüfen und reservieren. Gibt die neue Zeilen-ID zurück, wirft
+    KiLimitError, wenn das Kontingent nicht reicht."""
+    with new_db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            f"SELECT {limit_spalte} FROM users WHERE id=?", (user_id,)).fetchone()
+        limit = row[limit_spalte] if row else limit_default
+        verbraucht = db.execute(f"""
+            SELECT COALESCE(SUM({spalte}), 0) FROM {tabelle}
+            WHERE user_id=? AND erstellt >= date('now', 'start of month')
+        """, (user_id,)).fetchone()[0]
+        if verbraucht + menge > limit:
+            db.rollback()
+            raise KiLimitError(f"Monatliches Kontingent aufgebraucht ({verbraucht}/{limit}).")
+        zeile = db.execute(
+            f"INSERT INTO {tabelle}(user_id, feature, {spalte}) VALUES(?,?,?) RETURNING id",
+            (user_id, feature, menge),
+        ).fetchone()
+        db.commit()
+        return zeile["id"]
+
+
+def _kontingent_freigeben(tabelle: str, zeilen_id: int):
+    """Reservierung zurücknehmen - ein Fehlversuch beim Anbieter soll das
+    Kontingent nicht schmälern (galt schon vor #206, jetzt weiterhin)."""
+    with new_db() as db:
+        db.execute(f"DELETE FROM {tabelle} WHERE id=?", (zeilen_id,))
+
+
+def _kontingent_korrigieren(tabelle: str, spalte: str, zeilen_id: int, wert: int):
+    """Die Reservierung auf den tatsächlichen Verbrauch nachbessern - bei
+    ki_anfrage() war `max_tokens` nur die Obergrenze, nicht der Preis."""
+    with new_db() as db:
+        db.execute(f"UPDATE {tabelle} SET {spalte}=? WHERE id=?", (wert, zeilen_id))
+
+
 def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens: int = 1500,
                bilder=None) -> str:
     """Generischer KI-Aufruf über OpenRouter – von jedem KI-Feature verwendbar.
@@ -1240,7 +1314,8 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     damit künftige KI-Funktionen keine eigene Limit-Logik brauchen. Wirft
     KiLimitError bei aufgebrauchtem Kontingent, KiFehler bei anderen Problemen.
     Bei Erfolg wird der tatsächliche Verbrauch aus der Antwort in ki_nutzung
-    protokolliert.
+    protokolliert - siehe _kontingent_reservieren() oben für das WARUM der
+    Reservierung vorab (Wunsch #206).
 
     `bilder` (Wunsch #80, OCR-Import): optionale Liste aus (mime_type,
     base64_daten)-Tupeln fuer Bildeingabe (Vision) – OpenRouter/OpenAI-
@@ -1248,18 +1323,12 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     import json, urllib.request, urllib.error
     from flask import current_app
 
-    db = get_db()
-    row = db.execute("SELECT ki_token_limit FROM users WHERE id=?", (user_id,)).fetchone()
-    limit = row["ki_token_limit"] if row else 100000
-    verbraucht = db.execute("""
-        SELECT COALESCE(SUM(tokens), 0) FROM ki_nutzung
-        WHERE user_id=? AND erstellt >= date('now', 'start of month')
-    """, (user_id,)).fetchone()[0]
-    if verbraucht >= limit:
-        raise KiLimitError(f"Monatliches KI-Kontingent aufgebraucht ({verbraucht}/{limit} Tokens).")
+    platzhalter_id = _kontingent_reservieren(
+        "ki_nutzung", "tokens", user_id, "ki_token_limit", 100000, max_tokens, feature)
 
     key = current_app.config.get("OPENROUTER_API_KEY", "")
     if not key:
+        _kontingent_freigeben("ki_nutzung", platzhalter_id)
         raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
 
     if bilder:
@@ -1288,18 +1357,16 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
+        _kontingent_freigeben("ki_nutzung", platzhalter_id)
         detail = e.read().decode()[:200]
         raise KiFehler(f"OpenRouter-Fehler {e.code}: {detail}")
     except Exception as e:
+        _kontingent_freigeben("ki_nutzung", platzhalter_id)
         raise KiFehler(f"KI-Aufruf fehlgeschlagen: {e}")
 
     antwort = data["choices"][0]["message"]["content"]
     tokens  = data.get("usage", {}).get("total_tokens", 0)
-    db.execute(
-        "INSERT INTO ki_nutzung(user_id, feature, tokens) VALUES(?,?,?)",
-        (user_id, feature, tokens),
-    )
-    db.commit()
+    _kontingent_korrigieren("ki_nutzung", "tokens", platzhalter_id, tokens)
     return antwort
 
 
@@ -1338,15 +1405,6 @@ def ki_tts_zeichen_uebrig(user_id: int) -> int:
     return max(0, limit - verbraucht)
 
 
-def _tts_nutzung_protokollieren(user_id: int, zeichen: int):
-    db = get_db()
-    db.execute(
-        "INSERT INTO ki_tts_nutzung(user_id, feature, zeichen) VALUES(?,?,?)",
-        (user_id, "vokabeln_tts", zeichen),
-    )
-    db.commit()
-
-
 def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     """Wandelt Text per OpenRouter-TTS-Endpoint in Sprache um. Gibt
     (audio_bytes, mimetype) zurueck (Wunsch #81) - der Aufrufer braucht den
@@ -1367,17 +1425,22 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     das Ergebnis dauerhaft als Datei (siehe 16_vokabeln.py) - ein einmal
     erzeugtes Wort zaehlt dadurch kein zweites Mal.
 
-    Protokolliert wird erst NACH einem erfolgreichen Aufruf, auf beiden
-    Erfolgspfaden (mp3 direkt oder der pcm/wav-Rueckfall) - ein Fehlversuch
-    beim Anbieter soll das Kontingent nicht schmaelern."""
+    Reserviert wird VOR dem kostenpflichtigen Aufruf, atomar (Wunsch #206,
+    siehe _kontingent_reservieren()) - anders als bei ki_anfrage() ist
+    len(text) hier schon der ENDGÜLTIGE Wert (TTS wird exakt pro Zeichen
+    abgerechnet), eine Korrektur danach ist deshalb nicht nötig. Ein
+    Fehlversuch beim Anbieter gibt die Reservierung zurück - das Kontingent
+    soll dadurch nicht schmälern."""
     import io, urllib.error, wave
     from flask import current_app
 
-    if ki_tts_zeichen_uebrig(user_id) < len(text):
-        raise KiLimitError("Monatliches Kontingent für Sprachausgabe aufgebraucht.")
+    platzhalter_id = _kontingent_reservieren(
+        "ki_tts_nutzung", "zeichen", user_id, "ki_tts_zeichen_limit", 50000,
+        len(text), "vokabeln_tts")
 
     key = current_app.config.get("OPENROUTER_API_KEY", "")
     if not key:
+        _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
         raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
 
     modell, stimme = ki_stimme_fuer(sprache_id)
@@ -1387,20 +1450,23 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     eingabe = tts_eingabe(text, ki_sprachname(sprache_id))
     try:
         audio = _tts_anfrage(eingabe, modell, stimme, key, "mp3")
-        _tts_nutzung_protokollieren(user_id, len(text))
         return audio, "audio/mpeg"
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:300]
         if e.code != 400 or "pcm" not in detail.lower():
+            _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
             raise KiFehler(f"TTS-Fehler {e.code}: {detail}")
     except Exception as e:
+        _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
         raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")
 
     try:
         pcm = _tts_anfrage(eingabe, modell, stimme, key, "pcm")
     except urllib.error.HTTPError as e:
+        _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
         raise KiFehler(f"TTS-Fehler {e.code}: {e.read().decode()[:200]}")
     except Exception as e:
+        _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
         raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")
 
     # Gemini TTS liefert 24kHz/16-bit/Mono-PCM ohne Container (Google-Doku).
@@ -1410,7 +1476,6 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
         wav.setsampwidth(2)
         wav.setframerate(24000)
         wav.writeframes(pcm)
-    _tts_nutzung_protokollieren(user_id, len(text))
     return puffer.getvalue(), "audio/wav"
 
 

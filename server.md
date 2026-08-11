@@ -1,6 +1,6 @@
 # server.md – Aktueller Systemzustand
 
-*Letzte Aktualisierung: 2026-08-11 (portal-v200: Wuensche #204/#207/#205 - Identitaetspflicht, Ratenbegrenzung, Log-Saeuberung)*
+*Letzte Aktualisierung: 2026-08-11 (portal-v202: Wunsch #206 - KI-Kontingentpruefung atomar)*
 
 ## Host
 
@@ -498,6 +498,19 @@ teile/
                        DNS-Rebinding-Pinning beim Push-Weg - pywebpush loest
                        selbst auf, das Pinning aus 11_rezepte.py laesst sich
                        nicht uebernehmen ohne pywebpush nachzubauen.
+  00_kern.py         – _kontingent_reservieren()/_kontingent_freigeben()/
+                       _kontingent_korrigieren() (Wunsch #206, Sicherheitsaudit
+                       11.08.2026): atomare Kontingentpruefung fuer BEIDE
+                       KI-Kontingente (ki_nutzung/tokens, ki_tts_nutzung/
+                       zeichen). BEGIN IMMEDIATE auf new_db() (NICHT g.db,
+                       NICHT ueber den Netzwerkaufruf gehalten - SQLite kennt
+                       nur eine Schreibsperre fuers ganze File, ein 30s-Lock
+                       waere ein Denial-of-Service fuers ganze Portal
+                       gewesen). ki_anfrage() reserviert mit max_tokens und
+                       korrigiert danach auf den echten Verbrauch;
+                       ki_text_zu_sprache() reserviert mit len(text) - das ist
+                       dort schon der Endwert, keine Korrektur noetig
+                       (_tts_nutzung_protokollieren() ist deshalb entfallen).
   00_kern.py         – rate_ueberschritten()/client_ip() (Wunsch #207,
                        Sicherheitsaudit 11.08.2026): gleitendes Fenster im
                        Speicher, keine externe Abhaengigkeit, bewusst NICHT
