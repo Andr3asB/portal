@@ -2091,6 +2091,12 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
+**Hostschlüssel des NAS** (Wunsch #211, Audit F-03): `/srv/familienportal/ssh/known_hosts`, aufgenommen am 12.08.2026, ed25519 **und** rsa. `backup.py` fährt seitdem mit `StrictHostKeyChecking=yes` und `UserKnownHostsFile=/ssh/known_hosts`; fehlt die Datei, bricht der Lauf mit einer Fehlermeldung ab statt auf „nimm jeden Host" zurückzufallen. Fingerabdrücke: ED25519 `SHA256:EN7z/iS9NwYwrKDpo7Rka7lCl8gLWj3Sf6zZFGuBCCw`, RSA `SHA256:3OROAGW+Rk5oeMnEB1hTR+UDVOkdVPr42z2ykzeT9Ps`.
+
+> **Bei einem NAS-Umzug oder neu aufgesetztem SSH-Dienst schlägt das Backup fehl** – mit Absicht, Meldung `Host key verification failed`. Dann den neuen Schlüssel am NAS selbst ablesen, vergleichen und erst danach neu aufnehmen (`ssh-keyscan -p 2222 -t ed25519,rsa <ip> > /srv/familienportal/ssh/known_hosts`). Blindes Überschreiben stellt genau die Lücke wieder her, die #211 geschlossen hat.
+
+Der Datenstrom selbst geht **weiterhin unverschlüsselt** aufs NAS (zweiter Teil von #211 und ganz #130) – offen, weil die Wahl zwischen symmetrisch (Schlüssel aus der `.env`) und asymmetrisch (age, privater Schlüssel ausserhalb von home02 und NAS) über die Wiederherstellbarkeit entscheidet und deshalb Andi gehört. Entlastend: in der DB stehen seit Stufe 6 nur HMACs der Zugangstokens, ein erbeutetes Backup gibt also **keinen** Portalzugang.
+
 ## Bekannte Issues
 
 - **Der Container läuft in UTC, nicht in deutscher Zeit** (`docker exec
@@ -2385,6 +2391,18 @@ python -m venv .venv                                   # einmalig
   Bearbeiten lehnen dasselbe ab" laeuft ueber das VERHALTEN beider Endpunkte -
   die erste Fassung fragte nur ab, ob es einen gemeinsamen Helfer GIBT, und
   waere gruen geblieben, waehrend eine zweite Kopie abweicht.
+- `test_push_geraetewechsel.py` – Wunsch #209 (Audit F-01). Prueft die
+  Uebernahme UND dass hinterher nur EINE Zeile dasteht - der Test allein auf
+  die Uebernahme bliebe gruen, wenn jemand das UNIQUE auf `endpoint` aufhebt,
+  und dann bekaeme das Tablet die Nachrichten beider Personen. Braucht ein
+  autouse-Fixture, das `socket.getaddrinfo` stubbt: die Suite laeuft offline,
+  ohne Aufloesung faellt schon `ist_oeffentliche_url()` (#203) durch und jeder
+  Aufruf endet in 400 statt beim Abo-Besitz.
+- `test_backup_hostkey.py` – Wunsch #211, erster Teil. Liest die
+  SSH-Optionsliste, statt eine Verbindung aufzubauen (das NAS ist von der
+  Testmaschine aus nicht erreichbar; die echte Verbindung wurde nach dem
+  Ausrollen von Hand gefahren). Der wichtigste Test ist der Rueckfall, den es
+  NICHT geben darf: fehlt `known_hosts`, muss der Lauf ausfallen und es sagen.
 - `test_log_grenzen.py` – Wunsch #210, zweiter Teil. Liest `docker-compose.yml`
   zeilenweise statt per PyYAML (eine Abhaengigkeit nur fuer diesen Waechter
   waere zu teuer) und verlangt fuer JEDEN Dienst eine `logging:`-Grenze - der

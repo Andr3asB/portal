@@ -58,11 +58,23 @@ def subscribe():
         abort(403)
     user_id = row["id"]
 
+    # Wunsch #209 (Audit-Befund F-01): `user_id` gehoert in die UPDATE-Liste.
+    # `endpoint` ist UNIQUE und identifiziert den BROWSER, nicht die Person.
+    # Ohne diese Zeile blieb das Abo beim Erstbesitzer: Andi erlaubt Push auf
+    # dem Familien-Tablet, Simone oeffnet spaeter im selben Browser ihren Link,
+    # der Browser liefert denselben Endpunkt - und ab da bekam ihr Geraet
+    # ANDIS Benachrichtigungen samt Aufgabentexten und Rueckfragen, eigene
+    # keine. Kein Angreifer noetig, das passiert im Alltag.
+    #
+    # Die Regel ist dieselbe wie bei den Sitzungen (19_sitzung.py): Wer sich
+    # zuletzt ausgewiesen hat, besitzt das Geraet. Dort war sie schon richtig,
+    # beim Push war sie vergessen worden.
     db.execute("""
         INSERT INTO push_abos(user_id, endpoint, p256dh, auth, geraet)
         VALUES (?,?,?,?,?)
         ON CONFLICT(endpoint) DO UPDATE
-          SET p256dh=excluded.p256dh, auth=excluded.auth, geraet=excluded.geraet
+          SET user_id=excluded.user_id, p256dh=excluded.p256dh,
+              auth=excluded.auth, geraet=excluded.geraet
     """, (user_id, endpoint, p256dh, auth, geraet))
     db.commit()
     return jsonify(ok=True)

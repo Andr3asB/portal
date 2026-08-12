@@ -58,9 +58,28 @@ NAS_PORT = os.environ.get("BACKUP_NAS_PORT", "2222")
 SSH_KEY  = "/ssh/id_ed25519"
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 
+KNOWN_HOSTS = "/ssh/known_hosts"
+
+# Wunsch #211 (Audit-Befund F-03): Vorher stand hier StrictHostKeyChecking=no
+# und es gab gar keine known_hosts - der Container nahm JEDEN Host an, der
+# unter der NAS-Adresse antwortete. Wer im Netzsegment des NAS dessen IP
+# uebernimmt (ARP-Spoofing, abgepasste DHCP-Neuvergabe), bekam nachts die
+# vollstaendige Familiendatenbank zugestellt.
+#
+# Die Schluessel sind am 12.08.2026 per ssh-keyscan aufgenommen und liegen in
+# /srv/familienportal/ssh/known_hosts (read-only in den Container gemountet).
+# Beide Verfahren sind drin (ed25519 und rsa), damit eine Aenderung der
+# Server-Vorliebe das Backup nicht ueber Nacht abreissen laesst.
+#
+# ACHTUNG bei einem NAS-Umzug oder einem Neuaufsetzen des SSH-Dienstes: Dann
+# schlaegt das Backup fehl, und zwar mit Absicht. Die Meldung lautet
+# "Host key verification failed" - in dem Fall den neuen Schluessel PRUEFEN
+# (Fingerabdruck am NAS selbst ablesen) und erst dann neu aufnehmen. Ein
+# blindes Ueberschreiben waere genau die Luecke, die hier geschlossen wurde.
 SSH_OPTS = [
     "ssh", "-i", SSH_KEY, "-p", NAS_PORT,
-    "-o", "StrictHostKeyChecking=no",
+    "-o", "StrictHostKeyChecking=yes",
+    "-o", f"UserKnownHostsFile={KNOWN_HOSTS}",
     "-o", "BatchMode=yes",
     "-o", "ConnectTimeout=20",
     f"{NAS_USER}@{NAS_HOST}",
@@ -95,6 +114,14 @@ _REMOTE_CMD = (
 def run():
     if not os.path.exists(SSH_KEY):
         log.warning("SSH-Key %s fehlt – Backup übersprungen", SSH_KEY)
+        return
+    if not os.path.exists(KNOWN_HOSTS):
+        # Absichtlich ein Abbruch und kein Rueckfall auf
+        # StrictHostKeyChecking=no: Ein Backup, das im Zweifel jedem Host
+        # antwortet, ist schlimmer als ein ausgefallenes, das im Log steht.
+        log.error("known_hosts %s fehlt – Backup übersprungen. Schlüssel des "
+                  "NAS prüfen und aufnehmen, siehe Kommentar in backup.py",
+                  KNOWN_HOSTS)
         return
 
     log.info("Backup → %s:%s (Dateiname vergibt das NAS)", NAS_HOST, NAS_PATH)

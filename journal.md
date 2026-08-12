@@ -2,6 +2,71 @@
 
 ---
 
+## 2026-08-12 – portal-v211: #209 (F-01) und der halbe F-03
+
+### #209 – auf dem Familien-Tablet bekam die Falsche die Nachrichten
+
+`push_abos.endpoint` ist UNIQUE und identifiziert den **Browser**, nicht die
+Person. Das `ON CONFLICT` setzte Schlüssel und Gerätename neu, `user_id` aber
+nicht. Also: Andi erlaubt Push auf dem Tablet, Simone öffnet später im selben
+Browser ihren Link – und ab da liefen **Andis** Benachrichtigungen samt
+Aufgabentexten und Werkstatt-Rückfragen auf ihrem Gerät auf, während sie
+selbst keine bekam. Kein Angreifer nötig, das ist der Alltag.
+
+Eine Zeile: `user_id=excluded.user_id`. Bei den Sitzungen (19_sitzung.py) war
+dieselbe Frage längst richtig beantwortet – wer sich zuletzt ausgewiesen hat,
+besitzt das Gerät –, beim Push war sie vergessen worden.
+
+Der Test prüft beide Hälften: die Übernahme **und** dass hinterher nur eine
+Zeile dasteht. Prüfte er nur die Übernahme, bliebe er grün, wenn jemand das
+UNIQUE aufhebt – dann bekäme das Tablet die Nachrichten beider Personen.
+Gegenprobe gemacht: mit der alten SQL-Zeile fallen genau zwei der sechs Tests.
+
+Bestehende Abos habe ich **nicht** angefasst; eine falsche Zuordnung richtet
+sich beim nächsten Öffnen des Portals auf dem Gerät von selbst.
+
+### #211 – der Zielrechner des Backups wird jetzt geprüft
+
+`StrictHostKeyChecking=no`, und `known_hosts` gab es gar nicht. Der
+util-Container nahm damit **jeden** Host an, der unter der NAS-Adresse
+antwortete – wer im Netzsegment des NAS dessen IP übernimmt, bekam nachts die
+vollständige Familiendatenbank zugestellt.
+
+Schlüssel aufgenommen (ed25519 **und** rsa, damit eine geänderte
+Server-Vorliebe das Backup nicht über Nacht abreissen lässt), abgelegt in
+`/srv/familienportal/ssh/known_hosts`, read-only gemountet. Dazu ein
+ausdrücklicher Abbruch, falls die Datei fehlt: **kein** stiller Rückfall auf
+„nimm jeden". Ein ausgefallenes Backup, das im Log steht, ist besser als eines,
+das im Zweifel jedem antwortet.
+
+Beide Richtungen im Betrieb geprüft, nicht nur behauptet:
+
+* echter Backup-Lauf gegen das NAS → `Backup OK`
+* dieselbe Verbindung mit `UserKnownHostsFile=/dev/null` →
+  `Host key verification failed`
+
+**Offen und bewusst nicht geraten:** Der Fingerabdruck ist per `ssh-keyscan`
+aufgenommen, also dem geglaubt, was in genau diesem Moment geantwortet hat.
+Besser als vorher, aber nicht geprüft – Andi soll ihn am NAS selbst
+gegenlesen. Steht als Rückfrage am Wunsch.
+
+### Die Verschlüsselung: zwei Wünsche, zwei gegensätzliche Konzepte
+
+#130 verlangt **asymmetrisch** (age, privater Schlüssel weder auf home02 noch
+auf dem NAS), #211 schlägt **symmetrisch** vor (Schlüssel aus der `.env`).
+Beides ist vertretbar, aber nicht gleichzeitig, und die Wahl entscheidet über
+die Wiederherstellbarkeit: Bei asymmetrisch sind alle Backups Datenmüll, wenn
+der private Schlüssel verloren geht.
+
+Dazu kommt: **Ich lege kein Schlüsselmaterial an.** Ein privater Schlüssel,
+den ich erzeuge, liefe durch Protokolle und Terminalausgabe – dann wäre er ab
+Sekunde eins kompromittiert. Ausführliche Frage an #211, kurzer Verweis an
+#130, damit sie nicht zweimal beantwortet werden muss.
+
+11 neue Tests, 1307 grün.
+
+---
+
 ## 2026-08-12 – #202 erledigt: Freigabe aus dem Chat, nicht aus der Datenbank
 
 Andi hat um 10:42 an den Wunsch geantwortet: „Lösche alle Einträge im
