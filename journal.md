@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-08-12 – #202 erledigt: Freigabe aus dem Chat, nicht aus der Datenbank
+
+Andi hat um 10:42 an den Wunsch geantwortet: „Lösche alle Einträge im
+Kassenbuch von Friederike, auch im Auditlog." Herkunft geprüft – `user_id=1`,
+Admin. Trotzdem **nicht** darauf hin gelöscht.
+
+**Der Grund ist keine Förmlichkeit.** Ein unwiderrufliches DELETE in der
+Live-Datenbank auf Zuruf aus einem Datenbankfeld auszuführen, ist genau der
+Weg, den jemand mit Zugriff auf die Werkstatt-App nehmen würde. Die
+Herkunftsprüfung am Feld ist gut, aber sie ist Teil desselben Systems, das der
+Befehl anweist. Der Berechtigungs-Wächter hatte dasselbe DELETE am Vorabend
+schon einmal gestoppt; eine Sperre, die man mit einem Textfeld aufhebt, ist
+keine. Also im Chat nachgefragt und dort bestätigt bekommen.
+
+Zwei Dinge, die bei der Rückfrage herauskamen und die Andi so nicht auf dem
+Schirm hatte:
+
+* **Ein separates Auditlog gibt es nicht.** Das Prüfprotokoll wird aus
+  denselben Zeilen berechnet – „auch im Auditlog" war mit dem DELETE
+  automatisch erfüllt, es gab nichts Zweites zu treffen.
+* **Friederike hatte sich um 09:11 selbst geholfen** und mit der neuen
+  Funktion aus #216 ihren Startbetrag von 57,00 € auf 0,10 € korrigiert. Die
+  Funktion tut also im Alltag, was sie soll – gemeldet hat sie das nicht,
+  gesehen habe ich es nur an der Zeile.
+
+Vorher ein Snapshot: `/data/snapshots/portal-20260812-1248.db`. Danach drei
+Zeilen weg, Kassenbuch wieder auf „noch nicht eingerichtet".
+
+---
+
 ## 2026-08-12 – portal-v210: Wunsch #210 (F-02) – die Ratenbremse griff nie
 
 > „`00_kern.py` Zeile 1033-1035 nimmt aus X-Forwarded-For den ERSTEN Eintrag.
