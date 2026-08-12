@@ -535,7 +535,21 @@ teile/
                        und /csp-bericht (30/min). client_ip() liest
                        X-Forwarded-For, weil portal nur hinter Caddy haengt
                        und request.remote_addr sonst immer Caddys Bridge-IP
-                       zeigt. _RATE_TREFFER (Modul-Dict) wird in
+                       zeigt - seit Wunsch #210 (Audit F-02) den **LETZTEN**
+                       Eintrag der Kette, nicht den ersten. Caddy HAENGT die
+                       Adresse seines Gegenuebers an einen vorhandenen Header
+                       AN; alles links davon hat der Absender selbst
+                       geschrieben. Mit `[0]` konnte sich jede Anfrage einen
+                       eigenen Eimer aussuchen, die Bremse griff nie.
+                       **NICHT** umgesetzt wurde der im Befund vorgeschlagene
+                       `trusted_proxies static private_ranges` im Caddyfile:
+                       die Geraete der Familie stehen selbst in privaten
+                       Netzen (10.10.0.0/24 ueber das UniFi-Gateway), Caddy
+                       wuerde also ausgerechnet die Absender als
+                       vertrauenswuerdige Proxys einstufen, gegen die die
+                       Bremse schuetzt. Caddys Vorgabe "keinem Proxy
+                       vertrauen" ist fuer genau einen Hop richtig.
+                       _RATE_TREFFER (Modul-Dict) wird in
                        tests/conftest.py per autouse-Fixture vor jedem Test
                        geleert, sonst teilen sich alle Tests im selben Lauf
                        ein Kontingent.
@@ -2371,6 +2385,12 @@ python -m venv .venv                                   # einmalig
   Bearbeiten lehnen dasselbe ab" laeuft ueber das VERHALTEN beider Endpunkte -
   die erste Fassung fragte nur ab, ob es einen gemeinsamen Helfer GIBT, und
   waere gruen geblieben, waehrend eine zweite Kopie abweicht.
+- `test_log_grenzen.py` – Wunsch #210, zweiter Teil. Liest `docker-compose.yml`
+  zeilenweise statt per PyYAML (eine Abhaengigkeit nur fuer diesen Waechter
+  waere zu teuer) und verlangt fuer JEDEN Dienst eine `logging:`-Grenze - der
+  Fehler, der hier wirklich passiert, ist ein neuer Dienst ohne. Ein erster
+  Test sichert ab, dass die Datei ueberhaupt verstanden wird; sonst waeren die
+  Pruefungen leer und gruen.
 - `test_kassenbuch_aufsicht.py` – Wunsch #212 (Audit F-04). Haelt DREI Einstiege
   gleichzeitig fest (Uebersicht, fremdes Buch, Pruefprotokoll) - der Befund
   nannte nur die letzten beiden, die Uebersicht listet aber ebenfalls jedes

@@ -1022,17 +1022,42 @@ _RATE_TREFFER: dict = {}   # {(schluessel, client_ip): [zeitstempel, ...]}
 
 
 def client_ip() -> str:
-    """Echte Herkunftsadresse hinter Caddy.
+    """Echte Herkunftsadresse hinter Caddy - das RECHTE Ende der Kette.
 
-    portal ist ausschliesslich ueber das interne Bridge-Netz von Caddy
-    erreichbar (server.md, Abschnitt Stack) - kein anderer Absender kann
-    X-Forwarded-For faelschen. Ohne diese Zeile zeigt request.remote_addr
-    immer Caddys eigene Bridge-IP, egal wer wirklich anfragt - eine
-    Ratenbegrenzung darauf wuerfe die ganze Familie (und jeden Angreifer) in
-    denselben gemeinsamen Eimer."""
+    Ohne X-Forwarded-For zeigt request.remote_addr immer Caddys eigene
+    Bridge-IP, egal wer wirklich anfragt; eine Ratenbegrenzung darauf wuerfe
+    die ganze Familie und jeden Angreifer in denselben Eimer.
+
+    Wunsch #210 (Audit-Befund F-02): Bis v209 stand hier `split(",")[0]`, mit
+    der Begruendung "portal haengt nur hinter Caddy, also faelschungssicher".
+    Die Begruendung stimmt - aber nur fuer das RECHTE Ende der Kette. Caddys
+    reverse_proxy HAENGT die Adresse seines Gegenuebers an einen bereits
+    vorhandenen Header AN, statt ihn zu ersetzen. Schickt ein Client also
+
+        X-Forwarded-For: 1.2.3.4
+
+    dann sieht portal `1.2.3.4, <echte IP>` - und `[0]` lieferte den vom
+    Client frei gewaehlten Wert. Jede Anfrage konnte sich damit einen eigenen
+    Eimer aussuchen, und die Bremse griff nie.
+
+    Der letzte Eintrag ist dagegen immer der, den Caddy selbst angehaengt hat.
+    Den kann ein Absender nicht entfernen, ohne die Verbindung zu Caddy
+    abzubrechen - deshalb haengt die Sicherheit hier an der Struktur und nicht
+    an einer Konfigurationszeile, die jemand spaeter umstellt.
+
+    **Bewusst NICHT umgesetzt: `trusted_proxies static private_ranges` im
+    Caddyfile** (so im Befund vorgeschlagen). Die Geraete der Familie stehen
+    selbst in privaten Netzen - 10.10.0.0/24 ueber das UniFi-Gateway. Caddy
+    wuerde damit ausgerechnet die Absender als vertrauenswuerdige Proxys
+    einstufen, gegen die die Bremse schuetzen soll, und ihr X-Forwarded-For
+    wieder glauben. Caddys Vorgabe ist, KEINEM Proxy zu vertrauen, und das ist
+    fuer diesen Aufbau (genau ein Hop: Client -> Caddy -> portal) richtig.
+    """
     weitergeleitet = request.headers.get("X-Forwarded-For", "")
     if weitergeleitet:
-        return weitergeleitet.split(",")[0].strip()
+        eintraege = [t.strip() for t in weitergeleitet.split(",") if t.strip()]
+        if eintraege:
+            return eintraege[-1]
     return request.remote_addr or "unbekannt"
 
 

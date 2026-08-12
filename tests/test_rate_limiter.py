@@ -88,10 +88,40 @@ def test_client_ip_liest_x_forwarded_for(app):
         assert client_ip() == "203.0.113.5"
 
 
-def test_client_ip_nimmt_die_erste_von_mehreren(app):
+def test_client_ip_nimmt_die_LETZTE_von_mehreren(app):
+    """Wunsch #210 (Audit F-02). Hier stand bis v209 das Gegenteil, und der
+    Test hat damit die Luecke zementiert.
+
+    Caddy HAENGT die Adresse seines Gegenuebers an einen vorhandenen Header AN.
+    Alles links davon hat der Absender selbst geschrieben; nur der letzte
+    Eintrag stammt von Caddy. Die 172.30.0.10 hier ist Caddys Bridge-Adresse -
+    in echt steht dort die Adresse des anfragenden Geraets."""
     with app.test_request_context("/", headers={"X-Forwarded-For": "203.0.113.5, 172.30.0.10"}):
         from teile.kern import client_ip
-        assert client_ip() == "203.0.113.5"
+        assert client_ip() == "172.30.0.10"
+
+
+def test_gefaelschter_header_bekommt_keinen_eigenen_eimer(app):
+    """Der Befund in einem Satz: Wenn sich jeder seine eigene Herkunft
+    aussuchen kann, hat jede Anfrage einen eigenen Eimer und die Bremse
+    greift nie."""
+    from teile.kern import client_ip
+    gesehen = set()
+    for erfunden in ("1.2.3.4", "5.6.7.8", "9.10.11.12"):
+        with app.test_request_context(
+                "/", headers={"X-Forwarded-For": f"{erfunden}, 172.30.0.10"}):
+            gesehen.add(client_ip())
+    assert gesehen == {"172.30.0.10"}, (
+        f"Drei erfundene Absender ergaben {len(gesehen)} verschiedene Eimer: {gesehen}"
+    )
+
+
+def test_leere_eintraege_stoeren_nicht(app):
+    """`X-Forwarded-For: 1.2.3.4, ` endet sonst auf einem leeren Schluessel -
+    und ein leerer Schluessel waere fuer alle derselbe Eimer."""
+    from teile.kern import client_ip
+    with app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4, "}):
+        assert client_ip() == "1.2.3.4"
 
 
 def test_client_ip_faellt_ohne_header_zurueck(app):

@@ -2,6 +2,70 @@
 
 ---
 
+## 2026-08-12 – portal-v210: Wunsch #210 (F-02) – die Ratenbremse griff nie
+
+> „`00_kern.py` Zeile 1033-1035 nimmt aus X-Forwarded-For den ERSTEN Eintrag.
+> Die Begründung im Kommentar (portal hängt nur hinter Caddy, also
+> fälschungssicher) gilt für das rechte Ende der Kette, nicht für das linke."
+
+Der Befund hat recht, und der Kommentar im Code war das eigentliche Problem:
+Er klang nach einer geprüften Zusicherung und war eine halbe. Caddy **hängt**
+die Adresse seines Gegenübers an einen vorhandenen Header **an**, statt ihn zu
+ersetzen. Wer `X-Forwarded-For: 1.2.3.4` mitschickt, wird von `[0]` beim Wort
+genommen – jede Anfrage bekam einen eigenen Eimer, und die Bremse griff nie.
+
+Jetzt zählt der **letzte** Eintrag. Den hat Caddy selbst angehängt; ein
+Absender kann ihn nicht entfernen, ohne die Verbindung abzubrechen. Die
+Sicherheit hängt damit an der Struktur des Aufbaus und nicht an einer
+Konfigurationszeile, die jemand später umstellt.
+
+### Den vorgeschlagenen Fix habe ich bewusst NICHT umgesetzt
+
+Der Befund empfahl `trusted_proxies static private_ranges` im Caddyfile. Das
+wäre hier ein Eigentor: **Die Geräte der Familie stehen selbst in privaten
+Netzen** (10.10.0.0/24 über das UniFi-Gateway). Caddy würde damit ausgerechnet
+die Absender als vertrauenswürdige Proxys einstufen, gegen die die Bremse
+schützen soll, und ihr `X-Forwarded-For` wieder glauben – die Lücke wäre für
+jeden im Haus- und Gäste-WLAN offen geblieben, also für die wahrscheinlichste
+Herkunft überhaupt. Caddys Vorgabe ist, keinem Proxy zu vertrauen, und die ist
+für genau einen Hop (Client → Caddy → portal) richtig. Das Caddyfile bleibt
+unverändert.
+
+### Nachgewiesen, nicht behauptet
+
+34 Anfragen an `/csp-bericht` von diesem Rechner, jede mit einem **anderen**
+erfundenen `X-Forwarded-For`:
+
+```
+204 ×30, dann 429 429 429 429
+```
+
+Vorher wären alle 34 durchgegangen. Die 30 Logzeilen sind der Beweis und
+zugleich die Obergrenze – genau das, was der Endpunkt tun soll.
+
+### Der zweite Teil: Logs mit Deckel
+
+Die im Befund offene Frage ist beantwortet: In `/etc/docker/daemon.json` steht
+**keine** globale Grenze (nur `data-root`, `iptables`, `dns`), und alle drei
+Container liefen mit leerem `LogConfig` – also unbegrenzt. Jetzt `max-size
+10m`, `max-file 3` für alle drei, per YAML-Anker, damit es nicht auseinander
+läuft. Im Betrieb nachgesehen: alle drei tragen die Grenze.
+
+Das ist nicht nur unsere Angelegenheit – `/opt/docker` liegt auf derselben
+Platte wie iobroker, Paperless, Pi-hole und Portainer.
+
+### Ein Test, der die Lücke zementiert hatte
+
+`test_client_ip_nimmt_die_erste_von_mehreren` prüfte genau das falsche
+Verhalten und hätte den Fix rot gemacht. Der Befund hatte ausdrücklich darauf
+hingewiesen. Er heisst jetzt `…nimmt_die_LETZTE_von_mehreren`, mit dem Grund
+im Docstring. Dazu ein Test, der drei erfundene Absender schickt und verlangt,
+dass **ein** Eimer dabei herauskommt – das ist der Befund in einem Satz.
+
+5 neue Tests, 1296 grün.
+
+---
+
 ## 2026-08-12 – portal-v208: vier Audit-Befunde und der Startbetrag (#212–#216)
 
 Andi hat über Nacht fünf Wünsche freigegeben, vier davon aus dem

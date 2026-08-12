@@ -15,6 +15,15 @@ services:
     env_file: .env
     mem_limit: 256m
     cpus: "0.5"
+    # Wunsch #210: json-file waechst sonst unbegrenzt. /opt/docker liegt auf
+    # derselben Platte wie iobroker, Paperless, Pi-hole und Portainer - ein
+    # volllaufendes Log ist deren Problem, nicht nur unseres. In
+    # /etc/docker/daemon.json steht keine globale Grenze (nachgesehen).
+    logging: &log_grenzen
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "python3", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -43,6 +52,7 @@ services:
       - caddy_data:/data
     mem_limit: 64m
     cpus: "0.2"
+    logging: *log_grenzen
     healthcheck:
       # Wunsch #126: fragte vorher die Caddy-Admin-API ab (172.30.0.10:2019),
       # die jetzt abgeschaltet ist. Stattdessen der interne Klartext-Listener
@@ -78,6 +88,7 @@ services:
       BACKUP_NAS_PORT: "${BACKUP_NAS_PORT:-2222}"
     mem_limit: 64m
     cpus: "0.1"
+    logging: *log_grenzen
 
 networks:
   intern:
