@@ -2,6 +2,125 @@
 
 ---
 
+## 2026-08-12 – portal-v208: vier Audit-Befunde und der Startbetrag (#212–#216)
+
+Andi hat über Nacht fünf Wünsche freigegeben, vier davon aus dem
+Sicherheitsaudit vom 11.08. Alle fünf in einem Paket ausgeliefert – die
+Änderungen liegen in vier verschiedenen Modulen und stören sich nicht;
+fünf Bauläufe hintereinander wären nur Wartezeit gewesen. Getestet wurde
+nach jedem einzelnen Schritt.
+
+### #212 (F-04, `sehr_hoch`) – die Rolle `gast` sah jedes Kinder-Kassenbuch
+
+Die Berechtigung stand dreimal als **negative** Liste da: `if rolle ==
+"kind": abort(403)`. Alles andere galt damit als aufsichtsberechtigt – auch
+`gast`. Und `gast` ist die **Voreinstellung**: Schema-Default, Vorauswahl im
+Anlegeformular, dazu der Auto-Grant fürs Kassenbuch an alle. Der nächste
+Nutzer, der ohne ausdrückliche Rollenwahl entsteht – Besuch, Leihgerät –
+hätte jedes Kinderbuch samt Prüfprotokoll gesehen.
+
+Jetzt positiv: `_darf_aufsicht(user)` = `is_admin or rolle == "eltern"`.
+Der Unterschied ist die Richtung: Vergisst jemand bei einer künftigen Rolle
+die negative Liste nachzuziehen, bekommt sie zu viele Rechte; vergisst er es
+bei der positiven, zu wenige.
+
+**Der Befund nannte zwei Stellen, es waren drei.** `index()` stand nicht
+darin, listet aber ebenfalls jedes Kind mit Kontostand. Wer nur die zwei
+genannten Zeilen repariert hätte, hätte die Übersicht offen gelassen.
+
+Dazu läuft `_auto_grant_all` fürs Kassenbuch nur noch mit
+`rollen=('eltern','kind')`. **Entzogen wird nichts** – bestehende Grants sind
+Andis Entscheidung, nicht die eines Startvorgangs.
+
+### #216 (`hoch`) – Startbetrag richtigstellen, ohne die Zusage zu brechen
+
+Das Kassenbuch verspricht auf der Prüfseite, dass niemand je etwas ändert,
+auch kein Admin. Eine Korrekturfunktion, die `betrag_cent` überschreibt,
+hätte dieses Versprechen zu einer Lüge gemacht.
+
+Deshalb wird nichts überschrieben: **der alte Start-Eintrag wird storniert,
+ein neuer angelegt.** Die Korrektur erscheint im Prüfprotokoll dadurch von
+selbst als *angelegt / storniert / angelegt* – ohne dass es eine dritte
+Ereignisart bräuchte, um die es in #156 ging. Auch keine vierte Route: die
+Richtigstellung läuft über dieselbe `/start`, weil
+`test_kassenbuch_unveraenderlich.py` die schreibenden Routen zählt und diese
+Grenze nicht wegen eines fachlich identischen Vorgangs fallen soll.
+
+**Abweichung von meiner eigenen Formulierung, bewusst:** Ich hatte den Wunsch
+mit „solange sonst noch keine Buchung dazugekommen ist" eingetragen. Umgesetzt
+ist „solange keine **gültige** Buchung dasteht" – **stornierte Buchungen halten
+das Fenster offen.** Sonst hätte #216 ausgerechnet den Fall nicht gelöst, aus
+dem er entstand: Friederike hatte eine Ausgleichsbuchung angelegt und wieder
+storniert. Eine stornierte Zeile verschiebt keinen Kontostand; sie ist ein
+zurückgenommener Versuch, keine Historie.
+
+**Nebenwirkung, die #202 erledigen dürfte:** Friederikes Korrekturfenster ist
+seit dem Ausrollen offen (geprüft: gültiger Start, null gültige Buchungen).
+Sie kann die 57,00 € jetzt selbst richtigstellen – das Löschen von Hand, das
+gestern der Berechtigungs-Wächter gestoppt hat, ist damit vermutlich unnötig.
+Als Notiz an #202 gehängt, entschieden wird das dort.
+
+Zwei bestehende Tests mussten dafür **absichtlich** geändert werden, beide mit
+Begründung im Test: `test_zweiter_start_wird_ignoriert` (die Grenze ist jetzt
+die erste Buchung, nicht der erste Start) und
+`test_das_einzige_update_betrifft_nur_das_storno` → `test_jedes_update_…`
+(es gibt jetzt zwei UPDATEs, beide weiterhin nur auf die Storno-Spalten – die
+Zahl war nie der Massstab, der Inhalt ist es).
+
+### #213 (F-05, `mittel`) – Bildbombe beim Barcode-Foto
+
+Alle Grenzen im Portal messen die **Datei** (8 MB, `MAX_CONTENT_LENGTH`,
+Caddy), keine die entpackte Fläche. Ein PNG von wenigen Kilobyte geht zu
+hundert Megapixeln auf – mehrere hundert MB gegen ein Containerlimit von
+256 MB, und `restart: unless-stopped` macht daraus einen Dauerzustand.
+
+`Image.MAX_IMAGE_PIXELS = 40_000_000` allein reicht **nicht**, und das stand
+so auch nicht im Befund: Pillow *warnt* dort nur und bricht erst beim
+**Doppelten** hart ab – das Fenster dazwischen wird tatsächlich alloziert.
+Deshalb misst der Code selbst nach, zwischen `Image.open()` (liest nur den
+Dateikopf) und dem ersten echten Zugriff. Pillows eigener
+`DecompressionBombError` wird auf dieselbe Ausnahme umgebogen, damit die
+Antwort in beiden Fällen sagt, was los ist: „zu viele Bildpunkte" statt
+„konnte nicht gelesen werden" – bei einem legitimen 50-MPx-Foto wäre das
+Zweite schlicht irreführend.
+
+### #214 (F-06, `mittel`) – privates Todo mit Rollenziel
+
+`_visible_todos` fragte nach `privat`, `_darf_erledigen` nicht. Bei
+`privat=1, zugewiesen_an IS NULL, zugewiesen_rollen='kind'` lief beides
+auseinander: unsichtbar, aber änderbar. Eine Bedingung ergänzt. Der Test
+prüft beide Seiten **am selben Datensatz** – getrennt geprüft wäre derselbe
+Befund wieder möglich, sobald jemand nur eine der Funktionen anfasst.
+
+### #215 (`mittel`) – verwaiste `-wal`/`-shm` im Snapshot-Ordner
+
+`_prune()` suchte mit einem Muster, das auf `.db` endet, und sah die
+Begleitdateien deshalb nie. Jetzt räumt es zusätzlich alle `-wal`/`-shm` weg,
+deren `.db` nicht mehr existiert – **nach** dem Löschen der alten Snapshots,
+sonst blieben deren Begleiter eine Runde zu lang liegen.
+
+Der Ordner war beim Ausrollen bereits sauber (die 56 Altlasten aus dem Befund
+sind offenbar bei den v206-Arbeiten mitgegangen). Damit die Auslieferung nicht
+nur behauptet zu wirken, habe ich zwei künstliche Verwaiste angelegt
+(`portal-20260101-0000.db-wal/-shm`), `db_snapshot.take()` im util-Container
+laufen lassen und nachgesehen: weg, und exakt 24 Snapshots stehen da.
+
+Erster Test im Repo, der `util/` anfasst – das Modul hängt an nichts ausser
+`sqlite3` und `pathlib` und lässt sich per `spec_from_file_location` laden.
+
+### Gegenproben
+
+Zwei der Wächter (#212, #214) beweisen mit einem eigenen Test, dass sie
+anschlagen **können**: Sie setzen die alte, kaputte Regel per `monkeypatch`
+für die Dauer eines Tests wieder ein und verlangen, dass der Angriff dann
+durchgeht. Bewusst so und nicht durch kurzzeitiges Aufweichen des Quelltextes –
+eine abgeschwächte Berechtigungsprüfung soll nicht einmal für Minuten in einer
+Datei stehen, in der sie jemand committen könnte.
+
+52 neue Tests in fünf neuen Dateien, 1291 grün.
+
+---
+
 ## 2026-08-12 – portal-v207: Wunsch #201 (Figuren bearbeiten), #202 blockiert
 
 Erster Durchlauf des wieder eingeschalteten Stundenlaufs. Zwei freigegebene

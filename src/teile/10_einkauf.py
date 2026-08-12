@@ -42,6 +42,18 @@ APP = "einkauf"
 _BARCODE_MAX_BYTES = 8 * 1024 * 1024
 _BARCODE_MIME = {"jpg", "jpeg", "png", "heic", "webp"}
 
+# Wunsch #213 (Audit-Befund F-05): Grenze fuer die ENTPACKTE Bildflaeche.
+# Alle anderen Grenzen (8 MB hier, MAX_CONTENT_LENGTH, Caddy) messen die
+# DATEI - ein wenige Kilobyte grosses PNG kann zu ~100 Megapixel aufgehen,
+# bei 4 Byte je Pixel rund 400 MB gegen ein Containerlimit von 256 MB. Ein
+# Barcode-Foto ist nie mehr als ein paar Megapixel.
+_BARCODE_MAX_PIXEL = 40_000_000
+
+
+class _BildZuGross(Exception):
+    """Damit die Antwort sagen kann, WARUM - "konnte nicht gelesen werden"
+    waere bei einem legitimen 50-Megapixel-Foto schlicht irrefuehrend."""
+
 # Nur Ziffern - der Code landet in einer URL. Ohne diese Pruefung koennte ein
 # praeparierter "Barcode" den Pfad der Abfrage veraendern.
 #
@@ -100,7 +112,26 @@ def _barcode_aus_bild(rohdaten: bytes):
     from PIL import Image
     import zxingcpp
 
-    bild = Image.open(io.BytesIO(rohdaten))
+    # Wunsch #213: Pillows eigene Bombensperre reicht hier NICHT. Sie warnt bei
+    # MAX_IMAGE_PIXELS und bricht erst beim DOPPELTEN hart ab - das Fenster
+    # dazwischen wird tatsaechlich alloziert, und genau das treibt den
+    # Container ins OOM. Deshalb zusaetzlich selbst nachmessen.
+    Image.MAX_IMAGE_PIXELS = _BARCODE_MAX_PIXEL
+
+    # `Image.open` liest nur den Dateikopf; die Flaeche steht danach fest,
+    # ohne dass ein einziges Pixel entpackt waere. Erst `convert()` bzw.
+    # `read_barcodes()` weiter unten holen die Daten wirklich - die Pruefung
+    # muss also genau hier dazwischen stehen.
+    try:
+        bild = Image.open(io.BytesIO(rohdaten))
+    except Image.DecompressionBombError as fehler:
+        # Pillow greift von selbst, aber erst beim DOPPELTEN der Grenze.
+        # Auf dieselbe Ausnahme umbiegen, damit die Route in beiden Faellen
+        # dasselbe sagen kann.
+        raise _BildZuGross(str(fehler)) from fehler
+    if bild.width * bild.height > _BARCODE_MAX_PIXEL:
+        raise _BildZuGross(f"{bild.width}x{bild.height}")
+
     # Manche Handy-Fotos kommen als RGBA oder mit Palette - zxing-cpp will
     # etwas Handfestes.
     if bild.mode not in ("L", "RGB"):
@@ -199,6 +230,11 @@ def barcode(token):
 
     try:
         code = _barcode_aus_bild(rohdaten)
+    except _BildZuGross:
+        return jsonify(
+            ok=False,
+            fehler="Das Foto hat zu viele Bildpunkte. Bitte in kleinerer "
+                   "Auflösung aufnehmen."), 400
     except Exception:
         return jsonify(ok=False, fehler="Das Foto konnte nicht gelesen werden."), 400
     if not code:

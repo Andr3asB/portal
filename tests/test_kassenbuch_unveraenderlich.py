@@ -53,19 +53,31 @@ def test_kein_loeschen_im_quelltext():
     assert "DELETE FROM kassenbuch_eintraege" not in QUELLE
 
 
-def test_das_einzige_update_betrifft_nur_das_storno():
-    """Der Kern: Es gibt genau eine ändernde Anweisung, und sie fasst
-    ausschliesslich die Storno-Spalten an. Würde sie eines Tages auch
-    `betrag_cent` oder `zweck` setzen, wäre das Prüfprotokoll unvollständig,
-    ohne dass es jemand merkt."""
+def test_jedes_update_betrifft_nur_das_storno():
+    """Der Kern: JEDE ändernde Anweisung fasst ausschliesslich die
+    Storno-Spalten an. Würde eine davon eines Tages auch `betrag_cent` oder
+    `zweck` setzen, wäre das Prüfprotokoll unvollständig, ohne dass es jemand
+    merkt.
+
+    Bis Wunsch #216 stand hier „genau EIN UPDATE". Die Richtigstellung des
+    Startbetrags hat ein zweites hinzugefügt - bewusst als Storno des alten
+    und Neuanlage statt als Überschreiben des Betrags, damit die Zusage
+    unangetastet bleibt und die Korrektur im Protokoll von selbst als
+    angelegt / storniert / angelegt erscheint. Die Zahl der Anweisungen ist
+    also nicht der Massstab; ihr Inhalt ist es.
+    """
     anweisungen = re.findall(
         r"UPDATE\s+kassenbuch_eintraege\s+SET\s+(.*?)\s+WHERE",
         QUELLE, re.S | re.I)
-    assert len(anweisungen) == 1, f"Erwartet genau ein UPDATE, gefunden {len(anweisungen)}"
+    assert anweisungen, "Kein UPDATE gefunden - greift das Muster noch?"
 
-    spalten = {t.split("=")[0].strip().lower()
-               for t in anweisungen[0].split(",")}
-    assert spalten == {"storniert", "storniert_von", "storniert_am"}, spalten
+    for anweisung in anweisungen:
+        spalten = {t.split("=")[0].strip().lower() for t in anweisung.split(",")}
+        assert spalten == {"storniert", "storniert_von", "storniert_am"}, (
+            f"Dieses UPDATE fasst mehr als das Storno an: {sorted(spalten)}. "
+            f"Wenn ein Eintrag wirklich änderbar werden soll, braucht das "
+            f"Prüfprotokoll (#153) eine dritte Ereignisart 'geändert'."
+        )
 
 
 # --- Und dasselbe am laufenden Objekt --------------------------------------

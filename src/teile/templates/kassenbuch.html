@@ -22,6 +22,17 @@
   background:var(--surface); border-radius:16px; padding:16px;
   margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
 }
+/* Wunsch #216: zugeklappt. Die Richtigstellung ist der Ausnahmefall - offen
+   stünde sie gleichwertig neben dem Eintragen-Formular, das man taeglich
+   braucht. */
+.kb-korrektur-card {
+  background:var(--surface); border-radius:16px; padding:14px 16px;
+  margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
+}
+.kb-korrektur-card summary {
+  font-size:14px; font-weight:600; color:var(--text-2); cursor:pointer;
+}
+.kb-korrektur-card p { font-size:14px; color:var(--text-2); margin:12px 0; }
 .kb-art-wahl { display:flex; gap:8px; margin-bottom:12px; }
 .kb-art-btn {
   flex:1; text-align:center; border:1.5px solid var(--border); border-radius:12px;
@@ -125,6 +136,26 @@
       <div class="kb-saldo-label">Im Sparschwein</div>
       <div class="kb-saldo-betrag">{{ saldo_text }}</div>
     </div>
+
+    {% if eigenes_buch and start_korrigierbar %}
+    {# Wunsch #216: nur solange nichts gebucht ist. Mit der ersten stehenden
+       Buchung verschwindet diese Karte für immer. #}
+    <details class="kb-korrektur-card">
+      <summary>🏁 Startbetrag stimmt nicht? ({{ start_text }})</summary>
+      <p>Du hast noch nichts eingetragen – deshalb darfst du den Startbetrag
+         jetzt noch einmal richtigstellen. Sobald deine erste Einnahme oder
+         Ausgabe drinsteht, geht das nicht mehr. Der alte Betrag bleibt im
+         Kassenbuch stehen und wird als storniert gekennzeichnet.</p>
+      <form method="post" action="/a/kassenbuch{{ tp }}start">
+        <div class="kb-feld">
+          <label for="kb-start-neu">Richtiger Startbetrag</label>
+          <input class="kb-input" id="kb-start-neu" type="text" inputmode="decimal"
+                 name="betrag" placeholder="z. B. 12,50" required>
+        </div>
+        <button class="kb-submit" type="submit">Startbetrag richtigstellen</button>
+      </form>
+    </details>
+    {% endif %}
 
     {% if eigenes_buch %}
     <div class="kb-form-card">

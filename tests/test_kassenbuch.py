@@ -89,13 +89,19 @@ def test_start_setzt_den_kontostand(client, kb_token):
     assert "12,50" in seite
 
 
-def test_zweiter_start_wird_ignoriert(client, kb_token):
+def test_zweiter_start_nach_der_ersten_buchung_wird_ignoriert(client, kb_token):
     """Ein zweites Startguthaben würde den gesamten bisherigen Kontostand
-    rückwirkend bedeutungslos machen."""
+    rückwirkend bedeutungslos machen.
+
+    Seit Wunsch #216 gilt das ab der ersten stehenden Buchung - vorher darf
+    ein Tippfehler noch richtiggestellt werden (siehe
+    test_kassenbuch_startkorrektur.py). Die Grenze ist die Buchung, nicht der
+    Start-Eintrag."""
     _start(client, kb_token["TestKind"], "10,00")
+    _eintrag(client, kb_token["TestKind"], "einnahme", "1,00", person="Oma")
     _start(client, kb_token["TestKind"], "999,00")
     seite = client.get(f"/a/kassenbuch/{kb_token['TestKind']}/").get_data(as_text=True)
-    assert "10,00" in seite
+    assert "11,00" in seite
     assert "999,00" not in seite
 
 

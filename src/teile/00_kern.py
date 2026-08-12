@@ -1479,13 +1479,31 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     return puffer.getvalue(), "audio/wav"
 
 
-def _auto_grant_all(db, slug):
+def _auto_grant_all(db, slug, rollen=None):
+    """Vergibt eine App an alle Nutzer, die sie noch nicht haben.
+
+    `rollen` schraenkt das ein (Wunsch #212): Das Kassenbuch geht nur noch an
+    Eltern, Kinder und Admins - nicht mehr an `gast`, die VOREINSTELLUNG beim
+    Anlegen. Ein Gast bekaeme sonst eine Kachel, hinter der er nur ein 403
+    findet, und beim naechsten Umbau der Routen waere die Kachel der Grund,
+    warum jemand die Sperre wieder aufweicht.
+
+    Entzogen wird hier bewusst NICHTS: bestehende Grants sind Andis
+    Entscheidung, nicht die eines Startvorgangs.
+    """
     app_row = db.execute("SELECT id FROM apps WHERE slug=?", (slug,)).fetchone()
     if not app_row:
         return
+    bedingung = ""
+    werte = [app_row[0]]
+    if rollen:
+        platzhalter = ",".join("?" * len(rollen))
+        bedingung = f" AND (is_admin=1 OR rolle IN ({platzhalter}))"
+        werte.extend(rollen)
     missing = db.execute(
-        "SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM grants WHERE app_id=?)",
-        (app_row[0],),
+        "SELECT id FROM users WHERE id NOT IN "
+        f"(SELECT user_id FROM grants WHERE app_id=?){bedingung}",
+        werte,
     ).fetchall()
     for row in missing:
         # Der Klartext wird hier bewusst NICHT aufgehoben: Auto-Grants sind
@@ -2122,10 +2140,12 @@ def _init_db(app):
 
         _auto_grant_all(db, "hilfe")
         _auto_grant_all(db, "einkauf")
-        # Wunsch #144: ALLE Nutzer bekommen den Grant (wie hilfe/einkauf) -
-        # Kinder sehen darüber ihr eigenes Kassenbuch, Eltern/Admin die
-        # Übersicht aller Kinder (Aufsicht war Teil des Wunsches: "auditiert").
-        _auto_grant_all(db, "kassenbuch")
+        # Wunsch #144: Kinder sehen darüber ihr eigenes Kassenbuch,
+        # Eltern/Admin die Übersicht aller Kinder (Aufsicht war Teil des
+        # Wunsches: "auditiert"). Seit Wunsch #212 NICHT mehr an alle: `gast`
+        # ist die Voreinstellung beim Anlegen und hat in einem fremden
+        # Kassenbuch nichts verloren.
+        _auto_grant_all(db, "kassenbuch", rollen=("eltern", "kind"))
         # Wunsch #145: Geburtstage sind eine gemeinsame Familiensache -
         # jeder traegt ein, jeder sieht alles. Ein Grant je Nutzer waere
         # nur Verwaltungsaufwand ohne Nutzen.

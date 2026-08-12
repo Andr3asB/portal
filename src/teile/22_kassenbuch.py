@@ -80,6 +80,23 @@ def _datum_text(iso: str) -> str:
     return f"{tag}.{monat}.{jahr}"
 
 
+def _darf_aufsicht(user) -> bool:
+    """Wunsch #212 (Audit-Befund F-04): Aufsicht POSITIV formulieren.
+
+    Vorher stand an drei Stellen `if user["rolle"] == "kind": abort(403)` -
+    also: alles, was kein Kind ist, gilt als aufsichtsberechtigt. Damit war
+    auch die Rolle `gast` aufsichtsberechtigt, und `gast` ist die VOREINSTELLUNG
+    (Schema-Default, Anlegeformular). Der naechste Nutzer, der ohne
+    ausdrueckliche Rollenwahl angelegt wird - Besuch, Leihgeraet - haette
+    jedes Kinder-Kassenbuch samt Pruefprotokoll sehen koennen.
+
+    Der Unterschied ist die Richtung der Aufzaehlung: eine negative Liste muss
+    bei jeder neuen Rolle nachgezogen werden, eine positive nicht. Vergisst man
+    es hier, bekommt die neue Rolle zu wenig Rechte statt zu vieler.
+    """
+    return bool(user["is_admin"]) or user["rolle"] == "eltern"
+
+
 def _kind_oder_404(db, kid_id: int):
     row = db.execute(
         "SELECT id, name, farbe FROM users WHERE id=? AND rolle='kind'", (kid_id,)
@@ -108,12 +125,41 @@ def _saldo_cent(eintraege) -> int:
     return saldo
 
 
+def _start_korrektur_offen(eintraege) -> bool:
+    """Wunsch #216: Darf der Startbetrag noch einmal richtiggestellt werden?
+
+    Das Fenster ist absichtlich eng: Es gibt einen gültigen Start-Eintrag, und
+    sonst zählt nichts - keine gültige Einnahme, keine gültige Ausgabe. Dann
+    ist das Kassenbuch faktisch noch nicht in Benutzung, der Kontostand ist
+    exakt der Startbetrag, und eine Richtigstellung macht nichts rückwirkend
+    bedeutungslos. Mit der ersten stehenden Buchung schliesst es für immer.
+
+    **Stornierte Einträge halten das Fenster offen** - und das weicht von der
+    Formulierung des Wunsches ab ("sonst noch keine Buchung dazugekommen").
+    Grund: genau daran hing der Fall, aus dem der Wunsch entstand (#202,
+    Friederike: Startbetrag zu hoch, Ausgleichsbuchung, wieder storniert).
+    Eine stornierte Zeile verändert den Kontostand nicht, sie steht sichtbar
+    im Buch und im Prüfprotokoll - sie ist ein zurückgenommener Versuch, keine
+    Historie. Wer das enger haben will, ändert diese eine Funktion.
+    """
+    hat_gueltigen_start = any(e["art"] == "start" and not e["storniert"] for e in eintraege)
+    hat_buchung = any(e["art"] != "start" and not e["storniert"] for e in eintraege)
+    return hat_gueltigen_start and not hat_buchung
+
+
 def _buch_rendern(user, token, db, kind_row, eigenes_buch: bool):
     eintraege = _eintraege_laden(db, kind_row["id"])
-    hat_start = any(e["art"] == "start" for e in eintraege)
+    # Ein stornierter Start zaehlt nicht als vorhanden - sonst bliebe das
+    # Kassenbuch nach einer Richtigstellung im Zustand "eingerichtet", waehrend
+    # gar kein gueltiger Nullpunkt mehr dastuende.
+    hat_start = any(e["art"] == "start" and not e["storniert"] for e in eintraege)
+    start_cent = next((e["betrag_cent"] for e in eintraege
+                       if e["art"] == "start" and not e["storniert"]), 0)
     return render_template("kassenbuch.html",
         user=user, token=token, farbe=user["farbe"],
         kind=kind_row, eigenes_buch=eigenes_buch, hat_start=hat_start,
+        start_korrigierbar=_start_korrektur_offen(eintraege),
+        start_text=_cent_zu_euro_text(start_cent),
         saldo_cent=_saldo_cent(eintraege), saldo_text=_cent_zu_euro_text(_saldo_cent(eintraege)),
         eintraege=eintraege, heute=heute_lokal(),
     )
@@ -127,6 +173,10 @@ def index(token):
 
     if user["rolle"] == "kind":
         return _buch_rendern(user, token, db, user, eigenes_buch=True)
+    if not _darf_aufsicht(user):
+        # Die Uebersicht listet JEDES Kind mit Kontostand - kein Ort fuer
+        # jemanden ohne Aufsichtsrolle (Wunsch #212).
+        abort(403)
 
     # Eltern/Admin: Übersicht aller Kinder mit ihrem jeweiligen Kontostand.
     kinder_rows = db.execute(
@@ -152,9 +202,10 @@ def kind_buch(token, kid_id):
     kind_row = _kind_oder_404(db, kid_id)
 
     eigenes_buch = user["id"] == kid_id
-    if user["rolle"] == "kind" and not eigenes_buch:
-        # Kinder sehen NUR ihr eigenes Kassenbuch - keine Einsicht bei
-        # Geschwistern, anders als bei Eltern/Admin (Aufsicht).
+    if not eigenes_buch and not _darf_aufsicht(user):
+        # Fremdes Buch nur mit Aufsichtsrolle. Kinder sehen NUR ihr eigenes -
+        # keine Einsicht bei Geschwistern; alles andere ausser Eltern/Admin
+        # sieht gar keins (Wunsch #212).
         abort(403)
 
     return _buch_rendern(user, token, db, kind_row, eigenes_buch=eigenes_buch)
@@ -274,7 +325,7 @@ def pruefprotokoll(token, kid_id):
     Eigenes hinzu ausser der Perspektive der Aufsicht - und die gehoert
     laut Wunsch den Eltern."""
     user = _user(token)
-    if user["rolle"] == "kind":
+    if not _darf_aufsicht(user):
         abort(403)
     db = get_db()
     kind_row = _kind_oder_404(db, kid_id)
@@ -289,23 +340,42 @@ def pruefprotokoll(token, kid_id):
 @bp.route("/a/kassenbuch/<token>/start", methods=["POST"])
 def start(token):
     """Startbetrag festlegen - immer für den EIGENEN Bestand, nie für ein
-    fremdes Kind (kein kid_id-Parameter nötig/möglich)."""
+    fremdes Kind (kein kid_id-Parameter nötig/möglich).
+
+    Wunsch #216: Dieselbe Route stellt den Startbetrag auch RICHTIG, solange
+    das Fenster aus `_start_korrektur_offen()` offen ist. Bewusst hier und
+    nicht als vierte Route: `test_kassenbuch_unveraenderlich.py` zählt die
+    schreibenden Routen, und diese Grenze soll nicht wegen einer Korrektur
+    aufgeweicht werden, die fachlich derselbe Vorgang ist.
+
+    **Die Unveränderlichkeits-Zusage bleibt unangetastet.** Es wird kein
+    Betrag überschrieben: der alte Start-Eintrag wird STORNIERT und ein neuer
+    angelegt. Damit taucht die Richtigstellung im Prüfprotokoll ganz von
+    selbst als drei Ereignisse auf (angelegt / storniert / angelegt), ohne
+    dass es dafür eine neue Ereignisart bräuchte - genau die Lücke, um die es
+    in Wunsch #156 ging.
+    """
     user = _user(token)
     if user["rolle"] != "kind":
         abort(403)
     db = get_db()
-    bereits_da = db.execute(
-        "SELECT 1 FROM kassenbuch_eintraege WHERE user_id=? AND art='start'", (user["id"],)
-    ).fetchone()
-    if bereits_da:
-        # Kein zweiter Start-Eintrag - auch nicht nach einem (unmöglichen,
-        # weil Start nie stornierbar ist) Storno-Versuch.
+    eintraege = _eintraege_laden(db, user["id"])
+    alter_start = next((e for e in eintraege
+                        if e["art"] == "start" and not e["storniert"]), None)
+    if alter_start and not _start_korrektur_offen(eintraege):
+        # Ab der ersten stehenden Buchung ist der Nullpunkt endgültig.
         return redirect(url_for("kassenbuch_app.index", token=token))
 
     cent = _euro_zu_cent(request.form.get("betrag"))
     if cent is None:
         return redirect(url_for("kassenbuch_app.index", token=token))
 
+    if alter_start:
+        db.execute("""
+            UPDATE kassenbuch_eintraege
+            SET storniert=1, storniert_von=?, storniert_am=datetime('now')
+            WHERE id=?
+        """, (user["id"], alter_start["id"]))
     db.execute("""
         INSERT INTO kassenbuch_eintraege
             (user_id, art, betrag_cent, zweck, datum, erstellt_von)

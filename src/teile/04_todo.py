@@ -82,11 +82,26 @@ def _rolle_passt(row, user) -> bool:
 
 
 def _darf_erledigen(user, row) -> bool:
+    """Wunsch #214 (Audit-Befund F-06): `privat` gilt auch hier.
+
+    Die letzte Zeile fragte nicht nach `privat`, die Sichtbarkeitsabfrage
+    `_visible_todos` dagegen schon. Auseinander liefen die beiden bei genau
+    einer Kombination: privat=1, zugewiesen_an IS NULL, zugewiesen_rollen
+    enthaelt die Rolle des Nutzers. Das Todo war fuer ihn unsichtbar, aber
+    aenderbar - er konnte mit geratener ID den Status setzen oder Inhalt,
+    Ziel und Privat-Flag ueberschreiben, ohne den Inhalt je zu sehen.
+
+    Wer es SIEHT, darf es weiterhin: Ersteller und Zugewiesener kommen eine
+    Zeile darueber durch, Eltern/Admin ganz oben. Nur der Weg ueber die
+    Rollenzuweisung erreicht ein privates Todo nicht mehr - denn genau dieser
+    Weg fuehrt an der Sichtbarkeit vorbei.
+    """
     if user["is_admin"] or user["rolle"] == "eltern":
         return True
     if row["erstellt_von"] == user["id"] or row["zugewiesen_an"] == user["id"]:
         return True
-    return row["zugewiesen_an"] is None and _rolle_passt(row, user)
+    return (row["zugewiesen_an"] is None and not row["privat"]
+            and _rolle_passt(row, user))
 
 
 def _todo_url(db, user_id: int) -> str:

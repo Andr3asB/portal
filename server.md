@@ -363,7 +363,11 @@ teile/
                        Sentinel "alle" – Wunsch #39); nur Rollen/Alle-Ziel landet
                        initial im Backlog statt Offen; /status/<id> (4 Stufen:
                        backlog/offen/in_arbeit/erledigt) – Kind/Gast dürfen auch bei
-                       passender Rolle/"alle" ändern, nicht nur bei eigener Zuweisung;
+                       passender Rolle/"alle" ändern, nicht nur bei eigener Zuweisung,
+                       seit Wunsch #214 aber NICHT mehr bei privat=1: der
+                       Weg über die Rollenzuweisung ist der einzige, der an
+                       `_visible_todos` vorbeiführt – ein privates Todo mit
+                       Rollenziel war unsichtbar und trotzdem änderbar (F-06);
                        /bearbeiten/<id> (Wunsch #43: alle Felder – Text, Ziel
                        Person/Rolle(n)/Alle, Privat – gleiche UX wie /neu; Eltern
                        alle/Kinder eigene bzw. rollenpassende; Status bleibt beim
@@ -1124,18 +1128,35 @@ teile/
                        Kontostand) - keine separate Aenderungs-Historie noetig,
                        weil erstellt_von/erstellt und storniert_von/
                        storniert_am direkt auf der Zeile stehen. Der
-                       Startbetrag ist selbst ein Eintrag (art='start'), nie
-                       stornierbar. EIN Feld `person` statt getrennter
+                       Startbetrag ist selbst ein Eintrag (art='start').
+                       Wunsch #216: Er laesst sich EINMALIG richtigstellen,
+                       solange `_start_korrektur_offen()` gilt - gueltiger
+                       Start vorhanden und KEINE gueltige (nicht stornierte)
+                       Buchung daneben. Stornierte Buchungen halten das
+                       Fenster offen (Fall #202). Die Richtigstellung laeuft
+                       ueber dieselbe Route /start und ueberschreibt NICHTS:
+                       alter Start wird storniert, neuer angelegt - damit
+                       erscheint sie im Pruefprotokoll von selbst als
+                       angelegt/storniert/angelegt, ohne neue Ereignisart.
+                       Deshalb hat 22_kassenbuch.py jetzt ZWEI UPDATEs, beide
+                       nur auf die Storno-Spalten (test_kassenbuch_
+                       unveraenderlich.py prueft den Inhalt, nicht die Zahl).
+                       EIN Feld `person` statt getrennter
                        Empfaenger/Absender-Felder - die Formular-Beschriftung
                        wechselt clientseitig zwischen "Von wem?"/"An wen?" je
                        nach gewaehlter Art (kbArtGewaehlt() in kassenbuch.html).
-                       Zugriff: Kinder sehen NUR ihr eigenes Buch
-                       (kind_buch() lehnt fremde kid_id mit 403 ab), Eltern/
-                       Admin (Auto-Grant wie hilfe/einkauf) sehen ueber
-                       index() eine Uebersicht aller Kinder und koennen jedes
-                       Buch READ-ONLY oeffnen, aber nichts eintragen/
+                       Zugriff (seit Wunsch #212 POSITIV formuliert ueber
+                       `_darf_aufsicht(user)` = is_admin oder rolle=='eltern',
+                       geprueft in index(), kind_buch() UND pruefprotokoll()):
+                       Kinder sehen NUR ihr eigenes Buch, Eltern/Admin sehen
+                       ueber index() eine Uebersicht aller Kinder und koennen
+                       jedes Buch READ-ONLY oeffnen, aber nichts eintragen/
                        stornieren (eigene_buch-Pruefung serverseitig, nicht
-                       nur im Template versteckt).
+                       nur im Template versteckt). ALLE anderen Rollen -
+                       insbesondere `gast`, der Schema-Default - bekommen
+                       ueberall 403. Vorher stand dort dreimal "wer kein Kind
+                       ist, darf", also eine negative Liste; der Auto-Grant
+                       laeuft seit #212 mit rollen=('eltern','kind').
                        Wunsch #153: Pruefprotokoll unter
                        /kind/<id>/pruefung, NUR fuer Eltern/Admin (Kinder
                        bekommen 403, auch aufs eigene). Der Unterschied zum
@@ -2050,7 +2071,7 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 
 | Aufgabe | Zeitplan | Details |
 |---------|----------|---------|
-| SQLite-Snapshot | stündlich | 24 Slots in `/data/snapshots/` |
+| SQLite-Snapshot | stündlich | 24 Slots in `/data/snapshots/`. `_prune()` raeumt seit Wunsch #215 auch **verwaiste `-wal`/`-shm`** weg (Begleiter ohne zugehoerige `.db`) – das alte Muster endete auf `.db` und sah sie nie, wodurch am 11.08.2026 56 Altlasten vom 07./08.08. herumlagen und jede Nacht mitgesichert wurden. Reihenfolge zaehlt: erst die alten `.db` loeschen, dann die Verwaisten – sonst blieben die Begleiter der gerade entfernten Snapshots eine Runde zu lang liegen. |
 | Zertifikats-Watcher | täglich 04:00 + einmalig beim Start | prüft mtime, löst Caddy-Reload aus |
 | NAS-Backup | täglich 03:00 | tar+ssh-Pipe → Ugreen NAS 10.60.0.4:2222, User `familienportal`, Pfad `/volume2/portal.16schwaben.de_Backup/`, 7 Generationen |
 
@@ -2350,6 +2371,34 @@ python -m venv .venv                                   # einmalig
   Bearbeiten lehnen dasselbe ab" laeuft ueber das VERHALTEN beider Endpunkte -
   die erste Fassung fragte nur ab, ob es einen gemeinsamen Helfer GIBT, und
   waere gruen geblieben, waehrend eine zweite Kopie abweicht.
+- `test_kassenbuch_aufsicht.py` – Wunsch #212 (Audit F-04). Haelt DREI Einstiege
+  gleichzeitig fest (Uebersicht, fremdes Buch, Pruefprotokoll) - der Befund
+  nannte nur die letzten beiden, die Uebersicht listet aber ebenfalls jedes
+  Kind mit Kontostand und waere offen geblieben. Der Gast bekommt ausdruecklich
+  einen Grant, sonst pruefte der Test nur, dass ein fehlender Grant sperrt.
+  Enthaelt eine Gegenprobe per monkeypatch: mit der ALTEN, negativen Regel
+  kommt der Gast ueberall mit 200 durch - damit ist bewiesen, dass die 403
+  an `_darf_aufsicht` haengen und nicht an etwas anderem. Bewusst per
+  monkeypatch statt durch kurzzeitiges Aufweichen des Quelltextes.
+- `test_kassenbuch_startkorrektur.py` – Wunsch #216. Der Schwerpunkt ist NICHT
+  "kann man den Betrag aendern", sondern dass dabei nichts ueberschrieben wird:
+  nach der Korrektur stehen ZWEI Zeilen da (alte storniert, neue gueltig) und
+  beide Betraege im Pruefprotokoll. Dazu die Grenze in beide Richtungen und der
+  Fall aus #202 (stornierte Buchung haelt das Fenster offen).
+- `test_barcode_bildbombe.py` – Wunsch #213 (Audit F-05). Die Testbombe ist ein
+  handgebauter PNG-Kopf, der 20000x20000 BEHAUPTET, mit einem Byte Bilddaten -
+  waere die Pruefung hinter dem Entpacken, traefe der Test die Testmaschine
+  statt den Fehler zu finden. Ein Test prueft ausdruecklich die REIHENFOLGE im
+  Quelltext (nach `Image.open`, vor `convert`/`read_barcodes`), und zwar ohne
+  Kommentarzeilen - die erwaehnen beide Namen erklaerend und lagen sonst vorne.
+- `test_todo_privat_rollenziel.py` – Wunsch #214 (Audit F-06). Prueft Sehen und
+  Aendern am SELBEN Datensatz; getrennt geprueft waere der Befund wieder
+  moeglich, sobald jemand nur eine der beiden Funktionen anfasst. Auch hier
+  eine monkeypatch-Gegenprobe mit der alten Fassung.
+- `test_snapshot_aufraeumen.py` – Wunsch #215. Erster Test im Repo, der `util/`
+  anfasst; laedt `db_snapshot.py` per `importlib.util.spec_from_file_location`
+  und biegt `DB`/`SNAP_DIR` auf ein tmp_path um. Ein Test haelt die Reihenfolge
+  in `_prune()` fest (erst alte `.db`, dann Verwaiste).
 - `test_tierbaukasten_bearbeiten.py` – Wunsch #201. Derselbe Aufbau wie bei den
   Geburtstagen, plus der Fall, den nur diese App hat: der Kategoriewechsel muss
   die Spalten der alten Kategorie raeumen. Beim Gegenprobieren (Spalte
