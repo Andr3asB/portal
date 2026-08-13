@@ -2,6 +2,118 @@
 
 ---
 
+## 2026-08-13 – CLAUDE.md überholt, Guardrails scharf, Stundenlauf wieder an
+
+Kein Portal-Code, keine Auslieferung. Drei Dinge an der Arbeitsumgebung.
+
+### Der Guardrail-Hook lief seit jeher nicht
+
+`CLAUDE.md` sagte unter „Verzeichnisse": `.claude/` – *aktive Berechtigungen
+und Guardrail-Hook*. Tatsächlich lagen dort nur `settings.local.json` (eine
+gewachsene **allow**-Liste, keine einzige Verbotsregel) und ein Lock. Weder
+`settings.json` noch `guardrails.sh` waren je hineinkopiert worden – die
+Vorlagen im Root beschrieben eine Absicherung, die es auf diesem Rechner nicht
+gab. Der Satz in der Datei war also nicht nur falsch, er war die gefährliche
+Sorte falsch: eine Sitzung liest dort, dass SSH-Nutzlasten geprüft werden, und
+verlässt sich darauf.
+
+Beide Dateien liegen jetzt in `.claude/`, `guardrails.sh` mit `chmod +x`.
+**Gegenprobe gemacht**, und zwar unfreiwillig überzeugend: der Testbefehl, mit
+dem ich das Blocken prüfen wollte, enthielt selbst das Wort `sudo` in seiner
+JSON-Nutzlast – der Hook hat mein eigenes Kommando abgeräumt, bevor es lief.
+Besser kann man nicht zeigen, dass er greift.
+
+### CLAUDE.md: drei Fehler, acht Lücken
+
+Die Datei war gut, aber teilweise überholt. Korrigiert: der `.claude/`-Satz
+oben; „Suite dauert wenige Sekunden" (es sind **1307 Tests in gut einer
+Minute** – gemessen, nicht geschätzt); „`pytest` steht bewusst nur in
+`requirements-dev.txt`" (dort stehen auch `pip-audit` und `python-barcode`).
+
+Ergänzt, weil es sonst aus mehreren Dateien zusammengesucht werden muss:
+
+* **Das Stufen-Prinzip** (#140/#142). Fünf Schalter, `aus | beobachten |
+  scharf`, Zurücknehmen ist eine `.env`-Zeile plus `up -d portal` – kein
+  Rebuild, keine entfernte Route. Stand vorher nur als Nebensatz zu `CSP_MODUS`
+  drin, obwohl es das prägende Entwurfsmuster des Projekts ist.
+* **Das Zugangsmodell** samt des Satzes, der sonst nur in `.env.example` steht:
+  ohne `TOKEN_KEY` nützt auch ein wiederhergestelltes `/data`-Backup nichts.
+* **Die KI-Schicht** – alles über `ki_anfrage()`, Kontingent atomar reserviert
+  und bei Fehlschlag freigegeben, Modell/Stimme aus der DB statt aus dem Code.
+* **Aliase in `teile/__init__.py`** – ohne Eintrag dort kein modulübergreifender
+  Import, weil `16_vokabeln` kein gültiger Modulname ist. Jeder der sechs
+  Aliase existiert, weil sonst ein Duplikat entstanden wäre.
+* **Zwei Testfallen**, die nicht rot machen, sondern unzuverlässig: die Menge
+  `BLEIBT` in `conftest.py` (dreimal derselbe Fehler: #145, #161, #162) und
+  Hintergrund-Threads/Modulzustand, die abgeschaltet bzw. zurückgesetzt werden
+  müssen (#145, #183, #207).
+* Dazu: `util/` und `scripts/wunsch_lauf_check.py` fehlten in „Verzeichnisse"
+  ganz, der `util`-Container war als „supercronic o. ä." beschrieben (es ist
+  eine schlichte Python-Schleife im Minutentakt), `manage.py` war mit 4 von 18
+  Befehlen vertreten, und die Zeit-/Netz-Helfer im Kern (`heute_lokal()`,
+  `client_ip()` nach #210, die SSRF-Prüfer) standen nirgends.
+
+### Stundenlauf (#157) wieder eingeschaltet – diesmal mit Auftragstext im Journal
+
+Andis Rechner hat für Windows-Updates neu gestartet, damit war die Sitzung weg
+und mit ihr der Auftrag. Dieselben Grenzen wie immer: **nur diese Sitzung,
+höchstens sieben Tage.** Wieder um **:23**.
+
+Beim Wiederanlegen fiel auf, dass `server.md` auf „Fassung im Journal,
+12.08.2026" verweist – dort steht aber nur, *was* der Lauf tut, nicht sein
+Auftragstext. Ich musste ihn aus der Beschreibung rekonstruieren. Damit das
+beim nächsten Reboot nicht wieder passiert, steht er ab jetzt hier wörtlich:
+
+```
+Stündlicher Wunsch-Durchlauf (Wunsch #157).
+
+SCHRITT 1 – Gibt es Arbeit? Führe genau das aus, kein SQL im Prompt:
+
+    ssh -p 2222 claude@10.0.0.100 "docker exec -i portal python -" < scripts/wunsch_lauf_check.py
+
+SCHRITT 2 – Erste Ausgabezeile ist `ARBEIT: n`.
+Ist n = 0: antworte mit EINER Zeile ("Nichts zu tun") und tue sonst NICHTS.
+Kein Bericht, keine Aufräumarbeit, keine Vorschläge. Ohne diese Regel kämen 24
+Fortschrittsberichte am Tag heraus.
+
+SCHRITT 3 – Ist n > 0, arbeite die drei Listen in dieser Reihenfolge ab:
+
+1. ANTWORTEN zuerst – Andi hat auf eine Rückfrage geantwortet, hier wartet
+   jemand. Antwort lesen, danach den Wunsch umsetzen.
+2. FREIGEGEBEN – höchste Priorität zuerst (sehr_hoch, hoch, mittel, niedrig).
+3. WARTET – NICHT anfassen. Rückfrage läuft. Stelle NIE dieselbe Frage ein
+   zweites Mal, jede Frage löst einen Push bei Andi aus.
+
+UNANTASTBAR: Wünsche mit Priorität `zurueckgestellt` (#61) und Wünsche ganz
+ohne Priorität (NULL, #152) sind NICHT freigegeben und werden unter keinen
+Umständen umgesetzt. Die Priorität setzt ausschließlich ein Mensch.
+
+SCHRITT 4 – Für jeden umgesetzten Wunsch die volle Arbeitsweise aus CLAUDE.md:
+bauen → ausliefern → von diesem Rechner aus end-to-end testen → dokumentieren
+(journal.md, server.md, Hilfe-App). Danach im Container abhaken – erst dann
+gilt er als fertig:
+
+    docker exec portal python manage.py wunsch_erledigt <id> "was genau umgesetzt wurde" <tokens>
+
+Das zweite Argument ist Pflicht, das dritte ist der TATSÄCHLICHE Tokenverbrauch
+(nachher, nicht geschätzt). Rückfragen gehören an den Wunsch, nicht in den Chat:
+
+    docker exec portal python manage.py wunsch_aktion <id> frage "..."
+
+Zum Schluss committen und nach GitHub pushen.
+
+Fehlt der Kontext (neue Sitzung): CLAUDE.md lesen, dann bauplan.md, server.md,
+journal.md wie dort beschrieben.
+```
+
+**Stand beim Einschalten (Testlauf sofort ausgeführt): `ARBEIT: 5`** – zwei
+beantwortete Rückfragen (#130 und #211, beide heute 14:56/14:57: Backup-
+Verschlüsselung **asymmetrisch**, Andi legt den Schlüssel sicher ab) und drei
+freigegebene Wünsche zur Packliste (#217 `hoch`, #218 und #219 `mittel`).
+Keine offene Frage. Der nächste Lauf um :23 fängt bei den Antworten an.
+
+---
+
 ## 2026-08-12 – portal-v211: #209 (F-01) und der halbe F-03
 
 ### #209 – auf dem Familien-Tablet bekam die Falsche die Nachrichten

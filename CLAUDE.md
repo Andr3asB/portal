@@ -26,6 +26,11 @@ Dazu, wenn ein Umbau in Stufen ausgeliefert wird: `pruefplan.md` – Andis
 Handprüfung je Stufe (echtes Gerät, echter Browser, echter iFrame,
 installierte PWA). Nur was ein Skript prinzipiell nicht sehen kann.
 
+`SECURITY_REVIEW.md` liegt ebenfalls im Root, steht aber **in `.gitignore`**
+und fehlt deshalb nach einem frischen Klon – er ist eine Anleitung, solange
+Findings offen sind (Entscheidung von Andi, 11.08.2026). Wenn er da ist:
+vor Sicherheitsarbeiten hineinsehen.
+
 ## Harte Grenzen (Kurzfassung)
 
 - Ziel-Host: `ssh -p 2222 claude@10.0.0.100`
@@ -86,6 +91,12 @@ docker exec portal python manage.py listusers
 docker exec portal python manage.py backlog
 ```
 
+`manage.py` kennt 18 Befehle (u. a. `createadmin`, `adduser`, `addapp`,
+`grant`, `listapps`, `listki`, `ki_modell`, `ki_stimme`, `listpush`,
+`testpush`, dazu die Wunsch-Befehle weiter unten). Ein Aufruf ohne Argumente
+listet sie; die kommentierte Fassung steht in `server.md`, Abschnitt
+„manage.py – Wichtige Befehle".
+
 Auslieferung ist ein Dreischritt (Paket bauen → hochladen → entpacken +
 `--build`), die vollständige Fassung mit allen `--exclude` steht in
 `server.md`, Abschnitt „Deployment-Ablauf". Zwei Punkte, die dort leicht
@@ -116,7 +127,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (dauert wenige Sekunden)
+# Alles (1307 Tests, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -125,9 +136,38 @@ python -m venv .venv
 .venv/Scripts/python -m pytest tests/ -k kontingent -q
 ```
 
-`pytest` steht bewusst nur in `requirements-dev.txt`; `src/requirements.txt`
-beschreibt die Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts
-Test-Werkzeug hineinschreiben.
+Werkzeug steht bewusst nur in `requirements-dev.txt` (`pytest`, `pip-audit`,
+`python-barcode` – letzteres nur zum *Erzeugen* eines Testbarcodes, gelesen
+wird im Betrieb mit `zxing-cpp`); `src/requirements.txt` beschreibt die
+Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts Test-Werkzeug
+hineinschreiben.
+
+**CVE-Abgleich gegen den echten Produktionsstand**, nicht gegen die lokale
+`.venv` – die kann abweichen:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
+.venv/Scripts/python -m pip_audit -r freeze.txt
+```
+
+**Zwei Fallen, die einen Test nicht rot machen, sondern unzuverlässig:**
+
+- **Neue Tabelle?** `tests/conftest.py` leert vor jedem Test alles außer der
+  Menge `BLEIBT`. Eine neue **Seed**-Tabelle (Stammdaten aus `_init_db()`)
+  muss dort eingetragen werden – sonst fehlen die Stammdaten, und das schlägt
+  sofort und laut fehl, was die richtige Fehlerrichtung ist. Eine normale
+  Tabelle darf dort **nicht** stehen: sonst läuft ihr Bestand still über alle
+  Tests hinweg mit. Genau dieser Fehler ist dreimal passiert (#145 Geburtstage,
+  #161 Zählung je Wunsch, #162 `UNIQUE(tag, mahlzeit)` im Essensplan), immer
+  weil die Tabelle nicht per `ON DELETE CASCADE` am Nutzer hängt.
+- **Neuer Hintergrund-Thread?** Er braucht einen eigenen Schalter in
+  `app.py`, und `conftest.py` muss ihn auf `0` setzen – wie
+  `GEBURTSTAGS_ERINNERUNGEN` (#145) und `KI_GUTHABEN_WACHT` (#183). Ein Thread,
+  der nebenher in dieselbe SQLite-Datei schreibt, lässt die Fixtures mit
+  „database is locked" auflaufen. Dasselbe gilt für Modul-globalen Zustand:
+  `rate_ueberschritten()` hält seine Treffer in einem Dict in `teile.kern`,
+  das über die **ganze** Testsitzung bestehen bliebe – `conftest.py` setzt es
+  darum per `autouse`-Fixture zurück (#207).
 
 **Ein großer Teil der Suite sind Konventions-Wächter, keine Funktionstests.**
 `test_tippflaeche.py`, `test_aria_labels.py`, `test_loeschen_symbol.py`,
@@ -154,6 +194,23 @@ nie ablaufende Sitzung aus – das hatte 808 Zugänge in der Datenbank
 hinterlassen (journal.md, 08.08.2026). Das Skript legt genau **eine** Sitzung
 an (Kennung `geraet='PRUEFUNG'`) und löscht sie im `finally` wieder.
 
+Das zweite Werkzeug beantwortet die Frage „hat der stündliche Lauf (#157)
+gerade etwas zu tun?". Es läuft **nicht hier**, sondern im Container, und wird
+per stdin dorthin geschoben, damit keine Zeile SQL durch zwei
+Anführungszeichen-Ebenen muss:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker exec -i portal python -" < scripts/wunsch_lauf_check.py
+```
+
+Nur lesend, drei Listen: **ANTWORTEN** (Andi hat auf eine Rückfrage geantwortet
+– hat Vorrang, hier wartet jemand), **FREIGEGEBEN** (offen, Priorität gesetzt
+und nicht `zurueckgestellt`; Wünsche ohne Priorität sind *nicht* freigegeben),
+**WARTET** (Rückfrage gestellt, noch keine Antwort – nur zur Information, damit
+dieselbe Frage nicht zweimal gestellt wird). Sind alle drei Zähler 0, ist der
+Lauf fertig und darf nichts weiter tun – ohne diese Regel kämen 24
+Fortschrittsberichte am Tag heraus (journal.md, 08.08.2026).
+
 ## Architektur (Überblick)
 
 Stack `familienportal` mit drei Containern auf `home02`:
@@ -162,7 +219,7 @@ Stack `familienportal` mit drei Containern auf `home02`:
 |-----------|-------|
 | `portal`  | Python 3.12 + Flask + Gunicorn (1 Worker, Threads), SQLite unter `/srv/familienportal/data` |
 | `caddy`   | TLS-Terminierung, Zertifikat aus Volume `iobroker-certs` (read-only), kein ACME |
-| `util`    | Scheduler (supercronic o. ä.), stündliche SQLite-Snapshots, tägliches Backup, Zertifikats-Watcher |
+| `util`    | `util/scheduler.py` – schlichte Python-Schleife im Minutentakt, kein cron/supercronic: stündlicher SQLite-Snapshot, 03:00 Backup aufs NAS (tar über SSH-Pipe), 04:00 Zertifikats-Watcher |
 
 Netz: nur `caddy` bekommt eine macvlan-IP. `portal` und `util` hängen
 ausschließlich im internen Bridge-Netz.
@@ -178,10 +235,17 @@ nie von fremden CDNs.
 `teile/NN_name.py`-Modul in aufsteigender Nummernreihenfolge über
 `importlib`, ruft dessen `init_app(app)` auf. Alle Module teilen sich
 einen Namensraum – neue Funktionalität heißt: neue Datei mit nächster
-freier Nummer, kein Umbau von `app.py`. `teile/__init__.py` registriert
-`00_kern.py` zusätzlich als `teile.kern` in `sys.modules`, weil ein
-führendes `0N_` kein gültiger Python-Modulname für ein reguläres
-`from teile.00_kern import …` wäre.
+freier Nummer, kein Umbau von `app.py`.
+
+**Modulübergreifende Importe brauchen einen Alias in `teile/__init__.py`.**
+Ein führendes `0N_` ist kein gültiger Python-Modulname, `from teile.16_vokabeln
+import …` geht schlicht nicht. Darum registriert `teile/__init__.py` die
+Module, die andere brauchen, zusätzlich unter einem sprechenden Namen in
+`sys.modules`: `teile.kern`, `teile.todo` (#90), `teile.rezepte` (#184),
+`teile.werkstatt` (#187), `teile.werkstatt_app`, `teile.vokabeln` (#194). Wer
+aus Modul A eine Funktion von Modul B braucht, trägt B dort ein – und zwar
+**statt** die Funktion zu kopieren: jeder dieser Aliase existiert, weil ein
+Duplikat sonst irgendwann auseinandergelaufen wäre.
 
 **`teile/00_kern.py` ist die gemeinsame Basis, jedes weitere Modul baut darauf auf:**
 - `SCHEMA` (alle `CREATE TABLE IF NOT EXISTS`) + `_init_db()` (idempotente
@@ -198,6 +262,45 @@ führendes `0N_` kein gültiger Python-Modulname für ein reguläres
 - `to_int()`, `push_send()` (Web-Push, VAPID, non-blocking Thread),
   `_auto_grant_all()` (vergibt eine App automatisch an alle Nutzer, z. B.
   `hilfe` und `einkauf`).
+- **Zeit:** `heute_lokal()`, `utc_zu_lokal()`, `utc_zu_lokal_datum()` –
+  gespeichert wird UTC, angezeigt `Europe/Berlin`. Nie ein nacktes
+  `datetime.now()` in eine Vorlage.
+- **Netz:** `client_ip()` (wertet `X-Forwarded-For` so aus, dass die Ratenbremse
+  nicht darüber umgangen werden kann – Wunsch #210),
+  `ist_oeffentliche_url()`/`ip_ist_oeffentlich()` (SSRF-Riegel, u. a. beim
+  Push-Abo), `rate_ueberschritten()` für jede neue Ratenbremse.
+
+**Zugangsmodell.** Adressen tragen den Token im Pfad: `/p/<token>` für die
+persönliche Startseite, `/a/<slug>/<token>/` für eine App. In der Datenbank
+steht der Token **verschlüsselt** (`TOKEN_KEY`, Wunsch #129); gefunden wird er
+über `token_lookup()`, aufgelöst über `grant(token, slug)`. Daraus folgt der
+Satz, der in `.env.example` steht und sonst niemand liest: **ohne `TOKEN_KEY`
+kommt niemand mehr ins Portal – auch ein wiederhergestelltes `/data`-Backup
+nützt dann nichts**, denn das NAS-Backup sichert nur `/data`, die `.env` liegt
+bewusst nicht darin.
+
+**KI-Schicht.** Jede KI-Nutzung läuft über `ki_anfrage()` bzw.
+`ki_text_zu_sprache()` in `00_kern.py` – nie ein eigener HTTP-Aufruf an
+OpenRouter. Dort hängt das Nutzer-Kontingent daran, und zwar **atomar
+reserviert**: `_kontingent_reservieren()` vor der Anfrage,
+`_kontingent_freigeben()` bei Fehlschlag, `_kontingent_korrigieren()` auf den
+echten Verbrauch danach (`tests/test_ki_kontingent_atomar.py`). Modell und
+Stimme kommen je Zweck aus der Datenbank (`ki_modell_fuer()`,
+`ki_stimme_fuer()`, gesetzt per `manage.py ki_modell` / `ki_stimme`), nicht aus
+dem Code. `24_ki_budget.py` sieht stündlich aufs OpenRouter-Guthaben und legt
+bei ≤ 1,00 USD **eine** Aufgabe samt Push für den Admin an (#183).
+
+**Umbauten laufen in Stufen, jede Stufe ist eine Zeile in der `.env`.**
+`SITZUNG_AUSSTELLEN`, `CSRF_MODUS`, `SITZUNG_KONSUMIEREN`, `TOKENFREIE_URLS`
+(alle #140) und `CSP_MODUS` (#142). Die Riegel kennen `aus | beobachten |
+scharf` – „beobachten" protokolliert nur und blockiert nichts, damit sich vor
+dem Scharfschalten prüfen lässt, ob echte Anfragen fälschlich auffallen
+(`docker compose logs portal | grep CSRF-Verdacht` bzw. `CSP-Verstoss`).
+Zurücknehmen einer Stufe ist damit **eine Zeile plus `docker compose up -d
+portal` – kein Rebuild, kein Paket, keine entfernte Route**. Implementiert in
+`19_sitzung.py`, `20_csrf.py`, `21_csp.py`; Vollreferenz mit allen
+Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
+`server.md` („Umgebungsvariablen").
 
 **Verbindliche Konventionen (siehe auch `server.md` „Sicherheitskonventionen"):**
 - Ganzzahlen aus Nutzereingaben immer über `to_int()`, nie nacktes `int()`.
@@ -265,28 +368,43 @@ da sich das mit jeder Auslieferung ändert.
 
 ## Guardrails und Berechtigungen
 
-`settings.json` und `guardrails.sh` im Projekt-Root sind die
-Konfigurationsvorlagen für `.claude/` auf diesem Rechner.
+`settings.json` und `guardrails.sh` liegen im Projekt-Root als Quelle und
+zusätzlich als **aktive Kopie in `.claude/`** – erst dort greifen sie:
 
 - `settings.json`: deny-Liste für gefährliche lokale Befehle (sudo, apt,
-  docker network rm etc.) und eine allow-Liste für häufige Befehle
-- `guardrails.sh`: PreToolUse-Hook, der SSH-Nutzlasten auswertet und
-  dieselben Verbote durchsetzt – greift auch, wenn der Befehl erst per SSH
-  auf `home02` landet
+  docker network rm etc.), eine ask-Liste (`docker compose down`, `git push`, …)
+  und eine allow-Liste für häufige Befehle
+- `guardrails.sh`: PreToolUse-Hook auf `Bash`. Er liest die Nutzlast aus dem
+  JSON und setzt dieselben Verbote durch – **auch wenn der Befehl erst per SSH
+  auf `home02` landet**, denn präfixbasierte deny-Regeln greifen dort nicht,
+  weil die Zeile mit `ssh` beginnt. Rückgabe: `0` = erlaubt, `2` = blockiert,
+  stderr geht an Claude.
+
+Werden die Vorlagen im Root geändert, müssen beide Kopien nachgezogen werden
+(`.claude/guardrails.sh` zusätzlich `chmod +x`). `.claude/settings.local.json`
+enthält nur eine gewachsene allow-Liste, keine Verbote – die Verbote stehen
+ausschließlich in `.claude/settings.json`.
 
 **Nicht ändern** – außer nach expliziter Absprache mit Andi.
 
 ## Verzeichnisse
 
 - `src/` – Quellcode des Portals (wird nach `/srv/familienportal/src` ausgeliefert)
+- `util/` – Quellcode des **zweiten Containers** mit eigenem `Dockerfile` und
+  eigener `requirements.txt`: `scheduler.py` (Takt), `db_snapshot.py`
+  (stündlicher SQLite-Snapshot), `backup.py` (tägliches Backup aufs NAS per
+  tar+ssh), `cert_watcher.py`. Läuft im Bridge-Netz, ohne macvlan-IP.
 - `deploy/` – versionierte Auslieferungspakete (`portal-v1.tar.gz`, …), nie überschreiben
 - `tests/` – pytest-Suite, läuft offline gegen eine Wegwerf-DB (siehe „Tests")
 - `scripts/` – Werkzeuge gegen das LAUFENDE Portal, ebenfalls von diesem
   Rechner aus. `live_pruefung.py` ruft jede App eines Nutzers über HTTPS auf
   und legt dafür **eine** Sitzung an, die es im `finally` wieder löscht –
   nie wieder ad hoc mit `curl` prüfen, das hat 808 nie ablaufende Zugänge
-  in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026)
-- `.claude/` – aktive Berechtigungen und Guardrail-Hook, **nicht ändern**
+  in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026).
+  `wunsch_lauf_check.py` beantwortet nur lesend, ob der stündliche Lauf gerade
+  Arbeit hat (siehe „Prüfung gegen das laufende Portal").
+- `.claude/` – aktive Berechtigungen und Guardrail-Hook (Kopien der
+  Root-Vorlagen), **nicht ändern**
 
 ## Wünsche abschließen
 

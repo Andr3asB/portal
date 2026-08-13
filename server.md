@@ -2606,8 +2606,9 @@ docker exec portal python manage.py backlog
 Ein wiederkehrender Claude-Auftrag, jede Stunde um **:23**. Er **lebt nur in
 der Claude-Sitzung**, in der er angelegt wurde, und läuft spätestens nach
 sieben Tagen ab – wenn nichts mehr passiert, ist das die erste Erklärung.
-Neu einschalten: Auftrag mit demselben Text wieder anlegen (Fassung im
-Journal, 12.08.2026).
+Neu einschalten: Auftrag mit demselben Text wieder anlegen – der **wörtliche
+Auftragstext** steht im Journal, 13.08.2026 (die Einträge vom 08./12.08.
+beschreiben nur, was der Lauf tut, und taugen nicht zum Kopieren).
 
 Was ansteht, beantwortet ein reines Leseskript – **kein SQL im Auftragstext**,
 das musste sonst durch PowerShell, SSH und `docker exec` hindurch:
