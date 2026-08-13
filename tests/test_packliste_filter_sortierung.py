@@ -127,14 +127,40 @@ def test_filter_hat_einen_knopf_fuer_allgemein():
     assert "karte.dataset.person || 'allgemein'" in inhalt
 
 
+def _funktionskoerper(inhalt, name):
+    block = inhalt[inhalt.index(f"function {name}"):]
+    return block[:block.index("\n}")]
+
+
 def test_leere_kategorien_verschwinden_beim_filtern():
-    """Sonst stehen leere Ueberschriften da und die Liste sieht kaputt aus."""
+    """Sonst stehen leere Ueberschriften da und die Liste sieht kaputt aus.
+
+    Geaendert mit Wunsch #217: Vorher stand die Schleife ueber `.kat-label`
+    direkt in `packlisteFilter()`, und dieser Test suchte sie genau dort. Seit
+    #217 teilen Filter und Packmodus dieselbe Funktion
+    `aktualisiereKatLabels()` - dieselbe Wirkung, nur an einer Stelle statt an
+    zweien.
+
+    Der Test folgt deshalb EINER Ebene Indirektion, statt die Inline-Fassung zu
+    erzwingen. Seine Zaehne behaelt er: ruft `packlisteFilter()` niemanden auf,
+    der die Ueberschriften auffrischt, ist er rot. Was er bewusst NICHT mehr
+    vorschreibt, ist WO der Code steht - das war nie die Zusage, sondern nur
+    die damalige Bauart.
+    """
     inhalt = (TPL / "packliste.html").read_text(encoding="utf-8")
-    block = inhalt[inhalt.index("function packlisteFilter"):]
-    block = block[:block.index("\n}")]
-    assert ".kat-label" in block, (
-        "Der Filter blendet keine leeren Kategorie-Ueberschriften aus - "
-        "oder er benutzt einen Klassennamen, den es nicht gibt."
+    filter_koerper = _funktionskoerper(inhalt, "packlisteFilter")
+
+    if ".kat-label" in filter_koerper:
+        return                                    # Inline-Fassung, auch recht
+
+    aufgerufen = re.findall(r"\b(aktualisiere\w+|\w*KatLabels)\s*\(", filter_koerper)
+    assert aufgerufen, (
+        "Der Filter blendet keine leeren Kategorie-Ueberschriften aus - weder "
+        "selbst noch ueber eine aufgerufene Funktion."
+    )
+    assert any(".kat-label" in _funktionskoerper(inhalt, name) for name in aufgerufen), (
+        f"Der Filter ruft {aufgerufen} auf, aber keine dieser Funktionen fasst "
+        f".kat-label an - die leeren Ueberschriften bleiben also stehen."
     )
 
 

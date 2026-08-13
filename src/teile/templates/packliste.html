@@ -53,7 +53,10 @@
   background:#fff; color:var(--farbe); border:none; border-radius:8px;
   padding:7px 16px; font-weight:600; cursor:pointer;
 }
-body.packmodus .top-aktionen, body.packmodus .add-card, body.packmodus .ziel-row {
+body.packmodus .top-aktionen, body.packmodus .add-card, body.packmodus .ziel-row,
+/* Wunsch #217: auch die Filterkarte. Sie stand vorher offen im Packmodus
+   weiter da und bot Knoepfe an, die der Packmodus sofort wieder ueberschrieb. */
+body.packmodus .filter-card {
   display:none !important;
 }
 body.packmodus .item-check { width:32px; height:32px; }
@@ -89,7 +92,31 @@ body.packmodus .item-name { font-size:18px; }
   font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.6px;
   margin:14px 0 6px;
+  /* Wunsch #219: Überschrift links, Plus-Knopf rechts. Wichtig fuers
+     Ein-/Ausblenden: aktualisiereKatLabels() setzt style.display auf ''
+     zurueck - dann gilt wieder dieses flex hier. */
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
 }
+/* Wunsch #219: Direkt in DIESE Kategorie etwas hinzufuegen, ohne erst nach
+   oben zu scrollen und die Kategorie von Hand zu waehlen. */
+.kat-plus {
+  background:none; border:1.5px solid var(--border); color:var(--farbe);
+  border-radius:50%; width:26px; height:26px; line-height:1;
+  font-size:17px; font-weight:700; font-family:inherit;
+  cursor:pointer; flex-shrink:0; padding:0;
+}
+.kat-plus:hover { border-color:var(--farbe); }
+/* Wunsch #218: Zurueck an den Anfang. Fest im Blickfeld, weil genau dann
+   gebraucht, wenn man weit unten steht - und dort ist der Seitenanfang
+   ausser Reichweite. */
+.nach-oben {
+  display:none; position:fixed; right:16px; bottom:16px; z-index:6;
+  width:44px; height:44px; border-radius:50%;
+  background:var(--farbe); color:#fff; border:none;
+  font-size:20px; line-height:1; font-family:inherit;
+  cursor:pointer; box-shadow:0 2px 8px var(--shadow);
+}
+.nach-oben.sichtbar { display:block; }
 /* Items */
 .item-card {
   background:var(--surface); border-radius:12px; padding:10px 14px;
@@ -136,9 +163,16 @@ body.packmodus .item-name { font-size:18px; }
 <div class="nav-sub">{% if aktives_ziel_id %}{{ ziele|selectattr("id","equalto",aktives_ziel_id)|map(attribute="name")|first }}{% else %}Kein Ziel{% endif %}</div>
 {% endblock %}
 
-{% macro item_card(item, token, kategorien, personen) %}
+{# `gruppe` ist die Kategorie, unter der der Eintrag WIRKLICH steht - nicht
+   item.kategorie_id. Der Unterschied fällt nur bei Einträgen ohne oder mit
+   deaktivierter Kategorie auf: die landen unter „Ohne Kategorie" (Label mit
+   data-kategorie-label=""), trugen aber vorher data-kategorie="None" bzw. die
+   ID der abgeschalteten Kategorie. Damit passte die Überschrift nie zu ihren
+   Einträgen, und die Gruppe liess sich weder ausblenden noch filtern. #}
+{% macro item_card(item, token, kategorien, personen, gruppe) %}
 <div class="item-card{% if item.gepackt %} gepackt{% endif %}" id="item-{{ item.id }}"
-     data-kategorie="{{ item.kategorie_id }}" data-person="{{ item.person_id or '' }}">
+     data-kategorie="{{ gruppe }}" data-person="{{ item.person_id or '' }}"
+     data-gepackt="{{ 1 if item.gepackt else 0 }}">
   <input class="item-check" type="checkbox"
          data-aendern="toggleGepackt" data-args='[{{ item.id }}]'
          {% if item.gepackt %}checked{% endif %}>
@@ -224,7 +258,11 @@ body.packmodus .item-name { font-size:18px; }
 
   {# Wunsch #178: Filter nach Person. Bewusst getrennt vom Packmodus - der
      blendet alles andere aus und führt durch EINEN Packvorgang; hier geht es
-     nur ums Ansehen, mehrere Personen gleichzeitig sind erlaubt. #}
+     nur ums Ansehen, mehrere Personen gleichzeitig sind erlaubt.
+     Wunsch #217: dazu Kategorie und Packstatus. Die drei Zeilen wirken UND
+     miteinander (Person und Kategorie und Status), innerhalb einer Zeile
+     ODER - „Anna oder Ben" ist eine sinnvolle Frage, „Anna und Ben
+     gleichzeitig" wäre bei einem Eintrag mit genau einer Person keine. #}
   <div class="filter-card" id="filter-card">
     <div class="field-label">Wessen Sachen anzeigen?</div>
     <div class="btn-row" id="filter-person-row">
@@ -233,6 +271,25 @@ body.packmodus .item-name { font-size:18px; }
       <button type="button" class="chip-btn" data-value="{{ p.id }}">{{ p.name }}</button>
       {% endfor %}
     </div>
+
+    <div class="field-label">Welche Kategorien?</div>
+    <div class="btn-row" id="filter-kategorie-row">
+      {% for k in kategorien %}
+      <button type="button" class="chip-btn" data-value="{{ k.id }}">{{ k.name }}</button>
+      {% endfor %}
+      {# Nur anbieten, wenn es solche Einträge überhaupt gibt - ein Filter,
+         der garantiert nichts findet, ist kein Filter, sondern eine Falle. #}
+      {% if unsortiert %}
+      <button type="button" class="chip-btn" data-value="">Ohne Kategorie</button>
+      {% endif %}
+    </div>
+
+    <div class="field-label">Packstatus</div>
+    <div class="btn-row" id="filter-status-row">
+      <button type="button" class="chip-btn" data-value="offen">Offen</button>
+      <button type="button" class="chip-btn" data-value="gepackt">✓ Gepackt</button>
+    </div>
+
     <button type="button" class="filter-reset" id="filter-reset-btn">Filter zurücksetzen</button>
   </div>
 
@@ -280,15 +337,25 @@ body.packmodus .item-name { font-size:18px; }
   {% for kat in kategorien %}
     {% if gruppen[kat.id] %}
       {% set has_items.v = true %}
-      <div class="kat-label" data-kategorie-label="{{ kat.id }}">{{ kat.name }}</div>
-      {% for item in gruppen[kat.id] %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+      <div class="kat-label" data-kategorie-label="{{ kat.id }}">
+        <span>{{ kat.name }}</span>
+        {# Wunsch #219 #}
+        <button type="button" class="kat-plus"
+                data-klick="neuInKategorie" data-args='[{{ kat.id }}]'
+                title="Etwas zu {{ kat.name }} hinzufügen"
+                aria-label="Etwas zu {{ kat.name }} hinzufügen">+</button>
+      </div>
+      {% for item in gruppen[kat.id] %}{{ item_card(item, token, kategorien, personen, kat.id) }}{% endfor %}
     {% endif %}
   {% endfor %}
 
   {% if unsortiert %}
     {% set has_items.v = true %}
-    <div class="kat-label" data-kategorie-label="">Ohne Kategorie</div>
-    {% for item in unsortiert %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+    {# Bewusst OHNE Plus-Knopf: „Ohne Kategorie" ist keine Kategorie, die man
+       auswählen kann - das Formular verlangt eine, der Knopf könnte also
+       nichts vorbelegen. #}
+    <div class="kat-label" data-kategorie-label=""><span>Ohne Kategorie</span></div>
+    {% for item in unsortiert %}{{ item_card(item, token, kategorien, personen, '') }}{% endfor %}
   {% endif %}
 
   {% if not has_items.v %}
@@ -303,40 +370,81 @@ body.packmodus .item-name { font-size:18px; }
   {% if gepackte %}
   <div class="gepackt-section">
     <div class="gepackt-label">✓ Gepackt</div>
-    {% for item in gepackte %}{{ item_card(item, token, kategorien, personen) }}{% endfor %}
+    {% for item in gepackte %}{{ item_card(item, token, kategorien, personen, item.kategorie_id or '') }}{% endfor %}
   </div>
   {% endif %}
 
   {% endif %}
 
 </main>
+
+{# Wunsch #218: Der Pfeil steht ausserhalb von <main>, weil er fest im
+   Blickfeld klebt und nichts mit dem Textfluss zu tun hat. `↑` ist bewusst
+   ein Textpfeil ohne Varianten-Selektor - Twemoji ersetzt ihn dann nicht und
+   es braucht keine SVG-Datei (siehe tests/test_emoji.py). #}
+<button type="button" class="nach-oben" id="nach-oben-btn"
+        title="Nach oben" aria-label="Nach oben">↑</button>
 {% endblock %}
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
 
-/* --- Wunsch #178: Filter nach Person ---------------------------------- */
+/* --- Filter: Person (#178), Kategorie und Packstatus (#217) ------------ */
+
+// Die drei Zeilen des Filters. Innerhalb einer Zeile gilt ODER, zwischen den
+// Zeilen UND. Eine leere Zeile filtert nicht - das ist wichtiger, als es
+// aussieht: sonst muesste man in JEDER Zeile etwas auswaehlen, bevor
+// ueberhaupt wieder etwas zu sehen ist.
+const FILTER_ZEILEN = ['#filter-person-row', '#filter-kategorie-row', '#filter-status-row'];
+
+function _aktiveWerte(auswahl) {
+  return [...document.querySelectorAll(auswahl + ' .chip-btn.active')].map(b => b.dataset.value);
+}
+
 function packlisteFilter() {
-  const gewaehlt = [...document.querySelectorAll('#filter-person-row .chip-btn.active')]
-    .map(b => b.dataset.value);
+  const personen   = _aktiveWerte('#filter-person-row');
+  const kategorien = _aktiveWerte('#filter-kategorie-row');
+  const status     = _aktiveWerte('#filter-status-row');
+  const anzahl     = personen.length + kategorien.length + status.length;
+
+  let sichtbare = 0;
   document.querySelectorAll('.item-card').forEach(karte => {
     // Leeres data-person heisst "Allgemein" - Sachen, die niemandem
     // bestimmten gehoeren (Reiseapotheke). Ohne eigenen Knopf dafuer
     // verschwaenden sie beim Filtern spurlos, obwohl sie fast immer
     // mitgepackt werden muessen.
     const person = karte.dataset.person || 'allgemein';
-    karte.style.display = (!gewaehlt.length || gewaehlt.includes(person)) ? '' : 'none';
+    const kat    = karte.dataset.kategorie || '';
+    const st     = karte.dataset.gepackt === '1' ? 'gepackt' : 'offen';
+    const passt  = (!personen.length   || personen.includes(person))
+                && (!kategorien.length || kategorien.includes(kat))
+                && (!status.length     || status.includes(st));
+    karte.style.display = passt ? '' : 'none';
+    if (passt) sichtbare++;
   });
-  // Kategorie-Ueberschriften ohne sichtbare Eintraege ausblenden, sonst
-  // stehen leere Abschnitte da und die Liste sieht kaputt aus.
-  document.querySelectorAll('.kat-label').forEach(titel => {
-    let el = titel.nextElementSibling, sichtbar = false;
-    while (el && !el.classList.contains('kat-label')) {
-      if (el.classList.contains('item-card') && el.style.display !== 'none') { sichtbar = true; break; }
-      el = el.nextElementSibling;
-    }
-    titel.style.display = sichtbar ? '' : 'none';
-  });
+
+  aktualisiereKatLabels();
+
+  // Auch der Abschnitt "✓ Gepackt" verschwindet, wenn nichts davon uebrig
+  // ist - sonst steht eine Ueberschrift ueber dem Nichts.
+  const gepacktAbschnitt = document.querySelector('.gepackt-section');
+  if (gepacktAbschnitt) {
+    const nochDa = [...gepacktAbschnitt.querySelectorAll('.item-card')]
+      .some(el => el.style.display !== 'none');
+    gepacktAbschnitt.style.display = nochDa ? '' : 'none';
+  }
+
+  // Nur melden, wenn wirklich gefiltert wird. Ohne diese Bedingung stuende
+  // die Meldung auch auf einer schlicht leeren Packliste - dort sagt schon
+  // "Nichts auf der Packliste 🎉" dasselbe, nur freundlicher.
+  const hinweis = document.getElementById('packmodus-keine-treffer');
+  if (hinweis) hinweis.style.display = (anzahl && !sichtbare) ? 'block' : 'none';
+
+  // Wieviele Filter aktiv sind, gehoert AN DEN KNOPF: die Filterkarte klappt
+  // zu, und ein unsichtbarer Filter, der die halbe Liste ausblendet, sieht
+  // aus wie verlorene Eintraege.
+  const knopf = document.getElementById('filter-toggle-btn');
+  if (knopf) knopf.textContent = anzahl ? `🔍 Filter (${anzahl})` : '🔍 Filtern';
 }
 
 (function () {
@@ -347,14 +455,44 @@ function packlisteFilter() {
     karte.classList.toggle('open');
     knopf.classList.toggle('aktiv', karte.classList.contains('open'));
   });
-  document.querySelectorAll('#filter-person-row .chip-btn').forEach(b => {
-    b.addEventListener('click', () => { b.classList.toggle('active'); packlisteFilter(); });
+  FILTER_ZEILEN.forEach(zeile => {
+    document.querySelectorAll(zeile + ' .chip-btn').forEach(b => {
+      b.addEventListener('click', () => { b.classList.toggle('active'); packlisteFilter(); });
+    });
   });
   document.getElementById('filter-reset-btn').addEventListener('click', () => {
-    document.querySelectorAll('#filter-person-row .chip-btn.active')
-      .forEach(b => b.classList.remove('active'));
+    FILTER_ZEILEN.forEach(zeile => {
+      document.querySelectorAll(zeile + ' .chip-btn.active')
+        .forEach(b => b.classList.remove('active'));
+    });
     packlisteFilter();
   });
+})();
+
+/* --- Wunsch #219: direkt in eine Kategorie hinzufuegen ------------------ */
+function neuInKategorie(kategorieId) {
+  setFormularOffen(true);
+  const form = document.getElementById('add-form');
+  // Der Klick auf den Chip macht mehr als nur "aktiv" setzen: er fuellt das
+  // versteckte Feld und schaltet den Absenden-Knopf frei. Deshalb hier
+  // klicken statt die Klasse selbst zu setzen.
+  form?.querySelector(`.kat-row .chip-btn[data-value="${CSS.escape(String(kategorieId))}"]`)?.click();
+  document.getElementById('add-form-card')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+  // preventScroll, sonst springt der Browser hart ans Feld und macht das
+  // weiche Scrollen von eben zunichte.
+  document.getElementById('add-name')?.focus({preventScroll: true});
+}
+
+/* --- Wunsch #218: zurueck an den Anfang -------------------------------- */
+(function () {
+  const knopf = document.getElementById('nach-oben-btn');
+  if (!knopf) return;
+  // Erst ab einer Bildschirmhoehe: darueber ist der Seitenanfang ohnehin in
+  // Reichweite, und ein Knopf, der immer da ist, verdeckt nur Eintraege.
+  const zeigen = () => knopf.classList.toggle('sichtbar', window.scrollY > window.innerHeight);
+  window.addEventListener('scroll', zeigen, {passive: true});
+  knopf.addEventListener('click', () => window.scrollTo({top: 0, behavior: 'smooth'}));
+  zeigen();
 })();
 
 /* --- Wunsch #178: Umsortieren ------------------------------------------ */
@@ -576,7 +714,11 @@ document.getElementById('packmodus-beenden-btn')?.addEventListener('click', () =
   document.getElementById('packmodus-leiste').style.display = 'none';
   document.getElementById('packmodus-keine-treffer').style.display = 'none';
   document.querySelectorAll('.item-card').forEach(card => { card.style.display = ''; });
-  aktualisiereKatLabels();
+  // Wunsch #217: NICHT nur die Ueberschriften auffrischen, sondern den Filter
+  // neu anwenden. Sonst raeumt das Beenden des Packmodus einen gesetzten
+  // Filter still weg - die Chips stuenden weiter auf aktiv, die Liste zeigte
+  // aber wieder alles.
+  packlisteFilter();
   packmodusPersonWert = null;
   document.querySelectorAll('#packen-person-row .chip-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('packen-los-btn').disabled = true;

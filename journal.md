@@ -2,6 +2,108 @@
 
 ---
 
+## 2026-08-13 – portal-v213: Packliste bei langen Listen (#217, #218, #219)
+
+Drei Wünsche aus derselben Beobachtung: sobald eine Packliste länger ist als
+ein Bildschirm, ist sie mühsam. Alles im Browser, der Server liefert
+unverändert die ganze Liste – keine neue Route, keine Schemaänderung.
+
+### #217 – der Filter kann jetzt drei Fragen statt einer
+
+Vorher nur Person, jetzt zusätzlich Kategorie und Packstatus. Die Regel dazu
+steht im Template, weil sie sich nicht von selbst versteht: **zwischen den
+Reihen gilt UND, innerhalb einer Reihe ODER.** „Bens Sachen, Kategorie
+Kleidung, noch offen" ist eine sinnvolle Frage; „Anna und Ben gleichzeitig"
+wäre bei einem Eintrag mit genau einer Person keine.
+
+Eine leere Reihe filtert nicht. Das klingt nach einer Kleinigkeit, ist aber
+der Unterschied zwischen einem Filter und einem Formular: sonst müsste man in
+jeder der drei Reihen etwas auswählen, bevor überhaupt wieder etwas zu sehen
+ist.
+
+**Die Anzahl gesetzter Filter steht jetzt am Knopf** („🔍 Filter (2)"). Die
+Filterkarte klappt zu, und ein unsichtbarer Filter, der die halbe Liste
+ausblendet, sieht aus wie verlorene Einträge – das wäre genau die Art Fehler,
+die man dem Portal anlastet und nicht sich selbst.
+
+Zwei Wechselwirkungen mit dem Packmodus fielen dabei auf und sind mitbehoben:
+die Filterkarte stand im Packmodus offen weiter da und bot Knöpfe an, die der
+Packmodus sofort überschrieb; und das **Beenden** des Packmodus setzte alle
+Einträge wieder sichtbar – die Chips standen weiter auf aktiv, die Liste
+zeigte aber alles. Jetzt wird der Filter danach neu angewendet.
+
+### Der Fund nebenbei: eine Überschrift, die zu keinem ihrer Einträge passte
+
+Einträge ohne Kategorie (oder mit einer abgeschalteten) landen unter „Ohne
+Kategorie". Die Überschrift trägt `data-kategorie-label=""` – die Einträge
+trugen aber `data-kategorie="None"`, weil der Wert direkt aus
+`item.kategorie_id` kam und nicht aus der Gruppe, in der sie wirklich
+angezeigt werden. Beides passte nie zusammen: die Gruppe liess sich im
+Packmodus nicht ausblenden, und mit #217 wäre sie auch nicht filterbar
+gewesen.
+
+Das Makro bekommt die Gruppe jetzt als eigenen Parameter übergeben. Der
+Unterschied zwischen „welche Kategorie hat der Eintrag" und „unter welcher
+Überschrift steht er" ist genau dann sichtbar, wenn eine Kategorie
+abgeschaltet wird – also selten, aber dann dauerhaft.
+
+### #218 – zurück an den Anfang
+
+Erscheint erst ab einer Bildschirmhöhe. Darüber ist der Seitenanfang ohnehin
+in Reichweite, und ein Knopf, der immer da ist, verdeckt nur Einträge.
+
+Der Pfeil ist `↑` **ohne Varianten-Selektor**. Damit bleibt er normaler Text,
+Twemoji fasst ihn nicht an und es braucht keine SVG-Datei. Mit einem `️`
+dahinter wäre er ein Emoji – und unter Linux/Chrome eine leere Kachel, genau
+die Falle aus Wunsch #147. Ein Test wacht jetzt darüber, weil man diesem
+Zeichen den Unterschied nicht ansieht.
+
+### #219 – Plus an der Kategorie
+
+Öffnet das Eingabefeld, wählt die Kategorie aus, scrollt weich hin, Cursor
+ins Namensfeld. Die Kategorie wird nicht bloss markiert, sondern über
+denselben Weg gesetzt wie ein Klick von Hand (`chip.click()`) – nur so füllt
+sich auch das versteckte Feld und der Hinzufügen-Knopf wird frei. Eine
+Klasse selbst zu setzen hätte optisch funktioniert und beim Absenden nichts
+mitgeschickt.
+
+„Ohne Kategorie" bekommt bewusst **keinen** Plus-Knopf: das Formular verlangt
+eine Kategorie, der Knopf könnte dort nichts vorbelegen – eine Sackgasse mit
+Beschriftung.
+
+### Tests: einer neu, einer geändert
+
+12 neue Tests. Der interessanteste ist
+`test_jede_verdrahtete_aktion_existiert_auch`: er löst jedes
+`data-klick="…"` gegen die Funktionen im selben Template auf. Ein Tippfehler
+dort ergibt einen Knopf, der **still nichts tut** – der Verteiler in
+`base.html` schreibt zwar in die Konsole, aber die sieht im Betrieb niemand.
+
+Ein **bestehender** Wächter aus #178 ist rot geworden und musste geändert
+werden: `test_leere_kategorien_verschwinden_beim_filtern` suchte die Schleife
+über `.kat-label` wörtlich in `packlisteFilter()`. Filter und Packmodus teilen
+sich jetzt `aktualisiereKatLabels()` – dieselbe Wirkung, an einer Stelle
+statt an zweien. Der Test folgt deshalb **einer Ebene Indirektion**, statt die
+Inline-Fassung zu erzwingen; seine Zähne behält er (ruft der Filter niemanden
+auf, der die Überschriften auffrischt, ist er rot). Was er nicht mehr
+vorschreibt, ist *wo* der Code steht – das war nie die Zusage, sondern nur
+die damalige Bauart.
+
+Gegenproben für alle drei neuen Wächter gemacht (Klassenname verbogen,
+Tippfehler ins `data-klick`, Kategorienamen aus dem `aria-label` entfernt) –
+alle drei rot.
+
+1337 Tests grün, `live_pruefung.py` grün, Vorlage im laufenden Container
+gegengeprüft. Hilfe-App um drei Absätze ergänzt.
+
+**Was ein Skript nicht sehen kann** und deshalb an Andi geht: ob der Pfeil auf
+dem Telefon an der richtigen Stelle sitzt (er liegt fest unten rechts und
+könnte auf schmalen Geräten den letzten Eintrag verdecken), und ob das weiche
+Scrollen des Plus-Knopfes in der installierten PWA genauso läuft wie im
+Browser.
+
+---
+
 ## 2026-08-13 – portal-v212: Das Backup verlässt das Haus verschlüsselt (#130/#211)
 
 Andis Antwort auf die Frage vom 12.08.: **asymmetrisch**, er verwahrt den
