@@ -2,6 +2,100 @@
 
 ---
 
+## 2026-08-13 – portal-v214: Vokabelfilter (#220) – und #221 war schon fertig
+
+### #221 zuerst, weil er die Richtung von #220 bestimmt hat
+
+„Man soll geteilte Vokabeln auch ansehen können, nicht editieren, aber das
+Audio anhören." Das steht seit Wunsch #150 so im Code und ist durch 17 Tests
+gesichert. Statt das aus dem Quelltext zu behaupten, habe ich es **am
+laufenden Portal nachgemessen** (eine Prüfsitzung, im `finally` gelöscht):
+
+| | Andi | Johannes |
+|---|---|---|
+| Vokabeln in der Liste | 72 (64 eigene + 8 geteilte) | 8 (alle geteilt) |
+| als „Von Friederike geteilt" markiert | 8 | 8 |
+| Bearbeiten-Knöpfe | 64 | **0** |
+| Anhören-Knöpfe | 72 | 8 |
+
+Alle drei Punkte erfüllt. **Aber die Zahlen erklären den Wunsch trotzdem:**
+Die Liste sortiert eigene Vokabeln zuerst (`ORDER BY (v.user_id = :uid) DESC`),
+Andis acht geteilte stehen also auf **Platz 65 bis 72**. Sichtbar waren sie
+immer – auffindbar nie.
+
+Das ist der Unterschied zwischen „ist implementiert" und „ist benutzbar", und
+er wäre mir nicht aufgefallen, wenn ich nur die Tests gelesen hätte. Sie
+prüfen `"house" in seite` – und das stimmt auch an Position 72.
+
+### #220 – und warum der Kapitelfilter über die geteilten Kapitel gehen muss
+
+Der Wunsch verlangt Filter nach Sprache, Kapitel und „ohne Kapitel", einen
+Knopf zwischen Eintragen und Lernen, und dass der Filter bleibt, solange man
+die App nicht verlässt.
+
+Die eine Entscheidung, die nicht im Wunschtext steht: Der Kapitelfilter nimmt
+`_zugaengliche_kapitel()` (eigene **plus geteilte**, mit dem Namen des
+Besitzers dahinter), nicht `_eigene_kapitel()`. Mit den eigenen Kapiteln wäre
+er nicht falsch, sondern **unbrauchbar** – er könnte genau das nicht filtern,
+was man am ehesten sucht. Damit löst #220 in der Praxis das, was #221 gemeint
+haben dürfte.
+
+Daneben bleiben `sprachen` und `kapitel` weiterhin die eigenen: in ein fremdes
+Kapitel darf man nichts eintragen, und `_sprache_erlaubt()` lässt beim
+Speichern ohnehin nur eigene Sprachen durch. Zwei Listen mit verschiedenem
+Zweck, und genau deshalb nicht dieselbe.
+
+`sessionStorage` trifft „solange der Benutzer die App nicht verlässt" genau:
+überlebt Neuladen und Unterseiten, stirbt mit dem Tab. Der **Suchbegriff wird
+bewusst nicht mitgemerkt** – ein gemerkter Suchtext, den man beim Zurückkommen
+nicht im Feld sieht, sieht aus wie verschwundene Vokabeln.
+
+Suche und Filter teilen sich eine Funktion. Zwei getrennte würden beide
+`style.display` setzen und sich gegenseitig überschreiben: wer erst filtert
+und dann sucht, sähe wieder herausgefilterte Vokabeln. Ein Test wacht darüber.
+
+### Nebenbei behoben: eine Sperre, die Freigaben ins Leere zeigen liess
+
+Die Startseite hing an den **eigenen aktiven** Sprachen. Wer keine hatte, sah
+nur „Noch keine Sprache aktiv" – auch wenn ihm jemand ein Kapitel geteilt
+hatte. Jetzt sperrt nur noch der Fall, in dem es wirklich nichts zu sehen und
+nichts einzutragen gibt; eintragen bleibt gesperrt (mit Hinweis, warum),
+ansehen und anhören nicht.
+
+Beim Testen kam heraus, dass ich den Zustand zuerst falsch herstellte: Alle
+Sprachen abwählen genügt **nicht**, weil `_aktive_sprachen_sicherstellen()`
+sie wieder anlegt, sobald keine einzige Zeile mehr da ist. Erreichbar ist er
+nur, wenn ein Admin die einzige Sprache eines Nutzers **global** abschaltet.
+Selten – und genau deshalb wäre es nie aufgefallen.
+
+### Der Test, der allein grün war und im Gesamtlauf rot
+
+Meine Hilfsfunktion legte eine inaktive Sprache namens **„Suaheli"** an.
+Denselben Namen legt `test_tts_sprache.py` an, dort aber **aktiv** – und
+alphabetisch läuft es vorher. Das `INSERT OR IGNORE` fand die aktive Sprache
+vor, der Nutzer hatte plötzlich eine, und zwei Tests fielen um.
+
+`vokabel_sprachen` steht in `BLEIBT` (conftest.py) und wird zwischen den Tests
+nie geleert. Die Lehre steht schon in `CLAUDE.md`, aber die dortige Fassung
+warnt vor dem *Vergessen* einer Tabelle. Der Fall hier ist der Nachbar davon:
+**zwei Testdateien, die sich in einer Seed-Tabelle über den Weg laufen.** Der
+Name in einer nie geleerten Tabelle gehört genau einer Datei – jetzt heisst
+sie „Nur-für-Test-220 (inaktiv)", und `aktiv` wird ausdrücklich gesetzt statt
+auf die Voreinstellung vertraut.
+
+15 neue Tests, Gegenproben für alle vier Hauptwächter gemacht (Filter ohne
+geteilte Kapitel, alte Sperre, fehlender „Ohne Kapitel"-Chip, Knopf an der
+falschen Stelle) – alle vier rot. 1362 grün, `live_pruefung.py` grün, Filter
+am laufenden Portal gegengeprüft, Hilfe-App ergänzt.
+
+**#221 bleibt offen, mit Rückfrage.** Ich hake ihn nicht selbst ab: Er könnte
+sonst als erledigt gelten, ohne dass Andis eigentliches Problem gelöst ist.
+Drei Möglichkeiten stehen an der Frage – Filter reicht, oder er meinte eine
+eigene „Mit mir geteilt"-Ansicht, oder bei ihm sah es anders aus als hier
+gemessen.
+
+---
+
 ## 2026-08-13 – Der Stundenlauf hätte sich an #130 festgebissen
 
 Am Ende des Laufs, beim Nachsehen ob noch etwas offen ist, meldete

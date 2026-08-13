@@ -454,9 +454,18 @@ def index(token):
     vokabeln = [dict(v) for v in vokabeln]
     for v in vokabeln:
         v["audio_da"] = os.path.exists(_audio_pfad(v["sprache_id"], v["fremd"]))
+
+    # Wunsch #220: Der Filter muss ueber ALLES gehen, was in der Liste steht -
+    # also auch ueber geteilte Kapitel und deren Sprachen. `sprachen` und
+    # `kapitel` daneben bleiben die EIGENEN: in ein fremdes Kapitel darf man
+    # nichts eintragen, und `_sprache_erlaubt()` laesst beim Speichern ohnehin
+    # nur eigene Sprachen durch. Zwei Listen mit unterschiedlichem Zweck, und
+    # genau deshalb nicht dieselbe.
     return render_template("vokabeln.html",
         user=user, token=token, farbe=user["farbe"],
         sprachen=sprachen, kapitel=kapitel, vokabeln=vokabeln,
+        filter_sprachen=_zugaengliche_sprachen(db, user["id"]),
+        filter_kapitel=_zugaengliche_kapitel(db, user["id"]),
         verb_sprachen=sprachen_mit_verbformen(db))
 
 

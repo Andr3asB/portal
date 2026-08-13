@@ -101,7 +101,12 @@
 {% block body %}
 <main class="main">
 
-  {% if not sprachen %}
+  {# Wunsch #220: Die Sperre hing frueher allein an den EIGENEN Sprachen -
+     wer keine aktiviert hatte, sah nur diesen Hinweis, auch wenn ihm jemand
+     ein Kapitel geteilt hatte. Die geteilten Vokabeln waren damit
+     unerreichbar, obwohl die Freigabe stand. Jetzt sperrt nur noch der Fall,
+     in dem es wirklich nichts zu sehen und nichts einzutragen gibt. #}
+  {% if not sprachen and not vokabeln %}
   <div class="empty">
     Noch keine Sprache aktiv 🌐<br>
     <span style="font-size:13px">Aktiviere im Menü unter „Sprachen" mindestens eine Sprache, bevor du loslegst.</span>
@@ -109,10 +114,52 @@
   {% else %}
 
   <div class="top-aktionen">
+    {% if sprachen %}
     <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Vokabel eintragen</button>
+    {% endif %}
+    {# Wunsch #220: ausdrücklich ZWISCHEN Eintragen und Lernen. #}
+    <button type="button" class="btn-neu-toggle" id="filter-toggle-btn">🔍 Filtern</button>
     <a class="btn-lernen" href="/a/vokabeln{{ tp }}lernen">📖 Lernen</a>
   </div>
 
+  {% if not sprachen %}
+  <div class="vokabel-meta" style="margin:-8px 0 14px">
+    Du hast keine eigene Sprache aktiv – eintragen geht deshalb nicht.
+    Geteilte Vokabeln kannst du trotzdem ansehen, anhören und lernen.
+    <a class="hinweis-link" href="/a/vokabeln{{ tp }}sprachen">Sprachen wählen</a>
+  </div>
+  {% endif %}
+
+  {# Wunsch #220: Sprache, Kapitel und „ohne Kapitel". Innerhalb einer Reihe
+     ODER, zwischen den Reihen UND - dieselbe Regel wie bei der Packliste
+     (#217). Eine Reihe, in der nichts angetippt ist, filtert nicht. #}
+  <div class="form-card" id="filter-card">
+    {% if filter_sprachen|length > 1 %}
+    <div class="form-label">Sprache</div>
+    <div class="chip-row" id="filter-sprache-row">
+      {% for s in filter_sprachen %}
+      <button type="button" class="sprache-chip" data-value="{{ s.id }}">{{ s.name }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="form-label">Kapitel</div>
+    <div class="chip-row" id="filter-kapitel-row">
+      {% for k in filter_kapitel %}
+      {# Geteilte Kapitel gehoeren hier hinein - sonst laesst sich das, was
+         jemand mit mir geteilt hat, nicht gezielt ansehen. Genau daran
+         scheiterte es bisher: die fremden Vokabeln stehen ganz unten in der
+         Liste, und der Filter kannte sie nicht. #}
+      <button type="button" class="sprache-chip" data-value="{{ k.id }}">{{ k.name }}{% if k.geteilt_von %} <span style="opacity:.7">· {{ k.geteilt_von }}</span>{% endif %}</button>
+      {% endfor %}
+      <button type="button" class="sprache-chip" data-value="ohne">Ohne Kapitel</button>
+    </div>
+
+    <button type="button" class="vokabel-loeschen-btn" id="filter-reset-btn"
+            style="color:var(--text-2); text-decoration:underline">Filter zurücksetzen</button>
+  </div>
+
+  {% if sprachen %}
   <div class="form-card" id="neu-form-card">
     <form method="post" action="/a/vokabeln{{ tp }}neu" id="neu-form">
       <div class="form-label">Sprache</div>
@@ -162,13 +209,17 @@
       <button type="submit" class="btn-speichern">Speichern</button>
     </form>
   </div>
+  {% endif %}
 
   {% if vokabeln %}
   <input class="vokabel-suche" id="vokabel-suche" type="text"
          placeholder="🔍 Vokabel suchen…" autocomplete="off">
 
+  {# data-kapitel traegt die IDs kommagetrennt; leer heisst "ohne Kapitel" -
+     dasselbe, wonach der Chip „Ohne Kapitel" fragt. #}
   {% for v in vokabeln %}
-  <div class="vokabel-item" data-suche="{{ (v.fremd ~ ' ' ~ v.deutsch ~ ' ' ~ (v.simple_past or '') ~ ' ' ~ (v.perfect or ''))|lower }}">
+  <div class="vokabel-item" data-suche="{{ (v.fremd ~ ' ' ~ v.deutsch ~ ' ' ~ (v.simple_past or '') ~ ' ' ~ (v.perfect or ''))|lower }}"
+       data-sprache="{{ v.sprache_id }}" data-kapitel="{{ v.kapitel_ids or '' }}">
     <div class="vokabel-row">
       <div class="vokabel-text">
         <span class="vokabel-fremd">{{ v.fremd }}</span> – {{ v.deutsch }}
@@ -368,18 +419,100 @@ function toggleEdit(id) {
   if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
 }
 
-const sucheEl = document.getElementById('vokabel-suche');
-if (sucheEl) {
-  sucheEl.addEventListener('input', () => {
-    const q = sucheEl.value.trim().toLowerCase();
-    let treffer = 0;
-    document.querySelectorAll('.vokabel-item').forEach(el => {
-      const passt = !q || el.dataset.suche.includes(q);
-      el.style.display = passt ? '' : 'none';
-      if (passt) treffer++;
-    });
-    document.getElementById('vokabel-keine-treffer').style.display = treffer === 0 ? 'block' : 'none';
-  });
+/* --- Wunsch #220: Filter nach Sprache und Kapitel ----------------------- */
+
+// Suche und Filter greifen auf dieselbe Eigenschaft zu (style.display). Zwei
+// getrennte Funktionen wuerden sich gegenseitig ueberschreiben: wer erst
+// filtert und dann sucht, saehe wieder herausgefilterte Vokabeln. Deshalb
+// EINE Funktion, die beides zusammen entscheidet.
+const FILTER_KEY = 'vokabeln_filter_' + TOKEN;
+
+function _filterWerte(zeile) {
+  const el = document.getElementById(zeile);
+  return el ? [...el.querySelectorAll('.sprache-chip.aktiv')].map(b => b.dataset.value) : [];
 }
+
+function vokabelnAnzeigen() {
+  const sucheEl = document.getElementById('vokabel-suche');
+  const q       = (sucheEl?.value || '').trim().toLowerCase();
+  const sprachen = _filterWerte('filter-sprache-row');
+  const kapitel  = _filterWerte('filter-kapitel-row');
+  const anzahl   = sprachen.length + kapitel.length;
+
+  let treffer = 0;
+  document.querySelectorAll('.vokabel-item').forEach(el => {
+    // Leeres data-kapitel heisst "ohne Kapitel" - der Chip dafuer heisst
+    // 'ohne'. Ohne diesen Sonderfall waeren genau die Vokabeln unauffindbar,
+    // die noch niemand einsortiert hat.
+    const eigene = (el.dataset.kapitel || '').split(',').filter(Boolean);
+    const passt =
+      (!q || el.dataset.suche.includes(q)) &&
+      (!sprachen.length || sprachen.includes(el.dataset.sprache)) &&
+      (!kapitel.length || kapitel.some(
+        k => k === 'ohne' ? eigene.length === 0 : eigene.includes(k)));
+    el.style.display = passt ? '' : 'none';
+    if (passt) treffer++;
+  });
+
+  const leer = document.getElementById('vokabel-keine-treffer');
+  if (leer) leer.style.display = treffer === 0 ? 'block' : 'none';
+
+  const knopf = document.getElementById('filter-toggle-btn');
+  if (knopf) knopf.textContent = anzahl ? `🔍 Filter (${anzahl})` : '🔍 Filtern';
+
+  // Wunsch #220: "Der Filter bleibt erhalten, solange der Benutzer die App
+  // nicht verlaesst." sessionStorage passt genau darauf - er ueberlebt
+  // Neuladen und Unterseiten, aber nicht das Schliessen des Tabs. Die Suche
+  // gehoert bewusst NICHT hinein: ein gemerkter Suchbegriff, den man beim
+  // Zurueckkommen nicht sieht, sieht aus wie verschwundene Vokabeln.
+  try {
+    sessionStorage.setItem(FILTER_KEY, JSON.stringify({sprachen, kapitel}));
+  } catch (e) {}
+}
+
+function _filterWiederherstellen() {
+  let daten;
+  try { daten = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null'); } catch (e) { return; }
+  if (!daten) return;
+  for (const [zeile, werte] of [['filter-sprache-row', daten.sprachen],
+                                ['filter-kapitel-row', daten.kapitel]]) {
+    const el = document.getElementById(zeile);
+    if (!el) continue;
+    el.querySelectorAll('.sprache-chip').forEach(b => {
+      // Ein Kapitel kann inzwischen geloescht oder die Freigabe aufgehoben
+      // sein - dann fehlt der Chip einfach, und der Rest gilt weiter.
+      if ((werte || []).includes(b.dataset.value)) b.classList.add('aktiv');
+    });
+  }
+  // Die Karte aufklappen, wenn etwas gesetzt ist: Ein Filter, der wirkt, aber
+  // nicht zu sehen ist, sieht aus wie fehlende Vokabeln.
+  if ((daten.sprachen || []).length || (daten.kapitel || []).length) {
+    document.getElementById('filter-card')?.classList.add('open');
+  }
+}
+
+document.getElementById('filter-toggle-btn')?.addEventListener('click', () => {
+  document.getElementById('filter-card')?.classList.toggle('open');
+});
+
+['filter-sprache-row', 'filter-kapitel-row'].forEach(zeile => {
+  document.getElementById(zeile)?.querySelectorAll('.sprache-chip').forEach(b => {
+    b.addEventListener('click', () => {
+      b.classList.toggle('aktiv');
+      vokabelnAnzeigen();
+    });
+  });
+});
+
+document.getElementById('filter-reset-btn')?.addEventListener('click', () => {
+  document.querySelectorAll('#filter-sprache-row .sprache-chip, #filter-kapitel-row .sprache-chip')
+    .forEach(b => b.classList.remove('aktiv'));
+  vokabelnAnzeigen();
+});
+
+document.getElementById('vokabel-suche')?.addEventListener('input', vokabelnAnzeigen);
+
+_filterWiederherstellen();
+vokabelnAnzeigen();
 </script>
 {% endblock %}
