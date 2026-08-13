@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-08-13 – Der Stundenlauf hätte sich an #130 festgebissen
+
+Am Ende des Laufs, beim Nachsehen ob noch etwas offen ist, meldete
+`wunsch_lauf_check.py` weiter `ARBEIT: 1` – und zwar **#130**, den ich zwei
+Stunden vorher umgesetzt hatte. Der Wunsch ist fertig, aber nicht abhakbar:
+er wartet auf Andis öffentlichen Schlüssel.
+
+Die Einteilung kannte diesen Zustand nicht. „Neue Antwort" hiess bisher nur
+*jüngste `antwort` neuer als jüngste `frage`* – und das bleibt für immer wahr,
+solange der Wunsch offen ist. Der Lauf hätte #130 **stündlich neu
+aufgegriffen**, gelesen, festgestellt dass nichts zu tun ist, und das
+sieben Tage lang. Dieselbe Sorte Fehler wie die 24 Fortschrittsberichte, nur
+leiser.
+
+Der Zusatz ist eine Zeile: eine Antwort ist neu, wenn die Automatik **seitdem
+nichts getan hat** (`notiz`/`plan`/`umsetzung` jünger als die Antwort). #130
+rutscht damit dorthin, wo er hingehört – „wartet auf Andi", neben seinen
+Zwilling #211.
+
+Die Gegenrichtung ist der gefährlichere Fehler und hat deshalb einen eigenen
+Test: schreibt Andi **nach** meiner Notiz noch etwas, ist das eine echte neue
+Antwort und der Wunsch muss wieder auftauchen. Wer nur auf „gibt es eine
+Notiz?" prüft, verschluckt sie.
+
+Dazu 10 Tests (`test_wunsch_lauf_check.py`), die das Skript als eigenen
+Prozess gegen eine Wegwerf-DB fahren – genau wie im Betrieb, nur ohne
+Container. Neun Fälle, darunter die drei, die der Lauf **nie** anfassen darf:
+`zurueckgestellt` (#61), ohne Priorität (#152) und bereits erledigt. Bis heute
+war die Einteilung, nach der eine unbeaufsichtigte Automatik handelt, durch
+keinen einzigen Test gedeckt.
+
+Gegenprobe gemacht: mit der alten Logik ist der neue Test rot.
+
+---
+
 ## 2026-08-13 – portal-v213: Packliste bei langen Listen (#217, #218, #219)
 
 Drei Wünsche aus derselben Beobachtung: sobald eine Packliste länger ist als

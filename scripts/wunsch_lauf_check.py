@@ -36,7 +36,12 @@ rows = db.execute(f"""
            (SELECT max(erstellt) FROM wunsch_aktionen
              WHERE wunsch_id = w.id AND art = 'frage')   AS letzte_frage,
            (SELECT max(erstellt) FROM wunsch_aktionen
-             WHERE wunsch_id = w.id AND art = 'antwort') AS letzte_antwort
+             WHERE wunsch_id = w.id AND art = 'antwort') AS letzte_antwort,
+           -- Was die Automatik selbst zuletzt am Wunsch getan hat. 'frage'
+           -- zaehlt hier NICHT mit, die steht schon oben.
+           (SELECT max(erstellt) FROM wunsch_aktionen
+             WHERE wunsch_id = w.id
+               AND art IN ('notiz', 'plan', 'umsetzung'))  AS letzte_arbeit
     FROM   wuensche w
     WHERE  w.erledigt = 0
     ORDER  BY {PRIO} ASC, w.erstellt ASC
@@ -47,10 +52,33 @@ def ist_frei(r):
     return r["prioritaet"] not in (None, "", "zurueckgestellt")
 
 
-antworten = [r for r in rows if r["letzte_frage"] and r["letzte_antwort"]
-             and r["letzte_antwort"] > r["letzte_frage"]]
-wartet    = [r for r in rows if r["letzte_frage"]
-             and (not r["letzte_antwort"] or r["letzte_antwort"] < r["letzte_frage"])]
+def _beantwortet(r):
+    return (r["letzte_frage"] and r["letzte_antwort"]
+            and r["letzte_antwort"] > r["letzte_frage"])
+
+
+def _seit_der_antwort_bearbeitet(r):
+    return r["letzte_arbeit"] and r["letzte_arbeit"] > r["letzte_antwort"]
+
+
+# "Neu" heisst: Andi hat geantwortet und SEITDEM hat die Automatik nichts
+# getan. Ohne die zweite Haelfte bleibt ein beantworteter Wunsch, der laengst
+# umgesetzt aber noch nicht abgehakt ist, stuendlich als Arbeit stehen - und
+# wird stuendlich neu aufgegriffen. Genau das passierte am 13.08.2026 mit
+# #130: umgesetzt, per Notiz dokumentiert, aber nicht abhakbar, weil er auf
+# einen Schluessel von Andi wartet.
+antworten = [r for r in rows
+             if _beantwortet(r) and not _seit_der_antwort_bearbeitet(r)]
+
+# Der Ball liegt bei Andi. Zwei Wege dorthin, beide setzen voraus, dass
+# ueberhaupt einmal gefragt wurde - eine blosse Notiz auf einem Wunsch, den
+# niemand gefragt hat, ist kein Warten auf jemanden.
+wartet = [r for r in rows
+          if r["letzte_frage"] and (
+              # (a) Frage gestellt, noch keine Antwort
+              (not r["letzte_antwort"] or r["letzte_antwort"] < r["letzte_frage"])
+              # (b) beantwortet, bearbeitet - und haengt jetzt wieder an ihm
+              or (_beantwortet(r) and _seit_der_antwort_bearbeitet(r)))]
 # Ueber IDs ausschliessen, nicht ueber die Row-Objekte: sqlite3.Row vergleicht
 # sich der Reihe nach ueber die Werte, ein `not in` darauf ist nur zufaellig
 # richtig, solange keine zwei Wuensche gleich aussehen.
