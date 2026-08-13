@@ -2,7 +2,28 @@
 
 *Letzte Aktualisierung: 2026-08-11 (portal-v206: Backup repariert - Live-DB nicht mehr im Archiv, Wiederherstellung laeuft ueber die Snapshots, siehe unten)*
 
-## ⚠️ Wiederherstellung aus einem Backup (geaendert mit v206)
+## ⚠️ Wiederherstellung aus einem Backup (geaendert mit v206, erweitert mit v212)
+
+**Schritt 0 seit v212: entschluesseln.** Heisst die Datei auf dem NAS
+`portal-<datum>.tar.gz.age`, ist sie mit `age` gegen Andis oeffentlichen
+Schluessel verschluesselt (Wunsch #130/#211). Zum Zurueckspielen wird der
+**private** Schluessel gebraucht - der liegt weder auf home02 noch auf dem NAS,
+sondern nur bei Andi (Passwortmanager):
+
+```bash
+age -d -i portal-backup.key -o portal.tar.gz portal-<datum>.tar.gz.age
+tar xzf portal.tar.gz
+```
+
+**Ohne diesen Schluessel ist kein Backup wiederherstellbar.** Das ist kein
+Nebeneffekt, sondern der Zweck der Uebung - zusammen mit `TOKEN_KEY` an einem
+zweiten sicheren Ort aufbewahren. Aeltere Dateien ohne `.age` sind noch
+unverschluesselt und brauchen diesen Schritt nicht.
+
+Der Weg ist am 13.08.2026 einmal vollstaendig durchgespielt worden (echtes
+Archiv aufs NAS, zurueckgeholt, entschluesselt, `PRAGMA integrity_check` = ok)
+- in einem eigenen Pruefverzeichnis, damit kein echtes Backup wegrotiert.
+Details im journal.md, 13.08.2026.
 
 Die Backup-Tarballs auf dem NAS enthalten **keine `./portal.db` mehr**. Die
 Datenbank liegt darin unter `./snapshots/portal-<zeitstempel>.db` - den
@@ -191,7 +212,21 @@ TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
 KI_GUTHABEN_WACHT=1         # Wunsch #183: stuendlicher Blick aufs OpenRouter-Guthaben
+BACKUP_AGE_RECIPIENT=       # Wunsch #130/#211: oeffentlicher age-Schluessel
 ```
+
+**`BACKUP_AGE_RECIPIENT` ist Stand 13.08.2026 noch LEER** – die Mechanik ist
+mit v212 ausgeliefert und durchgespielt, aber bis Andi seinen oeffentlichen
+Schluessel eintraegt, geht das naechtliche Backup weiter im Klartext aufs NAS
+und schreibt dabei jede Nacht eine Warnung ins util-Log:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker logs util --tail=50 | grep -i unverschl"
+```
+
+Einschalten ist eine Zeile in der `.env` plus `docker compose up -d util` –
+kein Rebuild. Steht dort etwas, das kein age-Schluessel ist, faellt das Backup
+**aus** statt unverschluesselt zu laufen (Absicht, siehe backup.py).
 
 `PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN` und `KI_GUTHABEN_WACHT` stehen
 heute NICHT in der echten `.env` - sie greifen mit ihrer Voreinstellung (leer

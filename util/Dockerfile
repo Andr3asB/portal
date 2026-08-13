@@ -1,7 +1,11 @@
 FROM python:3.12-slim
 WORKDIR /app
+# age (Wunsch #130/#211): verschluesselt den Backup-Strom gegen einen
+# oeffentlichen Schluessel. Debian 13 (trixie) liefert 1.2.1. Bewusst das
+# Paket aus der Distribution statt eines Binaerdownloads - dann haengt die
+# Vertrauenskette an derselben apt-Signatur wie der Rest des Images.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends rsync openssh-client \
+    && apt-get install -y --no-install-recommends rsync openssh-client age \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -u 1001 -m -s /bin/sh portal
 COPY requirements.txt .

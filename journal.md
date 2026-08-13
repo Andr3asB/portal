@@ -2,6 +2,114 @@
 
 ---
 
+## 2026-08-13 – portal-v212: Das Backup verlässt das Haus verschlüsselt (#130/#211)
+
+Andis Antwort auf die Frage vom 12.08.: **asymmetrisch**, er verwahrt den
+privaten Schlüssel. Damit war der Weg klar, und beide Wünsche gehören
+zusammen – #130 hatte genau das vorgeschlagen, #211 (Audit-Befund F-03) das
+Gegenteil.
+
+Der Unterschied ist nicht akademisch. Symmetrisch (Schlüssel in der `.env`)
+hätte nur die Kopie auf dem NAS geschützt: wer `home02` hat, hätte auch den
+Schlüssel. Asymmetrisch schützt auch dagegen. Der Preis steht jetzt an drei
+Stellen im Klartext (`backup.py`, `.env.example`, `server.md`), weil ihn
+später niemand übersehen darf: **ist der private Schlüssel weg, sind alle
+Backups Datenmüll.** Es gibt keine Hintertür, das ist der Sinn.
+
+### `age` aus der Distribution, nicht aus dem Internet
+
+Debian 13 (trixie) liefert `age` 1.2.1 – ein Paket mehr im `util`-Dockerfile.
+Bewusst das Distributionspaket statt eines Binärdownloads von GitHub: dann
+hängt die Vertrauenskette an derselben apt-Signatur wie der Rest des Images.
+Ein `curl | tar` hätte an genau der Stelle eine zweite, schwächere Kette
+aufgemacht – in einer Datei, deren einziger Zweck Vertraulichkeit ist.
+
+### Aus einer Pipe wurden drei geprüfte Stufen
+
+Vorher war das eine Zeile: `tar | ssh`. Elegant, aber es gibt darin keinen
+Punkt, an dem man das Ergebnis noch ansehen kann, bevor es beim Empfänger
+liegt – und mit Verschlüsselung wäre dort die wichtigste Frage unbeantwortet
+geblieben: *ist der Strom, der rausgeht, wirklich verschlüsselt?*
+
+Jetzt: packen → verschlüsseln → senden, über eine Zwischendatei, jede Stufe
+mit eigenem Rückgabewert. Bezahlbar, weil `/data` **18 MB** gross ist; bei
+Gigabytes wäre die Abwägung eine andere gewesen, und das steht auch so im
+Docstring, damit die Entscheidung später nachvollziehbar bleibt.
+
+Dazu zwei Dinge, die vorher nur Glück waren:
+
+* **Der Klartext wird sofort gelöscht**, nicht erst mit dem Temp-Verzeichnis.
+  Solange er daneben liegt, kann ein späterer Fehler im Sendeschritt ihn
+  versehentlich anbieten.
+* **Auf dem NAS wird erst nach `.upload.part` geschrieben**, auf „nicht leer"
+  geprüft und dann umbenannt. Vorher konnte ein abgerissener Datenstrom als
+  vollwertiges Archiv liegenbleiben – und dabei über die 7er-Rotation ein
+  echtes Backup verdrängen. Der Name fängt bewusst nicht mit `portal-` an,
+  sonst zählte der Teil-Upload selbst als Backup mit.
+
+Die Rotation zählt jetzt `portal-*.tar.gz*` **mit Stern am Ende**, damit
+verschlüsselte und alte unverschlüsselte Archive gemeinsam rotieren. Ohne den
+Stern wären nach der Umstellung zwei getrennte Bestände zu je sieben
+gewachsen, und der alte Klartext-Bestand wäre für immer liegengeblieben.
+
+### Der Test, auf den es ankommt
+
+17 neue Tests, aber 16 davon prüfen Verdrahtung. Der eine, der zählt, ist
+`test_ohne_age_kopf_geht_nichts_raus`: `age` endet mit 0, die Ausgabedatei ist
+trotzdem Klartext. Genau dann muss Schluss sein – deshalb liest `backup.py`
+nach dem Verschlüsseln den age-Kopf und bricht ohne ihn ab.
+
+Ein Programm, das erfolgreich endet und trotzdem das Falsche hinterlässt
+(vertipptes `-o`, volle Platte, ein künftiger Umbau), wäre sonst dauerhaft
+unbemerkt geblieben. **Niemand sieht sich ein Backup an, das funktioniert.**
+
+Gegenprobe wie vorgeschrieben gemacht: drei absichtliche Fehler eingebaut
+(Kopf-Prüfung raus, Rotationsmuster ohne Stern, Warnung stummgeschaltet) –
+alle drei Wächter sind rot geworden.
+
+### Der Rückweg, einmal komplett gefahren
+
+„Ein Backup, das man nicht zurückspielen kann, ist keins" stand in #130. Also
+durchgespielt, mit dem **echten** `backup.run()`, nicht mit einer Nachbildung:
+
+1. Wegwerf-Schlüsselpaar im Container (ausdrücklich **nicht** der
+   Produktivschlüssel – den erzeuge ich nicht, er liefe durch Terminalausgabe
+   und Protokolle),
+2. echter Lauf → 4,4 MB verschlüsselt aufs NAS,
+3. zurückgeholt, Gegenprobe `tar tzf` schlägt fehl (**gut so**), age-Kopf da,
+4. entschlüsselt, ausgepackt, Datenbank geöffnet: `integrity_check: ok`,
+   4 Nutzer, 217 Wünsche,
+5. aufgeräumt.
+
+Das lief in einem **eigenen Prüfverzeichnis** auf dem NAS. Der Grund ist eine
+Kleinigkeit mit Folgen: dort lagen exakt sieben Backups, die Rotation hält
+sieben – ein Testlauf ins echte Verzeichnis hätte das älteste (10.08.)
+gelöscht. Nach dem Aufräumen stehen dort unverändert dieselben sieben.
+
+### Was noch fehlt – die Wünsche bleiben offen
+
+**Die Verschlüsselung ist ausgeliefert, aber noch nicht scharf.**
+`BACKUP_AGE_RECIPIENT` ist leer, bis Andi seinen öffentlichen Schlüssel
+einträgt; bis dahin läuft das Backup weiter unverschlüsselt und sagt das jede
+Nacht als Warnung ins Log. Einschalten ist eine `.env`-Zeile plus
+`docker compose up -d util`, kein Rebuild – dasselbe Stufen-Prinzip wie bei
+#140/#142.
+
+Deshalb sind **beide Wünsche bewusst nicht abgehakt**. Rückfrage hängt an
+#211 (mit der Anleitung zum `age-keygen`), Notiz an #130 – bewusst nur eine
+Frage, damit nicht zweimal derselbe Push kommt.
+
+Offen bleibt ausserdem, unverändert und ohne neuen Push: Andi wollte die
+beiden NAS-Fingerabdrücke am Gerät selbst gegenlesen (Frage vom 12.08.,
+Punkt 1). Ich habe es der neuen Frage als Erinnerung angehängt statt es als
+eigene Frage zu stellen – dieselbe Frage ein zweites Mal zu stellen ist genau
+das, was der Stundenlauf nicht tun soll.
+
+Keine Hilfe-App-Ergänzung: Backups sind nichts, was die Familie bedient, und
+`hilfe.html` erwähnt sie folgerichtig an keiner Stelle.
+
+---
+
 ## 2026-08-13 – CLAUDE.md überholt, Guardrails scharf, Stundenlauf wieder an
 
 Kein Portal-Code, keine Auslieferung. Drei Dinge an der Arbeitsumgebung.

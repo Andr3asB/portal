@@ -1,8 +1,8 @@
 """
-Tägliches Backup: /data → NAS per SSH (tar + pipe, kein rsync-Daemon nötig).
+Tägliches Backup: /data → NAS per SSH (tar über SSH, kein rsync-Daemon nötig).
 
-Zwei Dinge, die hier anders sind als man zunächst erwartet – beide aus dem
-Sicherheitsaudit vom 11.08.2026, beide mit echtem Schaden davor:
+Drei Dinge, die hier anders sind als man zunächst erwartet – alle aus dem
+Sicherheitsaudit vom 11.08.2026, alle mit echtem Schaden davor:
 
 **1. Die Live-Datenbank wird NICHT eingepackt.**
 `tar` las bis dahin `/data/portal.db`, während Gunicorn hineinschrieb. Ändert
@@ -38,13 +38,44 @@ darf sich nicht darauf verlassen, dass eine Einstellung auf einem fremden
 Gerät vorhanden und korrekt ist. Ist sie es, gewinnt der erzwungene Befehl;
 ist sie es nicht, trägt dieser hier das Backup allein.
 
+**3. Der Datenstrom wird verschlüsselt, bevor er das Haus verlässt.**
+Bis v211 lag auf dem NAS die komplette Familiendatenbank im Klartext – alle
+Kassenbuchbeträge, privaten Aufgaben, Geburtstage, Wünsche und Vokabeln. Wer
+Zugriff aufs NAS-Volume hatte oder auf ein Backup des NAS, hatte alles.
+(Entlastend, aber nur dafür: seit Stufe 6 stehen in der DB nur noch HMACs der
+Zugangstokens – ein erbeutetes Backup gibt also KEINEN Portalzugang.)
+
+Verschlüsselt wird **asymmetrisch mit `age`** gegen einen öffentlichen
+Schlüssel aus `BACKUP_AGE_RECIPIENT`. Andis Entscheidung vom 13.08.2026
+(Wunsch #130/#211); die Alternative wäre ein symmetrischer Schlüssel aus der
+`.env` gewesen. Der Unterschied ist nicht akademisch: symmetrisch schützt nur
+die Kopie auf dem NAS, denn wer `home02` hat, hat auch den Schlüssel.
+Asymmetrisch schützt auch dagegen – **der private Schlüssel liegt weder auf
+home02 noch auf dem NAS**, sondern nur bei Andi.
+
+Der Preis dafür steht hier, damit ihn niemand später übersieht: **Ist der
+private Schlüssel weg, sind alle Backups Datenmüll.** Es gibt keine
+Hintertür, das ist der Sinn der Sache.
+
+>>> WIEDERHERSTELLUNG einer `portal-*.tar.gz.age`:
+>>>     age -d -i <privater-schluessel> -o portal.tar.gz portal-….tar.gz.age
+>>>     tar xzf portal.tar.gz
+>>> Danach wie unten: den neuesten `./snapshots/portal-*.db` nach
+>>> `/data/portal.db`. Ausführlich in server.md, „Wiederherstellung".
+
+Fehlt `BACKUP_AGE_RECIPIENT`, läuft das Backup **unverschlüsselt** weiter und
+sagt das bei jedem Lauf als Warnung ins Log. Steht dort ein unbrauchbarer
+Wert, fällt das Backup aus – absichtlich, denn ein stiller Rückfall auf
+Klartext wäre genau die Sorte Fehler, die hier zweimal Schaden gemacht hat.
+
 Konfiguration via .env:
-  BACKUP_NAS_HOST   IP des NAS         (default: 10.60.0.4)
-  BACKUP_NAS_USER   SSH-User auf NAS   (default: familienportal)
-  BACKUP_NAS_PATH   Zielpfad auf NAS   (default: /volume2/portal.16schwaben.de_Backup)
-  BACKUP_NAS_PORT   SSH-Port           (default: 2222)
+  BACKUP_NAS_HOST        IP des NAS         (default: 10.60.0.4)
+  BACKUP_NAS_USER        SSH-User auf NAS   (default: familienportal)
+  BACKUP_NAS_PATH        Zielpfad auf NAS   (default: /volume2/portal.16schwaben.de_Backup)
+  BACKUP_NAS_PORT        SSH-Port           (default: 2222)
+  BACKUP_AGE_RECIPIENT   öffentlicher age-Schlüssel (age1…), leer = unverschlüsselt
 """
-import logging, os, subprocess
+import logging, os, re, subprocess, tempfile
 from pathlib import Path
 
 import db_snapshot
@@ -59,6 +90,24 @@ SSH_KEY  = "/ssh/id_ed25519"
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 
 KNOWN_HOSTS = "/ssh/known_hosts"
+
+# Wunsch #130/#211: oeffentlicher age-Schluessel. Nur der oeffentliche Teil
+# steht hier - der private liegt bei Andi und kommt weder in dieses Repo noch
+# auf home02 oder das NAS.
+AGE_RECIPIENT = os.environ.get("BACKUP_AGE_RECIPIENT", "").strip()
+
+# age1 + bech32 (ohne 1, b, i, o). Die Laenge steht bewusst als Bereich da und
+# nicht exakt: geprueft wird "sieht aus wie ein age-Schluessel", damit ein
+# Tippfehler VOR dem Anfassen des NAS auffaellt. Die echte Pruefung macht age
+# selbst - diese hier soll nur verhindern, dass ein halber Schluessel erst
+# nachts um drei als Fehlschlag sichtbar wird.
+_RECIPIENT_MUSTER = re.compile(r"^age1[02-9ac-hj-np-z]{50,70}$")
+
+# Erst unter diesem Namen hochladen, dann umbenennen. Der Name faengt bewusst
+# NICHT mit "portal-" an: die Rotation unten zaehlt "portal-*", und ein
+# liegengebliebener Teil-Upload wuerde dort sonst als vollwertiges Backup
+# mitzaehlen und ein echtes aus den sieben herausdraengen.
+_UPLOAD_TEIL = ".upload.part"
 
 # Wunsch #211 (Audit-Befund F-03): Vorher stand hier StrictHostKeyChecking=no
 # und es gab gar keine known_hosts - der Container nahm JEDEN Host an, der
@@ -104,11 +153,24 @@ SSH_OPTS = [
 # aktivem `command=` wuerde eine zweite Verbindung nur ein weiteres, leeres
 # Archiv anlegen (der erzwungene Befehl laeuft ja erneut) - und genau das
 # wuerde die 7er-Rotation auffressen.
-_REMOTE_CMD = (
-    "umask 077; "
-    f"f={NAS_PATH}/portal-$(date +%Y%m%d-%H%M%S).tar.gz; "
-    f'cat > "$f" && ls -t {NAS_PATH}/portal-*.tar.gz | tail -n +8 | xargs -r rm -f'
-)
+# Seit v212 zusaetzlich zweistufig: erst nach _UPLOAD_TEIL schreiben, auf
+# "nicht leer" pruefen, dann umbenennen. Bricht die Uebertragung ab, liegt
+# danach ein .part herum statt eines abgeschnittenen Archivs, das aussieht wie
+# ein gutes - und die Rotation laeuft gar nicht erst an. Frueher konnte ein
+# halber Datenstrom ein vollstaendiges Backup aus den sieben verdraengen.
+#
+# Die Rotation zaehlt "portal-*.tar.gz*" mit Stern am Ende, damit sie
+# verschluesselte (.tar.gz.age) und alte unverschluesselte Archive GEMEINSAM
+# rotiert. Ohne den Stern waeren es nach der Umstellung zwei getrennte
+# Bestaende zu je sieben.
+def _remote_cmd(endung: str) -> str:
+    return (
+        "umask 077; "
+        f"cd {NAS_PATH} && "
+        f"cat > {_UPLOAD_TEIL} && [ -s {_UPLOAD_TEIL} ] && "
+        f"mv {_UPLOAD_TEIL} portal-$(date +%Y%m%d-%H%M%S){endung} && "
+        "ls -t portal-*.tar.gz* | tail -n +8 | xargs -r rm -f"
+    )
 
 
 def run():
@@ -122,6 +184,15 @@ def run():
         log.error("known_hosts %s fehlt – Backup übersprungen. Schlüssel des "
                   "NAS prüfen und aufnehmen, siehe Kommentar in backup.py",
                   KNOWN_HOSTS)
+        return
+    if AGE_RECIPIENT and not _RECIPIENT_MUSTER.match(AGE_RECIPIENT):
+        # Kein Rueckfall auf unverschluesselt. Wer einen Schluessel eintraegt,
+        # will Verschluesselung - dann ist ein ausgefallenes Backup im Log das
+        # ehrlichere Ergebnis als ein Klartext-Archiv auf dem NAS, das niemand
+        # bemerkt.
+        log.error("BACKUP_AGE_RECIPIENT ist kein age-Schlüssel (erwartet "
+                  "age1…) – Backup übersprungen, es wird NICHT unverschlüsselt "
+                  "gesichert. Wert prüfen: %r", AGE_RECIPIENT[:12] + "…")
         return
 
     log.info("Backup → %s:%s (Dateiname vergibt das NAS)", NAS_HOST, NAS_PATH)
@@ -151,22 +222,101 @@ def _frischer_snapshot() -> Path:
 
 
 def _transfer():
-    tar = subprocess.Popen(
+    """Packen → (verschlüsseln) → senden, jede Stufe einzeln geprüft.
+
+    Bis v211 war das EINE Pipe (`tar | ssh`). Das ist elegant, aber es gibt
+    keinen Punkt, an dem man das Ergebnis noch ansehen kann, bevor es beim
+    Empfänger liegt – und mit Verschlüsselung wäre genau dort die gefährlichste
+    Frage unbeantwortet geblieben: *ist der Strom, der rausgeht, wirklich
+    verschlüsselt?* Deshalb jetzt über eine Zwischendatei. Das ist bezahlbar,
+    weil `/data` rund 18 MB gross ist; bei Gigabytes wäre die Abwägung eine
+    andere."""
+    with tempfile.TemporaryDirectory(prefix="backup-") as tmp:
+        archiv = _packen(Path(tmp) / "portal.tar.gz")
+
+        if AGE_RECIPIENT:
+            archiv = _verschluesseln(archiv)
+            endung = ".tar.gz.age"
+        else:
+            log.warning("BACKUP_AGE_RECIPIENT ist nicht gesetzt – das Backup "
+                        "geht UNVERSCHLÜSSELT aufs NAS (Wunsch #130/#211).")
+            endung = ".tar.gz"
+
+        _senden(archiv, endung)
+
+
+def _packen(ziel: Path) -> Path:
+    ergebnis = subprocess.run(
         # Die Live-DB (und ihre WAL-/SHM-Begleiter) bleiben draussen, siehe
         # Modul-Docstring. Das Muster trifft nur die oberste Ebene - die
         # Snapshots heissen ./snapshots/portal-*.db und bleiben drin.
-        ["tar", "czf", "-", "--exclude=./portal.db*", "-C", DATA_DIR, "."],
-        stdout=subprocess.PIPE,
+        ["tar", "czf", str(ziel), "--exclude=./portal.db*", "-C", DATA_DIR, "."],
+        capture_output=True,
     )
-    ssh = subprocess.Popen(
-        SSH_OPTS + [_REMOTE_CMD],
-        stdin=tar.stdout,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+
+    # GNU tar unterscheidet: 1 = Warnungen ("some files differ", typisch wenn
+    # sich eine Datei waehrend des Lesens aendert), 2 = fataler Fehler.
+    # Vorher galt beides als Fehlschlag, und genau das hat im August 2026 drei
+    # von sechs Naechten als Totalausfall gemeldet, obwohl das Archiv
+    # vollstaendig war. Seit die Live-DB draussen bleibt, kann eine 1 nur noch
+    # von einer nebenher geschriebenen Mediendatei kommen (vokabel_audio) - das
+    # Archiv ist dann bis auf diese eine Datei brauchbar, und die Datenbank
+    # darin ohnehin ein sauberer Snapshot. Deshalb: sichtbar protokollieren,
+    # aber nicht mehr das ganze Backup verwerfen.
+    if ergebnis.returncode == 1:
+        log.warning("tar meldete Warnungen (Exit 1) - eine Datei hat sich "
+                    "waehrend des Lesens geaendert. Datenbank-Snapshot ist "
+                    "davon nicht betroffen, Archiv wurde uebertragen.")
+    elif ergebnis.returncode != 0:
+        text = ergebnis.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(f"tar exit {ergebnis.returncode}: {text[:200]}")
+
+    if not ziel.exists() or ziel.stat().st_size == 0:
+        raise RuntimeError("Archiv ist leer – nichts zu sichern")
+    return ziel
+
+
+def _verschluesseln(quelle: Path) -> Path:
+    """Gegen den öffentlichen Schlüssel verschlüsseln – und nachsehen, ob es
+    geklappt hat.
+
+    Die Nachprüfung ist der Kern: `age` würde bei einem Fehler zwar mit != 0
+    enden, aber die einzige Frage, auf die es hier wirklich ankommt, ist nicht
+    „lief das Programm durch", sondern „steht in der Datei, die gleich das Haus
+    verlässt, wirklich kein Klartext mehr". Also wird der age-Kopf gelesen.
+    Ohne ihn: Abbruch, nichts geht raus."""
+    ziel = quelle.with_name(quelle.name + ".age")
+    ergebnis = subprocess.run(
+        ["age", "-r", AGE_RECIPIENT, "-o", str(ziel), str(quelle)],
+        capture_output=True,
     )
-    tar.stdout.close()
-    _, stderr = ssh.communicate(timeout=600)
-    tar.wait()
+    if ergebnis.returncode != 0:
+        text = ergebnis.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(f"age exit {ergebnis.returncode}: {text[:200]}")
+
+    kopf = ziel.read_bytes()[:21] if ziel.exists() else b""
+    if kopf != b"age-encryption.org/v1":
+        raise RuntimeError(
+            "age hat keine verschlüsselte Datei erzeugt (Kopf fehlt) – "
+            "es wird nichts übertragen")
+
+    # Den Klartext sofort loswerden, nicht erst mit dem Temp-Verzeichnis am
+    # Ende: solange er daneben liegt, kann ihn ein spaeterer Fehler in
+    # _senden() versehentlich zum Hochladen anbieten.
+    quelle.unlink()
+    log.info("Archiv verschlüsselt (age, %.1f MB)", ziel.stat().st_size / 1e6)
+    return ziel
+
+
+def _senden(datei: Path, endung: str):
+    with datei.open("rb") as strom:
+        ssh = subprocess.Popen(
+            SSH_OPTS + [_remote_cmd(endung)],
+            stdin=strom,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        _, stderr = ssh.communicate(timeout=600)
 
     if ssh.returncode != 0:
         # errors="replace": Antwortet die Gegenseite mit etwas Binaerem (im
@@ -176,19 +326,3 @@ def _transfer():
         # genau in dem Moment weg, in dem man sie am dringendsten braucht.
         text = stderr.decode("utf-8", "replace").strip()
         raise RuntimeError(f"SSH exit {ssh.returncode}: {text[:200]}")
-
-    # GNU tar unterscheidet: 1 = Warnungen ("some files differ", typisch wenn
-    # sich eine Datei waehrend des Lesens aendert), 2 = fataler Fehler.
-    # Vorher galt beides als Fehlschlag, und genau das hat im August 2026 drei
-    # von sechs Naechten als Totalausfall gemeldet, obwohl der Datenstrom
-    # vollstaendig uebertragen war. Seit die Live-DB draussen bleibt, kann eine
-    # 1 nur noch von einer nebenher geschriebenen Mediendatei kommen
-    # (vokabel_audio) - das Archiv ist dann bis auf diese eine Datei brauchbar,
-    # und die Datenbank darin ohnehin ein sauberer Snapshot. Deshalb: sichtbar
-    # protokollieren, aber nicht mehr das ganze Backup verwerfen.
-    if tar.returncode == 1:
-        log.warning("tar meldete Warnungen (Exit 1) - eine Datei hat sich "
-                    "waehrend des Lesens geaendert. Datenbank-Snapshot ist "
-                    "davon nicht betroffen, Archiv wurde uebertragen.")
-    elif tar.returncode != 0:
-        raise RuntimeError(f"tar exit {tar.returncode}")
