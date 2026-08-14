@@ -564,9 +564,20 @@
         platzhalter.remove();
         schatten.remove();
         eintrag.style.display = '';
-        opt.speichern([...document.querySelectorAll(opt.eintrag)]
-          .filter(el => !el.classList.contains('gepackt'))
-          .map(opt.idAus));
+        if (opt.spalten) {
+          // Wunsch #224: Beim Kanban-Brett zaehlt nicht die Gesamtliste,
+          // sondern die ZIELSPALTE - ihre Reihenfolge ist die Priorisierung,
+          // und die Spalte selbst ist der neue Status. `speichern` bekommt
+          // deshalb zusaetzlich das Spaltenelement.
+          const spalte = eintrag.closest(opt.spalten);
+          opt.speichern(
+            [...spalte.querySelectorAll(opt.eintrag)].map(opt.idAus),
+            spalte, eintrag);
+        } else {
+          opt.speichern([...document.querySelectorAll(opt.eintrag)]
+            .filter(el => !el.classList.contains('gepackt'))
+            .map(opt.idAus));
+        }
       }
       zustand = null;
     }
@@ -607,6 +618,32 @@
     function folge(e) {
       const { eintrag, schatten, platzhalter, abstandY } = zustand;
       schatten.style.top = `${e.clientY - abstandY}px`;
+
+      // Wunsch #224: Nur wenn `opt.spalten` gesetzt ist, darf ein Eintrag die
+      // Gruppe WECHSELN. Ohne die Option bleibt unten alles wie gehabt - das
+      // ist wichtig, weil Packliste (#181) und Einkauf sich ausdruecklich
+      // darauf verlassen, dass NICHT quer gezogen werden kann.
+      if (opt.spalten) {
+        const spalte = [...document.querySelectorAll(opt.spalten)].find(s => {
+          const r = s.getBoundingClientRect();
+          return e.clientX >= r.left && e.clientX <= r.right &&
+                 e.clientY >= r.top  && e.clientY <= r.bottom;
+        });
+        const ziel = spalte || platzhalter.closest(opt.spalten);
+        if (!ziel) return;
+        const ablage = ziel.querySelector(opt.ablage) || ziel;
+        const kandidaten = [...ablage.querySelectorAll(opt.eintrag)]
+          .filter(el => el !== eintrag);
+        for (const el of kandidaten) {
+          const r = el.getBoundingClientRect();
+          if (e.clientY < r.top + r.height / 2) {
+            el.parentNode.insertBefore(platzhalter, el);
+            return;
+          }
+        }
+        ablage.appendChild(platzhalter);
+        return;
+      }
 
       // Wunsch #181: Nur Eintraege DERSELBEN Gruppe kommen als Ziel infrage.
       // Ohne `opt.gruppe` verhaelt sich alles wie vorher (flache Liste).

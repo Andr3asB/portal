@@ -1849,6 +1849,12 @@ def _init_db(app):
             # "plan_tag" (ISO-Datum) ist die neue, tatsaechlich genutzte Spalte.
             ("wochentag", "INTEGER"),
             ("plan_tag", "TEXT"),
+            # Wunsch #224: Reihenfolge INNERHALB einer Kanban-Spalte, also die
+            # Priorisierung von Hand. Bewusst eine eigene Spalte und keine
+            # Ableitung aus `erstellt`: Prioritaet ist eine Entscheidung, kein
+            # Zeitpunkt. Gilt je Status - beim Verschieben in eine andere
+            # Spalte wird sie dort neu vergeben.
+            ("position", "INTEGER NOT NULL DEFAULT 0"),
         ]:
             try:
                 db.execute(f"ALTER TABLE todos ADD COLUMN {col} {definition}")

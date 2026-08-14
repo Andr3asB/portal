@@ -2,6 +2,101 @@
 
 ---
 
+## 2026-08-14 – portal-v218: Kanban-Brett für die Aufgaben (#224)
+
+> „Ich brauche für meine Aufgaben eine Kanban-Ansicht, in der ich die Aufgaben
+> nach Status in Spalten und in der Reihenfolge nach Priorität sortieren und
+> hin und her schieben kann."
+
+Die halbe Arbeit war schon da: Die vier Status (`backlog`, `offen`,
+`in_arbeit`, `erledigt`) gibt es seit Wunsch #20. Neu sind die Ansicht und
+`todos.position` – die Reihenfolge **innerhalb** einer Spalte, also die
+Priorisierung von Hand.
+
+### Zwei Rechte, die auseinanderfallen
+
+Das ist die Entscheidung, um die es hier wirklich ging:
+
+* **Spalte wechseln** ändert den Zustand einer Aufgabe. Das verlangt dasselbe
+  wie das Abhaken (`_darf_erledigen`) – inklusive der Schärfung aus Wunsch
+  #214 (Audit-Befund F-06).
+* **Umsortieren** innerhalb einer Spalte darf jeder, der das Brett sieht. Das
+  ist Arbeitsorganisation, kein Eingriff in fremde Aufgaben – dasselbe Muster
+  wie `reorder()` in der Packliste („wer packen darf, darf auch sortieren").
+
+Wer nicht verschieben darf, bekommt statt des Griffs ein 🔒. Die Sperre steht
+serverseitig ohnehin; ein Griff, der zu 403 führt, wäre schlechte Bedienung.
+
+Dazu zwei Feinheiten, die beim Schreiben der Tests erst klar wurden:
+
+* Eine **unsichtbare** Aufgabe gibt **404, nicht 403** – ein 403 wäre eine
+  Existenzbestätigung.
+* Fremde IDs in der mitgeschickten Reihenfolge werden **still übergangen**,
+  die eigene Sortierung kommt trotzdem durch. Eine untergeschobene ID darf
+  weder etwas verändern noch den ganzen Vorgang scheitern lassen.
+
+Beim Bauen des Test-Bestands fiel auf, dass „sichtbar" und „änderbar" nicht
+dasselbe sind: Eine Aufgabe, die den Eltern zugewiesen ist, sieht das Kind gar
+nicht (404). Für den 403-Fall braucht es eine Aufgabe **ohne** Zuweisung –
+sichtbar über die dritte Bedingung in `_visible_todos`, aber nicht änderbar.
+Der erste Testentwurf lag genau daneben und ist deshalb rot geworden.
+
+### Der geteilte Zieh-Helfer kann jetzt Spalten – aber nur auf Ansage
+
+`ziehSortierung()` in `base.html` konnte bisher nur **innerhalb** einer Gruppe
+sortieren. Für ein Brett ist der Gruppenwechsel der Sinn der Sache. Die
+Erweiterung hängt deshalb an zwei neuen, optionalen Angaben (`spalten`,
+`ablage`) – ohne sie bleibt alles exakt wie vorher.
+
+Das ist keine Vorsicht um der Vorsicht willen: Packliste (#181) und Einkauf
+verlassen sich ausdrücklich darauf, dass man dort **nicht** quer ziehen kann –
+ein Eintrag in einer fremden Kategorie spränge beim nächsten Laden zurück,
+weil die Gruppierung serverseitig aus `kategorie_id` kommt.
+
+### Ein Wächter, der nicht anschlagen konnte
+
+`test_der_spaltenwechsel_ist_optional` prüfte in der ersten Fassung nur, ob
+die Zeichenkette `if (opt.spalten)` irgendwo in `ziehSortierung` steht. Bei der
+Gegenprobe – Bedingung in `folge()` entfernt – **blieb er grün**: Die
+Zeichenkette steht zweimal drin, einmal in `folge()` und einmal in `ende()`.
+
+Genau davor warnt `CLAUDE.md` („ein Wächter, der nicht anschlagen kann, ist
+schlimmer als keiner"), und es ist beim ersten Versuch trotzdem passiert. Der
+Test hängt jetzt an den einzelnen Funktionen; drei Gegenproben (Bedingung in
+`folge()` weg, in `ende()` weg, Packliste setzt die Option doch) machen ihn
+jeweils rot.
+
+**Die eigentliche Lehre ist nicht der Fehler, sondern dass er auffiel** – weil
+die Gegenprobe zum Verfahren gehört und nicht als Formalie abgehakt wird.
+
+### Die Kleinigkeit, die Vertrauen gekostet hätte
+
+Nach der Migration steht bei **jeder** bestehenden Aufgabe `position=0` (der
+DEFAULT). Mit einer naiven Sortierung stünde das Brett anfangs komplett
+gegenläufig zur Liste: älteste zuerst, während die Liste daneben neueste
+zuerst zeigt. Aufgefallen ist es erst nach dem Ausrollen von v217, beim Blick
+in die echten Daten – deshalb v218 hinterher.
+
+Gelöst mit zwei stabilen Sortierungen (erst `erstellt` absteigend, dann
+`position` aufsteigend), dasselbe Muster wie in `_visible_todos`. Ein eigener
+Test hält es fest, denn sobald einmal gezogen wurde, entscheidet nur noch
+`position` – der Fehler wäre danach unsichtbar geworden.
+
+### Prüfung
+
+22 eigene Tests, sieben Gegenproben. 1440 grün. `live_pruefung.py` grün, und
+die Brett-Seite steht jetzt in dessen `UNTERSEITEN` – sonst merkt niemand,
+wenn sie 500 wirft. Live gegengeprüft: 1/6/1/2 Karten passend zu den
+Kopfzahlen, Andi als Admin bekommt überall einen Griff, alle Skriptblöcke
+parsen (`node --check`, seit #223 fester Bestandteil der Auslieferung).
+
+**Was ein Skript nicht sehen kann und deshalb an Andi geht:** ob sich die
+Karten auf dem Telefon angenehm ziehen lassen – besonders das waagerechte
+Schieben des Bretts gegen das senkrechte Ziehen einer Karte. Genau an dieser
+Stelle ist Touch-Bedienung erfahrungsgemäß entweder gut oder zum Aufgeben.
+
+---
+
 ## 2026-08-14 – portal-v216: Der Packlisten-Filter bleibt stehen (#223)
 
 Andi hat den Wunsch auf `sehr_hoch` gesetzt, kurz nachdem der Stundenlauf

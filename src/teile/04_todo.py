@@ -56,7 +56,7 @@ wird für GENAU diesen Tag nicht nochmal angeboten (unabhängig vom
 Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
 from datetime import date, datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, abort
+from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
 
 bp  = Blueprint("todo_app", __name__)
@@ -131,10 +131,18 @@ def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,
     landet die Aufgabe im Backlog statt in Offen."""
     db = get_db()
     status = "backlog" if (zugewiesen_an is None and zugewiesen_rollen) else "offen"
+    # Wunsch #224: ans ENDE der eigenen Spalte, nicht auf Position 0. Dieselbe
+    # Lehre wie bei der Packliste (#178): Landet jeder neue Eintrag oben,
+    # schiebt er die von Hand sortierte Reihenfolge jedes Mal durcheinander -
+    # und genau die ist hier die Priorisierung.
+    naechste = db.execute(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM todos WHERE status=?",
+        (status,)).fetchone()[0]
     db.execute(
-        "INSERT INTO todos(inhalt,erstellt_von,zugewiesen_an,privat,zugewiesen_rollen,status) "
-        "VALUES(?,?,?,?,?,?)",
-        (inhalt, erstellt_von, zugewiesen_an, 1 if privat else 0, zugewiesen_rollen, status),
+        "INSERT INTO todos(inhalt,erstellt_von,zugewiesen_an,privat,zugewiesen_rollen,status,position) "
+        "VALUES(?,?,?,?,?,?,?)",
+        (inhalt, erstellt_von, zugewiesen_an, 1 if privat else 0, zugewiesen_rollen,
+         status, naechste),
     )
     db.commit()
     if zugewiesen_an and zugewiesen_an != erstellt_von:
@@ -294,6 +302,113 @@ def set_status(token, tid):
     )
     db.commit()
     return redirect(url_for("todo_app.index", token=token))
+
+
+# ---------------------------------------------------------------------------
+# Wunsch #224: Kanban-Brett
+#
+# Die vier Status gibt es seit Wunsch #20, neu sind nur die Ansicht und die
+# Reihenfolge INNERHALB einer Spalte (`todos.position`).
+#
+# Zwei verschiedene Rechte, bewusst getrennt:
+#   * **Spalte wechseln** aendert den Zustand einer Aufgabe und verlangt
+#     deshalb dasselbe wie das Abhaken (`_darf_erledigen`).
+#   * **Umsortieren** innerhalb einer Spalte ist Arbeitsorganisation und steht
+#     jedem offen, der das Brett sieht - dasselbe Muster wie `reorder()` in
+#     17_packliste.py ("wer packen darf, darf auch sortieren").
+# ---------------------------------------------------------------------------
+
+def _sichtbare_ids(db, user) -> set:
+    """IDs, die dieser Nutzer ueberhaupt sehen darf.
+
+    Bewusst ueber `_visible_todos` und nicht ueber eine zweite, aehnliche
+    Abfrage: Genau solche Doppelungen sind in diesem Projekt schon zweimal
+    auseinandergelaufen (siehe `_darf_erledigen`, Audit-Befund F-06)."""
+    return {r["id"] for r in _visible_todos(db, user)}
+
+
+@bp.route("/a/todo/kanban", defaults={"token": None})
+@bp.route("/a/todo/<token>/kanban")
+def kanban(token):
+    user = check_grant(token, APP)
+    if not user:
+        return render_template("denied.html", reason="invalid"), 403
+    db = get_db()
+
+    spalten = {s: [] for s in STATUS_ORDER}
+    for row in _visible_todos(db, user):
+        eintrag = dict(row)
+        eintrag["darf_bewegen"] = _darf_erledigen(user, row)
+        # Ein unbekannter Status (Altbestand, spaeter entfernte Stufe) landet
+        # in "Offen" statt in einer unsichtbaren Spalte - sonst waere die
+        # Aufgabe auf dem Brett schlicht weg.
+        spalten["offen" if row["status"] not in spalten else row["status"]].append(eintrag)
+
+    for eintraege in spalten.values():
+        # Zwei stabile Sortierungen statt einer zusammengesetzten, weil der
+        # Gleichstand-Entscheider ANDERSHERUM laufen muss als die Position:
+        # erst `erstellt` absteigend, dann `position` aufsteigend.
+        #
+        # Der Gleichstand ist nicht theoretisch. Nach der Migration steht bei
+        # JEDER bestehenden Aufgabe position=0 (der DEFAULT) - ohne die
+        # zweite Zeile stuende das Brett anfangs komplett auf dem Kopf:
+        # aelteste zuerst, waehrend die Liste daneben neueste zuerst zeigt.
+        # Sobald einmal gezogen wurde, entscheidet ohnehin nur noch position.
+        eintraege.sort(key=lambda t: t["erstellt"] or "", reverse=True)
+        eintraege.sort(key=lambda t: t["position"] if t["position"] is not None else 0)
+
+    return render_template("todo_kanban.html",
+        user=user, token=token, farbe=user["farbe"],
+        spalten=spalten, status_order=STATUS_ORDER, status_labels=STATUS_LABELS,
+    )
+
+
+@bp.route("/a/todo/kanban/verschieben", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/todo/<token>/kanban/verschieben", methods=["POST"])
+def kanban_verschieben(token):
+    """Eine Bewegung auf dem Brett: Zielspalte plus deren neue Reihenfolge.
+
+    Geschickt wird nur die ZIELSPALTE. Die Herkunftsspalte braucht nichts:
+    ihre Luecke stoert nicht, Positionen muessen nicht lueckenlos sein."""
+    user = check_grant(token, APP)
+    if not user:
+        abort(403)
+
+    daten  = request.get_json(silent=True) or {}
+    tid    = to_int(daten.get("id"))
+    status = daten.get("status")
+    order  = daten.get("order")
+    if tid is None or status not in STATUS_ORDER or not isinstance(order, list):
+        abort(400)
+
+    db  = get_db()
+    row = db.execute("SELECT * FROM todos WHERE id=?", (tid,)).fetchone()
+    if not row:
+        abort(404)
+    sichtbar = _sichtbare_ids(db, user)
+    if tid not in sichtbar:
+        # 404 und nicht 403: Wer eine Aufgabe nicht sehen darf, soll auch
+        # nicht erfahren, dass es sie gibt.
+        abort(404)
+
+    if status != (row["status"] or "offen"):
+        if not _darf_erledigen(user, row):
+            abort(403)
+        erledigt = 1 if status == "erledigt" else 0
+        db.execute(
+            "UPDATE todos SET status=?, erledigt=?, "
+            "erledigt_am=CASE WHEN ?=1 THEN datetime('now') ELSE NULL END WHERE id=?",
+            (status, erledigt, erledigt, tid),
+        )
+
+    for platz, roh in enumerate(order):
+        andere = to_int(roh)
+        # Nur Sichtbares anfassen. Eine untergeschobene fremde ID veraendert
+        # damit nichts - und die eigene Sortierung bleibt trotzdem heil.
+        if andere is not None and andere in sichtbar:
+            db.execute("UPDATE todos SET position=? WHERE id=?", (platz, andere))
+    db.commit()
+    return jsonify(ok=True)
 
 
 @bp.route("/a/todo/bearbeiten/<int:tid>", defaults={"token": None}, methods=["POST"])

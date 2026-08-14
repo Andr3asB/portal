@@ -46,6 +46,7 @@ KENNUNG = "PRUEFUNG"
 UNTERSEITEN = {
     "admin": [("/a/admin/geraete", "Verwaltung › Geräte"),
               ("/a/admin/ki",      "Verwaltung › KI-Verbrauch")],
+    "todo":  [("/a/todo/kanban",   "Aufgaben › Brett")],
 }
 
 

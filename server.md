@@ -392,7 +392,26 @@ teile/
                        `_geraet_lesbar()` prueft von speziell nach allgemein
                        (Edge/Opera nennen sich auch "Chrome", jeder Chrome
                        nennt sich auch "Safari").
-  04_todo.py         – /a/todo/<token>/ Aufgabenliste; todos_neu() mit Push-Deep-Link;
+  04_todo.py         – /a/todo/<token>/ Aufgabenliste + /kanban Brett (#224);
+                       todos_neu() mit Push-Deep-Link;
+                       KANBAN (#224): /kanban zeigt dieselben Aufgaben in vier
+                       Spalten (die Status aus #20), /kanban/verschieben nimmt
+                       {id, status, order} als JSON. ZWEI RECHTE, bewusst
+                       getrennt: Spalte wechseln aendert den Zustand und
+                       verlangt `_darf_erledigen` (403); umsortieren innerhalb
+                       einer Spalte darf jeder, der das Brett sieht - dasselbe
+                       Muster wie `reorder()` in 17_packliste.py ("wer packen
+                       darf, darf auch sortieren"). Eine unsichtbare ID gibt
+                       404, nicht 403: ein 403 waere eine Existenzbestaetigung.
+                       Fremde IDs in `order` werden still uebergangen, die
+                       eigene Sortierung kommt trotzdem durch.
+                       `todos.position` ist die Prioritaet JE STATUS; neue
+                       Aufgaben landen am Ende ihrer Spalte (Lehre aus #178).
+                       Nach der Migration steht ueberall position=0 - deshalb
+                       sortiert `kanban()` in ZWEI stabilen Schritten, erst
+                       `erstellt` absteigend, dann `position` aufsteigend;
+                       ohne den Gleichstand-Entscheider stuende das Brett
+                       anfangs gegenlaeufig zur Liste.
                        Ziel: Person (zugewiesen_an, wie bisher) ODER eine/mehrere
                        Rollen bzw. "alle" (zugewiesen_rollen, kommagetrennt,
                        Sentinel "alle" – Wunsch #39); nur Rollen/Alle-Ziel landet
@@ -1784,6 +1803,18 @@ Text gekuerzt, ohne dass jemand den Grund sieht.
 
 `window.ziehSortierung({griff, eintrag, platzhalter, idAus, speichern})` in
 `base.html` - der gemeinsame Helfer fuer alle neuen Sortierungen.
+
+**`spalten:` + `ablage:`** (optional, Wunsch #224): Nur MIT diesen Angaben darf
+ein Eintrag seine Gruppe WECHSELN - gebraucht vom Kanban-Brett, wo die Spalte
+der Status ist. Ohne sie bleibt alles wie vorher, und das ist der Punkt:
+Packliste (#181) und Einkauf verlassen sich ausdruecklich darauf, dass man
+dort NICHT quer ziehen kann. `speichern` bekommt dann drei Argumente
+(`reihenfolge, spalte, eintrag`) statt einem, und die Reihenfolge ist die der
+ZIELSPALTE, nicht die der ganzen Seite.
+`tests/test_todo_kanban.py::test_der_spaltenwechsel_ist_optional` haelt beide
+Bedingungen fest - er prueft `folge()` und `ende()` EINZELN, weil eine
+Fassung, die nur nach der Zeichenkette im ganzen Helfer suchte, bei der
+Gegenprobe gruen blieb (die Zeichenkette steht zweimal drin).
 
 **Altbestand:** `packliste_kategorien.html` und `einkauf_laeden.html` haben je
 eine eigene, fast wortgleiche Fassung derselben ~120 Zeilen. Sie wurden bei
