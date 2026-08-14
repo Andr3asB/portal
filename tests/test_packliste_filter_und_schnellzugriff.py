@@ -206,6 +206,83 @@ def test_der_plus_knopf_sagt_welche_kategorie(seite, liste):
         f"Der Name nennt die Kategorie nicht: {aria.group(1)!r}")
 
 
+# ── #223: Der Filter bleibt, bis er zurückgesetzt wird ─────────────────────
+
+def _skript():
+    return PACKLISTE.read_text(encoding="utf-8")
+
+
+def test_der_filter_ueberlebt_das_verlassen_der_app():
+    """„Also auch wenn man die App verlässt und wieder zurückkommt, soll der
+    Filter noch immer da sein" – das ist localStorage, nicht sessionStorage.
+
+    Die Vokabel-App macht es bewusst andersherum (Wunsch #220 verlangte dort
+    wörtlich „solange der Benutzer die App nicht verlässt"). Zwei Apps, zwei
+    Zusagen – deshalb prüft dieser Test ausdrücklich das Gegenteil dessen,
+    was `test_vokabeln_filter.py` prüft."""
+    quelle = _skript()
+    assert "localStorage.setItem(FILTER_KEY" in quelle
+    assert "sessionStorage.setItem(FILTER_KEY" not in quelle
+
+
+def test_der_gemerkte_filter_wird_beim_laden_angewandt():
+    """Ohne diesen Aufruf läge der Filter zwar gespeichert vor, die Liste
+    zeigte aber wieder alles – und nach dem Anlegen eines Eintrags (Redirect,
+    also Neuladen) wäre er jedes Mal weg. Genau das war die Beschwerde."""
+    quelle = _skript()
+    assert re.search(r"^\s*filterWiederherstellen\(\);", quelle, re.M), (
+        "filterWiederherstellen() wird beim Laden nicht aufgerufen")
+
+
+def test_zuruecksetzen_loescht_auch_das_gemerkte():
+    """Der Fehler, der sich sonst einschleicht: Die Chips gehen aus, die
+    Liste ist wieder vollständig – und beim nächsten Öffnen ist der Filter
+    zurück, weil nur die Anzeige zurückgesetzt wurde."""
+    quelle = _skript()
+    block = quelle[quelle.index("function filterZuruecksetzen"):]
+    block = block[:block.index("\n}")]
+    assert "removeItem(FILTER_KEY)" in block, (
+        "Zurücksetzen entfernt den gemerkten Filter nicht - er käme beim "
+        "nächsten Öffnen wieder")
+
+
+def test_ein_aktiver_filter_ist_ueber_der_liste_sichtbar(seite):
+    """Ein Filter, der Tage überdauert, muss sich zeigen. Wer zurückkommt,
+    erinnert sich nicht – und eine Liste, die die Hälfte verschweigt, sieht
+    aus wie verlorene Einträge."""
+    assert 'id="filter-banner"' in seite
+    assert 'id="filter-banner-reset"' in seite, (
+        "Das Band nennt keinen Ausweg - „bis man den Filter zurück setzt“ "
+        "braucht eine Stelle, an der man genau das tut")
+
+
+def test_konstanten_stehen_vor_ihrer_benutzung():
+    """`const` liegt bis zur Deklaration in der temporalen Todeszone: Wer sie
+    weiter unten deklariert und oben benutzt, bekommt keinen `undefined`-Wert,
+    sondern einen ReferenceError – und der reisst den GESAMTEN Skriptblock
+    mit, nicht nur die eine Zeile.
+
+    Genau das ist beim Bauen von #223 passiert: `FILTER_KEY` brauchte `TOKEN`,
+    das 100 Zeilen weiter unten stand. Die Seite hätte gar kein JavaScript
+    mehr ausgeführt – kein Filter, kein Umsortieren, kein Abhaken."""
+    quelle = _skript()
+    skript = quelle[quelle.index("{% block extra_scripts %}"):]
+    # Kommentare heraus, sonst zaehlt der Test seine eigene Erklaerung mit -
+    # genau darueber ist er beim Schreiben gestolpert. Die Positionen bleiben
+    # erhalten (gleiche Laenge, Inhalt durch Leerzeichen ersetzt), damit der
+    # Vergleich unten weiter stimmt.
+    def _ohne(muster, text):
+        return re.sub(muster, lambda m: " " * len(m.group(0)), text, flags=re.S | re.M)
+    skript = _ohne(r"/\*.*?\*/", _ohne(r"//[^\n]*", skript))
+
+    for name in ("TOKEN", "TP"):
+        deklaration = skript.index(f"const {name}")
+        erste_nutzung = min(
+            (m.start() for m in re.finditer(rf"\b{name}\b", skript)), default=deklaration)
+        assert erste_nutzung >= deklaration, (
+            f"{name} wird vor seiner Deklaration benutzt - ReferenceError beim Laden")
+
+
 # ── Kein Knopf zeigt ins Leere ─────────────────────────────────────────────
 
 def test_jede_verdrahtete_aktion_existiert_auch():

@@ -957,6 +957,27 @@ teile/
                        UND Admin (vorher nur Admin, gleiches Muster wie
                        13_kinderplan.py) - Menuepunkte in base.html
                        entsprechend sichtbar.
+                       Wunsch #217/#218/#219 (v213): Filter ueber DREI
+                       Dimensionen (Person, Kategorie, Packstatus) - innerhalb
+                       einer Reihe ODER, zwischen den Reihen UND, eine leere
+                       Reihe filtert nicht. Pfeil zurueck an den Anfang, und
+                       ein Plus-Knopf je Kategorie-Ueberschrift, der das
+                       Formular oeffnet und die Kategorie vorbelegt.
+                       Wunsch #223 (v216): Der Filter liegt in **localStorage**
+                       und ueberdauert damit das Verlassen der App - bis er
+                       zurueckgesetzt wird. ACHTUNG, hier weichen zwei Apps
+                       bewusst voneinander ab: Der Vokabel-Filter (#220) nutzt
+                       sessionStorage, weil DORT woertlich "solange der
+                       Benutzer die App nicht verlaesst" verlangt war. Wer
+                       eines von beiden angleicht, bricht die Zusage des
+                       anderen; je ein Test haelt beide Richtungen fest.
+                       Weil der Filter jetzt Tage ueberdauert, steht ein Band
+                       ueber der Liste ("2 Filter sind aktiv - 7 von 23
+                       Eintraegen") samt Zuruecksetzen - ohne das saehe eine
+                       halb verschwiegene Liste aus wie verlorene Eintraege.
+                       Folge fuers Anlegen: Nach dem Redirect gilt der Filter
+                       weiter, ein neuer Eintrag, der nicht passt, bleibt
+                       ausgeblendet (ausdruecklich so gewuenscht).
   18_tvb.py           – /a/tvb/<token>/ Naechste Spiele, Ergebnisse und
                        Handball-Bundesliga-Tabelle des TVB Stuttgart
                        (Wunsch #120). Reiner Anzeige-Modus (keine

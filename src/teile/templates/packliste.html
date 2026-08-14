@@ -30,6 +30,19 @@
   background:none; border:none; color:var(--text-2); font-size:13px;
   text-decoration:underline; cursor:pointer; margin-top:8px; font-family:inherit;
 }
+/* Wunsch #223: Band ueber der Liste, solange ein Filter greift. */
+.filter-banner {
+  display:none; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--surface-2); border:1.5px solid var(--farbe); border-radius:12px;
+  padding:9px 12px; margin-bottom:12px; font-size:13px; color:var(--text);
+}
+.filter-banner.sichtbar { display:flex; }
+.filter-banner-reset {
+  background:none; border:none; color:var(--farbe); font-size:13px;
+  font-weight:600; font-family:inherit; text-decoration:underline;
+  cursor:pointer; flex-shrink:0;
+}
+body.packmodus .filter-banner { display:none !important; }
 .btn-neu-toggle, .btn-filter-toggle, .btn-packen-start {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
   color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
@@ -293,6 +306,17 @@ body.packmodus .item-name { font-size:18px; }
     <button type="button" class="filter-reset" id="filter-reset-btn">Filter zurücksetzen</button>
   </div>
 
+  {# Wunsch #223: Der Filter überlebt jetzt das Verlassen der App. Damit wird
+     ein Hinweis nötig, den es vorher nicht brauchte: Wer Tage später
+     zurückkommt, weiss nicht mehr, dass er gefiltert hat - und eine Liste,
+     die die Hälfte verschweigt, sieht aus wie verlorene Einträge. Das Band
+     steht deshalb ÜBER der Liste, nicht in der zugeklappten Filterkarte, und
+     trägt den Ausweg gleich mit. #}
+  <div class="filter-banner" id="filter-banner">
+    <span id="filter-banner-text">Filter aktiv</span>
+    <button type="button" class="filter-banner-reset" id="filter-banner-reset">Zurücksetzen</button>
+  </div>
+
   <div class="filter-card" id="packen-person-card">
     <div class="field-label">Für wen packst du gerade?</div>
     <div class="btn-row" id="packen-person-row">
@@ -389,6 +413,14 @@ body.packmodus .item-name { font-size:18px; }
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
 
+// Ganz nach oben, weil `const` in der temporalen Todeszone liegt: Wer sie
+// weiter unten deklariert und oben benutzt, bekommt keinen `undefined`-Wert,
+// sondern einen ReferenceError - und der reisst den GESAMTEN Skriptblock mit,
+// nicht nur die eine Zeile. Genau das ist beim Bauen von Wunsch #223
+// passiert, als FILTER_KEY den TOKEN brauchte.
+const TOKEN = {{ (token or '')|tojson }};
+const TP    = {{ tp|tojson }};
+
 /* --- Filter: Person (#178), Kategorie und Packstatus (#217) ------------ */
 
 // Die drei Zeilen des Filters. Innerhalb einer Zeile gilt ODER, zwischen den
@@ -445,6 +477,66 @@ function packlisteFilter() {
   // aus wie verlorene Eintraege.
   const knopf = document.getElementById('filter-toggle-btn');
   if (knopf) knopf.textContent = anzahl ? `🔍 Filter (${anzahl})` : '🔍 Filtern';
+
+  // Wunsch #223: Band ueber der Liste. Der Knopf allein reicht nicht mehr,
+  // seit der Filter Tage ueberdauert - wer zurueckkommt, erinnert sich nicht.
+  const band = document.getElementById('filter-banner');
+  if (band) {
+    band.classList.toggle('sichtbar', anzahl > 0);
+    const text = document.getElementById('filter-banner-text');
+    if (text) {
+      text.textContent = anzahl === 1
+        ? `🔍 Ein Filter ist aktiv – ${sichtbare} von ${document.querySelectorAll('.item-card').length} Einträgen`
+        : `🔍 ${anzahl} Filter sind aktiv – ${sichtbare} von ${document.querySelectorAll('.item-card').length} Einträgen`;
+    }
+  }
+
+  filterMerken();
+}
+
+/* --- Wunsch #223: Der Filter bleibt, bis er zurueckgesetzt wird ---------
+ *
+ * localStorage, nicht sessionStorage: Andi will ihn ausdruecklich auch nach
+ * dem Verlassen der App wiederfinden. (Die Vokabel-App macht es bewusst
+ * anders - dort verlangte Wunsch #220 woertlich "solange der Benutzer die
+ * App nicht verlaesst". Zwei Apps, zwei Zusagen, deshalb zwei Speicherorte.)
+ *
+ * Der zweite Teil des Wunsches faellt damit von selbst ab: Nach dem Anlegen
+ * eines Eintrags laedt die Seite neu (Redirect), der Filter wird
+ * wiederhergestellt - und ein neuer Eintrag, der nicht dazu passt, bleibt
+ * ausgeblendet. Genau das war verlangt.
+ */
+const FILTER_KEY = 'packliste_filter_' + (TOKEN || '');
+
+function filterMerken() {
+  const stand = {};
+  FILTER_ZEILEN.forEach(zeile => { stand[zeile] = _aktiveWerte(zeile); });
+  try { localStorage.setItem(FILTER_KEY, JSON.stringify(stand)); } catch (e) {}
+}
+
+function filterWiederherstellen() {
+  let stand;
+  try { stand = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); } catch (e) { return; }
+  if (!stand) return;
+  FILTER_ZEILEN.forEach(zeile => {
+    const werte = stand[zeile] || [];
+    document.querySelectorAll(zeile + ' .chip-btn').forEach(b => {
+      // Eine Kategorie kann geloescht oder eine Person entfernt worden sein -
+      // dann fehlt ihr Chip einfach, und der Rest des Filters gilt weiter.
+      b.classList.toggle('active', werte.includes(b.dataset.value));
+    });
+  });
+}
+
+function filterZuruecksetzen() {
+  FILTER_ZEILEN.forEach(zeile => {
+    document.querySelectorAll(zeile + ' .chip-btn.active')
+      .forEach(b => b.classList.remove('active'));
+  });
+  // Nicht nur die Knoepfe: Ohne das Entfernen waere der Filter beim naechsten
+  // Oeffnen wieder da, obwohl er sichtbar zurueckgesetzt wurde.
+  try { localStorage.removeItem(FILTER_KEY); } catch (e) {}
+  packlisteFilter();
 }
 
 (function () {
@@ -460,13 +552,11 @@ function packlisteFilter() {
       b.addEventListener('click', () => { b.classList.toggle('active'); packlisteFilter(); });
     });
   });
-  document.getElementById('filter-reset-btn').addEventListener('click', () => {
-    FILTER_ZEILEN.forEach(zeile => {
-      document.querySelectorAll(zeile + ' .chip-btn.active')
-        .forEach(b => b.classList.remove('active'));
-    });
-    packlisteFilter();
-  });
+  document.getElementById('filter-reset-btn').addEventListener('click', filterZuruecksetzen);
+  document.getElementById('filter-banner-reset')?.addEventListener('click', filterZuruecksetzen);
+
+  filterWiederherstellen();
+  packlisteFilter();
 })();
 
 /* --- Wunsch #219: direkt in eine Kategorie hinzufuegen ------------------ */
@@ -519,9 +609,6 @@ ziehSortierung({
     });
   },
 });
-
-const TOKEN = {{ (token or '')|tojson }};
-const TP    = {{ tp|tojson }};
 
 function toggleGepackt(id, cb) {
   const zielChecked = cb.checked;

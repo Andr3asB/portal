@@ -2,6 +2,80 @@
 
 ---
 
+## 2026-08-14 – portal-v216: Der Packlisten-Filter bleibt stehen (#223)
+
+Andi hat den Wunsch auf `sehr_hoch` gesetzt, kurz nachdem der Stundenlauf
+durchgelaufen war – ohne Priorität hätte die Automatik ihn nicht angefasst
+(#152), er kam deshalb erst auf direkte Anweisung dran.
+
+> „Filter in der Packliste … so lange erhalten bleiben, bis man den Filter
+> zurück setzt. Also auch wenn man die App verlässt und wieder zurückkommt …
+> Und auch beim absenden eines neuen Eintrags soll der Filter bestehen bleiben"
+
+Der Filter aus #217 lebte bisher **nur im DOM** – jedes Neuladen setzte ihn
+zurück, und das Anlegen eines Eintrags ist ein Redirect, also ein Neuladen.
+Genau daran ist Andi hängengeblieben.
+
+### localStorage – und warum die Vokabel-App das Gegenteil macht
+
+`localStorage`, nicht `sessionStorage`: Der Filter soll das Verlassen der App
+überdauern. **Die Vokabel-App (#220) benutzt bewusst sessionStorage**, weil
+dort wörtlich „solange der Benutzer die App nicht verlässt" verlangt war.
+
+Zwei Apps, zwei gegensätzliche Zusagen, und sie sehen im Code fast gleich aus
+– das ist die Sorte Unterschied, die beim nächsten Aufräumen „vereinheitlicht"
+wird. Deshalb hält **je ein Test beide Richtungen** fest und nennt im
+Docstring die jeweils andere Datei; `server.md` sagt es ebenfalls.
+
+Der zweite Teil des Wunsches fiel damit von selbst ab: Nach dem Anlegen lädt
+die Seite neu, der Filter wird wiederhergestellt – ein neuer Eintrag, der
+nicht dazu passt, bleibt ausgeblendet. Genau das war verlangt.
+
+### Was der Wunsch nicht sagte, aber nötig macht
+
+Ein Filter, der Tage überdauert, muss sich zeigen. Wer nach einer Woche
+zurückkommt, erinnert sich nicht – und eine Liste, die die Hälfte verschweigt,
+sieht aus wie verlorene Einträge. Über der Liste steht deshalb jetzt ein Band:
+**„🔍 2 Filter sind aktiv – 7 von 23 Einträgen"**, mit *Zurücksetzen* daneben.
+Der Zähler am Filterknopf allein reichte, solange der Filter mit dem Neuladen
+verschwand; ab jetzt nicht mehr.
+
+### Der Fehler, den ich mir dabei eingebaut habe
+
+`FILTER_KEY` braucht den `TOKEN` – und der wurde **100 Zeilen weiter unten**
+deklariert. `const` liegt bis zur Deklaration in der temporalen Todeszone:
+Das gibt keinen `undefined`-Wert, sondern einen **ReferenceError**, und der
+reisst den *gesamten* Skriptblock mit. Kein Filter, kein Umsortieren, kein
+Abhaken – die ganze Seite wäre tot gewesen.
+
+Aufgefallen ist es beim Lesen, nicht beim Testen, und das ist der eigentliche
+Punkt: **Eine pytest-Suite, die Vorlagen als Text prüft, kann so etwas
+prinzipiell nicht finden.** Zwei Konsequenzen gezogen:
+
+1. `TOKEN`/`TP` stehen jetzt ganz oben, und
+   `test_konstanten_stehen_vor_ihrer_benutzung` hält das fest. (Der Test ist
+   beim Schreiben über sich selbst gestolpert – er fand `TOKEN` in seinem
+   eigenen Erklärkommentar. Er blendet Kommentare jetzt aus, behält aber die
+   Zeichenpositionen bei, damit der Vergleich stimmt.)
+2. **Neu im Werkzeugkasten:** Nach dem Ausliefern wird die live gerenderte
+   Seite geholt und ihr JavaScript durch `node --check` geschickt. Alle sechs
+   Skriptblöcke der Packliste parsen sauber. Das findet Syntaxfehler, keine
+   Laufzeitfehler – aber genau die Klasse Fehler, die eine Vorlage still
+   unbrauchbar macht, während alle 1404 Tests grün bleiben.
+
+### Nicht angefasst
+
+`#139` und `#190`–`#193` stehen auf `zurueckgestellt` und bleiben es – auch
+bei „implementiere die Wünsche" (#61). `#130`/`#211` hängen weiter an Andis
+öffentlichem age-Schlüssel; `BACKUP_AGE_RECIPIENT` ist unverändert leer, und
+das Backup von heute 03:00 hat die Warnung wie vorgesehen ins Log geschrieben.
+Nicht noch einmal nachgefragt – die Frage steht seit gestern am Wunsch.
+
+1404 Tests grün, vier Gegenproben für die neuen Wächter gemacht,
+`live_pruefung.py` grün, Hilfe-App und `server.md` ergänzt.
+
+---
+
 ## 2026-08-14 – portal-v215: Neue App „Ausfälle" (#222), und #221 erledigt sich
 
 ### #221 zuerst: Andi hat geantwortet
