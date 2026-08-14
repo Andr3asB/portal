@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% set app_slug = "ausfaelle" %}
+{% block title %}Ausfälle{% endblock %}
+
+{% block extra_styles %}
+/* Wunsch #222: Der Melde-Knopf ist der einzige Grund, warum jemand diese App
+   im Auto öffnet. Er ist deshalb absichtlich groß, steht ganz oben und
+   braucht keinen zweiten Handgriff - kein Formular, keine Bestätigung. */
+.melden-btn {
+  width:100%; background:#d92d20; color:#fff; border:none; border-radius:16px;
+  padding:26px 16px; font-size:20px; font-weight:700; font-family:inherit;
+  cursor:pointer; box-shadow:0 2px 8px var(--shadow); margin-bottom:10px;
+}
+.melden-btn:disabled { opacity:.6; cursor:default; }
+.melde-status {
+  font-size:14px; color:var(--text-2); text-align:center; min-height:20px;
+  margin-bottom:16px; line-height:1.5;
+}
+.zahlen {
+  display:flex; gap:8px; margin-bottom:18px;
+}
+.zahl-karte {
+  flex:1; background:var(--surface); border-radius:14px; padding:12px;
+  text-align:center; box-shadow:0 1px 3px var(--shadow);
+}
+.zahl-wert  { font-size:24px; font-weight:700; color:var(--farbe); }
+.zahl-label { font-size:12px; color:var(--text-2); margin-top:2px; }
+
+.eintrag {
+  background:var(--surface); border-radius:14px; padding:12px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.eintrag-kopf { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.eintrag-zeit { flex:1; font-size:15px; font-weight:600; min-width:0; }
+.badge-person {
+  display:inline-flex; align-items:center; gap:3px;
+  border-radius:8px; padding:2px 8px; font-size:12px; font-weight:600;
+  white-space:nowrap;
+}
+.eintrag-meta { font-size:13px; color:var(--text-2); margin-top:4px; }
+.eintrag-meta a { color:var(--farbe); }
+.eintrag-notiz { font-size:14px; margin-top:6px; white-space:pre-wrap; }
+.notiz-fehlt { font-size:13px; color:var(--text-2); font-style:italic; margin-top:6px; }
+.notiz-panel { display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.notiz-panel.offen { display:block; }
+.notiz-feld {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:16px; font-family:inherit; box-sizing:border-box;
+  background:var(--surface); color:var(--text); min-height:70px; resize:vertical;
+}
+.notiz-feld:focus { border-color:var(--farbe); }
+.btn-speichern {
+  margin-top:10px; background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer;
+}
+.eintrag-knopf {
+  background:none; border:none; font-size:16px; cursor:pointer;
+  color:var(--text-2); flex-shrink:0;
+}
+.btn-loeschen-inline {
+  background:none; border:none; color:#ff3b30; font-size:13px;
+  cursor:pointer; padding:6px 0; margin-top:8px;
+}
+.empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<div class="nav-title">🚗 Ausfälle</div>
+<div class="nav-sub">{{ gesamt }} Eintrag{{ 'e' if gesamt != 1 else '' }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main">
+
+  <button type="button" class="melden-btn" id="melden-btn">⚠️ Ausfall melden</button>
+  <div class="melde-status" id="melde-status" aria-live="polite">
+    Ein Druck genügt – Zeitpunkt und Ort werden sofort festgehalten.
+  </div>
+
+  <div class="zahlen">
+    <div class="zahl-karte">
+      <div class="zahl-wert">{{ gesamt }}</div>
+      <div class="zahl-label">insgesamt</div>
+    </div>
+    <div class="zahl-karte">
+      <div class="zahl-wert">{{ letzte_30 }}</div>
+      <div class="zahl-label">letzte 30 Tage</div>
+    </div>
+  </div>
+
+  {% if eintraege %}
+  {% for e in eintraege %}
+  <div class="eintrag" id="eintrag-{{ e.id }}">
+    <div class="eintrag-kopf">
+      <span class="eintrag-zeit">{{ e.zeit_lokal }}</span>
+      {% if e.melder %}
+      <span class="badge-person" style="background:{{ e.melder_farbe }}22; color:{{ e.melder_farbe }}">{{ e.melder }}</span>
+      {% endif %}
+      {% if e.darf_aendern %}
+      <button class="eintrag-knopf" type="button"
+              data-klick="notizPanel" data-args='[{{ e.id }}]'
+              title="Notiz bearbeiten" aria-label="Notiz bearbeiten">✏️</button>
+      {% endif %}
+    </div>
+
+    <div class="eintrag-meta">
+      {% if e.lat is not none and e.lon is not none %}
+      📌 <a href="https://www.openstreetmap.org/?mlat={{ '%.5f'|format(e.lat) }}&mlon={{ '%.5f'|format(e.lon) }}#map=17/{{ '%.5f'|format(e.lat) }}/{{ '%.5f'|format(e.lon) }}"
+            target="_blank" rel="noopener noreferrer">{{ '%.5f'|format(e.lat) }}, {{ '%.5f'|format(e.lon) }}</a>
+      {%- if e.genauigkeit %} <span>(±{{ e.genauigkeit|round|int }} m)</span>{% endif %}
+      {% else %}
+      📌 <span>kein Ort erfasst</span>
+      {% endif %}
+    </div>
+
+    {% if e.notiz %}
+    <div class="eintrag-notiz">📝 {{ e.notiz }}</div>
+    {% else %}
+    <div class="notiz-fehlt">Keine Notiz</div>
+    {% endif %}
+
+    {% if e.darf_aendern %}
+    <div class="notiz-panel" id="notiz-panel-{{ e.id }}">
+      <form method="post" action="/a/ausfaelle{{ tp }}{{ e.id }}/notiz">
+        <textarea class="notiz-feld" name="notiz" placeholder="Was ist passiert? Was ging nicht mehr?">{{ e.notiz or '' }}</textarea>
+        <button type="submit" class="btn-speichern">Notiz speichern</button>
+      </form>
+      <form method="post" action="/a/ausfaelle{{ tp }}{{ e.id }}/loeschen"
+            data-bestaetigen="Diesen Eintrag vom {{ e.zeit_lokal }} wirklich löschen?">
+        <button type="submit" class="btn-loeschen-inline">🗑️ Eintrag löschen</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">
+    Noch kein Ausfall protokolliert 🚗<br>
+    <span style="font-size:13px">Beim nächsten Aussetzer oben auf den roten Knopf tippen.</span>
+  </div>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+const TP = {{ tp|tojson }};
+
+function notizPanel(id) {
+  document.getElementById('notiz-panel-' + id)?.classList.toggle('offen');
+}
+
+/* --- Wunsch #222: Melden in zwei Schritten -----------------------------
+ *
+ * Erst der Eintrag, dann der Ort. Genau in dieser Reihenfolge, und zwar aus
+ * einem Grund, der im Auto zaehlt: Die Ortung braucht Sekunden, kann
+ * abgelehnt werden oder in der Tiefgarage gar nicht klappen. Wuerde erst auf
+ * sie gewartet, ginge der Ausfall verloren, sobald jemand das Handy weglegt
+ * oder die Seite schliesst - und genau dann passieren diese Ausfaelle.
+ *
+ * Die Zeit kommt vom Server (siehe 25_ausfall.py). Sie ist die des
+ * Knopfdrucks, weil die Anfrage unmittelbar rausgeht.
+ */
+document.getElementById('melden-btn')?.addEventListener('click', async () => {
+  const knopf  = document.getElementById('melden-btn');
+  const status = document.getElementById('melde-status');
+  knopf.disabled = true;
+  knopf.textContent = 'Wird gespeichert …';
+
+  // Schritt 1: Eintrag anlegen. Passiert das nicht, ist alles andere egal.
+  let daten;
+  try {
+    const antwort = await fetch(`/a/ausfaelle${TP}melden`, {method: 'POST'});
+    daten = await antwort.json();
+    if (!daten.ok) throw new Error('Server meldet Fehler');
+  } catch (err) {
+    // Laut statt still: Wer glaubt, der Ausfall sei protokolliert, schaut
+    // spaeter in eine Liste, in der er fehlt.
+    console.error('Melden fehlgeschlagen', err);
+    status.textContent = 'Konnte nicht gespeichert werden – bitte nochmal versuchen.';
+    knopf.disabled = false;
+    knopf.textContent = '⚠️ Ausfall melden';
+    return;
+  }
+
+  status.textContent = `Erfasst um ${daten.zeit}. Ort wird gesucht …`;
+  knopf.textContent = '✓ Erfasst';
+
+  // Schritt 2: Ortung nachreichen. Schlaegt sie fehl, bleibt der Eintrag
+  // stehen - nur eben ohne Ort. Das ist ausdruecklich in Ordnung.
+  if (!navigator.geolocation) {
+    status.textContent = `Erfasst um ${daten.zeit}. (Dieses Gerät kann keinen Ort bestimmen.)`;
+    neuLaden();
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      await fetch(`/a/ausfaelle${TP}${daten.id}/position`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          genauigkeit: pos.coords.accuracy,
+        }),
+      });
+      status.textContent = `Erfasst um ${daten.zeit}, Ort gespeichert.`;
+    } catch (err) {
+      console.warn('Ort konnte nicht gespeichert werden', err);
+      status.textContent = `Erfasst um ${daten.zeit}. (Ort ging verloren.)`;
+    }
+    neuLaden();
+  }, (fehler) => {
+    console.warn('Ortung nicht möglich', fehler && fehler.message);
+    status.textContent = `Erfasst um ${daten.zeit}. (Kein Ort – Ortung nicht möglich.)`;
+    neuLaden();
+  }, {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
+
+  function neuLaden() {
+    // Kurz stehen lassen, damit die Meldung lesbar ist - danach zeigt die
+    // frisch geladene Liste den Eintrag mitsamt Ort.
+    setTimeout(() => location.reload(), 2500);
+  }
+});
+</script>
+{% endblock %}

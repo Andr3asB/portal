@@ -416,6 +416,27 @@ CREATE TABLE IF NOT EXISTS tvb_kader (
 -- Urheberschaft wird vergessen - dasselbe Muster wie bei `wuensche`.
 -- (Ohne diese Regel scheitert schon das Loeschen eines Nutzers an einer
 -- FOREIGN-KEY-Verletzung; genau daran liefen die Tests zuerst auf.)
+-- Wunsch #222: Ausfaelle des Infotainments protokollieren, fuer die Werkstatt.
+--
+-- `zeitpunkt` setzt der SERVER beim ersten Knopfdruck (datetime('now')), nicht
+-- der Browser. Andi verlangt ausdruecklich die Zeit des Knopfdrucks und nicht
+-- die des Speicherns - der Server bekommt die Meldung im selben Moment, und
+-- eine falsch gestellte Handy-Uhr kann so keinen Eintrag verfaelschen.
+--
+-- lat/lon/genauigkeit sind NULL, solange (oder falls) keine Position kommt:
+-- Die Ortung braucht Sekunden, kann abgelehnt werden oder in der Tiefgarage
+-- gar nicht klappen. Der Eintrag entsteht trotzdem sofort - ein Protokoll,
+-- das einen Ausfall verschluckt, weil GPS zickt, waere wertlos.
+CREATE TABLE IF NOT EXISTS ausfaelle (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  zeitpunkt   TEXT    NOT NULL DEFAULT (datetime('now')),
+  lat         REAL,
+  lon         REAL,
+  genauigkeit REAL,
+  notiz       TEXT,
+  erstellt    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS geburtstage (
   id           INTEGER PRIMARY KEY,
   name         TEXT    NOT NULL,
@@ -490,6 +511,7 @@ _CORE_APPS = [
     ("tvb",           "TVB",           "🤾", None),
     ("kassenbuch",    "Kassenbuch",    "🐷", "Taschengeld verwalten"),
     ("geburtstage",   "Geburtstage",   "🎂", "Wer wann Geburtstag hat"),
+    ("ausfaelle",     "Ausfälle",      "🚗", "Ausfälle des Infotainments protokollieren"),
 ]
 
 _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller", "Penny"]
@@ -2175,6 +2197,12 @@ def _init_db(app):
         # jeder traegt ein, jeder sieht alles. Ein Grant je Nutzer waere
         # nur Verwaltungsaufwand ohne Nutzen.
         _auto_grant_all(db, "geburtstage")
+        # Wunsch #222: Das Ausfallprotokoll gehoert zum Auto, also an die, die
+        # es fahren. Bewusst NICHT an alle: Ein Kind, das den grossen roten
+        # Knopf findet, traegt Ausfaelle ein, die es nicht gab - und der
+        # Ausdruck fuer die Werkstatt ist genau dann wertlos, wenn er
+        # angezweifelt werden kann.
+        _auto_grant_all(db, "ausfaelle", rollen=("eltern",))
         db.commit()
         db.close()
 

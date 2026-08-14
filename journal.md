@@ -2,6 +2,105 @@
 
 ---
 
+## 2026-08-14 – portal-v215: Neue App „Ausfälle" (#222), und #221 erledigt sich
+
+### #221 zuerst: Andi hat geantwortet
+
+> „(A) … ich habe nicht weit genug nach unten gescrollt und es gab noch keinen
+> Filter. Jetzt ist alles okay."
+
+Genau die Vermutung von gestern. Der Wunsch ist ohne eine Zeile Code
+abgehakt – die Funktion gab es seit #150, gefehlt hat die Auffindbarkeit, und
+die kam mit dem Kapitelfilter aus #220.
+
+Die Lehre steht in der Umsetzung am Wunsch, weil sie sich wiederholen wird:
+**Ein Test, der prüft, ob ein Wort auf der Seite steht, ist auch an Position
+72 grün.** „Implementiert" und „benutzbar" sind zwei verschiedene Dinge, und
+die Testsuite kann nur das erste.
+
+### #222 – ein Knopf, der nichts vergisst
+
+Neue App für ein sehr konkretes Problem: Das Infotainment im Enyaq stürzt ab,
+und die Werkstatt will Zahlen statt Erinnerungen.
+
+Der Satz, der den ganzen Aufbau bestimmt, steht wörtlich im Wunsch: *„Wichtig
+wäre das die GPS Position und die Uhrzeit vom ersten Knopfdruck gezogen wird
+und nicht erst mal speichern der Notiz."*
+
+Daraus folgt **kein Formular**, sondern drei Schritte:
+
+1. **Knopfdruck** → der Eintrag entsteht sofort, mit Zeit und Nutzer. Sonst
+   nichts.
+2. **Ortung** trudelt Sekunden später ein und wird nachgehängt.
+3. **Notiz** irgendwann danach, am Küchentisch.
+
+Die Reihenfolge ist der ganze Punkt. Würde erst auf die Ortung gewartet, ginge
+der Ausfall verloren, sobald sie scheitert (Tiefgarage, abgelehnt, altes
+Gerät) oder jemand das Handy weglegt – **und genau dann passieren diese
+Ausfälle.** Ein Protokoll, das den Vorfall verschluckt, für den es gebaut
+wurde, wäre schlimmer als keins. `test_gespeichert_wird_vor_der_ortung` wacht
+darüber, indem er die Reihenfolge im Skript prüft; die Gegenprobe (Ortung
+davor) macht ihn rot.
+
+**Die Zeit setzt der Server**, nicht der Browser. Der Knopfdruck löst die
+Anfrage unmittelbar aus, der Unterschied liegt im Millisekundenbereich – aber
+eine falsch gestellte Handy-Uhr kann so kein Protokoll verfälschen, das später
+in der Werkstatt auf dem Tisch liegt. Ein eigener Test schickt einen
+Zeitstempel von 1999 mit und prüft, dass er ignoriert wird.
+
+Zwei kleinere Entscheidungen, die sich erst beim Bauen ergaben:
+
+* **Eine Position wird nur einmal geschrieben.** Der erste Messwert gehört zum
+  Knopfdruck; ein zweiter (zweiter Tab, ungenauere Nachmessung) darf ihn nicht
+  verdrängen.
+* **Koordinaten werden auf ihren Wertebereich geprüft.** Eine unmögliche
+  Angabe wäre schlimmer als gar keine – sie sieht aus wie eine Angabe. NaN
+  fällt über denselben Vergleich mit heraus.
+
+**Freigabe nur an `eltern`**, nicht an alle. Ein Kind, das den großen roten
+Knopf findet, trägt Ausfälle ein, die es nicht gab – und der Ausdruck für die
+Werkstatt ist genau dann wertlos, wenn er angezweifelt werden kann. Auf dem
+Server hat die App damit Andi und Simone.
+
+Sehen dürfen alle mit der App alles, samt Melder – das verlangt der Wunsch
+ausdrücklich. Ändern und löschen nur Urheber oder Admin; Admin, damit sich ein
+Fehldruck aufräumen lässt.
+
+Oben stehen zwei Zahlen (gesamt / letzte 30 Tage). „Wie oft?" ist die erste
+Frage in der Werkstatt, die soll niemand abzählen müssen.
+
+### Was bewusst NICHT drin ist
+
+**Kein Offline-Betrieb.** Die Meldung braucht in dem Moment Netz. Ohne Empfang
+lässt sich nichts speichern – das steht so in der Hilfe, statt es zu
+verschweigen. Eine Warteschlange wäre ein eigener Umbau (bei der
+Einkaufsliste ist genau das seit #100 zurückgestellt) und war nicht Teil des
+Wunsches. Falls es im Alltag stört, ist es ein Folgewunsch.
+
+**Kein Export.** Der Wunsch verlangt, die Einträge zu *sehen*; ein PDF für die
+Werkstatt hat er nicht bestellt.
+
+### Prüfung
+
+23 eigene Tests, vier Gegenproben gemacht (Ortung zuerst, zweite Position
+überschreibt, Koordinaten ungeprüft, fremde Notiz änderbar) – alle vier rot.
+1399 grün insgesamt.
+
+Das Twemoji-SVG für 🚗 (`1f697.svg`) fehlte und wurde nachgeladen – ohne die
+Datei bliebe die App-Kachel unter Linux/Chrome leer (Wunsch #147).
+
+`live_pruefung.py` grün, jetzt mit 17 Apps. Auf dem Server gegengeprüft:
+App-Zeile, Tabelle und die beiden Grants stehen.
+
+**Was ein Skript nicht kann und deshalb Andis Handprüfung braucht:** der
+eigentliche Knopfdruck. Ich habe bewusst **keinen** Testeintrag im echten
+Protokoll erzeugt – Testmüll in echten Konten hat hier schon einmal zwei Tage
+in Friederikes Kassenbuch gestanden. Zu prüfen wären: fragt der Browser beim
+ersten Mal nach der Ortung, kommt eine Position an (und wie genau), und sieht
+die Meldung im Auto brauchbar aus.
+
+---
+
 ## 2026-08-13 – portal-v214: Vokabelfilter (#220) – und #221 war schon fertig
 
 ### #221 zuerst, weil er die Richtung von #220 bestimmt hat

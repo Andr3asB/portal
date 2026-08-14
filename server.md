@@ -1257,6 +1257,28 @@ teile/
                        Anfrage mehr durch; nur aufs Konto zu schauen
                        uebersieht ein aufgebrauchtes Monatslimit.
                        Betraege sind USD, nicht EUR (der Wunsch sagt Euro).
+  25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto
+                       (Wunsch #222). DREI Routen statt eines Formulars, und
+                       das ist der Kern: `melden` legt den Eintrag SOFORT an
+                       (nur Zeit + Nutzer), `position` haengt die Ortung
+                       Sekunden spaeter an, `notiz` kommt irgendwann danach.
+                       Grund steht woertlich im Wunsch - Zeit und Ort sollen
+                       vom ERSTEN Knopfdruck stammen, nicht vom Speichern der
+                       Notiz. Wuerde erst auf die Ortung gewartet, ginge der
+                       Eintrag verloren, sobald sie scheitert oder jemand das
+                       Handy weglegt; genau dann passieren diese Ausfaelle.
+                       Die Zeit setzt der SERVER (datetime('now')), nicht der
+                       Browser - eine falsch gestellte Handy-Uhr kann so kein
+                       Protokoll verfaelschen, das in der Werkstatt vorliegt.
+                       `position` schreibt nur, solange noch nichts drinsteht:
+                       der erste Messwert gehoert zum Knopfdruck, ein zweiter
+                       (zweiter Tab, ungenauere Nachmessung) darf ihn nicht
+                       verdraengen. Koordinaten werden auf Wertebereich
+                       geprueft - eine unmoegliche Angabe waere schlimmer als
+                       gar keine, weil sie wie eine Angabe aussieht.
+                       Sehen duerfen alle mit der App (der Wunsch verlangt
+                       alle Eintraege inklusive Benutzer), aendern und
+                       loeschen nur Urheber oder Admin.
                        `guthaben_pruefen()` laeuft stuendlich als Daemon-
                        Thread (Schalter `KI_GUTHABEN_WACHT`, im Test 0) und
                        legt bei <= 1,00 USD EINE Aufgabe fuer den ersten
@@ -1702,6 +1724,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `tvb` | TVB | 🤾 | Nächste Spiele, Ergebnisse und Handball-Bundesliga-Tabelle des TVB Stuttgart (Wunsch #120) | – (alle vier granted) |
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
+| `ausfaelle` | Ausfälle | 🚗 | Ausfallprotokoll fürs Auto: Knopfdruck hält Zeitpunkt und GPS fest, Notiz kommt hinterher (Wunsch #222) | ✅ nur `eltern` |
 
 ## Testdatenbank leeren (conftest.py)
 
