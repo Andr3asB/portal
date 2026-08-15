@@ -17,7 +17,7 @@
 /* Eingabe */
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 /* Wunsch #178: Zieh-Griff und Platzhalter beim Umsortieren */
-.item-drag-handle {
+.item-drag-handle { background:none; border:none; padding:0; font-family:inherit;
   font-size:15px; color:var(--text-2); cursor:grab; touch-action:none;
   flex-shrink:0; padding:0 2px;
 }
@@ -191,7 +191,7 @@ body.packmodus .item-name { font-size:18px; }
          {% if item.gepackt %}checked{% endif %}>
   {# Wunsch #178: nur bei offenen Einträgen – gepackte stehen in einem eigenen
      Abschnitt nach Packzeitpunkt, dort wäre Sortieren sinnlos. #}
-  {% if not item.gepackt %}<span class="item-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</span>{% endif %}
+  {% if not item.gepackt %}<button type="button" class="item-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>{% endif %}
   <span class="item-name">{{ item.name }}</span>
 
   {% if item.person_id %}

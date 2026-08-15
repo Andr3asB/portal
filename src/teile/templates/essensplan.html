@@ -55,7 +55,7 @@
   font-size:11px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px; flex:1;
 }
-.mahlzeit-drag-handle { font-size:15px; color:var(--text-2); cursor:grab; touch-action:none; }
+.mahlzeit-drag-handle { background:none; border:none; padding:0; font-family:inherit; font-size:15px; color:var(--text-2); cursor:grab; touch-action:none; }
 .mahlzeit-drag-handle:active { cursor:grabbing; }
 .mahlzeit-edit-toggle {
   background:none; border:none; font-size:15px; cursor:pointer; color:var(--text-2);
@@ -99,7 +99,7 @@
         <div class="mahlzeit-slot" data-tag="{{ tag.iso }}" data-mahlzeit="{{ mahlzeit }}">
           <div class="mahlzeit-kopf">
             <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
-            {% if eintrag %}<span class="mahlzeit-drag-handle" title="Verschieben">⠿</span>{% endif %}
+            {% if eintrag %}<button type="button" class="mahlzeit-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>{% endif %}
             <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
           </div>
           <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}">

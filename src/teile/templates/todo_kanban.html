@@ -55,7 +55,7 @@
   border-radius:8px; padding:1px 7px; font-size:11px; font-weight:600;
   white-space:nowrap;
 }
-.karte-griff {
+.karte-griff { background:none; border:none; padding:0; font-family:inherit;
   font-size:15px; color:var(--text-2); cursor:grab; touch-action:none;
   flex-shrink:0; padding:0 2px;
 }
@@ -67,6 +67,13 @@
 }
 .spalte-leer { font-size:12px; color:var(--text-2); text-align:center; padding:14px 4px; }
 .hinweis { font-size:13px; color:var(--text-2); margin-bottom:12px; line-height:1.5; }
+/* Wunsch #227 */
+.brett-meldung {
+  display:none; background:var(--surface-2); border:1.5px solid var(--farbe);
+  border-radius:12px; padding:9px 12px; margin-bottom:12px;
+  font-size:13px; line-height:1.45; color:var(--text);
+}
+.brett-meldung.sichtbar { display:block; }
 {% endblock %}
 
 {% block nav_title %}
@@ -90,10 +97,15 @@
     <a class="btn-zurueck" href="/a/todo{{ tp }}?ansicht=liste">☰ Liste</a>
   </div>
 
-  {{ teile.filter_karte(user, users, status_order, status_labels, mit_status=false) }}
+  {{ teile.filter_karte(user, users, status_order, status_labels, mit_status=true) }}
   {{ teile.neu_karte(users, rollen, rollen_labels, user.id) }}
 
   <div id="todo-keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">Keine Aufgabe passt zum Filter 🔍</div>
+
+  {# Wunsch #227: Ein Balken statt eines modalen Fensters. Eine Meldung, die
+     man wegtippen muss und die danach die Seite neu laedt, ist auf dem
+     Telefon die schlechteste aller Antworten auf einen Netz-Aussetzer. #}
+  <div class="brett-meldung" id="brett-meldung" role="status" aria-live="polite"></div>
 
   <div class="hinweis">
     Am Griff <span aria-hidden="true">⠿</span> ziehen: nach oben oder unten setzt die
@@ -118,7 +130,7 @@
              data-nutzer="{{ t.erstellt_von }},{{ t.zugewiesen_an or '' }}">
           <div class="karte-kopf">
             {% if t.darf_bewegen %}
-            <span class="karte-griff" title="Verschieben" aria-label="Verschieben">⠿</span>
+            <button type="button" class="karte-griff" title="Verschieben" aria-label="Verschieben">⠿</button>
             {% else %}
             {# Wunsch #10/#214: Wer die Aufgabe nicht abhaken darf, darf sie auch
                nicht verschieben - der Statuswechsel ist dasselbe Recht. Ein
@@ -180,29 +192,75 @@ ziehSortierung({
   spalten:     '.spalte',
   ablage:      '[data-ablage]',
   idAus:       el => parseInt(el.dataset.id, 10),
-  speichern:   (reihenfolge, spalte, eintrag) => {
-    const status = spalte.dataset.status;
-    fetch(`/a/todo${TP}kanban/verschieben`, {
+  speichern:   (reihenfolge, spalte, eintrag) => verschiebenSpeichern(
+    parseInt(eintrag.dataset.id, 10), spalte.dataset.status, reihenfolge),
+});
+
+/* --- Wunsch #227: Speichern, das einen Aussetzer aushaelt ---------------
+ *
+ * Vorher: JEDER Fehlschlag brachte ein modales Fenster und ein hartes
+ * `location.reload()`. Auf dem Telefon ist das die schlechteste aller
+ * Antworten - eine Sekunde ohne Empfang, und die halbe Bedienung ist weg,
+ * samt aufgeklapptem Formular und Filter.
+ *
+ * Der gemeldete Fehler liess sich hier nicht nachstellen: Alle POSTs, die
+ * am Server ankamen, wurden mit 200 beantwortet (Protokoll vom 15.08.), und
+ * ein simulierter Zug im Browser laeuft sauber durch. Die wahrscheinlichste
+ * Ursache ist der Service Worker: Bei einer Auslieferung ruft er
+ * `skipWaiting()` + `clients.claim()` und uebernimmt die offene Seite
+ * mitten im Betrieb - eine Anfrage, die genau dann laeuft, kann unter iOS
+ * scheitern, ohne je den Server zu erreichen. An dem Tag gingen vier
+ * Versionen raus, waehrend Andi das Brett benutzte.
+ *
+ * Deshalb hier kein Ratespiel um die Ursache, sondern eine Antwort, die
+ * jede transiente Stoerung ueberlebt:
+ *   1. EINMAL wiederholen (nach kurzer Pause) - deckt genau den Aussetzer ab.
+ *   2. Erst dann aufgeben, und dann NICHT die Seite wegwerfen, sondern die
+ *      Karte dorthin zuruecklegen, wo sie herkam.
+ *   3. Die echte Ursache nennen statt "hat nicht geklappt" - beim naechsten
+ *      Mal steht sie in der Meldung und muss nicht erraten werden.
+ */
+function meldung(text, dauerhaft) {
+  const balken = document.getElementById('brett-meldung');
+  if (!balken) return;
+  balken.textContent = text;
+  balken.classList.add('sichtbar');
+  clearTimeout(balken._weg);
+  if (!dauerhaft) balken._weg = setTimeout(() => balken.classList.remove('sichtbar'), 4000);
+}
+
+async function verschiebenSpeichern(id, status, reihenfolge, versuch = 1) {
+  // Woher die Karte kam - fuer den Rueckweg, falls es endgueltig scheitert.
+  const karte = document.getElementById('karte-' + id);
+  const herkunft = karte?.dataset.status;
+  try {
+    const antwort = await fetch(`/a/todo${TP}kanban/verschieben`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        id: parseInt(eintrag.dataset.id, 10),
-        status: status,
-        order: reihenfolge,
-      }),
-    }).then(antwort => {
-      if (!antwort.ok) throw new Error('HTTP ' + antwort.status);
-      zaehlerAuffrischen();
-    }).catch(err => {
-      // Laut statt still: Wer glaubt, die Aufgabe stehe jetzt in "In Arbeit",
-      // wundert sich beim naechsten Laden - und sucht sie in der falschen
-      // Spalte. Neu laden bringt den echten Stand zurueck.
-      console.error('Verschieben fehlgeschlagen', err);
-      alert('Das Verschieben konnte nicht gespeichert werden. Die Seite wird neu geladen.');
-      location.reload();
+      body: JSON.stringify({id, status, order: reihenfolge}),
     });
-  },
-});
+    if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
+    if (karte) karte.dataset.status = status;   // fuer Filter und naechsten Zug
+    zaehlerAuffrischen();
+    wendeTodoFilterAn();
+  } catch (fehler) {
+    if (versuch === 1) {
+      meldung('Verbindung stockt – wird nochmal versucht …');
+      await new Promise(r => setTimeout(r, 1200));
+      return verschiebenSpeichern(id, status, reihenfolge, 2);
+    }
+    console.error('Verschieben endgültig fehlgeschlagen', fehler);
+    // Zurueck an den Ausgangsplatz, statt die ganze Seite neu zu laden.
+    if (karte && herkunft) {
+      const ablage = document.querySelector(
+        `.spalte[data-status="${CSS.escape(herkunft)}"] [data-ablage]`);
+      if (ablage) ablage.appendChild(karte);
+      zaehlerAuffrischen();
+    }
+    meldung(`Nicht gespeichert (${fehler.message}). Die Aufgabe steht wieder, `
+            + `wo sie war – bitte nochmal versuchen.`, true);
+  }
+}
 
 // Zaehler und "nichts hier" nachfuehren - sonst zeigt die Spalte nach dem
 // Ziehen eine falsche Zahl an, und die leere Spalte behaelt ihren Hinweis
@@ -211,7 +269,21 @@ ziehSortierung({
 // Wunsch #225: zaehlt nur SICHTBARE Karten. Seit der Filter auch hier greift,
 // waere die Kopfzahl sonst eine Zahl fuer etwas, das man nicht sieht.
 function zaehlerAuffrischen() {
+  // Wunsch #229: Ein abgewaehlter Status blendet die GANZE SPALTE aus, nicht
+  // nur ihre Karten. Andis Beispiel: Filter auf Offen/In Arbeit/Erledigt ->
+  // Backlog erscheint gar nicht mehr. Eine leere Spalte stehen zu lassen waere
+  // die halbe Antwort - sie nimmt auf dem Telefon eine ganze Bildschirmbreite
+  // ein, obwohl man sie gerade weggefiltert hat.
+  //
+  // Keine Auswahl = kein Filter, also alle Spalten. Dieselbe Regel wie
+  // ueberall sonst im Portal.
+  const gewaehlt = [...document.querySelectorAll('#filter-status-row .chip-btn.active')]
+    .map(b => b.dataset.value);
+
   document.querySelectorAll('.spalte').forEach(spalte => {
+    const sichtbar = !gewaehlt.length || gewaehlt.includes(spalte.dataset.status);
+    spalte.style.display = sichtbar ? '' : 'none';
+
     const anzahl = [...spalte.querySelectorAll('.karte')]
       .filter(k => k.style.display !== 'none').length;
     const zahl = spalte.querySelector('[data-zahl-fuer]');
@@ -224,7 +296,7 @@ function zaehlerAuffrischen() {
 // wieder einblendet (siehe todo_teile.html).
 window.nachDemFiltern = zaehlerAuffrischen;
 
-{{ teile.gemeinsame_skripte('.karte', mit_status=false) }}
+{{ teile.gemeinsame_skripte('.karte', gruppen_label=false) }}
 
 zaehlerAuffrischen();
 </script>

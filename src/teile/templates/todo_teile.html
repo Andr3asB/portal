@@ -215,9 +215,11 @@
    kein eigenes Skript-Element - `test_csp.py` liesse eines ohne Nonce auch
    gar nicht durch, und es hat beim Schreiben dieser Zeile prompt
    angeschlagen, weil das Wort als Beispiel im Kommentar stand. #}
-{% macro gemeinsame_skripte(eintrag_auswahl, mit_status=true) %}
+{% macro gemeinsame_skripte(eintrag_auswahl, gruppen_label=true) %}
 const FILTER_EINTRAG = {{ eintrag_auswahl|tojson }};
-const FILTER_MIT_STATUS = {{ mit_status|tojson }};
+// Nur die LISTE gruppiert mit Zwischenueberschriften; das Brett hat dafuer
+// seine Spalten (Wunsch #229).
+const FILTER_GRUPPEN_LABEL = {{ gruppen_label|tojson }};
 
 // Wunsch #93: Standardmäßig ist nur der "+ Neue Aufgabe"-Knopf sichtbar,
 // gleiches Muster wie in der Einkaufsliste (Wunsch #85) - Formular bleibt
@@ -289,7 +291,7 @@ function wendeTodoFilterAn() {
   // Status-Überschrift ausblenden, wenn darunter (bis zur nächsten
   // Überschrift) kein sichtbares Item mehr übrig ist. Nur die Liste hat
   // solche Überschriften - auf dem Brett übernimmt das die Spalte selbst.
-  if (FILTER_MIT_STATUS) {
+  if (FILTER_GRUPPEN_LABEL) {
     document.querySelectorAll('.section-label').forEach(label => {
       let el = label.nextElementSibling;
       let hatSichtbare = false;

@@ -2,6 +2,100 @@
 
 ---
 
+## 2026-08-15 – portal-v222: Drei Meldungen vom iPhone (#227, #228, #229)
+
+Andi hat das Brett unterwegs benutzt – und damit drei Dinge gefunden, die am
+Schreibtisch unsichtbar waren.
+
+### #228 – der Griff war 15 × 20 Pixel (gemessen, nicht geschätzt)
+
+Das Portal lokal gegen eine **Wegwerf-Datenbank** gestartet, im echten Browser
+nachgemessen: Der Ziehgriff war 15 × 20 px, ein danebenliegender echter Knopf
+im selben Moment 44 × 44.
+
+Die Ursache ist die Art von Detail, die man nie sucht: Die globale
+Tippflächen-Regel aus Wunsch #169 gibt **jedem `button`** unsichtbare 44 × 44 px
+– die Ziehgriffe waren aber `<span>`. Die Regel hat sie deshalb nie erreicht,
+und zwar in **allen fünf** Zieh-Listen des Portals (Brett, Packliste,
+Essensplan, zwei Kategorie-Seiten). Gemeldet wurde es nur am Brett, weil man
+dort quer über den Bildschirm zieht.
+
+Alle fünf sind jetzt echte `<button type="button">`. Nach der Auslieferung am
+laufenden Portal gegengeprüft: **44 × 44**.
+
+Zwei Fallen dabei, je ein Test: Ein `button` ohne `type` sendet in einem
+Formular ab – ein Ziehgriff, der beim Antippen speichert, wäre schlimmer als
+der Fehler, den wir beheben. Und ein `button` bringt Rahmen, Hintergrund und
+Systemschrift mit; ohne Zurücksetzen sähe aus jedem Griff ein grauer Kasten.
+
+### #227 – der Fehler liess sich nicht nachstellen, die Reaktion darauf war trotzdem falsch
+
+Im Protokoll steht: **Jeder POST, der den Server erreichte, wurde mit 200
+beantwortet.** Ein simulierter Zug im Browser läuft sauber durch. Die Meldung
+kam also nicht von einem abgelehnten Speichern.
+
+Wahrscheinlichste Ursache: der Service Worker. Bei einer Auslieferung ruft er
+`skipWaiting()` + `clients.claim()` und übernimmt die offene Seite mitten im
+Betrieb – eine Anfrage, die genau dann läuft, kann unter iOS scheitern, ohne
+je den Server zu erreichen. **An dem Tag gingen vier Versionen raus, während
+Andi das Brett benutzte.**
+
+Statt weiter zu raten habe ich die Reaktion repariert, denn die war unabhängig
+von der Ursache falsch: ein modales Fenster plus `location.reload()`. Auf dem
+Telefon räumt das bei einer Sekunde ohne Empfang die halbe Bedienung weg –
+aufgeklapptes Formular, Filter, Position in der Liste. Jetzt:
+
+1. **Einmal wiederholen** nach kurzer Pause – deckt genau den Aussetzer ab.
+2. Erst dann aufgeben, und dann die Karte **dorthin zurücklegen, wo sie
+   herkam**, statt die Seite wegzuwerfen.
+3. **Die Ursache nennen** statt „hat nicht geklappt". Das Suchen dieses
+   Fehlers hat einen halben Tag gekostet, weil die Meldung nichts verriet.
+
+### #229 – Status im Brett-Filter: ich lag mit meiner Begründung falsch
+
+Bei #225 hatte ich den Status-Filter auf dem Brett **weggelassen**, mit dem
+Argument: Die Spalten *sind* der Status, man könnte sonst eine Spalte
+leerfiltern, die man direkt daneben sieht.
+
+Andi meinte etwas anderes: Ein abgewählter Status blendet **die ganze Spalte**
+aus. So gelesen war mein Einwand gegenstandslos – es entsteht gar keine leere
+Spalte. Auf dem Telefon ist das sogar der Kern der Sache: Eine Spalte nimmt
+eine ganze Bildschirmbreite ein.
+
+Der alte Test, der die Abwesenheit festhielt, ist umgedreht – **mitsamt der
+Begründung, warum er sich gedreht hat**, damit niemand (auch ich nicht) den
+Filter später unter Berufung auf die alte Überlegung wieder entfernt.
+
+### Was diese Sitzung über Prüfen gelehrt hat
+
+Beim lokalen Nachstellen hingen die Ereignis-Horcher der Seite nicht – Ziehen
+und Filter-Chips taten nichts, obwohl alle Konstanten des Skriptblocks gesetzt
+waren. **Am laufenden Portal ist derselbe Test grün.** Es war ein Artefakt
+meiner Testumgebung (alter Service Worker plus zwei Instanzen nacheinander auf
+derselben Adresse), nicht des Codes.
+
+Die Lehre daraus steht hier, weil sie Zeit gekostet hat: Ein lokaler Aufbau,
+der einen Service Worker registriert, ist **kein sauberer Prüfstand** – der
+überlebt Neustarts der Anwendung und kontrolliert die nächste Instanz mit.
+Wer so etwas nochmal braucht: eigener Port je Lauf, oder den Worker vorher
+abmelden.
+
+Deshalb wurde am Ende **am laufenden Portal** gemessen, mit einem Tastdruck,
+der sofort abgebrochen wird – kein Speichern, keine Spur in echten Daten.
+
+Nebenbefund, nicht angefasst: In `base.html` steckt beim Umschalter-Helfer
+(#171) dieselbe Sprödigkeit – `alert()` plus Bitte um Neuladen. Anderer
+Wunsch, deshalb hier nur notiert.
+
+20 neue Tests, acht Gegenproben. 1512 grün, `live_pruefung.py` grün, alles am
+laufenden Portal gegengeprüft.
+
+**Für Andi:** Ob sich die Karten jetzt zuverlässig greifen lassen, kann nur er
+sagen. Und falls die Meldung doch wieder kommt: Sie nennt ab sofort den
+Grund – der gehört dann in den Wunsch.
+
+---
+
 ## 2026-08-15 – portal-v220/v221: Brett und Liste sind gleichberechtigt (#225)
 
 > „Die Brettansicht ist sehr gut geworden. Die Ansicht soll als vollständige

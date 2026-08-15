@@ -159,13 +159,38 @@ def test_das_brett_kann_dasselbe_wie_die_liste(client, tokens, db, was, muster):
     assert re.search(muster, seite), f"{was} fehlt auf dem Brett"
 
 
-def test_der_status_filter_fehlt_auf_dem_brett(client, tokens):
-    """Bewusst weggelassen: Auf dem Brett SIND die Spalten der Status. Eine
-    zweite Auswahl dafür wäre nicht nur überflüssig – man könnte eine Spalte
-    leerfiltern, die man direkt daneben sieht."""
+def test_der_status_filter_ist_auch_auf_dem_brett(client, tokens):
+    """Umgekehrte Zusage seit Wunsch #229 – und der Grund gehört hierher.
+
+    Bei #225 hatte ich den Status-Filter auf dem Brett **weggelassen**, mit dem
+    Argument: Die Spalten *sind* der Status, man könnte sonst eine Spalte
+    leerfiltern, die man direkt daneben sieht. Andi hat das überstimmt, und
+    zwar mit einer anderen Semantik als der von mir angenommenen: Ein
+    abgewählter Status blendet **die ganze Spalte** aus, nicht nur ihre Karten.
+
+    So gelesen war mein Einwand gegenstandslos – es entsteht keine leere
+    Spalte. Das steht hier, damit niemand (auch ich nicht) den Filter unter
+    Berufung auf die alte Begründung wieder entfernt."""
     seite = client.get(f"/a/todo/{tokens['TestAdmin']}/kanban").get_data(as_text=True)
     assert 'id="filter-nutzer-row"' in seite
-    assert 'id="filter-status-row"' not in seite
+    assert 'id="filter-status-row"' in seite
+
+
+def test_ein_abgewaehlter_status_blendet_die_spalte_aus():
+    """Andis Beispiel: Filter auf Offen/In Arbeit/Erledigt → Backlog erscheint
+    gar nicht mehr. Eine leere Spalte stehen zu lassen wäre die halbe Antwort –
+    sie nimmt auf dem Telefon eine ganze Bildschirmbreite ein, obwohl man sie
+    gerade weggefiltert hat."""
+    quelle = BRETT.read_text(encoding="utf-8")
+    block = quelle[quelle.index("function zaehlerAuffrischen"):]
+    block = block[:block.index("\n}")]
+    assert "#filter-status-row" in block, (
+        "Die Spaltensichtbarkeit fragt den Status-Filter gar nicht ab")
+    assert "spalte.style.display" in block, (
+        "Es wird nur gezählt, aber keine Spalte ausgeblendet")
+    assert "!gewaehlt.length ||" in block, (
+        "Ohne Auswahl müssen ALLE Spalten stehen bleiben - sonst ist das Brett "
+        "leer, bis man etwas antippt")
 
 
 def test_karten_tragen_die_filtermerkmale(client, tokens, db):
