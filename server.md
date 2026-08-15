@@ -392,7 +392,32 @@ teile/
                        `_geraet_lesbar()` prueft von speziell nach allgemein
                        (Edge/Opera nennen sich auch "Chrome", jeder Chrome
                        nennt sich auch "Safari").
+  todo_teile.html    – GETEILTE Bausteine von Liste und Brett (#225): CSS,
+                       Neu-Formular, Filterkarte, Ziel-Auswahl,
+                       Bearbeiten-Panel und das gemeinsame JavaScript.
+                       Einbinden IMMER mit `with context`, sonst kennen die
+                       Makros `tp` nicht und die Formular-Adressen sind falsch.
+                       Warum geteilt und nicht kopiert: Zwei Fassungen
+                       desselben Formulars laufen auseinander, und der Schaden
+                       faellt erst auf, wenn jemand ueber die "falsche"
+                       Ansicht speichert und ein Feld still verlorengeht.
+                       `test_todo_ansicht.py::test_keine_zweite_fassung_der_formulare`
+                       laesst kein zweites Markup zu.
   04_todo.py         – /a/todo/<token>/ Aufgabenliste + /kanban Brett (#224);
+                       ANSICHT MERKEN (#225): `todo_nutzer_ansicht` haelt je
+                       NUTZER, ob zuletzt Liste oder Brett benutzt wurde -
+                       serverseitig, weil der Wunsch "fuer einen Benutzer"
+                       sagt und nicht "in diesem Browser-Tab" (wie #116).
+                       Gemerkt wird NUR die ausdrueckliche Wahl ueber den
+                       Knopf (`?ansicht=liste` / `?ansicht=brett`); ein
+                       blosser Aufruf der Adresse folgt der Merkung, aendert
+                       sie aber nicht. Das ist kein Detail: sonst schriebe
+                       jeder Lauf von `live_pruefung.py` - das beide
+                       Ansichten abruft - die Vorliebe auf das um, was
+                       zufaellig als letztes dran war.
+                       Der Zurueck-Link vom Brett MUSS `?ansicht=liste`
+                       tragen, sonst schickt die Merkung einen sofort wieder
+                       aufs Brett und die Liste ist unerreichbar.
                        todos_neu() mit Push-Deep-Link;
                        KANBAN (#224): /kanban zeigt dieselben Aufgaben in vier
                        Spalten (die Status aus #20), /kanban/verschieben nimmt

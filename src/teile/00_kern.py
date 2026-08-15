@@ -416,6 +416,15 @@ CREATE TABLE IF NOT EXISTS tvb_kader (
 -- Urheberschaft wird vergessen - dasselbe Muster wie bei `wuensche`.
 -- (Ohne diese Regel scheitert schon das Loeschen eines Nutzers an einer
 -- FOREIGN-KEY-Verletzung; genau daran liefen die Tests zuerst auf.)
+-- Wunsch #225: Welche Ansicht der Aufgaben-App hat dieser Nutzer zuletzt
+-- benutzt - Liste oder Brett. Serverseitig und nicht im Browser, weil der
+-- Wunsch "fuer einen Benutzer" sagt und nicht "in diesem Browser-Tab";
+-- dieselbe Ueberlegung wie bei packlisten_nutzer_ziel (#116). Eine fehlende
+-- Zeile heisst "Liste", die bisherige Hauptansicht.
+CREATE TABLE IF NOT EXISTS todo_nutzer_ansicht (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  ansicht TEXT    NOT NULL
+);
 -- Wunsch #222: Ausfaelle des Infotainments protokollieren, fuer die Werkstatt.
 --
 -- `zeitpunkt` setzt der SERVER beim ersten Knopfdruck (datetime('now')), nicht

@@ -90,15 +90,33 @@ def test_die_liste_verlinkt_das_brett(client, brett):
 
 def test_das_brett_fuehrt_zurueck(client, brett):
     """Projektkonvention: keine Sackgassen – jede Unterseite braucht einen
-    eigenen Zurück-Link, der ⌂-Knopf ist kein Ersatz."""
+    eigenen Zurück-Link, der ⌂-Knopf ist kein Ersatz.
+
+    Seit #225 muss der Link `?ansicht=liste` tragen: Ohne den Zusatz schickte
+    die gemerkte Ansicht („Brett") einen sofort wieder hierher zurück, und man
+    käme nie mehr in die Liste."""
     seite = client.get(f"/a/todo/{brett['tokens']['TestAdmin']}/kanban").get_data(as_text=True)
-    assert re.search(r'href="/a/todo/[^"]*"[^>]*>\s*← Zur Liste', seite)
+    assert re.search(r'href="/a/todo/[^"]*\?ansicht=liste"', seite), (
+        "Kein Weg zurück in die Liste - oder einer, der sofort zurückspringt")
+
+
+def _spalte(seite, status):
+    """Der Markup-Block EINER Brett-Spalte.
+
+    Die Grenze hängt an `class="spalte" data-status=` und nicht nur an
+    `data-status=`: Seit #225 tragen auch die KARTEN ein `data-status`
+    (der geteilte Filter arbeitet daran), und mit dem kürzeren Muster endete
+    die Spalte schon bei ihrer ersten Karte."""
+    treffer = re.search(
+        rf'<div class="spalte" data-status="{status}">'
+        rf'.*?(?=<div class="spalte" data-status=|</div>\s*</main>)', seite, re.S)
+    assert treffer, f"Spalte {status} nicht gefunden"
+    return treffer.group(0)
 
 
 def test_aufgaben_stehen_in_ihrer_spalte(client, brett):
     seite = client.get(f"/a/todo/{brett['tokens']['TestAdmin']}/kanban").get_data(as_text=True)
-    spalte = re.search(r'data-status="in_arbeit".*?(?=data-status=|</div>\s*</main>)',
-                       seite, re.S).group(0)
+    spalte = _spalte(seite, "in_arbeit")
     assert "Rasen mähen" in spalte
     assert "Müll rausbringen" not in spalte
 
@@ -130,11 +148,24 @@ def test_bei_gleicher_position_steht_das_neuere_oben(client, brett, db):
         "der Liste entgegen")
 
 
+def _kartentexte(seite):
+    """Nur die Aufgabentexte der Karten.
+
+    Bewusst nicht die ganze Seite durchsuchen: Seit #225 steht das geteilte
+    JavaScript samt seiner deutschen Kommentare mit im Quelltext, und dort kam
+    zufällig das Wort „Überraschung" vor – der Test schlug an, obwohl die
+    Aufgabe nirgends gerendert war. Ein Wächter, der an einem Kommentar
+    hängenbleibt, sagt beim nächsten Mal nichts mehr aus."""
+    return re.findall(r'<div class="karte-text">\s*([^<]*)', seite)
+
+
 def test_fremde_private_aufgaben_stehen_nicht_auf_dem_brett(client, brett):
     """Dieselbe Sichtbarkeitsregel wie die Liste – das Brett darf kein
     Schlupfloch daneben sein."""
     seite = client.get(f"/a/todo/{brett['tokens']['TestKind']}/kanban").get_data(as_text=True)
-    assert "Überraschung" not in seite
+    texte = " ".join(_kartentexte(seite))
+    assert texte, "Gar keine Karten gefunden - Muster kaputt?"
+    assert "Überraschung" not in texte
 
 
 # ── Spalte wechseln = Status ───────────────────────────────────────────────
@@ -318,6 +349,15 @@ def test_nur_wer_darf_bekommt_einen_griff(client, brett):
 
 
 def test_jede_verdrahtete_aktion_existiert_auch():
+    """Ein Tippfehler im `data-klick` ergibt einen Knopf, der still nichts tut.
+
+    Seit #225 kann die Funktion auch in `todo_teile.html` stehen – die
+    gemeinsamen Bausteine bringen ihr JavaScript selbst mit. Geprüft wird
+    deshalb gegen beide Dateien; die Zusage bleibt dieselbe."""
     quelle = BRETT.read_text(encoding="utf-8")
-    for name in set(re.findall(r'data-(?:klick|aendern|eingabe)="(\w+)"', quelle)):
-        assert re.search(r"function\s+%s\s*\(" % re.escape(name), quelle), name
+    gemeinsam = (TPL / "todo_teile.html").read_text(encoding="utf-8")
+    verdrahtet = set(re.findall(r'data-(?:klick|aendern|eingabe)="(\w+)"',
+                                quelle + gemeinsam))
+    assert verdrahtet, "Muster kaputt - gar keine Aktion gefunden"
+    for name in verdrahtet:
+        assert re.search(r"function\s+%s\s*\(" % re.escape(name), quelle + gemeinsam), name

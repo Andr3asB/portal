@@ -1,14 +1,19 @@
 {% extends "base.html" %}
+{% import "todo_teile.html" as teile with context %}
 {% set app_slug = "todo" %}
 {% block title %}Aufgaben – Brett{% endblock %}
 
 {% block extra_styles %}
+{{ teile.stile() }}
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
-.btn-zurueck {
+.btn-zurueck, .btn-neu-toggle, .btn-filter-toggle {
   flex:1; display:block; text-align:center; background:none;
   border:1.5px solid var(--farbe); color:var(--farbe); border-radius:12px;
   padding:12px 10px; font-size:14px; font-weight:600; text-decoration:none;
+  font-family:inherit; cursor:pointer; white-space:nowrap;
 }
+.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.section-label { font-size:13px; font-weight:600; color:var(--text-2); margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
 /* Wunsch #224: Vier Spalten nebeneinander. Auf dem Telefon passt das nicht
    auf einen Bildschirm - deshalb scrollt das BRETT waagerecht, nicht die
    Seite. `scroll-snap` laesst es dabei je Spalte einrasten, sonst steht man
@@ -36,8 +41,13 @@
 .karte {
   background:var(--surface); border-radius:12px; padding:10px 12px;
   margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
-  display:flex; align-items:flex-start; gap:8px;
 }
+.karte-kopf { display:flex; align-items:flex-start; gap:8px; }
+.karte-knopf {
+  background:none; border:none; font-size:14px; cursor:pointer;
+  color:var(--text-2); flex-shrink:0; padding:0 2px;
+}
+.karte-del:active { color:#ff3b30; }
 .karte-text { flex:1; font-size:14px; line-height:1.4; min-width:0; overflow-wrap:anywhere; }
 .karte-meta { font-size:12px; color:var(--text-2); margin-top:4px; }
 .badge-person {
@@ -69,9 +79,21 @@
 
   {# Projektkonvention: jede Unterseite braucht einen eigenen Zurueck-Link,
      der ⌂-Knopf ist kein Ersatz. #}
+  {# Wunsch #225: Dieselben Knöpfe wie die Liste – das Brett ist eine
+     vollwertige Alternative, kein Zusatzfenster.
+     `?ansicht=liste` ist am Zurück-Link Pflicht: ohne den Zusatz schickte die
+     gemerkte Ansicht („Brett") einen sofort wieder hierher, und man käme nie
+     mehr in die Liste. #}
   <div class="top-aktionen">
-    <a class="btn-zurueck" href="/a/todo{{ tp }}">← Zur Liste</a>
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neue Aufgabe</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    <a class="btn-zurueck" href="/a/todo{{ tp }}?ansicht=liste">☰ Liste</a>
   </div>
+
+  {{ teile.filter_karte(user, users, status_order, status_labels, mit_status=false) }}
+  {{ teile.neu_karte(users, rollen, rollen_labels, user.id) }}
+
+  <div id="todo-keine-treffer" style="display:none; text-align:center; color:var(--text-2); padding:40px 20px; font-size:15px;">Keine Aufgabe passt zum Filter 🔍</div>
 
   <div class="hinweis">
     Am Griff <span aria-hidden="true">⠿</span> ziehen: nach oben oder unten setzt die
@@ -88,26 +110,47 @@
       </div>
       <div class="ablage" data-ablage>
         {% for t in spalten[status] %}
-        <div class="karte" id="karte-{{ t.id }}" data-id="{{ t.id }}">
-          {% if t.darf_bewegen %}
-          <span class="karte-griff" title="Verschieben" aria-label="Verschieben">⠿</span>
-          {% else %}
-          {# Wunsch #10/#214: Wer die Aufgabe nicht abhaken darf, darf sie auch
-             nicht verschieben - der Statuswechsel ist dasselbe Recht. Ein
-             Griff, der zu 403 fuehrt, waere schlechte Bedienung. #}
-          <span class="karte-fest" title="Nur ansehen" aria-label="Nur ansehen">🔒</span>
-          {% endif %}
-          <div class="karte-text">
-            {{ t.inhalt }}
-            <div class="karte-meta">
-              {% if t.fuer_name %}
-              <span class="badge-person" style="background:{{ t.fuer_farbe }}22; color:{{ t.fuer_farbe }}">{{ t.fuer_name }}</span>
-              {% elif t.zugewiesen_rollen %}
-              <span>für {{ t.zugewiesen_rollen }}</span>
-              {% endif %}
-              {% if t.privat %} · 🔒 privat{% endif %}
+        {# `data-nutzer` und `data-status` sind das, woran der geteilte Filter
+           arbeitet - dieselben Attribute wie an einem `.todo-item` der Liste
+           (Wunsch #225). #}
+        <div class="karte" id="karte-{{ t.id }}" data-id="{{ t.id }}"
+             data-status="{{ t.status }}"
+             data-nutzer="{{ t.erstellt_von }},{{ t.zugewiesen_an or '' }}">
+          <div class="karte-kopf">
+            {% if t.darf_bewegen %}
+            <span class="karte-griff" title="Verschieben" aria-label="Verschieben">⠿</span>
+            {% else %}
+            {# Wunsch #10/#214: Wer die Aufgabe nicht abhaken darf, darf sie auch
+               nicht verschieben - der Statuswechsel ist dasselbe Recht. Ein
+               Griff, der zu 403 fuehrt, waere schlechte Bedienung. #}
+            <span class="karte-fest" title="Nur ansehen" aria-label="Nur ansehen">🔒</span>
+            {% endif %}
+            <div class="karte-text">
+              {{ t.inhalt }}
+              <div class="karte-meta">
+                {% if t.fuer_name %}
+                <span class="badge-person" style="background:{{ t.fuer_farbe }}22; color:{{ t.fuer_farbe }}">{{ t.fuer_name }}</span>
+                {% elif t.zugewiesen_rollen %}
+                <span>für {{ t.zugewiesen_rollen }}</span>
+                {% endif %}
+                {% if t.serie_id %} · 🔁{% endif %}
+                {% if t.privat %} · 🔒 privat{% endif %}
+              </div>
             </div>
+            {% if t.darf_bewegen %}
+            <button class="karte-knopf" type="button" data-klick="toggleTodoEdit" data-args='[{{ t.id }}]'
+                    title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+            {% endif %}
+            {% if darf_loeschen %}
+            <form method="post" action="/a/todo{{ tp }}loeschen/{{ t.id }}"
+                  data-bestaetigen="{{ ('„' ~ t.inhalt|truncate(40) ~ '“ löschen?') }}">
+              <button class="karte-knopf karte-del" type="submit" title="Löschen" aria-label="Löschen">🗑️</button>
+            </form>
+            {% endif %}
           </div>
+          {% if t.darf_bewegen %}
+          {{ teile.bearbeiten_panel(t, user, users, rollen, rollen_labels, historie) }}
+          {% endif %}
         </div>
         {% endfor %}
         {% if not spalten[status] %}
@@ -164,15 +207,25 @@ ziehSortierung({
 // Zaehler und "nichts hier" nachfuehren - sonst zeigt die Spalte nach dem
 // Ziehen eine falsche Zahl an, und die leere Spalte behaelt ihren Hinweis
 // unter der frisch hineingezogenen Karte.
+//
+// Wunsch #225: zaehlt nur SICHTBARE Karten. Seit der Filter auch hier greift,
+// waere die Kopfzahl sonst eine Zahl fuer etwas, das man nicht sieht.
 function zaehlerAuffrischen() {
   document.querySelectorAll('.spalte').forEach(spalte => {
-    const anzahl = spalte.querySelectorAll('.karte').length;
+    const anzahl = [...spalte.querySelectorAll('.karte')]
+      .filter(k => k.style.display !== 'none').length;
     const zahl = spalte.querySelector('[data-zahl-fuer]');
     if (zahl) zahl.textContent = anzahl;
     const leer = spalte.querySelector('[data-leer-fuer]');
     if (leer) leer.style.display = anzahl ? 'none' : '';
   });
 }
+// Der geteilte Filter ruft diesen Haken auf, sobald er Karten aus- oder
+// wieder einblendet (siehe todo_teile.html).
+window.nachDemFiltern = zaehlerAuffrischen;
+
+{{ teile.gemeinsame_skripte('.karte', mit_status=false) }}
+
 zaehlerAuffrischen();
 </script>
 {% endblock %}

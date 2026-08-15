@@ -222,13 +222,54 @@ def _historie_map(db, todo_ids):
     return historie
 
 
+# Wunsch #225: Liste und Brett sind gleichberechtigte Ansichten derselben
+# Aufgaben. Gemerkt wird SERVERSEITIG - der Wunsch sagt "fuer einen Benutzer",
+# nicht "in diesem Browser-Tab" (dieselbe Ueberlegung wie bei #116).
+ANSICHTEN = ("liste", "brett")
+
+
+def _ansicht_merken(db, user_id, ansicht):
+    db.execute(
+        "INSERT INTO todo_nutzer_ansicht(user_id, ansicht) VALUES(?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET ansicht=excluded.ansicht",
+        (user_id, ansicht),
+    )
+    db.commit()
+
+
+def _gemerkte_ansicht(db, user_id) -> str:
+    row = db.execute(
+        "SELECT ansicht FROM todo_nutzer_ansicht WHERE user_id=?", (user_id,)).fetchone()
+    return row["ansicht"] if row and row["ansicht"] in ANSICHTEN else "liste"
+
+
 @bp.route("/a/todo/", defaults={"token": None})
 @bp.route("/a/todo/<token>/")
 def index(token):
     user = check_grant(token, APP)
     if not user:
         return render_template("denied.html", reason="invalid"), 403
-    db    = get_db()
+    db = get_db()
+
+    # Gemerkt wird NUR bei ausdruecklicher Wahl (`?ansicht=liste`, so verlinkt
+    # das Brett zurueck). Ein Aufruf ohne Angabe FOLGT der Merkung, aendert sie
+    # aber nicht.
+    #
+    # Der Unterschied ist keine Feinheit: Sonst schriebe jedes Oeffnen der
+    # Adresse die Vorliebe um - auch `live_pruefung.py`, das beide Ansichten
+    # der Reihe nach abruft. Ein Pruefwerkzeug, das nebenbei Nutzereinstellungen
+    # verstellt, ist schlimmer als keines; gemerkt haette es zuletzt immer,
+    # was zufaellig als letztes an der Reihe war.
+    #
+    # Nebeneffekt, der genau richtig ist: Nach dem Anlegen, Bearbeiten oder
+    # Loeschen leiten alle Routen auf `index` - wer vom Brett kam, landet
+    # ueber die Merkung wieder dort.
+    gewuenscht = request.args.get("ansicht")
+    if gewuenscht == "liste":
+        _ansicht_merken(db, user["id"], "liste")
+    elif gewuenscht is None and _gemerkte_ansicht(db, user["id"]) == "brett":
+        return redirect(url_for("todo_app.kanban", token=token))
+
     todos = _visible_todos(db, user)
     users = db.execute(
         "SELECT id, name, farbe FROM users ORDER BY name"
@@ -334,6 +375,12 @@ def kanban(token):
     if not user:
         return render_template("denied.html", reason="invalid"), 403
     db = get_db()
+    # Wunsch #225, spiegelbildlich zu `index()`: nur die ausdrueckliche Wahl
+    # ueber den Knopf (`?ansicht=brett`) wird gemerkt. Ein direkter Aufruf der
+    # Adresse - Lesezeichen, Pruefwerkzeug, Weiterleitung von `index` - zeigt
+    # das Brett, aendert die Vorliebe aber nicht.
+    if request.args.get("ansicht") == "brett":
+        _ansicht_merken(db, user["id"], "brett")
 
     spalten = {s: [] for s in STATUS_ORDER}
     for row in _visible_todos(db, user):
@@ -357,9 +404,17 @@ def kanban(token):
         eintraege.sort(key=lambda t: t["erstellt"] or "", reverse=True)
         eintraege.sort(key=lambda t: t["position"] if t["position"] is not None else 0)
 
+    # Wunsch #225: Das Brett soll eine vollwertige Alternative zur Liste sein -
+    # also braucht es dieselben Zutaten wie `index()`: Nutzer und Rollen fuers
+    # Anlegen und Bearbeiten, den Verlauf und das Loeschrecht.
+    alle = [t for eintraege in spalten.values() for t in eintraege]
     return render_template("todo_kanban.html",
         user=user, token=token, farbe=user["farbe"],
         spalten=spalten, status_order=STATUS_ORDER, status_labels=STATUS_LABELS,
+        users=db.execute("SELECT id, name, farbe FROM users ORDER BY name").fetchall(),
+        rollen=ROLLEN, rollen_labels=ROLLEN_LABELS,
+        darf_loeschen=_darf_loeschen(user),
+        historie=_historie_map(db, [t["id"] for t in alle]),
     )
 
 

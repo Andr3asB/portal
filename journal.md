@@ -2,6 +2,75 @@
 
 ---
 
+## 2026-08-15 – portal-v220/v221: Brett und Liste sind gleichberechtigt (#225)
+
+> „Die Brettansicht ist sehr gut geworden. Die Ansicht soll als vollständige
+> Alternativ Ansicht für die Aufgabenliste dienen. Für einen Benutzer sei
+> gespeichert sein, welche Ansicht er zuletzt genutzt hat … Außerdem soll die
+> Brettansicht alle Funktionen der Hauptansicht erhalten."
+
+Zwei Teile, und der zweite stellte die eigentliche Frage: **kopieren oder
+teilen?**
+
+### Geteilt, nicht verdoppelt
+
+Neu-Formular, Filterkarte, Ziel-Auswahl, Bearbeiten-Panel samt Verlauf, das
+zugehörige CSS und das JavaScript liegen jetzt in `todo_teile.html`; Liste und
+Brett binden sie ein. Der Umbau der Liste war dabei bewusst **verhaltensneutral**
+– erst umziehen, Tests grün (1461), dann das Brett anschliessen.
+
+Zwei Kopien desselben Formulars laufen auseinander; in diesem Projekt ist das
+mehrfach passiert (jeder Alias in `teile/__init__.py` existiert genau deshalb).
+Hier wäre der Schaden besonders spät sichtbar geworden: Ein Feld, das nur in
+einer Ansicht nachgezogen wird, verschwindet still, sobald jemand über die
+andere speichert. Ein Test lässt deshalb kein zweites Markup mehr zu.
+
+**Bewusst nicht übernommen:** der Status-Filter. Auf dem Brett *sind* die
+Spalten der Status – eine zweite Auswahl dafür wäre nicht nur überflüssig, man
+könnte eine Spalte leerfiltern, die man direkt daneben sieht. Der
+Personen-Filter dagegen teilt sich denselben Speicher wie die Liste: Wer dort
+nach einer Person filtert, findet das Brett genauso gefiltert vor.
+
+### Die gemerkte Ansicht – und der Fehler, den ich beim Ausliefern fand
+
+Erste Fassung (v220): Jeder Aufruf einer Ansicht merkte sie sich. Klingt
+richtig, ist es aber nicht – und aufgefallen ist es in dem Moment, als ich
+`live_pruefung.py` starten wollte. **Das Prüfskript ruft beide Ansichten der
+Reihe nach ab.** Jeder Prüflauf hätte damit Andis Vorliebe auf das umgeschrieben,
+was zufällig als letztes dran war. Ein Werkzeug, das nebenbei
+Nutzereinstellungen verstellt, ist schlimmer als keines – und der Effekt wäre
+völlig rätselhaft gewesen: „warum kommt manchmal die Liste?"
+
+Die Regel ist jetzt symmetrisch und schmaler: **Gemerkt wird nur die
+ausdrückliche Wahl** über den Knopf (`?ansicht=liste` / `?ansicht=brett`). Ein
+blosser Aufruf der Adresse – Lesezeichen, Weiterleitung, Prüfskript – zeigt
+die Ansicht, ändert die Vorliebe aber nicht. Gegenprobe am laufenden System:
+`live_pruefung.py` durchlaufen lassen, danach war **keine einzige Merkung**
+gespeichert.
+
+Zwei Dinge fallen daraus von selbst ab:
+
+* Der **Zurück-Link** vom Brett muss `?ansicht=liste` tragen. Ohne den Zusatz
+  schickte die Merkung einen sofort wieder aufs Brett – die Liste wäre
+  unerreichbar. Ein Test hält das fest.
+* **Nach dem Anlegen, Bearbeiten oder Löschen bleibt man, wo man war.** Alle
+  ändernden Routen leiten auf `index`, und von dort führt die Merkung zurück
+  aufs Brett. Ohne sie landete man nach jeder neuen Aufgabe wieder in der
+  Liste.
+
+### Prüfung
+
+24 neue Tests, fünf Gegenproben. 1485 grün. Live gegengeprüft: beide Ansichten
+zeigen Neu-Knopf, Filter, Bearbeiten und Ziel-Auswahl – nur der Status-Filter
+fehlt auf dem Brett, wie beabsichtigt; alle Skriptblöcke parsen.
+
+**Für Andi zum Ausprobieren:** ob sich die Karten auf dem Telefon jetzt sauber
+ziehen lassen (#226 sollte das Markieren beseitigt haben) und ob das
+Bearbeiten-Panel auf einer Karte nicht zu gedrängt wirkt – auf dem Brett ist
+weniger Platz als in der Liste.
+
+---
+
 ## 2026-08-15 – portal-v219: Beim Ziehen wird nichts mehr markiert (#226)
 
 > „Beim Ziehen von Aufgaben kommt es immer wieder vor, dass der Text der

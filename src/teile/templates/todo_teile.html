@@ -1,0 +1,364 @@
+{# ===========================================================================
+   Gemeinsame Bausteine der Aufgaben-App (Wunsch #225).
+
+   Liste (`todo.html`) und Brett (`todo_kanban.html`) sind seit #225
+   gleichberechtigte Ansichten derselben Aufgaben. Damit brauchte das Brett
+   Neu-Formular, Filter und Bearbeiten-Panel – und damit stand die Frage, ob
+   man sie kopiert.
+
+   Diese Datei ist die Antwort: Sie werden GETEILT, nicht verdoppelt. Zwei
+   Fassungen desselben Formulars sind in diesem Projekt schon mehrfach
+   auseinandergelaufen (siehe `teile/__init__.py`, wo jeder Alias genau
+   deshalb existiert). Ein Feld, das nur in einer der beiden Ansichten
+   nachgezogen wird, fällt niemandem auf – bis jemand über die „falsche"
+   Ansicht speichert und ein Wert stillschweigend verlorengeht.
+
+   Einbinden mit **`with context`**, sonst kennen die Makros `tp` nicht:
+       {% import "todo_teile.html" as teile with context %}
+   =========================================================================== #}
+
+
+{# --- Geteiltes CSS -------------------------------------------------------
+   Neu-Formular, Filterkarte und Bearbeiten-Panel sehen in beiden Ansichten
+   gleich aus - also gehoert ihr Aussehen auch an EINE Stelle. Wird ganz oben
+   im `extra_styles`-Block der jeweiligen Vorlage aufgerufen, damit deren
+   eigene Regeln danach kommen und im Zweifel gewinnen. #}
+{% macro stile() %}
+.new-todo-card {
+  background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow);
+  display:none;
+}
+.new-todo-card.open { display:block; }
+.filter-card {
+  background:var(--surface); border-radius:16px; padding:16px; margin-bottom:16px;
+  box-shadow:0 1px 3px var(--shadow);
+  display:none;
+}
+.filter-card.open { display:block; }
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+.chip-btn {
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:8px 14px; font-size:13px; font-family:inherit; font-weight:500;
+  background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.new-todo-row { display:flex; gap:8px; margin-bottom:10px; }
+.new-todo-input {
+  flex:1; border:1.5px solid var(--border); border-radius:10px;
+  padding:10px 12px; font-size:16px; font-family:inherit;
+  background:var(--surface); color:var(--text);
+}
+.new-todo-input:focus { border-color:var(--farbe); }
+.new-todo-submit {
+  background:var(--farbe); color:#fff; border:none;
+  border-radius:10px; padding:10px 16px; font-size:20px; cursor:pointer;
+  min-width:48px;
+}
+.todo-options { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.todo-select {
+  border:1.5px solid var(--border); border-radius:8px; padding:7px 10px;
+  font-size:16px; background:var(--surface); color:var(--text); flex:1; min-width:120px;
+}
+.ziel-typ-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+.ziel-typ-radio { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--text-2); }
+.ziel-typ-radio input { width:16px; height:16px; }
+.ziel-detail { flex:1; min-width:120px; }
+.rollen-row { display:flex; gap:10px; flex-wrap:wrap; }
+.rolle-chip { display:flex; align-items:center; gap:5px; font-size:14px; color:var(--text-2); }
+.rolle-chip input { width:16px; height:16px; }
+.privat-row { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text-2); }
+.privat-row input { width:18px; height:18px; }
+.todo-edit-panel {
+  display:none; flex-direction:column; gap:8px; margin-top:10px;
+  padding-top:10px; border-top:1px solid var(--border);
+}
+.todo-edit-form { display:flex; gap:8px; }
+.todo-edit-input {
+  flex:1; border:1.5px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:16px; font-family:inherit;
+  background:var(--surface); color:var(--text);
+}
+.todo-edit-input:focus { border-color:var(--farbe); }
+.todo-edit-save {
+  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
+}
+.todo-verlauf-toggle {
+  background:none; border:none; font-size:12px; color:var(--text-2);
+  cursor:pointer; padding:2px 0; text-align:left; align-self:flex-start;
+  text-decoration:underline; text-decoration-style:dotted;
+}
+.todo-verlauf { display:none; flex-direction:column; gap:6px; margin-top:4px; }
+.todo-verlauf-eintrag {
+  font-size:12px; color:var(--text-2); background:var(--surface-2);
+  border-radius:8px; padding:6px 10px;
+}
+.todo-verlauf-text { display:block; color:var(--text); font-size:13px; }
+.todo-verlauf-meta { display:block; margin-top:2px; opacity:.8; }
+{% endmacro %}
+
+
+{# --- Ziel: Person / Rolle(n) / Alle (Wunsch #39, #43) -------------------- #}
+{% macro ziel_auswahl(users, rollen, rollen_labels, aktueller_user_id, vorbelegt_zugewiesen_an=None, vorbelegte_rollen=None, vorbelegt_privat=False) %}
+{% set ziel_typ_aktuell = 'alle' if vorbelegte_rollen == 'alle' else ('rollen' if vorbelegte_rollen else 'person') %}
+{% set gewaehlte_rollen = vorbelegte_rollen.split(',') if vorbelegte_rollen and vorbelegte_rollen != 'alle' else [] %}
+<div class="ziel-wrap">
+  <div class="ziel-typ-row">
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="person" {% if ziel_typ_aktuell == 'person' %}checked{% endif %} data-aendern="updateZielTyp"> Person</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="rollen" {% if ziel_typ_aktuell == 'rollen' %}checked{% endif %} data-aendern="updateZielTyp"> Rolle(n)</label>
+    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="alle" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %} data-aendern="updateZielTyp"> Alle</label>
+  </div>
+  <div class="todo-options">
+    <div class="ziel-person ziel-detail" {% if ziel_typ_aktuell != 'person' %}style="display:none"{% endif %}>
+      <select class="todo-select" name="zugewiesen_an">
+        <option value="" {% if not vorbelegt_zugewiesen_an %}selected{% endif %}>Für mich</option>
+        {% for u in users %}
+        <option value="{{ u.id }}"
+          {% if u.id == vorbelegt_zugewiesen_an %}selected{% endif %}
+          {% if u.id == aktueller_user_id %}style="font-weight:600"{% endif %}>
+          → {{ u.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ziel-rollen ziel-detail rollen-row" {% if ziel_typ_aktuell != 'rollen' %}style="display:none"{% endif %}>
+      {% for r in rollen %}
+      <label class="rolle-chip"><input type="checkbox" name="rollen" value="{{ r }}" {% if r in gewaehlte_rollen %}checked{% endif %}> {{ rollen_labels[r] }}</label>
+      {% endfor %}
+    </div>
+    <label class="privat-row">
+      <input type="checkbox" name="privat" {% if vorbelegt_privat %}checked{% endif %}> 🔒 Privat
+    </label>
+  </div>
+</div>
+{% endmacro %}
+
+
+{# --- Neue Aufgabe -------------------------------------------------------- #}
+{% macro neu_karte(users, rollen, rollen_labels, aktueller_user_id) %}
+<div class="new-todo-card" id="new-todo-card">
+  <form method="post" action="/a/todo{{ tp }}neu">
+    <div class="new-todo-row">
+      <input class="new-todo-input" type="text" name="inhalt"
+             placeholder="Neue Aufgabe…" required autocomplete="off">
+      <button class="new-todo-submit" type="submit" title="Hinzufügen" aria-label="Hinzufügen">+</button>
+    </div>
+    {{ ziel_auswahl(users, rollen, rollen_labels, aktueller_user_id) }}
+  </form>
+</div>
+{% endmacro %}
+
+
+{# --- Filter (Wunsch #94) -------------------------------------------------
+   `mit_status`: Auf dem Brett SIND die Spalten der Status - eine zweite
+   Auswahl dafür wäre nicht nur überflüssig, sondern verwirrend (man könnte
+   eine Spalte leerfiltern, die man direkt daneben sieht). #}
+{% macro filter_karte(user, users, status_order, status_labels, mit_status=true) %}
+<div class="filter-card" id="filter-card">
+  <div class="section-label" style="margin:0 0 8px">Benutzer</div>
+  <div class="btn-row" id="filter-nutzer-row">
+    <button type="button" class="chip-btn" data-value="{{ user.id }}">{{ user.name }} (ich)</button>
+    {% for u in users %}
+    {% if u.id != user.id %}
+    <button type="button" class="chip-btn" data-value="{{ u.id }}">{{ u.name }}</button>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if mit_status %}
+  <div class="section-label">Status</div>
+  <div class="btn-row" id="filter-status-row">
+    {% for s in status_order %}
+    <button type="button" class="chip-btn" data-value="{{ s }}">{{ status_labels[s] }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <button type="button" class="todo-verlauf-toggle" id="filter-zuruecksetzen-btn" style="display:none; margin-top:10px">Filter zurücksetzen</button>
+</div>
+{% endmacro %}
+
+
+{# --- Bearbeiten + Verlauf (Wunsch #19, #43) ------------------------------ #}
+{% macro bearbeiten_panel(t, user, users, rollen, rollen_labels, historie) %}
+<div class="todo-edit-panel" id="todo-edit-{{ t.id }}">
+  <form method="post" action="/a/todo{{ tp }}bearbeiten/{{ t.id }}">
+    <div class="todo-edit-form">
+      <input class="todo-edit-input" type="text" name="inhalt" value="{{ t.inhalt }}" required>
+      <button type="submit" class="todo-edit-save">Speichern</button>
+    </div>
+    {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}
+  </form>
+  {% if historie.get(t.id) %}
+  <button type="button" class="todo-verlauf-toggle" data-klick="toggleVerlauf" data-args='[{{ t.id }}]'>🕘 Verlauf ({{ historie[t.id]|length }})</button>
+  <div class="todo-verlauf" id="todo-verlauf-{{ t.id }}">
+    {% for h in historie[t.id] %}
+    <div class="todo-verlauf-eintrag">
+      <span class="todo-verlauf-text">„{{ h.alter_inhalt }}“</span>
+      <span class="todo-verlauf-meta">{{ h.geaendert_von_name or 'unbekannt' }} · {{ h.geaendert_am[:16] }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# --- Das gemeinsame JavaScript ------------------------------------------
+   `eintrag_auswahl` ist der CSS-Wähler der filterbaren Einträge: in der Liste
+   `.todo-item`, auf dem Brett `.karte`. Beide tragen `data-nutzer` und
+   `data-status` - daran, und nur daran, filtert der Code.
+
+   Wird INNERHALB des Skriptblocks der jeweiligen Vorlage aufgerufen, damit
+   das Nonce der Seite gilt (CSP, Wunsch #142). Hier steht deshalb bewusst
+   kein eigenes Skript-Element - `test_csp.py` liesse eines ohne Nonce auch
+   gar nicht durch, und es hat beim Schreiben dieser Zeile prompt
+   angeschlagen, weil das Wort als Beispiel im Kommentar stand. #}
+{% macro gemeinsame_skripte(eintrag_auswahl, mit_status=true) %}
+const FILTER_EINTRAG = {{ eintrag_auswahl|tojson }};
+const FILTER_MIT_STATUS = {{ mit_status|tojson }};
+
+// Wunsch #93: Standardmäßig ist nur der "+ Neue Aufgabe"-Knopf sichtbar,
+// gleiches Muster wie in der Einkaufsliste (Wunsch #85) - Formular bleibt
+// nach dem Öffnen über mehrere Einträge/Reloads offen (sessionStorage),
+// wird aber beim echten Schließen des Tabs/Browsers verworfen.
+const TODO_OFFEN_KEY = 'todo_formular_offen';
+
+function setFormularOffen(offen) {
+  const card = document.getElementById('new-todo-card');
+  if (!card) return;
+  card.classList.toggle('open', offen);
+  try { sessionStorage.setItem(TODO_OFFEN_KEY, offen ? '1' : '0'); } catch (e) {}
+}
+
+document.getElementById('neu-toggle-btn')?.addEventListener('click', () => {
+  const card = document.getElementById('new-todo-card');
+  const nowOpen = !card.classList.contains('open');
+  setFormularOffen(nowOpen);
+  if (nowOpen) document.querySelector('#new-todo-card .new-todo-input')?.focus();
+});
+
+if (sessionStorage.getItem(TODO_OFFEN_KEY) === '1') {
+  setFormularOffen(true);
+}
+
+// Wunsch #94: Filtern nach Benutzer UND Status, bleibt aktiv (auch über
+// Reloads hinweg via sessionStorage), bis er manuell zurückgesetzt wird -
+// anders als die rein sitzungsflüchtigen Filter in Einkauf (Wunsch #87),
+// hier ausdrücklich als dauerhaft gewünscht.
+//
+// Wunsch #225: derselbe Filter und derselbe Speicher gelten jetzt für BEIDE
+// Ansichten. Wer in der Liste nach einer Person filtert, findet das Brett
+// genauso gefiltert vor - alles andere wäre eine Überraschung.
+const TODO_FILTER_KEY = 'todo_filter';
+
+function holeTodoFilter() {
+  try { return JSON.parse(sessionStorage.getItem(TODO_FILTER_KEY) || 'null') || { nutzer: [], status: [] }; }
+  catch (e) { return { nutzer: [], status: [] }; }
+}
+
+function speichereTodoFilter(filter) {
+  try { sessionStorage.setItem(TODO_FILTER_KEY, JSON.stringify(filter)); } catch (e) {}
+}
+
+function aktuelleTodoFilterAuswahl() {
+  return {
+    nutzer: [...document.querySelectorAll('#filter-nutzer-row .chip-btn.active')].map(b => b.dataset.value),
+    status: [...document.querySelectorAll('#filter-status-row .chip-btn.active')].map(b => b.dataset.value),
+  };
+}
+
+function wendeTodoFilterAn() {
+  const { nutzer, status } = aktuelleTodoFilterAuswahl();
+  let sichtbareGesamt = 0;
+
+  document.querySelectorAll(FILTER_EINTRAG).forEach(item => {
+    let sichtbar = true;
+    if (nutzer.length) {
+      const beteiligt = (item.dataset.nutzer || '').split(',').filter(Boolean);
+      sichtbar = nutzer.some(id => beteiligt.includes(id));
+    }
+    if (sichtbar && status.length) {
+      sichtbar = status.includes(item.dataset.status);
+    }
+    item.style.display = sichtbar ? '' : 'none';
+    if (sichtbar) sichtbareGesamt++;
+  });
+
+  // Status-Überschrift ausblenden, wenn darunter (bis zur nächsten
+  // Überschrift) kein sichtbares Item mehr übrig ist. Nur die Liste hat
+  // solche Überschriften - auf dem Brett übernimmt das die Spalte selbst.
+  if (FILTER_MIT_STATUS) {
+    document.querySelectorAll('.section-label').forEach(label => {
+      let el = label.nextElementSibling;
+      let hatSichtbare = false;
+      while (el && !el.classList.contains('section-label')) {
+        if (el.matches?.(FILTER_EINTRAG) && el.style.display !== 'none') { hatSichtbare = true; break; }
+        el = el.nextElementSibling;
+      }
+      label.style.display = hatSichtbare ? '' : 'none';
+    });
+  }
+
+  const filterAktiv = nutzer.length > 0 || status.length > 0;
+  document.getElementById('filter-toggle-btn')?.classList.toggle('aktiv', filterAktiv);
+  const zurueck = document.getElementById('filter-zuruecksetzen-btn');
+  if (zurueck) zurueck.style.display = filterAktiv ? 'inline-block' : 'none';
+  const keine = document.getElementById('todo-keine-treffer');
+  if (keine) keine.style.display = (filterAktiv && sichtbareGesamt === 0) ? 'block' : 'none';
+
+  speichereTodoFilter({ nutzer, status });
+  // Das Brett haengt hier seine Spaltenzaehler ein - die stimmen sonst nicht
+  // mehr, sobald der Filter Karten ausblendet.
+  window.nachDemFiltern?.();
+}
+
+document.getElementById('filter-toggle-btn')?.addEventListener('click', function() {
+  document.getElementById('filter-card')?.classList.toggle('open');
+});
+
+document.querySelectorAll('#filter-nutzer-row .chip-btn, #filter-status-row .chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('active');
+    wendeTodoFilterAn();
+  });
+});
+
+document.getElementById('filter-zuruecksetzen-btn')?.addEventListener('click', () => {
+  document.querySelectorAll('#filter-nutzer-row .chip-btn, #filter-status-row .chip-btn').forEach(b => b.classList.remove('active'));
+  wendeTodoFilterAn();
+});
+
+// Beim Laden gespeicherten Filter wiederherstellen (Wunsch #94: bleibt
+// aktiv, bis er deaktiviert wird - übersteht deshalb auch Reloads).
+(function() {
+  const gespeichert = holeTodoFilter();
+  gespeichert.nutzer.forEach(id => {
+    document.querySelector(`#filter-nutzer-row .chip-btn[data-value="${CSS.escape(id)}"]`)?.classList.add('active');
+  });
+  gespeichert.status.forEach(s => {
+    document.querySelector(`#filter-status-row .chip-btn[data-value="${CSS.escape(s)}"]`)?.classList.add('active');
+  });
+  wendeTodoFilterAn();
+})();
+
+function toggleTodoEdit(id) {
+  const p = document.getElementById('todo-edit-' + id);
+  if (p) p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+}
+function toggleVerlauf(id) {
+  const v = document.getElementById('todo-verlauf-' + id);
+  if (v) v.style.display = v.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// Wunsch #39: Ziel Person/Rolle(n)/Alle umschalten. Über closest('.ziel-wrap')
+// statt IDs skopiert, damit dieselbe Markup-Struktur im Neu-Formular UND in
+// jedem Bearbeiten-Panel unabhängig voneinander funktioniert (Wunsch #43).
+function updateZielTyp(radio) {
+  const wrap = radio.closest('.ziel-wrap');
+  const typ  = wrap.querySelector('input[name="ziel_typ"]:checked').value;
+  wrap.querySelector('.ziel-person').style.display = typ === 'person' ? '' : 'none';
+  wrap.querySelector('.ziel-rollen').style.display  = typ === 'rollen' ? 'flex' : 'none';
+}
+{% endmacro %}
