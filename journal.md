@@ -2,6 +2,52 @@
 
 ---
 
+## 2026-08-15 – portal-v219: Beim Ziehen wird nichts mehr markiert (#226)
+
+> „Beim Ziehen von Aufgaben kommt es immer wieder vor, dass der Text der
+> anderen Aufgaben zum Kopieren markiert wird. Das stört das User Interface
+> erheblich."
+
+Gemeldet am Kanban-Brett, aber **der Fehler saß im geteilten Zieh-Helfer** –
+Packliste, Essensplan und die Kategorie-Listen hatten ihn genauso, nur ist er
+dort seltener aufgefallen, weil man kürzere Strecken zieht.
+
+Der Browser hält die Bewegung für eine Textauswahl. Das `preventDefault()`
+beim Aufsetzen half nicht: Es unterdrückt die Auswahl **am Griff**, nicht auf
+allem, worüber der Finger danach hinwegzieht.
+
+### Eine Klasse am `body`, nicht `user-select:none` auf den Karten
+
+Die naheliegende Lösung wäre gewesen, den Karten dauerhaft `user-select:none`
+zu geben. Das wäre falsch: Einen Aufgabentext markieren und kopieren zu können
+ist eine Funktion – man holt die Adresse oder Telefonnummer aus einer Aufgabe
+heraus. Deshalb hängt die Sperre nur **während** des Ziehens am `body` und
+verschwindet danach wieder. Ein Test hält genau das fest und schlägt an, sobald
+irgendeine Vorlage `user-select` außerhalb eines Ziehgriffs setzt.
+
+Zwei Feinheiten, die beim Schreiben der Tests erst sichtbar wurden:
+
+* **Beide Ausgänge müssen lösen**, `ende()` *und* `abbruch()`. Bliebe die
+  Klasse nach einem abgebrochenen Zug hängen (Finger weggerutscht, Anruf
+  dazwischen), wäre die halbe Seite bis zum nächsten Neuladen nicht mehr
+  markierbar – und niemand käme auf die Ursache.
+* **Das Lösen darf nicht in `if (zustand.laeuft)` stehen.** Sonst bliebe die
+  Sperre bei jedem Zug hängen, der die 8-Pixel-Schwelle gar nicht
+  überschritten hat – also bei jedem versehentlichen Antippen des Griffs.
+  Beides prüft je ein eigener Test; ohne sie wären es zwei stille Fallen.
+
+Dazu wird eine **schon bestehende** Auswahl beim Start aufgehoben: Wer vorher
+versehentlich Text markiert hatte, zöge ihn sonst sichtbar blau mit sich
+herum. Die Sperre verhindert nur neue Auswahl, nicht die alte.
+
+7 Tests, vier Gegenproben gemacht – alle rot. 1447 grün. Live gegengeprüft:
+Regel und beide Aufrufe stehen im Container, alle Skriptblöcke parsen.
+
+Keine Hilfe-App-Ergänzung: Dass beim Ziehen nichts markiert wird, ist die
+Abwesenheit eines Fehlers, keine Funktion, die man erklärt.
+
+---
+
 ## 2026-08-14 – portal-v218: Kanban-Brett für die Aufgaben (#224)
 
 > „Ich brauche für meine Aufgaben eine Kanban-Ansicht, in der ich die Aufgaben

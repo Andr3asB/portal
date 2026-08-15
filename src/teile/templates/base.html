@@ -180,6 +180,26 @@
       border-radius: 4px;
     }
 
+    /* Wunsch #226: Waehrend eines Ziehvorgangs wird nichts markiert.
+       Beim Ziehen einer Aufgabe faerbte der Browser reihenweise den Text der
+       ANDEREN Karten blau ein - er hielt die Bewegung fuer eine
+       Textauswahl. Das `preventDefault()` beim Aufsetzen genuegt dagegen
+       nicht: Es unterdrueckt die Auswahl nur am Griff selbst, nicht auf allem,
+       worueber der Finger danach hinwegzieht.
+
+       Deshalb eine Klasse am `body`, die nur waehrend des Ziehens haengt -
+       und nicht dauerhaft `user-select:none` auf den Karten, denn ausserhalb
+       des Ziehens soll man einen Aufgabentext sehr wohl markieren und
+       kopieren koennen. Gilt fuer JEDE Zieh-Liste im Portal (Packliste,
+       Essensplan, Kanban), weil `ziehSortierung()` die Klasse setzt. */
+    body.zieht,
+    body.zieht * {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    /* Der Griff selbst ist nie zum Markieren da. */
+    [class*="drag-handle"], .karte-griff { user-select: none; -webkit-user-select: none; }
+
     /* Wunsch #196: Nach unten ziehen laedt neu.
        `overscroll-behavior-y: contain` schaltet das browsereigene
        Pull-to-Refresh ab - sonst gaebe es auf dem iPhone im Browser ZWEI
@@ -558,6 +578,7 @@
     function ende(e) {
       if (!zustand || zustand.griff !== e.currentTarget) return;
       loesen(zustand.griff);
+      document.body.classList.remove('zieht');      // Wunsch #226
       if (zustand.laeuft) {
         const { eintrag, platzhalter, schatten } = zustand;
         platzhalter.parentNode.insertBefore(eintrag, platzhalter);
@@ -585,6 +606,7 @@
     function abbruch(e) {
       if (!zustand || zustand.griff !== e.currentTarget) return;
       loesen(zustand.griff);
+      document.body.classList.remove('zieht');      // Wunsch #226
       if (zustand.laeuft) {
         const { eintrag, platzhalter, schatten } = zustand;
         if (platzhalter?.parentNode) platzhalter.parentNode.insertBefore(eintrag, platzhalter);
@@ -597,6 +619,13 @@
 
     function starte(e) {
       const { eintrag } = zustand;
+      // Wunsch #226: Ab jetzt wird nichts mehr markiert - siehe die Regel
+      // `body.zieht` oben. Wieder weg in ende() UND abbruch(), sonst bliebe
+      // die halbe Seite unmarkierbar, sobald ein Zug einmal abbricht.
+      document.body.classList.add('zieht');
+      // Eine schon bestehende Auswahl aufheben: Wer vorher versehentlich
+      // Text markiert hatte, zoege ihn sonst sichtbar blau mit sich herum.
+      window.getSelection?.()?.removeAllRanges?.();
       const r = eintrag.getBoundingClientRect();
       const schatten = eintrag.cloneNode(true);
       schatten.style.cssText = ['position:fixed', 'z-index:1000', 'pointer-events:none',
