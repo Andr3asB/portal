@@ -2,6 +2,107 @@
 
 ---
 
+## 2026-08-30 – portal-v225–v227: Die TVB-App läuft wieder (#192, #193, #230)
+
+Andis Antwort auf die Rückfrage von heute Nachmittag: „bau alles neu, so dass
+es wieder funktioniert." Also der Neubau der kompletten Datenschicht.
+
+### Der Verein spielt in zwei Welten – die neue API kennt nur eine
+
+Der wichtigste Befund kam erst beim Bauen, nicht beim Prüfen: Die neue
+`/api/new/`-API kennt **11 Verbände, Württemberg ist nicht darunter**. Und die
+1. Bundesliga steckt gar nicht im DHB-Spielbetrieb – dort gibt es nur die
+Jugend-Bundesligen. Aus einer Quelle wurden damit zwei:
+
+| Bereich | Quelle |
+|---|---|
+| Amateur/Jugend (überregional) | `handball.net/api/new/`, Header `x-client-token` |
+| Profis (Opel HBL) | Sportradar-Embed, gefunden über opel-hbl.de |
+| Kader/HPI | unverändert – als einzige alte Quelle intakt |
+
+Die Profi-Quelle zu finden war der mühsame Teil: opel-hbl.de rendert alles
+erst im Browser, das HTML enthält keine einzige Mannschaft. Gefunden per
+`fetch`-Hook plus SPA-interner Navigation – dieselbe Technik, die schon bei
+handball.net funktioniert hat und die hier deshalb als Verfahren festgehalten
+wird: **Hook setzen, dann die Seite sich selbst navigieren lassen.** Ein
+Reload verliert den Hook, ein Netzwerk-Mitschnitt von außen sah nichts.
+
+Zu #192 (Kader von handball.net statt HPI): Die Prämisse trägt für die Profis
+nicht – sie sind in jenem System schlicht nicht vorhanden. Der Kader bleibt
+bei der HPI-API, die den Relaunch unbeschadet überstanden hat.
+
+### Was der Umbau gebracht hat
+
+Die früheren **zwei** Vereinsobjekte sind zu **einem** zusammengefallen – das
+war die größte Umständlichkeit des Moduls und die ausdrückliche Frage aus
+#191. Altersklasse und Geschlecht stehen jetzt als Felder an der Mannschaft,
+statt aus dem Liganamen geraten zu werden.
+
+Die Mannschaftsliste entsteht bewusst aus den **Spielen**, nicht aus dem
+Mannschafts-Endpunkt: der kennt zwar alle gemeldeten Teams, aber weder Liga
+noch Tabelle – beides hängt an der Phase, die erst am Spiel steht. Angenehmer
+Nebeneffekt: Sobald es für eine Mannschaft wieder Spiele gibt, taucht sie von
+selbst im Umschalter auf, ohne Codeänderung.
+
+### Was er gekostet hat – und was daraus wurde
+
+Aus 18 Mannschaften sind **4** geworden: Profis, 3. Liga, A- und B-Jugend
+(Jugendbundesliga). Die rund 14 württembergischen Bezirks- und
+Jugendmannschaften haben **keine Quelle mehr** – handball.net hatte
+Handball4All mit aggregiert, genau das ist weggefallen, und der früher offene
+Dienst `spo.handball4all.de/service/if_g_json.php` antwortet inzwischen mit
+401. Auf Andis Wunsch als eigener Auftrag festgehalten: **#230**.
+
+### Drei Dinge, die erst die echten Daten gezeigt haben
+
+1. **Die Tabelle kommt je Spieltag.** `standings?phase_id=…` lieferte für die
+   3. Liga **480 Zeilen** – 30 Runden à 16 Mannschaften. Ohne Auswahl hätten
+   alle 480 untereinander auf der Seite gestanden. Genommen wird die Runde mit
+   den meisten ausgetragenen Spielen; die höchste Rundennummer wäre falsch,
+   weil alle Runden vorangelegt sind und bis dahin denselben Zwischenstand
+   tragen.
+2. **Vor dem Saisonstart steht jede Mannschaft auf Rang 0** mit lauter Nullen.
+   Ausgegeben sähe das aus wie eine Tabelle, in der zehn Teams gemeinsam
+   Erster sind. Gilt jetzt als „noch keine Tabelle" – der Hinweis, den es
+   ohnehin schon gab.
+3. **Der Bremsmechanismus aus #190 hätte den Neubau ausgesperrt.** Nach v225
+   blieb der Umschalter leer: In `tvb_quellen` stand noch der Fehlschlag der
+   *alten* HTML-Quelle, und die 30-Minuten-Bremse schaltete damit gegen die
+   *neue* Quelle scharf, die damit nichts zu tun hatte. Der Zustand einer
+   Quelle, die es nicht mehr gibt, wird jetzt bei der Migration verworfen
+   (v226).
+
+Dazu eine Migration, die leicht zu übersehen gewesen wäre: Die bisher
+gesammelten Bundesliga-Spiele hingen an der alten Sportradar-Team-ID. Ohne
+Umhängen auf die neue Kennung `profis` wären sie auf einen Schlag unsichtbar
+gewesen – vorhanden, aber unter einer ID, die im Umschalter nicht mehr
+vorkommt. Die Altersklassen-Kürzel („mA", „Herren", …) sind aus demselben
+Grund bewusst unverändert: die pro Nutzer ausgeblendeten Klassen (#124) hängen
+daran, ein neues Schema hätte jedem stillschweigend seine Einstellungen
+zurückgesetzt.
+
+### Tests
+
+`test_tvb_wettbewerbe.py` ist entfallen und durch `test_tvb_datenschicht.py`
+ersetzt. Die alte Datei prüfte das Spielformat der Widget-API und die
+Eigenheit, dass je Wettbewerb eine eigene Team-ID vergeben wurde – beides gibt
+es nicht mehr. Ein Test auf ein Format, das keine Quelle mehr liefert, kann
+nichts finden; er bliebe grün, bis ihn jemand löscht.
+
+24 neue Tests. Gegenprobe gemacht: nimmt man die Rundenauswahl heraus oder
+liest die Sportradar-Zeit als Ortszeit statt UTC, fallen genau die zwei Tests,
+die das prüfen. Einer der neuen Wächter hat sofort einen echten Fehler
+gefunden: `_KLASSEN_NAMEN` kannte kein „mE" – seit die Kürzel aus
+Altersklasse **und** Geschlecht der API entstehen, sind alle Kombinationen
+möglich, und eine männliche E-Jugend hätte auf der Einstellungsseite einen
+leeren Haken bekommen.
+
+Am laufenden Portal gegengeprüft: 4 Mannschaften im Umschalter, 69 Spiele,
+Profis auf Platz 9, 3. Liga auf Platz 14, beide Jugendmannschaften korrekt mit
+„noch keine Tabelle".
+
+---
+
 ## 2026-08-30 – portal-v223/v224: Der Relaunch hat zugeschlagen (#190, #191)
 
 Der Stundenlauf war seit Andis Reboot aus. Beim Wiedereinschalten standen vier

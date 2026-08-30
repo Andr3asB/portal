@@ -1922,6 +1922,46 @@ def _init_db(app):
         except sqlite3.OperationalError:
             pass
 
+        # Wunsch #192/#193 (Neubau nach dem handball.net-Relaunch): Die
+        # Profis haengen nicht mehr an der wettbewerbsgebundenen
+        # Sportradar-Team-ID, sondern an der quellenunabhaengigen Kennung
+        # 'profis' - die neue Quelle (Sportradar-Embed) kennt gar keine
+        # stabile Mannschafts-ID. Ohne dieses Umhaengen waeren alle bisher
+        # gesammelten Bundesliga-Spiele auf einen Schlag unsichtbar: sie
+        # stuenden weiter in der Tabelle, aber unter einer team_id, die im
+        # Umschalter nicht mehr vorkommt. Idempotent - beim zweiten Lauf
+        # trifft das WHERE nichts mehr.
+        try:
+            db.execute("UPDATE tvb_spiele SET team_id='profis' "
+                       "WHERE team_id LIKE 'sr.competitor.6272%'")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
+        # Der in tvb_quellen vermerkte Zustand stammt von den ALTEN Quellen
+        # (den beiden HTML-Seiten), die es nicht mehr gibt. Ihn stehen zu
+        # lassen waere doppelt falsch: 'liga_id' bezeichnet eine Quelle, die
+        # niemand mehr abfragt, und der Fehlschlag unter 'mannschaften'
+        # wuerde die 30-Minuten-Bremse (#190) gegen die NEUE Quelle
+        # scharfschalten, die damit nichts zu tun hat. Einmal leeren; der
+        # erste Aufruf traegt sofort wieder den echten Zustand ein.
+        try:
+            db.execute("DELETE FROM tvb_quellen WHERE quelle IN ('liga_id','mannschaften')")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
+        # Der Mannschafts-Cache wird ohnehin komplett neu aufgebaut, traegt
+        # aber noch die alten IDs beider frueherer Vereinsobjekte. Einmal
+        # leeren, damit im Umschalter keine Knoepfe stehen bleiben, hinter
+        # denen keine Quelle mehr steckt (siehe #230).
+        try:
+            db.execute("DELETE FROM tvb_mannschaften WHERE team_id LIKE 'sr.competitor.%' "
+                       "OR team_id LIKE 'handball4all.%'")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
         # Wunsch #112: mehrere Wochentage je Serien-Vorlage moeglich, statt nur
         # einem - fester_wochentag (einzelner int) bleibt als totes Altfeld
         # liegen, feste_wochentage (kommagetrennt, z.B. "1,3,5") ist ab jetzt

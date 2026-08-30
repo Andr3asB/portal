@@ -319,7 +319,9 @@ abrufbar"-Kästchen erzeugt statt eines Fehlers.
 | Quelle | Genutzt von | Auth | Abruf | Anmerkung |
 |--------|-------------|------|-------|-----------|
 | hae-Server (`HAE_API_URL`, über Caddy-Relay `:2021`) | `14_sportschau.py` | `api-key`-Header aus `.env` | live je Seitenaufruf | Eigener Server im Haus, siehe „hae-Server-Relay" oben |
-| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | **SEIT DEM RELAUNCH TOT (30.08.2026, #191)** – antwortet mit HTTP **200**, liefert aber die leere SPA-Hülle statt JSON. Angezeigt wird seither der gespeicherte Bestand aus `tvb_spiele`. Früher: der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufrief; nur `table`, `schedule`, `team-schedule`, dazu `club/<id>/schedule` (#151) |
+| handball.net Widget-API (`/a/sportdata/1/widgets/…`) und die beiden HTML-Seiten | früher `18_tvb.py` | – | – | **ABGESCHALTET** mit dem Relaunch (#191). Die Widget-Endpunkte antworten mit HTTP 200 und liefern die leere SPA-Hülle statt JSON. Ersetzt durch die beiden Zeilen darunter |
+| handball.net **neue API** (`www.handball.net/api/new/…`) | `18_tvb.py` (Mannschaften, Spiele, Tabelle für Amateur/Jugend) | Header `x-client-token`, Wert aus dem Meta-Tag `client-token` einer normalen Seite (`_client_token()`, zwischengespeichert, bei 403 einmal erneuert) | stündlich, ein Aufruf für den ganzen Verein | Handball360/DHB-Spielbetrieb. **Kennt Württemberg NICHT** (#230) und auch nicht die 1. Bundesliga – nur die Jugend-Bundesligen. Nützliche Endpunkte: `seasons` (`is_active`), `teams?club_id=…&season_id=…`, `matches?club_id=…` (seitenweise), `standings?phase_id=…`. **`standings` liefert die Tabelle JE SPIELTAG** – für die 3. Liga 480 Zeilen; genommen wird die Runde mit den meisten ausgetragenen Spielen |
+| Sportradar-Embed der Opel HBL (`embed-api.eui.connect.sportradar.com/v1/embed/248/…`) | `18_tvb.py` (Spiele und Tabelle der Profis) | keine | live je Seitenaufruf | Gefunden über die offizielle Liga-Seite opel-hbl.de, die genau diese Adressen aufruft. `standings` und `fixtures_ribbon`; das Ribbon liefert nur den AKTUELLEN Spieltag aller 18 Mannschaften – deshalb wie bisher: einmal gesehene Spiele bleiben in `tvb_spiele` stehen. Zeitangaben ohne Zeitzone, gelten als UTC |
 | Open Food Facts (`world.openfoodfacts.org/api/v2/product/<ean>.json`) | `10_einkauf.py` (Barcode-Erfassung, Wunsch #143) | keine | live je Scan, nichts gecacht | Freie Produktdatenbank, rund 420.000 Produkte fuer Deutschland. Unbekannte Codes beantwortet sie mit HTTP 404 - das ist der Normalfall bei Nicht-Lebensmitteln, kein Fehler. Der Code wird vorher gegen `\A[0-9]{6,14}\Z` geprueft, weil er in den Pfad der Abfrage eingesetzt wird |
 | HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net. **Nach dem Relaunch am 30.08.2026 als einzige der vier TVB-Quellen unverändert lebendig** |
 | handball.net HTML (Vereinsseite `/vereine/<id>`, Tabellenseite `/mannschaften/<id>/tabelle`) | `18_tvb.py` (Mannschaftsliste, Liga-ID) | keine | max. 24 h, Bremse 30 Min nach Fehlschlag (#190) | **SEIT DEM RELAUNCH TOT (30.08.2026)** – die Vereinsseite leitet in der App auf `/404`, die Tabellenseite liefert die leere Hülle. Zustand steht in `tvb_quellen`, die TVB-Seite warnt nach 3 Tagen (#190) |
@@ -1115,26 +1117,18 @@ teile/
                        gleich aufgebaut). Profis und Unterbau sind auf
                        handball.net ZWEI Vereinsobjekte:
                        sr.competitor.6272 (nur Profis) und
-                       handball4all.wuerttemberg.131 (17 Mannschaften: 2./
-                       3./4. Herren + Jugend A bis F) - _AMATEUR_VEREIN_ID.
-                       Die Mannschaftsliste gibt es NICHT als API
-                       (club/<id>/teams -> 404, club/<id>/schedule zeigt nur
-                       Teams mit Spielen in 14 Tagen), deshalb wird die
-                       Vereinsseite geparst (_mannschaften_von_handball_net)
-                       und in tvb_mannschaften gespeichert, erneuert alle
-                       _MANNSCHAFTEN_MAX_ALTER_STUNDEN (24) - schlaegt das
-                       Parsen fehl, bleibt der alte Stand stehen statt der
-                       Umschalter zu verschwinden. Seit Wunsch #190 wird
-                       dieser Fehlschlag in tvb_quellen vermerkt (statt
-                       verschluckt), die Seite warnt nach 3 Tagen, und eine
-                       Pause von _QUELLE_PAUSE_MINUTEN (30) verhindert, dass
-                       jeder Seitenaufruf die tote Quelle neu anfragt.
-                       ACHTUNG: seit dem handball.net-Relaunch (30.08.2026,
-                       #191) ist diese Quelle tot - der angezeigte Stand
-                       stammt vom 14.08.2026. `_kurzlabel()` baut aus
-                       der langen Liga-Bezeichnung das Chip-Label
-                       ("maennliche B-Jugend Bezirksoberliga Staffel 2" ->
-                       "mB BOL 2"), Doppelungen werden durchnummeriert.
+                       Seit dem Neubau (30.08.2026, #192/#193) ZWEI
+                       Quellen: `/api/new/` fuer Amateur/Jugend (Zugang per
+                       x-client-token aus einem Meta-Tag) und das
+                       Sportradar-Embed fuer die Profis - die 1. Bundesliga
+                       steckt NICHT im DHB-Spielbetrieb. Die frueheren zwei
+                       Vereinsobjekte sind zu einem zusammengefallen
+                       (_NEU_CLUB). Die Mannschaftsliste entsteht aus den
+                       SPIELEN, nicht aus dem Mannschafts-Endpunkt: der kennt
+                       weder Liga noch Tabelle, beides haengt an der Phase am
+                       Spiel. Folge: eine Mannschaft taucht von selbst wieder
+                       auf, sobald es fuer sie Spiele gibt (#230). Kader
+                       weiterhin ueber die HPI-API.
                        `_turnier_id_sichern()` holt die Liga-ID FAUL - erst
                        wenn eine Mannschaft geoeffnet wird, dann dauerhaft
                        gemerkt: bevorzugt aus den Spieldaten (kostenlos
@@ -2243,20 +2237,20 @@ Der Datenstrom selbst geht **weiterhin unverschlüsselt** aufs NAS (zweiter Teil
 
 ## Bekannte Issues
 
-- **Die TVB-App hat seit dem handball.net-Relaunch keinen Datennachschub**
-  (30.08.2026, Wunsch #191). Drei der vier Quellen sind tot: die Widget-API
-  (Spiele, Tabelle) und beide HTML-Seiten (Mannschaftsliste, Liga-ID). Nur die
-  HPI-API (Kader) lebt weiter. **Die Widget-Endpunkte antworten mit HTTP 200**
-  und liefern die leere SPA-Hülle statt JSON – ein reiner Erreichbarkeitstest
-  meldet hier grün, deshalb prüft `18_tvb.py` seit #190 auf „erreichbar UND
-  parsebar". Die App zeigt den gespeicherten Bestand und warnt auf der Seite
-  (#190). Der neue Zugang ist gefunden (`/api/new/…` mit Header
-  `x-client-token` aus einem Meta-Tag), die Umstellung wäre ein Neubau der
-  Datenschicht und wartet als Rückfrage an #193 (deckt #192 mit ab) auf Andi.
-  **Wer hier weiterarbeitet: eine Quelle immer mit den Headern prüfen, die der
-  Code wirklich schickt** – eine Sonde mit `Accept: application/json` bekam
-  404 für Seiten, die es noch gibt, und hätte fast zu einem falschen Befund
-  geführt.
+- **Die TVB-App zeigt nur noch 4 statt 18 Mannschaften** (seit dem
+  handball.net-Relaunch, neu gebaut am 30.08.2026 mit v225–v227). Die neue
+  `/api/new/`-API kennt **11 Verbände, HANDBALL WÜRTTEMBERG ist nicht
+  darunter** – vom Verein liegen dort nur die überregionalen Mannschaften
+  (3. Liga, Jugendbundesliga). Die rund 14 württembergischen Bezirks- und
+  Jugendmannschaften haben keine Quelle mehr; Ersatzsuche läuft als **#230**.
+  Ihr Bestand steht weiter in der Datenbank, und weil die Mannschaftsliste aus
+  den SPIELEN entsteht, tauchen sie von selbst wieder auf, sobald es für sie
+  Spiele gibt. **Wer hier weiterarbeitet, zwei Fallen:** (1) Eine Quelle immer
+  mit den Headern prüfen, die der Code wirklich schickt – eine Sonde mit
+  `Accept: application/json` bekam bei handball.net 404 für Seiten, die es
+  noch gibt. (2) Die abgeschalteten Widget-Endpunkte antworten mit **HTTP
+  200** und liefern die leere SPA-Hülle statt JSON; ein reiner
+  Erreichbarkeitstest meldet dort grün.
 - **Der Container läuft in UTC, nicht in deutscher Zeit** (`docker exec
   portal python3 -c "import time; print(time.tzname)"` → `('UTC','UTC')`).
   `datetime.now()` ohne `tzinfo` liefert also UTC, nicht Europe/Berlin -
@@ -2673,13 +2667,23 @@ python -m venv .venv                                   # einmalig
   "noch nie" auf der Seite, obwohl die Liste vom 14.08.2026 stammt), aber ohne
   jeden Bestand wird kein Datum erfunden. Gegenprobe gemacht: mit dem alten
   Verhalten fallen 4 der 11 Tests.
-- `test_tvb_wettbewerbe.py` – Wunsch #151. Der erste Test haelt bewusst den
-  IST-Zustand fest (der exakte ID-Vergleich uebersieht das Pokalspiel): geht er
-  eines Tages durch, hat handball.net die IDs vereinheitlicht und die
-  Erweiterung ist ueberfluessig - besser ein roter Test als eine still
-  ueberfluessige Sonderbehandlung. Dazu die Gegenrichtung (fremde Vereine mit
-  Praefix 62721) und dass die Wettbewerbsspalte die Speicherung ueberlebt -
-  der Spielplan liest aus tvb_spiele, nicht aus der API-Antwort.
+- `test_tvb_datenschicht.py` – Neubau nach dem Relaunch (#192/#193). Loest
+  `test_tvb_wettbewerbe.py` ab (jene Datei prueft das Spielformat der
+  abgeschalteten Widget-API und die weggefallene Eigenheit, dass je Wettbewerb
+  eine eigene Team-ID vergeben wurde - ein Test auf ein Format, das keine
+  Quelle mehr liefert, bleibt nur gruen, bis ihn jemand loescht). Prueft die
+  Umwandlung BEIDER neuer Quellformate in das eine Anzeigeformat. Die drei
+  Faelle, die am laufenden Portal aufgefallen sind: `standings` liefert die
+  Tabelle je Spieltag (480 Zeilen fuer die 3. Liga - genommen wird die Runde
+  mit den meisten ausgetragenen Spielen, NICHT die hoechste Rundennummer, weil
+  alle Runden vorangelegt sind); vor dem Saisonstart steht jede Mannschaft auf
+  Rang 0 mit lauter Nullen und gilt deshalb als "noch keine Tabelle"; die
+  Sportradar-Zeit kommt OHNE Zeitzone und gilt als UTC (sonst laege jeder
+  Anwurf zwei Stunden daneben). Gegenprobe gemacht: nimmt man die
+  Rundenauswahl heraus oder liest die Zeit als Ortszeit, fallen genau die zwei
+  zustaendigen Tests. Der Waechter `test_jedes_kuerzel_hat_einen_anzeigenamen`
+  hat sofort einen echten Fehler gefunden - `_KLASSEN_NAMEN` kannte kein "mE",
+  seit die Kuerzel aus Altersklasse UND Geschlecht entstehen.
 - `test_tts_sprache.py` – Wunsch #149/#148: Sprachangabe geht ans Modell,
   Kontingent zaehlt nur das Wort, Cache-Schluessel ist versioniert, gleiches
   Wort teilt sich die Datei, verschiedene Sprachen nicht. Dazu die
