@@ -2,6 +2,86 @@
 
 ---
 
+## 2026-08-30 – portal-v223/v224: Der Relaunch hat zugeschlagen (#190, #191)
+
+Der Stundenlauf war seit Andis Reboot aus. Beim Wiedereinschalten standen vier
+freigegebene Wünsche an, alle vier aus #189 – dem angekündigten Relaunch von
+handball.net. Der hat inzwischen stattgefunden, und das Ergebnis ist deutlicher
+als erwartet.
+
+### #191 – drei von vier Quellen sind tot
+
+| Quelle | Stand 10.08.2026 | Stand 30.08.2026 |
+|--------|------------------|------------------|
+| Widget-JSON (`/a/sportdata/1/widgets`) | Spiele, Tabelle, Vereinsspielplan | **tot** – liefert die leere SPA-Hülle |
+| Vereinsseite HTML (Mannschaftsliste) | 18 Mannschaften | **tot** – Seite leitet auf `/404` |
+| Tabellenseite HTML (Liga-ID) | Liga-ID je Mannschaft | **tot** – dieselbe leere Hülle |
+| `hpi.handball-bundesliga.de` (Kader) | Kader + HPI-Werte | **lebt unverändert** |
+
+Der erste Fall ist der unangenehmste: Die Widget-Endpunkte antworten mit
+**200**, nur eben mit HTML statt JSON. Ein Erreichbarkeitstest hätte hier grün
+gemeldet. Genau deshalb zählt in der neuen Prüfung (#190) nur „erreichbar UND
+parsebar" als Erfolg.
+
+Eine Falle bei der Prüfung selbst, die fast zu einem falschen Befund geführt
+hätte: Meine erste Sonde schickte `Accept: application/json` und bekam 404 –
+auch für Seiten, die es noch gibt. Mit den Headern, die das Modul wirklich
+benutzt, kamen dieselben URLs mit 200 zurück. Wer eine Quelle prüft, muss sie
+**so** prüfen, wie der Code sie aufruft, sonst prüft er etwas anderes.
+
+Der neue Unterbau ist gefunden: handball.net ist jetzt eine Angular-App gegen
+`/api/new/…`, abgesichert per Header `x-client-token`, dessen Wert als
+Meta-Tag in jeder ausgelieferten Seite steht. Erreichbar und geprüft:
+`seasons` (Saison-ID 2627), `competitions`, `teams`, `players`, `federations`,
+`age-categories`. Zur mitgestellten Frage nach den zwei Vereinsobjekten:
+`teams?name=Bittenfeld` liefert 25 Mannschaften in **einem** Namensraum mit
+neuen, rein numerischen IDs – Handball360 führt die alte Trennung
+(`sr.competitor.6272` gegen `handball4all.wuerttemberg.131`) offenbar zusammen.
+
+### #190 – das stille Veralten hat aufgehört, still zu sein
+
+Neue Tabelle `tvb_quellen`: je HTML-Quelle `zuletzt_ok`, `zuletzt_versuch`,
+`letzter_fehler`. Die Lücke zwischen den ersten beiden ist genau das, was
+vorher niemand sehen konnte. Auf der Seite erscheint ein oranger Hinweis mit
+dem Datum des letzten geglückten Standes – aber erst nach **drei Tagen**, ein
+einzelner Aussetzer der Gegenstelle soll die Familie nicht beunruhigen.
+
+Beim Bauen kam ein **Betriebsschaden** ans Licht, der im Wunsch nicht steht:
+Schlägt das Laden fehl, bleibt `aktualisiert_am` alt, `_mannschaften_holen()`
+hält den Bestand für überfällig – und startet bei **jedem** Seitenaufruf einen
+neuen Versuch, mit 15 s Zeitlimit vor dem Seitenaufbau. Seit dem Relaunch war
+das der Dauerzustand. Dagegen jetzt eine Pause von 30 Minuten nach einem
+Fehlschlag. Am laufenden Portal bestätigt: die zweite Live-Prüfung hat die tote
+Quelle nicht erneut angefasst.
+
+Ein Schönheitsfehler fiel erst **nach** der Auslieferung von v223 auf, und zwar
+am echten Datenbestand: `tvb_quellen` ist neu, also war `zuletzt_ok` leer – die
+Seite hätte „noch nie geladen" gemeldet, obwohl die Liste nachweislich vom
+14.08.2026 stammt. Ersatzweise zählt jetzt `tvb_mannschaften.aktualisiert_am`,
+denn diese Tabelle wird **ausschließlich im Erfolgsfall** neu geschrieben. Das
+war v224. Die Lehre: eine leere Historie ist nicht dasselbe wie „ist nie
+passiert" – und das sieht man nur an echten Daten, nicht an einer Testdatenbank.
+
+11 neue Tests. Gegenprobe gemacht: mit dem alten Verhalten fallen 4 davon.
+
+Der Beweis kam von selbst – der erste Seitenaufruf nach der Auslieferung hat
+den echten Ausfall gefangen: Bestand vom 14.08., Quelle tot, Hinweis steht.
+
+### #192/#193 – Rückfrage statt Schnellschuss
+
+Beide Wünsche fragen „gibt es das jetzt als API – wenn ja, umstellen". Die
+Antwort ist ja. Trotzdem Rückfrage, weil die Umstellung drei Dinge mitbringt,
+die in den Wünschen nicht stehen: Das HTML-Auslesen verschwindet nicht, es
+verschiebt sich (Token aus einem Meta-Tag statt Liste aus einem `<div>`). Es
+hängt mehr daran als die Liste – Spiele und Tabelle sind ebenfalls ohne
+Nachschub, eine frische Liste zu eingefrorenen Spielen wäre halbe Arbeit. Und
+die Mannschafts-IDs ändern sich vollständig, woran gespeicherte Spiele und die
+je Nutzer ausgeblendeten Altersklassen (#124) hängen. Das ist ein Neubau der
+Datenschicht, kein Austausch zweier Funktionen – die Frage steht an #193, #192
+verweist darauf, damit Andi nur einmal antwortet.
+
+---
+
 ## 2026-08-15 – portal-v222: Drei Meldungen vom iPhone (#227, #228, #229)
 
 Andi hat das Brett unterwegs benutzt – und damit drei Dinge gefunden, die am

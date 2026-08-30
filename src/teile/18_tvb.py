@@ -113,7 +113,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, redirect, render_template, request
-from teile.kern import grant as check_grant, get_db
+from teile.kern import grant as check_grant, get_db, utc_zu_lokal
 
 bp  = Blueprint("tvb_app", __name__)
 APP = "tvb"
@@ -136,6 +136,21 @@ _HB_BASE       = "https://www.handball.net"
 # als die Profis, siehe Docstring).
 _AMATEUR_VEREIN_ID = "handball4all.wuerttemberg.131"
 _MANNSCHAFTEN_MAX_ALTER_STUNDEN = 24
+
+# Wunsch #190: Die Mannschaftsliste entsteht durch HTML-Auslesen und konnte
+# bisher still veralten - schlaegt das Auslesen fehl, bleibt der alte Stand
+# stehen, und niemand erfaehrt davon. Ab wann die Seite warnt:
+_QUELLE_WARNUNG_TAGE = 3
+# ... und wie lange nach einem Fehlschlag nicht erneut versucht wird. Ohne
+# diese Bremse fragt JEDER Seitenaufruf die tote Quelle neu an: solange nichts
+# geladen wird, bleibt `aktualisiert_am` alt, `_mannschaften_holen()` haelt den
+# Bestand fuer ueberfaellig und startet den naechsten Versuch - mit 15 s
+# Zeitlimit vor dem Seitenaufbau. Genau das ist seit dem Relaunch der Fall.
+_QUELLE_PAUSE_MINUTEN = 30
+
+# Schluessel in tvb_quellen - je HTML-Quelle einer, die beide in #190 stehen.
+_QUELLE_MANNSCHAFTEN = "mannschaften"
+_QUELLE_LIGA_ID      = "liga_id"
 
 # Kurzlabels fuer den Umschalter aus der langen Liga-Bezeichnung bauen -
 # "Stuttgart-Rems-Murr - maennliche B-Jugend Bezirksoberliga Staffel 2"
@@ -280,6 +295,70 @@ def _kurzlabel(liga, name):
     return " ".join(teile) if teile else rest[:24]
 
 
+def _quelle_melden(db, quelle, ok, fehler=None):
+    """Wunsch #190: haelt je Quelle fest, wann sie zuletzt WIRKLICH lieferte.
+
+    `zuletzt_versuch` wird immer gesetzt, `zuletzt_ok` nur im Erfolgsfall -
+    die Luecke zwischen beiden ist genau das, was vorher niemand sehen
+    konnte."""
+    db.execute("""
+        INSERT INTO tvb_quellen(quelle, zuletzt_ok, zuletzt_versuch, letzter_fehler)
+        VALUES (?, CASE WHEN ? THEN datetime('now') END, datetime('now'), ?)
+        ON CONFLICT(quelle) DO UPDATE SET
+            zuletzt_versuch = datetime('now'),
+            zuletzt_ok      = CASE WHEN ? THEN datetime('now')
+                                   ELSE tvb_quellen.zuletzt_ok END,
+            letzter_fehler  = excluded.letzter_fehler
+    """, (quelle, 1 if ok else 0, None if ok else (fehler or "unbekannt"),
+          1 if ok else 0))
+    db.commit()
+
+
+def _quelle_status(db, quelle):
+    """Zeile aus tvb_quellen als dict, oder None wenn die Quelle noch nie
+    angefasst wurde."""
+    z = db.execute("SELECT * FROM tvb_quellen WHERE quelle=?", (quelle,)).fetchone()
+    return dict(z) if z else None
+
+
+def _quelle_pausiert(db, quelle):
+    """True, wenn der letzte Versuch fehlschlug und die Pause noch laeuft."""
+    z = db.execute("""
+        SELECT 1 FROM tvb_quellen
+        WHERE quelle=? AND letzter_fehler IS NOT NULL
+          AND zuletzt_versuch > datetime('now', ?)
+    """, (quelle, f"-{_QUELLE_PAUSE_MINUTEN} minutes")).fetchone()
+    return z is not None
+
+
+def _quelle_warnung(db, quelle):
+    """Wunsch #190: Text fuer die Seite, oder None wenn alles in Ordnung ist.
+
+    Warnt erst nach `_QUELLE_WARNUNG_TAGE` - ein einzelner Aussetzer der
+    Gegenstelle ist normal und soll die Familie nicht beunruhigen."""
+    z = _quelle_status(db, quelle)
+    if not z or not z["letzter_fehler"]:
+        return None
+
+    zuletzt_ok = z["zuletzt_ok"]
+    if zuletzt_ok is None and quelle == _QUELLE_MANNSCHAFTEN:
+        # tvb_quellen gibt es erst seit #190 - der Bestand davor ist deshalb
+        # ohne Erfolgsdatum, obwohl er nachweislich einmal geladen wurde.
+        # `tvb_mannschaften.aktualisiert_am` IST dieses Datum: die Tabelle wird
+        # ausschliesslich im Erfolgsfall neu geschrieben. Ohne diesen Rueckgriff
+        # meldete die Seite beim ersten Ausfall nach der Auslieferung "noch nie"
+        # und damit etwas Falsches - der Stand vom 14.08.2026 war echt.
+        zeile = db.execute(
+            "SELECT MAX(aktualisiert_am) AS m FROM tvb_mannschaften").fetchone()
+        zuletzt_ok = zeile["m"] if zeile else None
+    if zuletzt_ok is None:
+        return "noch nie"
+    veraltet = db.execute(
+        "SELECT ? < datetime('now', ?)", (zuletzt_ok, f"-{_QUELLE_WARNUNG_TAGE} days")
+    ).fetchone()[0]
+    return utc_zu_lokal(zuletzt_ok) if veraltet else None
+
+
 def _mannschaften_von_handball_net():
     """Parst die Vereinsseite und gibt [(team_id, name, liga)] zurueck.
     Leere Liste, wenn die Seite nicht erreichbar/nicht parsebar ist."""
@@ -306,15 +385,22 @@ def _mannschaften_von_handball_net():
     return gefunden
 
 
-def _liga_id_der_mannschaft(team_id):
+def _liga_id_der_mannschaft(team_id, db=None):
     """Liga-ID fuer die Tabelle. In der Sommerpause stehen keine Spiele zur
     Verfuegung, aus denen sie ableitbar waere - deshalb von der /tabelle-Seite
     der Mannschaft lesen. Die eigene Liga ist immer die `handball4all.*`
     (die `sportradar.dhbdata.*` sind die immer gleichen Navigationslinks)."""
-    html = _hb_seite_holen(f"mannschaften/{team_id}/tabelle")
-    if not html:
+    if db is not None and _quelle_pausiert(db, _QUELLE_LIGA_ID):
         return None
-    treffer = re.findall(r"/ligen/(handball4all\.[A-Za-z0-9._-]+)", html)
+    html = _hb_seite_holen(f"mannschaften/{team_id}/tabelle")
+    treffer = re.findall(r"/ligen/(handball4all\.[A-Za-z0-9._-]+)", html) if html else []
+    if db is not None:
+        # Wunsch #190: erreichbar UND parsebar ist der Erfolg. Eine Seite, die
+        # 200 liefert, in der die Liga-ID aber nicht mehr steht, ist genau der
+        # stille Ausfall, um den es hier geht - deshalb zaehlt sie als Fehler.
+        _quelle_melden(db, _QUELLE_LIGA_ID, bool(treffer),
+                       None if treffer else ("Seite nicht erreichbar" if not html
+                                             else "Liga-ID nicht mehr im HTML"))
     return treffer[0] if treffer else None
 
 
@@ -324,6 +410,10 @@ def _mannschaften_aktualisieren(db):
     konnte - besser ein veralteter Umschalter als gar keiner."""
     gefunden = _mannschaften_von_handball_net()
     if not gefunden:
+        # Wunsch #190: der Fehlschlag wird ab jetzt festgehalten statt
+        # verschluckt - und bremst zugleich den naechsten Versuch aus.
+        _quelle_melden(db, _QUELLE_MANNSCHAFTEN, False,
+                       "Vereinsseite nicht erreichbar oder nicht mehr parsebar")
         return
 
     db.execute("DELETE FROM tvb_mannschaften")
@@ -354,6 +444,7 @@ def _mannschaften_aktualisieren(db):
             VALUES (?,?,?,?,?,NULL,?,0, datetime('now'))
         """, (team_id, name, liga, kurz, _altersklasse(liga), pos))
     db.commit()
+    _quelle_melden(db, _QUELLE_MANNSCHAFTEN, True)
 
 
 def _turnier_id_sichern(db, mannschaft, spiel_antworten):
@@ -373,7 +464,7 @@ def _turnier_id_sichern(db, mannschaft, spiel_antworten):
         if turnier_id:
             break
     if not turnier_id:
-        turnier_id = _liga_id_der_mannschaft(mannschaft["team_id"])
+        turnier_id = _liga_id_der_mannschaft(mannschaft["team_id"], db)
     if turnier_id:
         db.execute("UPDATE tvb_mannschaften SET turnier_id=? WHERE team_id=?",
                    (turnier_id, mannschaft["team_id"]))
@@ -388,7 +479,7 @@ def _mannschaften_holen(db):
         SELECT 1 FROM tvb_mannschaften
         WHERE aktualisiert_am > datetime('now', ?) LIMIT 1
     """, (f"-{_MANNSCHAFTEN_MAX_ALTER_STUNDEN} hours",)).fetchone()
-    if not frisch:
+    if not frisch and not _quelle_pausiert(db, _QUELLE_MANNSCHAFTEN):
         _mannschaften_aktualisieren(db)
     return [dict(z) for z in db.execute(
         "SELECT * FROM tvb_mannschaften ORDER BY position"
@@ -626,6 +717,10 @@ def index(token):
         vergangene=vergangene, kommende=kommende,
         haupt_wettbewerb=_haupt_wettbewerb(liga_antwort),
         tabelle=_tabelle_aufbereiten(tabelle_antwort, gewaehlt["name"]),
+        # Wunsch #190: None, solange die Liste frisch ist - erst wenn das
+        # Erneuern seit Tagen scheitert, steht hier das Datum des letzten
+        # geglueckten Laufs (oder "noch nie").
+        liste_veraltet=_quelle_warnung(db, _QUELLE_MANNSCHAFTEN),
     )
 
 

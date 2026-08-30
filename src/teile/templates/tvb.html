@@ -71,6 +71,14 @@
    JS unten). pointer-events:none, damit die Chips darunter antippbar
    bleiben - der Hinweis zeigt nur an, er ist kein Bedienelement. */
 .team-leiste-wrap { position:relative; }
+/* Wunsch #190: Farbton durchscheinend ueber var(--text) statt zweier fester
+   Farbpaare - so stimmt der Hinweis in BEIDEN Dunkelmodus-Zustaenden
+   (body.dark und body.auto), ohne dass jemand zwei Bloecke nachziehen muss. */
+.listen-warnung {
+  margin: 0 0 14px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,149,0,.14); border-left: 4px solid #ff9500;
+  color: var(--text); font-size: 15px; line-height: 1.45;
+}
 .team-scroll-hinweis {
   position:absolute; top:0; bottom:8px; width:38px;
   display:flex; align-items:center;
@@ -114,6 +122,22 @@
 
   {% if gewaehlt.liga %}
   <div class="team-liga">{{ gewaehlt.name }} · {{ gewaehlt.liga }}</div>
+  {% endif %}
+
+  {# Wunsch #190: Die Mannschaftsliste kommt aus dem HTML der Vereinsseite.
+     Bricht das, bleibt der alte Stand stehen - das ist richtig, war aber
+     unsichtbar. Der Hinweis erscheint erst nach mehreren Tagen ohne
+     geglueckte Erneuerung, damit ein einzelner Aussetzer niemanden stoert. #}
+  {% if liste_veraltet %}
+  <div class="listen-warnung">
+    ⚠️ Die Mannschaftsliste konnte seit mehreren Tagen nicht erneuert werden.
+    {% if liste_veraltet == 'noch nie' %}
+      Sie wurde noch nie erfolgreich geladen.
+    {% else %}
+      Angezeigt wird der Stand vom {{ liste_veraltet }}.
+    {% endif %}
+    Neue oder umbenannte Mannschaften fehlen möglicherweise.
+  </div>
   {% endif %}
 
   {# Der Kader (Wunsch #121) kommt aus der HPI-Statistik der Bundesliga -

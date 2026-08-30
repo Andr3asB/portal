@@ -319,9 +319,10 @@ abrufbar"-Kästchen erzeugt statt eines Fehlers.
 | Quelle | Genutzt von | Auth | Abruf | Anmerkung |
 |--------|-------------|------|-------|-----------|
 | hae-Server (`HAE_API_URL`, über Caddy-Relay `:2021`) | `14_sportschau.py` | `api-key`-Header aus `.env` | live je Seitenaufruf | Eigener Server im Haus, siehe „hae-Server-Relay" oben |
-| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | Inoffiziell: das ist der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufruft. Nur `table`, `schedule`, `team-schedule` existieren – **kein** Kader/Spieler-Endpunkt, und `club/<id>/schedule` (Wunsch #151, s.u.) |
+| handball.net Widget-API (`www.handball.net/a/sportdata/1/widgets/…`) | `18_tvb.py` (Spiele, Tabelle) | keine | live je Seitenaufruf (Antworten 5–10 KB) | **SEIT DEM RELAUNCH TOT (30.08.2026, #191)** – antwortet mit HTTP **200**, liefert aber die leere SPA-Hülle statt JSON. Angezeigt wird seither der gespeicherte Bestand aus `tvb_spiele`. Früher: der Endpunkt, den handball.net für seine einbettbaren Vereins-Widgets selbst aufrief; nur `table`, `schedule`, `team-schedule`, dazu `club/<id>/schedule` (#151) |
 | Open Food Facts (`world.openfoodfacts.org/api/v2/product/<ean>.json`) | `10_einkauf.py` (Barcode-Erfassung, Wunsch #143) | keine | live je Scan, nichts gecacht | Freie Produktdatenbank, rund 420.000 Produkte fuer Deutschland. Unbekannte Codes beantwortet sie mit HTTP 404 - das ist der Normalfall bei Nicht-Lebensmitteln, kein Fehler. Der Code wird vorher gegen `\A[0-9]{6,14}\Z` geprueft, weil er in den Pfad der Abfrage eingesetzt wird |
-| HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net |
+| HPI-API der HBL (`hpi.handball-bundesliga.de/api/…`) | `18_tvb.py` (Kader) | keine | gecacht in `tvb_kader`, max. 6 h alt | Handball Performance Index, offizielle Leistungskennzahl der Liga. Antwort ~400 KB (ganze Liga) – deshalb Cache, anders als bei handball.net. **Nach dem Relaunch am 30.08.2026 als einzige der vier TVB-Quellen unverändert lebendig** |
+| handball.net HTML (Vereinsseite `/vereine/<id>`, Tabellenseite `/mannschaften/<id>/tabelle`) | `18_tvb.py` (Mannschaftsliste, Liga-ID) | keine | max. 24 h, Bremse 30 Min nach Fehlschlag (#190) | **SEIT DEM RELAUNCH TOT (30.08.2026)** – die Vereinsseite leitet in der App auf `/404`, die Tabellenseite liefert die leere Hülle. Zustand steht in `tvb_quellen`, die TVB-Seite warnt nach 3 Tagen (#190) |
 
 Gemeinsam gilt: Bilder/Assets dieser Quellen werden **nicht** eingebunden
 (z. B. Spielerfotos vom CDN `images.dc.prod.cloud.atriumsports.com`) – das
@@ -1123,7 +1124,14 @@ teile/
                        und in tvb_mannschaften gespeichert, erneuert alle
                        _MANNSCHAFTEN_MAX_ALTER_STUNDEN (24) - schlaegt das
                        Parsen fehl, bleibt der alte Stand stehen statt der
-                       Umschalter zu verschwinden. `_kurzlabel()` baut aus
+                       Umschalter zu verschwinden. Seit Wunsch #190 wird
+                       dieser Fehlschlag in tvb_quellen vermerkt (statt
+                       verschluckt), die Seite warnt nach 3 Tagen, und eine
+                       Pause von _QUELLE_PAUSE_MINUTEN (30) verhindert, dass
+                       jeder Seitenaufruf die tote Quelle neu anfragt.
+                       ACHTUNG: seit dem handball.net-Relaunch (30.08.2026,
+                       #191) ist diese Quelle tot - der angezeigte Stand
+                       stammt vom 14.08.2026. `_kurzlabel()` baut aus
                        der langen Liga-Bezeichnung das Chip-Label
                        ("maennliche B-Jugend Bezirksoberliga Staffel 2" ->
                        "mB BOL 2"), Doppelungen werden durchnummeriert.
@@ -1755,6 +1763,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 | `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), wettbewerb (Wunsch #151 – Name des Wettbewerbs; NULL bei Altbestand, weil nachtraeglich nicht rekonstruierbar), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
+| `tvb_quellen` | quelle (PK, `mannschaften` oder `liga_id`), zuletzt_ok (letzter WIRKLICH geglückter Abruf – NULL heißt: seit Bestehen der Tabelle keiner), zuletzt_versuch, letzter_fehler (NULL = zuletzt hat es geklappt) – Wunsch #190: macht das stille Veralten der beiden HTML-Quellen sichtbar und bremst nach einem Fehlschlag 30 Min. „Erreichbar" zählt bewusst **nicht** als Erfolg: eine Seite, die 200 liefert, in der die Liga-ID aber fehlt, gilt als Fehler – genau so sieht ein Relaunch aus |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
@@ -2234,6 +2243,20 @@ Der Datenstrom selbst geht **weiterhin unverschlüsselt** aufs NAS (zweiter Teil
 
 ## Bekannte Issues
 
+- **Die TVB-App hat seit dem handball.net-Relaunch keinen Datennachschub**
+  (30.08.2026, Wunsch #191). Drei der vier Quellen sind tot: die Widget-API
+  (Spiele, Tabelle) und beide HTML-Seiten (Mannschaftsliste, Liga-ID). Nur die
+  HPI-API (Kader) lebt weiter. **Die Widget-Endpunkte antworten mit HTTP 200**
+  und liefern die leere SPA-Hülle statt JSON – ein reiner Erreichbarkeitstest
+  meldet hier grün, deshalb prüft `18_tvb.py` seit #190 auf „erreichbar UND
+  parsebar". Die App zeigt den gespeicherten Bestand und warnt auf der Seite
+  (#190). Der neue Zugang ist gefunden (`/api/new/…` mit Header
+  `x-client-token` aus einem Meta-Tag), die Umstellung wäre ein Neubau der
+  Datenschicht und wartet als Rückfrage an #193 (deckt #192 mit ab) auf Andi.
+  **Wer hier weiterarbeitet: eine Quelle immer mit den Headern prüfen, die der
+  Code wirklich schickt** – eine Sonde mit `Accept: application/json` bekam
+  404 für Seiten, die es noch gibt, und hätte fast zu einem falschen Befund
+  geführt.
 - **Der Container läuft in UTC, nicht in deutscher Zeit** (`docker exec
   portal python3 -c "import time; print(time.tzname)"` → `('UTC','UTC')`).
   `datetime.now()` ohne `tzinfo` liefert also UTC, nicht Europe/Berlin -
@@ -2636,6 +2659,20 @@ python -m venv .venv                                   # einmalig
   Buchungsdatum, "nachgetragen" mit Gegenprobe (zeitnaher Eintrag darf NICHT
   markiert werden) und die Zeitzonen-Umrechnung. Zwei Tests wurden durch
   absichtliches Kaputtmachen gegengeprueft.
+- `test_tvb_quellen_alter.py` – Wunsch #190. Prueft, dass ein Fehlschlag der
+  HTML-Quellen ueberhaupt festgehalten wird (vorher wurde er verschluckt), dass
+  er NICHT sofort warnt (ein einzelner Aussetzer der Gegenstelle soll die
+  Familie nicht beunruhigen - ohne diese Gegenprobe waere eine Warnung, die
+  immer erscheint, ebenfalls gruen) und dass die Bremse greift: ohne sie fragt
+  jeder Seitenaufruf die tote Quelle neu an, mit 15 s Zeitlimit vor dem
+  Seitenaufbau. Der Test dazu zaehlt die Abrufe. Ein weiterer haelt den
+  heimtueckischen Fall fest, dass die Seite antwortet, die Liga-ID darin aber
+  fehlt - ein reiner Erreichbarkeitstest wuerde das gruen melden. Zwei Tests
+  decken den Bestand von VOR der Aenderung ab: ein altes
+  `tvb_mannschaften.aktualisiert_am` gilt als letzter Erfolg (sonst stuende
+  "noch nie" auf der Seite, obwohl die Liste vom 14.08.2026 stammt), aber ohne
+  jeden Bestand wird kein Datum erfunden. Gegenprobe gemacht: mit dem alten
+  Verhalten fallen 4 der 11 Tests.
 - `test_tvb_wettbewerbe.py` – Wunsch #151. Der erste Test haelt bewusst den
   IST-Zustand fest (der exakte ID-Vergleich uebersieht das Pokalspiel): geht er
   eines Tages durch, hat handball.net die IDs vereinheitlicht und die

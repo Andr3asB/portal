@@ -379,6 +379,12 @@ CREATE TABLE IF NOT EXISTS tvb_ausgeblendet (
   altersklasse TEXT    NOT NULL,
   PRIMARY KEY (user_id, altersklasse)
 );
+CREATE TABLE IF NOT EXISTS tvb_quellen (
+  quelle          TEXT PRIMARY KEY,
+  zuletzt_ok      TEXT,
+  zuletzt_versuch TEXT,
+  letzter_fehler  TEXT
+);
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
   vorname         TEXT    NOT NULL,
