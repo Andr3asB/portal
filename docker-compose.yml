@@ -86,6 +86,8 @@ services:
       BACKUP_NAS_USER: "${BACKUP_NAS_USER:-familienportal}"
       BACKUP_NAS_PATH: "${BACKUP_NAS_PATH:-/volume2/portal.16schwaben.de_Backup}"
       BACKUP_NAS_PORT: "${BACKUP_NAS_PORT:-2222}"
+      # Wunsch #130/#211: leer = unverschluesselt (mit Warnung im Log)
+      BACKUP_AGE_RECIPIENT: "${BACKUP_AGE_RECIPIENT:-}"
     mem_limit: 64m
     cpus: "0.1"
     logging: *log_grenzen

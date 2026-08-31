@@ -212,21 +212,23 @@ TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
 KI_GUTHABEN_WACHT=1         # Wunsch #183: stuendlicher Blick aufs OpenRouter-Guthaben
-BACKUP_AGE_RECIPIENT=       # Wunsch #130/#211: oeffentlicher age-Schluessel
+BACKUP_AGE_RECIPIENT=age1…  # Wunsch #130/#211: oeffentlicher age-Schluessel
 ```
 
-**`BACKUP_AGE_RECIPIENT` ist Stand 13.08.2026 noch LEER** – die Mechanik ist
-mit v212 ausgeliefert und durchgespielt, aber bis Andi seinen oeffentlichen
-Schluessel eintraegt, geht das naechtliche Backup weiter im Klartext aufs NAS
-und schreibt dabei jede Nacht eine Warnung ins util-Log:
+**`BACKUP_AGE_RECIPIENT` ist seit 31.08.2026 GESETZT** (Andis oeffentlicher
+Schluessel `age1ursp…rvgzg`) – das naechtliche Backup geht seither
+verschluesselt (`portal-*.tar.gz.age`) aufs NAS. End-to-end mit dem echten
+Schluessel durchgespielt (eigener Lauf in ein Pruefverzeichnis, age-Kopf
+verifiziert, `tar` liest nichts – journal.md 31.08.2026). Der PRIVATE
+Schluessel liegt ausschliesslich bei Andi (Passwortmanager), nie auf home02,
+nie auf dem NAS – ohne ihn ist jedes Backup absichtlich unlesbar.
+Wiederherstellung siehe „Wiederherstellung aus einem Backup".
 
-```bash
-ssh -p 2222 claude@10.0.0.100 "docker logs util --tail=50 | grep -i unverschl"
-```
-
-Einschalten ist eine Zeile in der `.env` plus `docker compose up -d util` –
-kein Rebuild. Steht dort etwas, das kein age-Schluessel ist, faellt das Backup
-**aus** statt unverschluesselt zu laufen (Absicht, siehe backup.py).
+Steht in der Variable etwas, das kein age-Schluessel ist, faellt das Backup
+**aus** statt unverschluesselt zu laufen (Absicht, siehe backup.py). Achtung:
+`docker-compose.yml` muss die Variable explizit im `environment:`-Block von
+`util` durchreichen – das fehlte bis 31.08.2026 und war der Grund, warum der
+erste Scharfschalt-Versuch wirkungslos blieb.
 
 `PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN` und `KI_GUTHABEN_WACHT` stehen
 heute NICHT in der echten `.env` - sie greifen mit ihrer Voreinstellung (leer
@@ -2233,7 +2235,7 @@ SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/
 
 > **Bei einem NAS-Umzug oder neu aufgesetztem SSH-Dienst schlägt das Backup fehl** – mit Absicht, Meldung `Host key verification failed`. Dann den neuen Schlüssel am NAS selbst ablesen, vergleichen und erst danach neu aufnehmen (`ssh-keyscan -p 2222 -t ed25519,rsa <ip> > /srv/familienportal/ssh/known_hosts`). Blindes Überschreiben stellt genau die Lücke wieder her, die #211 geschlossen hat.
 
-Der Datenstrom selbst geht **weiterhin unverschlüsselt** aufs NAS (zweiter Teil von #211 und ganz #130) – offen, weil die Wahl zwischen symmetrisch (Schlüssel aus der `.env`) und asymmetrisch (age, privater Schlüssel ausserhalb von home02 und NAS) über die Wiederherstellbarkeit entscheidet und deshalb Andi gehört. Entlastend: in der DB stehen seit Stufe 6 nur HMACs der Zugangstokens, ein erbeutetes Backup gibt also **keinen** Portalzugang.
+Der Datenstrom geht seit dem 31.08.2026 **verschlüsselt** aufs NAS (`age`, asymmetrisch – Andis Wahl, #130/#211): `BACKUP_AGE_RECIPIENT` in der `.env` trägt den öffentlichen Schlüssel, der private liegt nur bei Andi (Passwortmanager). Ältere `portal-*.tar.gz` ohne `.age` sind noch Klartext und rotieren binnen 7 Tagen heraus. Entlastend galt schon vorher: in der DB stehen seit Stufe 6 nur HMACs der Zugangstokens, ein erbeutetes Backup gibt also **keinen** Portalzugang.
 
 ## Bekannte Issues
 

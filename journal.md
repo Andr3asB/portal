@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-08-31 – #130/#211: Backup-Verschlüsselung scharf – und die Variable, die nie ankam
+
+Andi hat seinen öffentlichen age-Schlüssel geliefert (`age1ursp…rvgzg`,
+erzeugt auf seinem Windows-Rechner, privater Teil im Passwortmanager – genau
+wie am 13.08. geplant). Eingetragen als `BACKUP_AGE_RECIPIENT` in die
+Server-`.env`, `docker compose up -d util` … und nichts passierte, zweifach:
+
+1. **`up -d` ohne `--force-recreate` reichte nicht** – Compose sah keine
+   Änderung am Dienst und ließ den Container stehen.
+2. Auch nach dem Recreate: Variable im Container **nicht da**. Der
+   `environment:`-Block von `util` in der `docker-compose.yml` zählt die
+   durchgereichten Variablen einzeln auf – `BACKUP_AGE_RECIPIENT` fehlte
+   darin schlicht. Die v212-Auslieferung hatte die Mechanik in `backup.py`
+   und die Doku in `.env.example` gebaut, aber die Leitung dazwischen
+   vergessen. Aufgefallen ist das erst jetzt, weil die Variable bis heute
+   leer war – ein leerer Wert und ein nie ankommender sehen im Log gleich
+   aus. Zeile ergänzt, Datei per scp auf den Server, Recreate, Variable da.
+
+Dann die Nachweise, in derselben Reihenfolge wie beim Probelauf am 13.08.:
+
+- `age`-Proberunde im Container gegen den echten Key: Ausgabe beginnt mit
+  `age-encryption.org/v1`.
+- **Echter `backup.run()`** mit `BACKUP_NAS_PATH` auf ein eigenes
+  Prüfverzeichnis (`pruefung-age/`) gebogen – wieder nicht ins echte
+  Verzeichnis, dort liegen exakt 7 Backups und die Rotation hätte das
+  älteste gefressen. Ergebnis: 6,5 MB `portal-….tar.gz.age`, age-Kopf da,
+  `tar tzf` scheitert (gut so – kein Klartext).
+- Prüfverzeichnis geräumt, die 7 echten Backups unverändert.
+
+**Der letzte Nachweis steht noch aus und gehört Andi:** Die Testdatei liegt
+in seinem `Downloads`-Ordner; erst wenn `age -d` mit seinem **privaten**
+Schlüssel sie öffnet, ist bewiesen, dass beim Kopieren des Public Keys kein
+Zeichen verrutscht ist. Bis dahin bleiben #130/#211 offen – ein Tippfehler
+fiele sonst erst beim Ernstfall-Restore auf, wenn alle Backups seit heute
+unlesbar wären. Ab heute Nacht 03:00 laufen die Backups verschlüsselt; die
+alten Klartext-Archive rotieren binnen sieben Tagen von selbst hinaus.
+
 ## 2026-08-31 – Lint eingeführt: ruff über den ganzen Baum, 242 Funde behoben
 
 Auftrag: „fix lint errors". Es gab bislang gar keinen Linter – also ruff
