@@ -55,7 +55,7 @@ Eine Serie, die an einem bestimmten Tag schon eine eigene Instanz hat,
 wird für GENAU diesen Tag nicht nochmal angeboten (unabhängig vom
 Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
@@ -151,6 +151,23 @@ def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int | None = None,
     if zugewiesen_an and zugewiesen_an != erstellt_von:
         push_send(zugewiesen_an, "Neue Aufgabe 📋", inhalt[:80], "todo",
                   _todo_url(db, zugewiesen_an))
+
+
+def _ohne_alte_erledigte(todos):
+    """Wunsch #243: Laenger als 7 Tage Erledigtes verschwindet aus beiden
+    Ansichten - dieselbe Frist wie bei der Packliste (#234), damit sich das
+    Portal ueberall gleich verhaelt. Geloescht wird nichts; `?erledigt=alle`
+    holt alles zurueck. Ein Altbestand ohne erledigt_am (von vor der Spalte)
+    bleibt bewusst sichtbar, statt beim Ausrollen kommentarlos zu
+    verschwinden.
+
+    Gibt (sichtbare, anzahl_versteckter) zurueck."""
+    grenze = (datetime.now(timezone.utc) - timedelta(days=7)) \
+        .strftime("%Y-%m-%d %H:%M:%S")
+    frisch = [t for t in todos
+              if not (t["erledigt"] and t["erledigt_am"]
+                      and t["erledigt_am"] < grenze)]
+    return frisch, len(todos) - len(frisch)
 
 
 def _visible_todos(db, user):
@@ -271,15 +288,20 @@ def index(token):
     if gewuenscht == "liste":
         _ansicht_merken(db, user["id"], "liste")
     elif gewuenscht is None and _gemerkte_ansicht(db, user["id"]) == "brett":
-        return redirect(url_for("todo_app.kanban", token=token))
+        # Wunsch #243: ?erledigt=alle uebersteht die Weiterleitung aufs Brett.
+        return redirect(url_for("todo_app.kanban", token=token,
+                                erledigt=request.args.get("erledigt")))
 
     todos = _visible_todos(db, user)
+    erledigt_versteckt = 0
+    if request.args.get("erledigt") != "alle":
+        todos, erledigt_versteckt = _ohne_alte_erledigte(todos)
     users = db.execute(
         "SELECT id, name, farbe FROM users ORDER BY name"
     ).fetchall()
     return render_template("todo.html",
         user=user, token=token, farbe=user["farbe"],
-        todos=todos, users=users,
+        todos=todos, users=users, erledigt_versteckt=erledigt_versteckt,
         darf_loeschen=_darf_loeschen(user),
         historie=_historie_map(db, [t["id"] for t in todos]),
         status_order=STATUS_ORDER, status_labels=STATUS_LABELS,
@@ -385,8 +407,13 @@ def kanban(token):
     if request.args.get("ansicht") == "brett":
         _ansicht_merken(db, user["id"], "brett")
 
+    todos = _visible_todos(db, user)
+    erledigt_versteckt = 0
+    if request.args.get("erledigt") != "alle":
+        todos, erledigt_versteckt = _ohne_alte_erledigte(todos)
+
     spalten = {s: [] for s in STATUS_ORDER}
-    for row in _visible_todos(db, user):
+    for row in todos:
         eintrag = dict(row)
         eintrag["darf_bewegen"] = _darf_erledigen(user, row)
         # Ein unbekannter Status (Altbestand, spaeter entfernte Stufe) landet
@@ -413,6 +440,7 @@ def kanban(token):
     alle = [t for eintraege in spalten.values() for t in eintraege]
     return render_template("todo_kanban.html",
         user=user, token=token, farbe=user["farbe"],
+        erledigt_versteckt=erledigt_versteckt,
         spalten=spalten, status_order=STATUS_ORDER, status_labels=STATUS_LABELS,
         users=db.execute("SELECT id, name, farbe FROM users ORDER BY name").fetchall(),
         rollen=ROLLEN, rollen_labels=ROLLEN_LABELS,

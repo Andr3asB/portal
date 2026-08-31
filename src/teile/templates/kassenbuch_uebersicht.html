@@ -15,7 +15,7 @@
   border-left:6px solid var(--kind-farbe, var(--farbe));
 }
 .kb-kind-name { flex:1; font-size:17px; font-weight:600; }
-.kb-kind-saldo { font-size:17px; font-weight:700; color:var(--farbe-kontrast); }
+.kb-kind-saldo { font-size:17px; font-weight:700; color:var(--farbe-kontrast); font-variant-numeric:tabular-nums; }
 .kb-kind-saldo-leer { font-size:13px; font-weight:500; color:var(--text-2); }
 {% endblock %}
 
@@ -25,7 +25,7 @@
 {% endblock %}
 
 {% block body %}
-<main class="main">
+<main class="main" id="main">
   {% if not kinder %}
   <div class="kb-hinweis">Es sind noch keine Nutzer mit der Rolle „Kind“ angelegt – ein Kassenbuch gehört immer zu einem Kind.</div>
   {% endif %}

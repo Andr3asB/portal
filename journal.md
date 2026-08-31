@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-09-01 – portal-v233: Feinschliff-Wünsche #243–#245
+
+Die zwei Wünsche aus dem Vercel-Checklisten-Durchgang (beide `hoch`) plus
+Andis Frage-Wunsch #243 (`mittel`), alle in einem Deploy.
+
+**#244 (base.html):** `prefers-reduced-motion` global beachtet (Dauern auf
+0,01ms statt `none` – `transitionend` muss weiter feuern; der
+Nach-oben-Knopf prüft zusätzlich im Skript, weil `scrollTo({behavior})` CSS
+ignoriert). `color-scheme` hängt jetzt am `html`-Element, dunkel über
+`html:has(body.dark)` – live geprüft: `colorScheme=dark` am Wurzelelement,
+Scrollbalken folgen dem Theme. `touch-action: manipulation` auf allen
+Bedienelementen; Zieh-Griffe behalten ihr `none` per Klassenregel.
+
+**#245:** Skip-Link als erster Tab-Stopp (Ziel `<main id="main">`, in allen
+46 Vorlagen ergänzt und gewächtert), Hover-Feedback per
+`@media (hover:hover)` + `brightness(.94)` (sichtbar auch auf transparenten
+Knöpfen, klebt auf Touch nicht fest), `tabular-nums` auf den
+Zahlenkolonnen, Offline-Banner mit `aria-live`.
+
+**#243 – Andis Frage „wann werden erledigte Aufgaben gelöscht?":** Antwort
+im Wunsch selbst: nie gelöscht, aber ab jetzt **7 Tage nach dem Abhaken
+ausgeblendet** – 7 statt der ebenfalls angebotenen 3, weil die Packliste
+(#234) dieselbe Frist hat und sich das Portal überall gleich verhalten
+soll. Gilt für Liste UND Brett (gemeinsamer Filter in `04_todo.py`),
+Rückweg `?erledigt=alle` überlebt auch die Weiterleitung auf die gemerkte
+Brett-Ansicht. Altbestand ohne `erledigt_am` bleibt bewusst sichtbar.
+
+**Stolperfalle des Abends:** Zwei neue `html {}`-Regeln schoben sich vor
+die bestehende `scroll-padding`-Regel – und `test_kopfzeile_bleibt` greift
+die ERSTE `html`-Regel der Datei. Gelöst durch Verschmelzen
+(`color-scheme` in die bestehende Regel) bzw. `:root` statt `html` im
+reduced-motion-Block; beide Tests dokumentieren das jetzt im Kommentar.
+
+Wächter: `test_system_feinschliff.py` (8 Zusagen, Gegenproben gemacht),
+`test_todo_erledigt_frist.py` (6 Tests). Suite: 1790 grün. Live-Prüfung
+grün, Erledigt-Spalte zeigt „8 ältere anzeigen". Nebenbei den letzten
+grauen Rollen-Chip in todo.html von #8e8e93 auf #747479 gehoben (#237-Rest).
+
 ## 2026-08-31 – Externe UI-Skills geprüft: einer rein (eingefroren), einer nur als Doku
 
 Andis Frage nach externen Skills (Snyk-Artikel „Top Claude Skills for UI/UX

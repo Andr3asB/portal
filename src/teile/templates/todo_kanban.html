@@ -54,6 +54,7 @@
 .spalte-zahl {
   background:var(--surface); border-radius:10px; padding:1px 8px;
   font-size:12px; font-weight:700; color:var(--text-2);
+  font-variant-numeric:tabular-nums;
 }
 .ablage { flex:1; min-height:60px; }
 .karte {
@@ -84,6 +85,14 @@
   background:var(--surface);
 }
 .spalte-leer { font-size:12px; color:var(--text-2); text-align:center; padding:14px 4px; }
+/* Wunsch #243: Fussnote der Erledigt-Spalte - holt die ausgeblendeten
+   aelteren Eintraege zurueck. */
+.aeltere-erledigte {
+  display:block; text-align:center; text-decoration:none;
+  border:1.5px solid var(--border); border-radius:10px;
+  color:var(--text-2); padding:9px 8px; font-size:12px; font-weight:600;
+  margin-top:6px;
+}
 .hinweis { font-size:13px; color:var(--text-2); margin-bottom:12px; line-height:1.5; }
 /* Wunsch #227 */
 .brett-meldung {
@@ -100,7 +109,7 @@
 {% endblock %}
 
 {% block body %}
-<main class="main">
+<main class="main" id="main">
 
   {# Projektkonvention: jede Unterseite braucht einen eigenen Zurueck-Link,
      der ⌂-Knopf ist kein Ersatz. #}
@@ -187,6 +196,12 @@
         <div class="spalte-leer" data-leer-fuer="{{ status }}">nichts hier</div>
         {% endif %}
       </div>
+      {# Wunsch #243: Aeltere Erledigte sind ausgeblendet, nicht weg. #}
+      {% if status == 'erledigt' and erledigt_versteckt %}
+      <a class="aeltere-erledigte knopf" href="?erledigt=alle">
+        {{ erledigt_versteckt }} ältere anzeigen
+      </a>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

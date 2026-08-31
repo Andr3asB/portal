@@ -2543,6 +2543,16 @@ python -m venv .venv                                   # einmalig
 - `test_packliste_gepackt_frist.py` – Wunsch #234. Gepacktes verschwindet
   nach 7 Tagen aus der Ansicht (nicht aus der DB), `?gepackt=alle` und der
   Zaehl-Link holen es zurueck, offene Eintraege kennen keine Frist.
+- `test_todo_erledigt_frist.py` – Wunsch #243. Dieselbe 7-Tage-Frist fuer
+  erledigte Aufgaben, in BEIDEN Ansichten (Liste + Brett); Altbestand ohne
+  erledigt_am bleibt sichtbar, und die Weiterleitung auf die gemerkte
+  Brett-Ansicht darf `?erledigt=alle` nicht verlieren.
+- `test_system_feinschliff.py` – Wuensche #244/#245. Acht unsichtbare
+  base.html-Zusagen: reduced-motion (0,01ms statt none, sonst haengen
+  transitionend-Skripte), color-scheme in der ERSTEN html-Regel (eine
+  zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
+  touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
+  Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
 - `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
   Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
   wieder gruen sein.

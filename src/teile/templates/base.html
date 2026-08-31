@@ -92,6 +92,55 @@
     @media (prefers-color-scheme: dark) {
       body.auto .farbtext { color: var(--ft-hell); }
     }
+
+    /* Wunsch #244: color-scheme am WURZEL-Element, nicht nur an Feldern -
+       sonst bleiben Scrollbalken und native Bedienelemente (Datumswaehler,
+       select-Pfeile) im Dunkelmodus hell. Der Zustand haengt an der
+       body-Klasse, deshalb :has() - alle Familiengeraete koennen das. */
+    html:has(body.dark) { color-scheme: dark; }
+    @media (prefers-color-scheme: dark) {
+      html:has(body.auto) { color-scheme: dark; }
+    }
+
+    /* Wunsch #244: Wer im System "Bewegung reduzieren" gewaehlt hat, bekommt
+       keine Zier-Animationen - Transitionen enden sofort, smooth-scroll wird
+       zum Sprung. 0.01ms statt none, damit transitionend-Ereignisse weiter
+       feuern und kein Skript haengen bleibt. Das Ziehen selbst (Schatten
+       folgt dem Finger) ist Funktion, keine Animation, und bleibt. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      /* :root statt html: test_kopfzeile_bleibt greift die ERSTE html-Regel
+         der Datei, und das muss die mit scroll-padding-top bleiben. */
+      :root { scroll-behavior: auto !important; }
+    }
+
+    /* Wunsch #244: kein Doppeltipp-Zoom-Verzoegerer auf Bedienelementen.
+       Zieh-Griffe setzen ihr eigenes touch-action:none per Klasse - die
+       Klassenregel schlaegt diese Element-Regel. */
+    button, a, input, select, textarea, label { touch-action: manipulation; }
+
+    /* Wunsch #245: Maus-Feedback fuer alle Knoepfe - nur dort, wo es echtes
+       Hover gibt (Media-Query), sonst klebt der Zustand auf Touch. brightness
+       dunkelt Text UND Flaeche leicht ab: sichtbar auf gefuellten wie auf
+       transparenten Knoepfen, und der Kontrast steigt dabei, statt zu sinken. */
+    @media (hover: hover) {
+      button:hover, a.knopf:hover, .menu-item:hover { filter: brightness(.94); }
+    }
+
+    /* Wunsch #245: Skip-Link - erster Tab-Stopp jeder Seite, sichtbar nur
+       mit Tastaturfokus. Ziel ist das <main id="main"> der Vorlagen. */
+    .skip-link {
+      position: absolute; left: 8px; top: calc(var(--st) + 8px);
+      z-index: 400; transform: translateY(-200%);
+      background: var(--surface); color: var(--text);
+      border: 2px solid var(--farbe-kontrast); border-radius: 10px;
+      padding: 10px 16px; font-weight: 600; text-decoration: none;
+    }
+    .skip-link:focus-visible { transform: none; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
@@ -168,7 +217,10 @@
     /* Sonst verschwindet jedes Sprungziel (#wunsch-123, die Hilfe-Kapitel,
        #gb-…) unter der stehenden Leiste. Der Wert ist die Kopfhoehe:
        Statusleiste + 6 + 46 Mindesthoehe + 6, plus etwas Luft. */
-    html { scroll-padding-top: calc(var(--st) + 66px); }
+    /* color-scheme hier mit drin (Wunsch #244): eine zweite html-Regel
+       weiter unten wuerde dem Kopfzeilen-Waechter die erste vor die Nase
+       schieben. */
+    html { scroll-padding-top: calc(var(--st) + 66px); color-scheme: light; }
     .nav-bar {
       display: flex;
       align-items: center;
@@ -384,6 +436,9 @@
 {%- set dm = user.dark_mode if user is defined and user else 0 -%}
 <body class="{{ 'dark' if dm == 1 else ('auto' if dm == 2 else '') }}">
 
+<!-- Wunsch #245: erster Tab-Stopp, springt ueber die Kopfleiste -->
+<a class="skip-link" href="#main">Zum Inhalt springen</a>
+
 <!-- App-Header mit Navigation -->
 <div class="ptr-anzeige" id="ptr-anzeige" aria-hidden="true">Zum Neuladen ziehen</div>
 
@@ -407,7 +462,7 @@
     <span class="nav-ghost"></span>
     {% endif %}
   </div>
-  <div class="offline-banner" id="offline-banner" style="display:none">📡 Offline – manche Funktionen sind eingeschränkt</div>
+  <div class="offline-banner" id="offline-banner" style="display:none" aria-live="polite">📡 Offline – manche Funktionen sind eingeschränkt</div>
 </header>
 {# Wunsch #155: Hier stand ein Block `header_extra`, ueber den Aktionsknoepfe
    direkt auf das farbige Kopfband geklebt wurden. Zuletzt nutzte ihn nur noch
@@ -931,7 +986,12 @@
   })();
 
   // Kleinkram, der früher als Ausdruck direkt im Attribut stand.
-  window.nachObenScrollen  = function() { window.scrollTo({top: 0, behavior: 'smooth'}); };
+  window.nachObenScrollen  = function() {
+    // Wunsch #244: scrollTo({behavior}) ignoriert CSS scroll-behavior -
+    // die Systemeinstellung muss hier selbst geprueft werden.
+    var ruhig = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({top: 0, behavior: ruhig ? 'auto' : 'smooth'});
+  };
   window.formularAbsenden  = function(el) {
     const f = (el && el.form) || el;
     if (f.requestSubmit) f.requestSubmit(); else f.submit();

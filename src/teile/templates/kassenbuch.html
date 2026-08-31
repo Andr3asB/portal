@@ -8,7 +8,7 @@
   padding:22px 20px; margin-bottom:16px; text-align:center;
 }
 .kb-saldo-label { font-size:13px; opacity:.85; }
-.kb-saldo-betrag { font-size:34px; font-weight:700; margin-top:4px; }
+.kb-saldo-betrag { font-size:34px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
 .kb-setup-card {
   background:var(--surface); border-radius:16px; padding:20px;
   box-shadow:0 1px 3px var(--shadow);
@@ -67,7 +67,7 @@
 .kb-eintrag-zweck { font-size:15px; font-weight:500; }
 .kb-eintrag-zweck.kb-leer { color:var(--text-2); font-weight:400; font-style:italic; }
 .kb-eintrag-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
-.kb-eintrag-betrag { font-size:16px; font-weight:700; white-space:nowrap; }
+.kb-eintrag-betrag { font-size:16px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .kb-eintrag-betrag.kb-plus { color:var(--gruen-text); }
 .kb-eintrag-betrag.kb-minus { color:var(--rot-text); }
 .kb-storno-btn {
@@ -102,7 +102,7 @@
 {% endblock %}
 
 {% block body %}
-<main class="main">
+<main class="main" id="main">
 
   {% if not eigenes_buch %}
   <a class="kb-pruef-link" href="/a/kassenbuch{{ tp }}kind/{{ kind.id }}/pruefung">

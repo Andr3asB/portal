@@ -45,7 +45,7 @@
 }
 .kbp-sache { font-size:15px; font-weight:500; margin-top:2px; word-break:break-word; }
 .kbp-meta { font-size:12px; color:var(--text-2); margin-top:3px; line-height:1.45; }
-.kbp-betrag { font-size:15px; font-weight:700; white-space:nowrap; align-self:center; }
+.kbp-betrag { font-size:15px; font-weight:700; white-space:nowrap; align-self:center; font-variant-numeric:tabular-nums; }
 .kbp-markierung {
   display:inline-block; margin-top:5px; padding:1px 7px; border-radius:8px;
   font-size:12px; font-weight:700; background:#ff950022; color:#a55800;
@@ -64,7 +64,7 @@
 {% endblock %}
 
 {% block body %}
-<main class="main">
+<main class="main" id="main">
 
   <div class="kbp-erklaerung">
     Das Kassenbuch sortiert nach dem Tag, an dem das Geld geflossen ist. Hier
