@@ -99,7 +99,16 @@ listet sie; die kommentierte Fassung steht in `server.md`, Abschnitt
 
 Auslieferung ist ein Dreischritt (Paket bauen → hochladen → entpacken +
 `--build`), die vollständige Fassung mit allen `--exclude` steht in
-`server.md`, Abschnitt „Deployment-Ablauf". Zwei Punkte, die dort leicht
+`server.md`, Abschnitt „Deployment-Ablauf". **Zu jedem Deploy gehört danach
+das Aufräumen** – jeder `--build` lässt das vorherige Image ungetaggt zurück
+(Andi, 31.08.2026: 151 Stück in Portainer):
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker image prune -f --filter 'until=72h' && docker builder prune -f --filter 'until=72h'"
+```
+
+Bewusst ohne `-a` (nur ungetaggte, fremde Stacks bleiben unberührt); `system`/
+`volume`/`network prune` bleiben tabu, der Guardrail blockiert sie ohnehin. Zwei Punkte, die dort leicht
 untergehen:
 
 - **Code-Änderungen brauchen `--build`, nicht `restart`.** Templates und

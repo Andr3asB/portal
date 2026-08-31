@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-08-31 – #235: 151 vergessene Images – der Deploy räumt jetzt hinter sich auf
+
+Andi sah in Portainer „hunderte unused Images" und fragte, ob die von mir
+kommen. Ja: **Jeder `docker compose up -d --build` lässt das vorherige Image
+ungetaggt zurück**, und nach ~230 Deploys lagen 151 davon herum, dazu 1,7 GB
+Build-Cache in 603 Einträgen. Niemandem aufgefallen, weil `docker system df`
+nie Teil eines Ablaufs war.
+
+Einmalig aufgeräumt und den Schritt dauerhaft als vierten Teil des
+Deploy-Ablaufs verankert (server.md, CLAUDE.md):
+
+```bash
+docker image prune -f --filter 'until=72h' && docker builder prune -f --filter 'until=72h'
+```
+
+Ergebnis: 176 → 26 Images, Build-Cache 603 → 69 Einträge, ~855 MB frei. Die
+Werkzeugwahl ist der eigentliche Inhalt dieses Eintrags: **bewusst ohne
+`-a`** – nur ungetaggte Images fallen, die getaggten der anderen Stacks auf
+home02 (iobroker, paperless, portainer, …) bleiben unberührt. Die 72h-Frist
+setzt Andis Vorgabe um („ein paar Tage dürfen sie liegen, aber nicht
+monatelang"). `system`/`volume`/`network prune` bleiben tabu – der Guardrail
+blockiert sie ohnehin, und genau für solche Fälle ist er da: `system prune`
+hätte auch fremde Ressourcen abgeräumt.
+
+### Nachtrag zu #233: Zertifikat wieder da, Daten fließen
+
+Der hae-Server liefert wieder ein gültiges Zertifikat (ausgestellt 30.07.,
+gültig bis 28.10.2026 – es existierte offenbar längst und wurde nur nicht
+ausgeliefert). Gegenprobe durchs Relay: HTTP 200, 62 Workouts. Die Sportschau
+läuft wieder, ohne dass am Portal irgendetwas zu tun war – exakt wie in der
+Diagnose vorhergesagt: das Portal cached nichts, der nächste Aufruf genügt.
+
+---
+
 ## 2026-08-31 – #230: Württemberg kommt noch – abwarten statt Ersatzquelle bauen
 
 Andi klärt die offene Frage aus dem Neubau: Die neue handball.net-API hat

@@ -2768,6 +2768,14 @@ scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf portal-vN.tar.gz"
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d --build"
 
+# Aufräumen (Andi, 31.08.2026): Jeder --build lässt das vorherige Image
+# ungetaggt zurück – nach ~230 Deploys lagen 151 davon plus 1,7 GB
+# Build-Cache herum. Deshalb gehört zu JEDEM Deploy dieser Schritt.
+# Bewusst OHNE -a (nur ungetaggte – getaggte Images fremder Stacks wie
+# iobroker/paperless bleiben unberührt) und mit 72h-Frist ("ein paar Tage
+# dürfen sie liegen"). system/volume/network prune bleiben tabu (Guardrail).
+ssh -p 2222 claude@10.0.0.100 "docker image prune -f --filter 'until=72h' && docker builder prune -f --filter 'until=72h'"
+
 # Caddyfile geaendert? Dann zusaetzlich (bind-gemountete Einzeldatei,
 # siehe Bekannte Issues - ein reload/restart greift NICHT):
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d --force-recreate caddy"
