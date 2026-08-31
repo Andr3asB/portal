@@ -110,7 +110,13 @@ _NEU_API       = "https://www.handball.net/api/new"
 # den Rest) - Handball360 fuehrt beide zusammen, was die groesste
 # Umstaendlichkeit des Moduls beseitigt hat (die Frage aus #191).
 _NEU_CLUB      = "00j8j80"
-_SR_EMBED      = "https://embed-api.eui.connect.sportradar.com/v1/embed/248"
+_SR_BASIS      = "https://embed-api.eui.connect.sportradar.com/v1/embed"
+# Wunsch #151 wollte die Spiele ausserhalb der Liga sichtbar machen - der
+# DHB-Pokal hat bei Sportradar ein EIGENES Embed. Ohne den zweiten Eintrag
+# waeren die Pokalspiele nach dem Neubau lautlos verschwunden, genau der
+# Zustand, den #151 behoben hatte.
+_SR_EMBEDS = {248: "Opel HBL", 255: "DHB-Pokal"}
+_SR_TABELLE_EMBED = 248          # eine Tabelle gibt es nur in der Liga
 
 # ACHTUNG Reichweite (Wunsch #230): Die neue API kennt 11 Verbaende,
 # HANDBALL WUERTTEMBERG ist NICHT darunter. Vom Verein liegen dort nur die
@@ -294,14 +300,14 @@ def _neu_api_alle_seiten(pfad, grenze=10):
     return gesammelt
 
 
-def _sr_get(pfad):
+def _sr_get(pfad, embed=248):
     """Sportradar-Embed der Opel HBL - die einzige Quelle fuer Spiele und
     Tabelle der Profis (#191): die 1. Bundesliga steckt NICHT im
     DHB-Spielbetrieb, den die neue handball.net-API abbildet. Gefunden ueber
     die offizielle Liga-Seite opel-hbl.de, die genau diese Adressen aufruft.
     Ohne Anmeldung, aber ebenso wenig zugesagt wie alles andere hier."""
     req = urllib.request.Request(
-        f"{_SR_EMBED}/{pfad}",
+        f"{_SR_BASIS}/{embed}/{pfad}",
         headers={"Accept": "application/json", "User-Agent": _UA},
     )
     try:
@@ -639,42 +645,84 @@ def _spiel_aus_neu(roh, team_id):
     }
 
 
-def _profi_spiele():
-    """Spiele der Profis aus dem Sportradar-Embed der Opel HBL.
+def _sr_spiel(eintrag, wettbewerb):
+    """Ein Sportradar-Spiel in unser Anzeigeformat - oder None.
 
-    Das Embed liefert den AKTUELLEN Spieltag aller 18 Mannschaften, nicht den
-    ganzen Saisonkalender - genauso, wie es das alte Widget tat. Deshalb wie
-    bisher: was einmal gesehen wurde, bleibt in tvb_spiele stehen."""
-    antwort = _sr_get("fixtures_ribbon?locale=de-DE")
-    spiele = []
-    for eintrag in ((antwort or {}).get("data") or {}).get("fixtures") or []:
-        beteiligte = eintrag.get("competitors") or []
-        if len(beteiligte) != 2:
-            continue
-        heim = next((b for b in beteiligte if b.get("isHome")), beteiligte[0])
-        gast = next((b for b in beteiligte if b is not heim), beteiligte[1])
-        if not any(_IST_TVB(b.get("name")) for b in beteiligte):
-            continue
-        partie = eintrag.get("fixture") or {}
-        try:
-            anstoss = datetime.fromisoformat(partie["date"]).replace(
-                tzinfo=timezone.utc).astimezone(_TZ).isoformat()
-        except Exception:
-            continue
-        spiele.append({
-            "id":         f"sr{partie.get('fixtureId')}",
-            "team_id":    _PROFI_TEAM_ID,
-            "spieltag":   None,
-            "heim":       heim.get("name") or "?",
-            "gast":       gast.get("name") or "?",
-            "heim_tore":  heim.get("score"),
-            "gast_tore":  gast.get("score"),
-            "anstoss":    anstoss,
-            "ort":        None,
-            "status":     "Ended" if partie.get("isFinal") else "Pre",
-            "wettbewerb": "Opel HBL",
-        })
-    return spiele
+    Die beiden benutzten Endpunkte liefern DASSELBE Spiel in ZWEI Formen:
+    `fixtures_ribbon` verpackt Zeit und Zustand in einem `fixture`-Objekt,
+    `fixtures` legt sie flach daneben (`startTimeUTC`, `status`). Beide
+    Formen hier zu behandeln ist billiger, als zwei fast gleiche Funktionen
+    auseinanderlaufen zu lassen."""
+    beteiligte = eintrag.get("competitors") or []
+    if len(beteiligte) != 2 or not any(_IST_TVB(b.get("name")) for b in beteiligte):
+        return None
+    heim = next((b for b in beteiligte if b.get("isHome")), beteiligte[0])
+    gast = next((b for b in beteiligte if b is not heim), beteiligte[1])
+
+    partie = eintrag.get("fixture") or eintrag
+    kennung = partie.get("fixtureId")
+    zeit = partie.get("date") or partie.get("startTimeUTC")
+    if not kennung or not zeit:
+        return None
+    try:
+        # Beide Endpunkte liefern UTC OHNE Zeitzonenangabe. Wird das als
+        # Ortszeit gelesen, liegt jeder Anwurf zwei Stunden daneben.
+        anstoss = datetime.fromisoformat(zeit).replace(
+            tzinfo=timezone.utc).astimezone(_TZ).isoformat()
+    except Exception:
+        return None
+
+    tore_heim, tore_gast = heim.get("score"), gast.get("score")
+    fertig = partie.get("isFinal") or (tore_heim is not None and tore_gast is not None)
+    return {
+        "id":         f"sr{kennung}",
+        "team_id":    _PROFI_TEAM_ID,
+        "spieltag":   None,
+        "heim":       heim.get("name") or "?",
+        "gast":       gast.get("name") or "?",
+        "heim_tore":  tore_heim,
+        "gast_tore":  tore_gast,
+        "anstoss":    anstoss,
+        "ort":        (partie.get("venue") or {}).get("name") if isinstance(partie.get("venue"), dict) else None,
+        "status":     "Ended" if fertig else "Pre",
+        "wettbewerb": wettbewerb,
+    }
+
+
+def _profi_spiele():
+    """Spiele der Profis aus den Sportradar-Embeds von Liga und Pokal.
+
+    Zwei Endpunkte je Wettbewerb, weil keiner allein reicht (Wunsch #231):
+
+    - `fixtures` liefert den kompletten weiteren Spielplan - in der Liga
+      allerdings AUSSCHLIESSLICH Angesetztes: 297 Spiele, kein einziges mit
+      Ergebnis. Beim Pokal ist es umgekehrt, dort steht das gespielte Spiel
+      samt Resultat drin.
+    - `fixtures_ribbon` liefert den AKTUELLEN Spieltag - und nur dort stehen
+      die Liga-Ergebnisse, solange die Runde laeuft.
+
+    Daraus folgt die Einschraenkung, die man kennen muss: Ein Liga-Ergebnis
+    wird nur eingesammelt, wenn die App waehrend oder kurz nach dem Spieltag
+    geoeffnet wird. Danach rollt es aus dem Ribbon heraus und ist von keiner
+    erreichbaren Stelle mehr zu holen. Deshalb bleibt jedes einmal gesehene
+    Spiel in tvb_spiele stehen."""
+    spiele = {}
+    for embed, wettbewerb in _SR_EMBEDS.items():
+        for pfad in ("fixtures?locale=de-DE", "fixtures_ribbon?locale=de-DE"):
+            antwort = _sr_get(pfad, embed=embed)
+            for eintrag in ((antwort or {}).get("data") or {}).get("fixtures") or []:
+                spiel = _sr_spiel(eintrag, wettbewerb)
+                if not spiel:
+                    continue
+                # Dasselbe Spiel kommt aus beiden Endpunkten. Die Fassung MIT
+                # Ergebnis gewinnt - sonst ueberschriebe der reine Spielplan
+                # ein gerade eingesammeltes Resultat wieder mit None.
+                vorher = spiele.get(spiel["id"])
+                if vorher and vorher["heim_tore"] is not None and spiel["heim_tore"] is None:
+                    continue
+                spiele[spiel["id"]] = spiel
+    return list(spiele.values())
+
 
 
 def _IST_TVB(name):
@@ -828,7 +876,7 @@ def index(token):
     # die NICHT im DHB-Spielbetrieb steckt, den die neue handball.net-API
     # abbildet. Deshalb hier die Weiche.
     if gewaehlt["ist_profi"]:
-        tabelle_antwort = _sr_get("standings?locale=de-DE")
+        tabelle_antwort = _sr_get("standings?locale=de-DE", embed=_SR_TABELLE_EMBED)
         gesehene_spiele = _profi_spiele()
         tabelle = _tabelle_aus_sr(tabelle_antwort)
         fehler_spiele  = not gesehene_spiele and tabelle_antwort is None

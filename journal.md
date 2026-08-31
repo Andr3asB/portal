@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-08-31 – portal-v228: Ergebnisse und ein veraltetes Etikett (#231, #232)
+
+Andi hat die neu gebaute App sofort benutzt und zwei Fehler gemeldet. Beide
+hatten dieselbe Ursache – und es war noch ein dritter dabei, den er noch nicht
+gesehen hatte.
+
+### Eine Ursache, drei Symptome
+
+In `tvb_spiele` standen elf Profi-Spiele aus der abgeschalteten Widget-API.
+Alle als `Pre`, alle **ohne Ergebnis**, weil die alte Quelle starb, bevor sie
+gespielt wurden. Daraus wurde:
+
+1. **#231** – vergangene Spiele zeigten nur ein Datum. Genau diese Karteileichen.
+2. **#232** – sie trugen das Etikett „DAIKIN HBL". Die Liga heißt inzwischen
+   Opel HBL.
+3. **Noch nicht gemeldet:** Das Hamburg-Spiel am 02.09. stand **doppelt** –
+   einmal als „HSV Hamburg" 19:00 aus der alten Quelle, einmal als „Handball
+   Club Hamburg" 21:00 aus der neuen.
+
+Alle drei verschwinden mit derselben Migration. Verloren geht dabei nichts:
+keine dieser Zeilen hatte je ein Ergebnis. Der Sicherheitsgurt steht trotzdem
+in der Bedingung (`heim_tore IS NULL AND gast_tore IS NULL`).
+
+### Der eigentliche Fund: ein Endpunkt reicht nicht
+
+Warum kamen überhaupt keine Ergebnisse nach? Weil `fixtures_ribbon` nur den
+**aktuellen** Spieltag zeigt. Also den vollen Spielplan gesucht – und
+gefunden: `fixtures` liefert 297 Spiele. Nur eben **kein einziges mit
+Ergebnis**, alle 297 auf `SCHEDULED`.
+
+Beim DHB-Pokal ist es genau umgekehrt: dort steht das gespielte Spiel samt
+26:39 im Spielplan. Also werden jetzt **beide** Endpunkte je Wettbewerb
+abgefragt, und beim Zusammenführen gewinnt die Fassung **mit** Ergebnis –
+sonst überschriebe der reine Spielplan ein gerade eingesammeltes Resultat
+wieder mit `None`. Dafür gibt es einen eigenen Test, denn der Fehler wäre
+später kaum zu finden gewesen: er tritt nur auf, wenn beide Endpunkte
+dasselbe Spiel führen.
+
+Zwei Formen desselben Spiels mussten dabei unter einen Hut: `fixtures_ribbon`
+verpackt Zeit und Zustand in ein `fixture`-Objekt, `fixtures` legt sie flach
+daneben (`startTimeUTC`, `status`). Eine Funktion für beide – zwei fast
+gleiche wären auseinandergelaufen.
+
+### Der Pokal wäre fast lautlos verschwunden
+
+Beim Prüfen fiel auf, dass der DHB-Pokal bei Sportradar ein **eigenes Embed**
+hat (255 statt 248). Ohne diesen zweiten Abruf hätte der Neubau von gestern
+die Pokalspiele stillschweigend abgeräumt – und damit Wunsch #151 rückgängig
+gemacht, der sie eigens sichtbar gemacht hatte. Ein Test hält das jetzt fest.
+
+### Was bleibt
+
+Das Liga-Ergebnis vom 28.08. ist **endgültig verloren**. Die Ergebnisleiste
+rollt weiter, `fixtures` führt keine gespielten Ligaspiele, und ein
+`round`-Parameter wird zwar angenommen, aber ignoriert (fünf Varianten
+durchprobiert, alle liefern dieselbe Antwort). Daraus folgt eine
+Betriebseigenschaft, die in der Hilfe steht: Ein Bundesliga-Ergebnis wird nur
+übernommen, wenn die App am Spieltagswochenende geöffnet wird. Das Fenster ist
+großzügig (die Leiste reicht etwa von einem Tag vorher bis drei Tage danach),
+und einmal übernommen bleibt es dauerhaft.
+
+Am laufenden Portal geprüft: beide vergangenen Spiele zeigen jetzt ihr
+Ergebnis (35:26 und 26:39), „DAIKIN HBL" kommt nicht mehr vor, 34 Profi-Spiele
+ohne Doppelung.
+
+---
+
 ## 2026-08-30 – portal-v225–v227: Die TVB-App läuft wieder (#192, #193, #230)
 
 Andis Antwort auf die Rückfrage von heute Nachmittag: „bau alles neu, so dass

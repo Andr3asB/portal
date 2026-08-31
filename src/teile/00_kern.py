@@ -1938,6 +1938,33 @@ def _init_db(app):
         except sqlite3.OperationalError:
             pass
 
+        # Wunsch #231/#232: Die Profi-Spiele aus der abgeschalteten Widget-API
+        # sind Karteileichen. Sie stehen als "Pre" ohne Ergebnis in der
+        # Tabelle, obwohl sie laengst gespielt sind - im Spielplan erschienen
+        # sie damit als vergangene Begegnung, die nur ein Datum zeigt (#231).
+        # Nachfuellen laesst sich das nicht: die Quelle gibt es nicht mehr.
+        # Sie tragen ausserdem den veralteten Wettbewerbsnamen "DAIKIN HBL"
+        # (#232) und doppeln sich mit den Spielen der neuen Quelle, die
+        # dieselbe Partie unter anderer Kennung und anderem Vereinsnamen
+        # fuehrt ("HSV Hamburg" gegen "Handball Club Hamburg").
+        #
+        # Alle drei Fehler haben dieselbe Ursache und dieselbe Loesung: weg
+        # damit. Verloren geht nichts - KEINE dieser Zeilen hatte ein
+        # Ergebnis. Der kuenftige Spielplan kommt vollstaendig aus der neuen
+        # Quelle, das gespielte Pokalspiel samt 26:39 ebenfalls.
+        try:
+            # Die alten Kennungen der Widget-API beginnen mit "sr." (etwa
+            # "sr.sport_event:12345"), die der neuen Quelle mit "sr" plus
+            # UUID. Der Punkt ist damit das Unterscheidungsmerkmal. Die
+            # Bedingung auf beide Torspalten ist der Sicherheitsgurt: eine
+            # alte Zeile MIT Ergebnis bliebe stehen.
+            db.execute("DELETE FROM tvb_spiele "
+                       "WHERE team_id='profis' AND id LIKE 'sr.%' "
+                       "AND heim_tore IS NULL AND gast_tore IS NULL")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
         # Der in tvb_quellen vermerkte Zustand stammt von den ALTEN Quellen
         # (den beiden HTML-Seiten), die es nicht mehr gibt. Ihn stehen zu
         # lassen waere doppelt falsch: 'liga_id' bezeichnet eine Quelle, die

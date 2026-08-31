@@ -81,40 +81,106 @@ def test_id_traegt_ein_quellen_praefix(modul):
 
 
 # --- Quelle 2: Sportradar (Profis) -----------------------------------------
+#
+# Zwei Endpunkte je Wettbewerb, in ZWEI verschiedenen Formen: `fixtures_ribbon`
+# verpackt Zeit und Zustand in einem `fixture`-Objekt, `fixtures` legt sie
+# flach daneben. Beide muessen dasselbe Anzeigeformat ergeben.
 
-def _sr_antwort(heim="TVB Stuttgart", gast="THW Kiel", final=True):
+def _ribbon(heim="TVB Stuttgart", gast="THW Kiel", final=True, tore=(30, 28),
+            kennung="d803da2c"):
     return {"data": {"fixtures": [{
         "competitors": [
-            {"name": heim, "isHome": True, "score": 30},
-            {"name": gast, "isHome": False, "score": 28},
+            {"name": heim, "isHome": True, "score": tore[0]},
+            {"name": gast, "isHome": False, "score": tore[1]},
         ],
         "fixture": {"date": "2026-09-05T17:30:00", "isFinal": final,
-                    "fixtureId": "d803da2c-79f2-11f1"},
+                    "fixtureId": kennung},
     }]}}
 
 
-def test_profispiel_wird_erkannt(modul, monkeypatch):
-    monkeypatch.setattr(modul, "_sr_get", lambda p: _sr_antwort())
+def _fixtures(heim="TVB Stuttgart", gast="THW Kiel", tore=(None, None),
+              kennung="d803da2c"):
+    return {"data": {"fixtures": [{
+        "competitors": [
+            {"name": heim, "isHome": True, "score": tore[0]},
+            {"name": gast, "isHome": False, "score": tore[1]},
+        ],
+        "fixtureId": kennung,
+        "startTimeUTC": "2026-09-05T17:30:00",
+        "status": {"value": "SCHEDULED"},
+        "venue": {"name": "Porsche-Arena"},
+    }]}}
+
+
+def _nur(antwort):
+    """Beantwortet jeden Aufruf gleich - egal welcher Endpunkt, welches Embed."""
+    return lambda pfad, embed=248: antwort
+
+
+def test_profispiel_aus_dem_ribbon(modul, monkeypatch):
+    monkeypatch.setattr(modul, "_sr_get", _nur(_ribbon()))
     spiele = modul._profi_spiele()
     assert len(spiele) == 1
     s = spiele[0]
     assert s["heim"] == "TVB Stuttgart" and s["gast"] == "THW Kiel"
     assert (s["heim_tore"], s["gast_tore"]) == (30, 28)
     assert s["team_id"] == modul._PROFI_TEAM_ID
-    assert s["wettbewerb"] == "Opel HBL"
+    assert s["status"] == "Ended"
+
+
+def test_profispiel_aus_dem_spielplan(modul, monkeypatch):
+    """Die flache Form muss dasselbe ergeben - nur ohne Ergebnis."""
+    monkeypatch.setattr(modul, "_sr_get", _nur(_fixtures()))
+    s = modul._profi_spiele()[0]
+    assert s["heim"] == "TVB Stuttgart"
+    assert s["status"] == "Pre"
+    assert s["ort"] == "Porsche-Arena"
+
+
+def test_ergebnis_wird_nicht_vom_spielplan_ueberschrieben(modul, monkeypatch):
+    """Wunsch #231, der Kern: Dasselbe Spiel kommt aus BEIDEN Endpunkten -
+    einmal mit Ergebnis (Ribbon), einmal ohne (Spielplan). Gewinnt der
+    Spielplan, ist das gerade eingesammelte Resultat sofort wieder weg."""
+    def wechselnd(pfad, embed=248):
+        if embed != 248:
+            return {"data": {"fixtures": []}}
+        return _ribbon() if "ribbon" in pfad else _fixtures()
+
+    monkeypatch.setattr(modul, "_sr_get", wechselnd)
+    spiele = modul._profi_spiele()
+    assert len(spiele) == 1, "dasselbe Spiel doppelt gespeichert"
+    assert spiele[0]["heim_tore"] == 30, "Ergebnis vom Spielplan ueberschrieben"
+
+
+def test_pokalspiel_kommt_aus_dem_zweiten_embed(modul, monkeypatch):
+    """Wunsch #151 wollte die Spiele ausserhalb der Liga sichtbar machen.
+    Der Pokal hat bei Sportradar ein eigenes Embed - ohne den zweiten Abruf
+    waeren die Pokalspiele beim Neubau lautlos verschwunden."""
+    def je_embed(pfad, embed=248):
+        if embed == 248:
+            return {"data": {"fixtures": []}}
+        return _fixtures(heim="TSB Heilbronn-Horkheim", gast="TVB Stuttgart",
+                         tore=(26, 39), kennung="pokal1")
+
+    monkeypatch.setattr(modul, "_sr_get", je_embed)
+    spiele = modul._profi_spiele()
+    assert len(spiele) == 1
+    assert spiele[0]["wettbewerb"] == "DHB-Pokal"
+    assert (spiele[0]["heim_tore"], spiele[0]["gast_tore"]) == (26, 39)
+    assert spiele[0]["status"] == "Ended", "Ergebnis da, aber nicht als gespielt gewertet"
 
 
 def test_fremde_paarung_wird_nicht_eingesammelt(modul, monkeypatch):
-    """Das Embed liefert den Spieltag ALLER 18 Mannschaften. Ohne Filter
+    """Das Embed liefert die Spiele ALLER 18 Mannschaften. Ohne Filter
     stuenden 17 fremde Begegnungen im Spielplan der Familie."""
     monkeypatch.setattr(modul, "_sr_get",
-                        lambda p: _sr_antwort(heim="SC Magdeburg", gast="THW Kiel"))
+                        _nur(_ribbon(heim="SC Magdeburg", gast="THW Kiel")))
     assert modul._profi_spiele() == []
 
 
 def test_profispiel_auch_auswaerts(modul, monkeypatch):
     monkeypatch.setattr(modul, "_sr_get",
-                        lambda p: _sr_antwort(heim="THW Kiel", gast="TVB Stuttgart"))
+                        _nur(_ribbon(heim="THW Kiel", gast="TVB Stuttgart")))
     spiele = modul._profi_spiele()
     assert len(spiele) == 1 and spiele[0]["gast"] == "TVB Stuttgart"
 
@@ -122,12 +188,20 @@ def test_profispiel_auch_auswaerts(modul, monkeypatch):
 def test_sportradar_zeit_gilt_als_utc(modul, monkeypatch):
     """Sportradar liefert die Zeit OHNE Zeitzone. Wird sie als Ortszeit
     gelesen, verschiebt sich jeder Anwurf um zwei Stunden."""
-    monkeypatch.setattr(modul, "_sr_get", lambda p: _sr_antwort())
+    monkeypatch.setattr(modul, "_sr_get", _nur(_ribbon()))
     assert modul._profi_spiele()[0]["anstoss"].startswith("2026-09-05T19:30")
 
 
 def test_quelle_weg_ergibt_leere_liste(modul, monkeypatch):
-    monkeypatch.setattr(modul, "_sr_get", lambda p: None)
+    monkeypatch.setattr(modul, "_sr_get", _nur(None))
+    assert modul._profi_spiele() == []
+
+
+def test_spiel_ohne_kennung_wird_uebersprungen(modul, monkeypatch):
+    """tvb_spiele.id ist Primaerschluessel - ohne Kennung kein Datensatz."""
+    kaputt = _ribbon()
+    del kaputt["data"]["fixtures"][0]["fixture"]["fixtureId"]
+    monkeypatch.setattr(modul, "_sr_get", _nur(kaputt))
     assert modul._profi_spiele() == []
 
 
