@@ -39,6 +39,12 @@ fiele sonst erst beim Ernstfall-Restore auf, wenn alle Backups seit heute
 unlesbar wären. Ab heute Nacht 03:00 laufen die Backups verschlüsselt; die
 alten Klartext-Archive rotieren binnen sieben Tagen von selbst hinaus.
 
+**Nachtrag, gleicher Abend:** Andi hat entschlüsselt, `tar` zeigt die
+Dateiliste – der Kreis ist geschlossen, der Public Key gehört nachweislich zu
+seinem privaten. **#130 und #211 sind abgehakt** (`wunsch_erledigt`, mit
+Umsetzungstext). Damit ist die letzte offene Zusage aus dem Audit vom
+11.08.2026 erledigt.
+
 ## 2026-08-31 – Lint eingeführt: ruff über den ganzen Baum, 242 Funde behoben
 
 Auftrag: „fix lint errors". Es gab bislang gar keinen Linter – also ruff
