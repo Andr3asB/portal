@@ -155,7 +155,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (1997 Tests, gut eine Minute)
+# Alles (2068 Tests, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -165,10 +165,23 @@ python -m venv .venv
 ```
 
 Werkzeug steht bewusst nur in `requirements-dev.txt` (`pytest`, `pip-audit`,
-`python-barcode` – letzteres nur zum *Erzeugen* eines Testbarcodes, gelesen
-wird im Betrieb mit `zxing-cpp`); `src/requirements.txt` beschreibt die
-Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts Test-Werkzeug
+`ruff`, `python-barcode` – letzteres nur zum *Erzeugen* eines Testbarcodes,
+gelesen wird im Betrieb mit `zxing-cpp`); `src/requirements.txt` beschreibt
+die Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts Test-Werkzeug
 hineinschreiben.
+
+**Lint** (ruff, eingeführt 31.08.2026 – journal.md: damals 242 Funde behoben):
+
+```bash
+.venv/Scripts/python -m ruff check src/ util/ tests/ scripts/
+```
+
+Konfiguration in `ruff.toml` im Repo-Root. Die dortigen `ignore`-Einträge
+sind bewusst und jeweils begründet – sie decken dokumentierte
+Projektkonventionen ab (nummerierte Modulnamen, breite excepts in
+Migrationen/Threads, die eigene Zeit-Konvention). Nichts davon „aufräumen",
+und neue Regeln nur ignorieren, wenn eine dokumentierte Konvention
+dagegensteht, nicht weil sie lästig sind.
 
 **CVE-Abgleich gegen den echten Produktionsstand**, nicht gegen die lokale
 `.venv` – die kann abweichen:
