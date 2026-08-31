@@ -2,6 +2,57 @@
 
 ---
 
+## 2026-08-31 – UI-Review: alle 17 Seiten vermessen, 6 Wünsche (#237–#242)
+
+Andis Anlass: „Ich habe nicht das Gefühl, dass wir bereits das beste UI
+haben." Verabredung: erst ein einmaliger, struktureller Durchgang; ob daraus
+ein dauerhafter `/ui-review`-Skill wird, entscheidet sich danach.
+
+**Methode.** Jede Seite (Startseite, 15 App-Startseiten, Aufgaben-Brett) im
+echten Browser bei 400px Breite geladen – als erster Admin, über **eine**
+Sitzung nach dem Muster von `live_pruefung.py` (Cookie per JS gesetzt, am
+Ende `sitzung_loeschen()`: genau 1 entfernt). Screenshots waren in der
+Browser-Erweiterung durchweg kaputt (Injection-Timeout, auch auf fremden
+Seiten – bekanntes Muster, siehe Memory „CSS-Prozent-Höhe verifizieren").
+Stattdessen eine Mess-Funktion je Seite injiziert: WCAG-Kontrast jedes
+Textelements (echte gerenderte Farben, Hintergrund über die Elternkette
+aufgelöst), Schriftgrößen < 12px, Link-Tippflächen < 34px, Seitenhöhe,
+Anzahl interaktiver Elemente. Bewusst NICHT geklickt: nichts, was Zustand
+ändert – auch nicht der Listen/Brett-Umschalter (der würde Andis gemerkte
+Ansicht umstellen; `/a/todo/` leitet auf die zuletzt genutzte Ansicht um,
+was erst wie ein Navigationsfehler aussah).
+
+**Die Funde, gebündelt zu sechs Wünschen (alle ohne Priorität – Andi
+priorisiert):**
+
+- **#237 Kontrast (home):** Kopfband-Elemente portalweit 3,15:1
+  (halbtransparentes Weiß auf App-Farbe), Aktionsknöpfe/Chips in App-Farbe
+  auf Weiß ebenfalls ~3,15:1, Verwaltung: inaktive App-Chips 2,22:1,
+  Push-Badge 1,98:1. WCAG-Grenze ist 4,5:1.
+- **#238 Kleinstschrift (home):** 10–11px an mindestens acht Stellen quer
+  durch die Apps (Geholfen, Essensplan, Brett, Werkstatt, Geburtstage,
+  Verwaltung, TVB, Sportschau). Die bestehende 16px-Regel (#170) deckt nur
+  Eingabefelder.
+- **#239 Tippflächen (home):** Die 44px-Regel (#169) hängt am
+  `button`-Element – als Link gebaute Knöpfe fallen durch (Personen-Pills
+  33px, Bearbeiten-Links 29px, Koordinaten-Links 17px).
+- **#240 Werkstatt:** 51.781px Seitenhöhe, 1.214 interaktive Elemente –
+  alle 230 erledigten Wünsche werden immer voll mitgerendert.
+- **#241 Ausfälle:** alle 71 Einträge auf einmal (7.521px), Koordinaten-
+  Links 103×17px.
+- **#242 Hilfe:** 29.943px am Stück; Kapitel einklappbar machen.
+  (Nebenbefund im Text: Vokabeln 5.736px, dort federn die Filter ab.)
+
+**Was der Durchgang über die Wächter sagt:** Die sechs bestehenden
+Konventions-Tests sichern genau das ab, was sie kennen – aber drei der
+sechs Funde sind Löcher in den Regeln selbst (44px nur für `button`, 16px
+nur für Felder, gar keine Kontrastregel). Jeder dieser Wünsche endet
+deshalb mit „und einen Wächter dafür", damit der Fund nicht wiederkommt.
+
+Kein Code geändert, kein Deploy – reiner Review. Ob der Ablauf ein
+`/ui-review`-Skill wird, liegt bei Andi; das Mess-Skript dafür steht in
+diesem Eintrag beschrieben und ließe sich nach `scripts/` heben.
+
 ## 2026-08-31 – #130/#211: Backup-Verschlüsselung scharf – und die Variable, die nie ankam
 
 Andi hat seinen öffentlichen age-Schlüssel geliefert (`age1ursp…rvgzg`,
