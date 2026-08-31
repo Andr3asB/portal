@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-09-01 – Dritter UI-Durchgang (Vercel-Checkliste): #246/#247
+
+Auf Andis Wunsch der erste Lauf nach dem Ablauf des neuen Skills
+(`.claude/skills/web-design-guidelines/` – der Skill selbst war der
+laufenden Sitzung noch nicht bekannt, der Ablauf aus seiner SKILL.md wurde
+von Hand befolgt). Diesmal die Tiefen-Kategorien: Formulare, Semantik,
+Navigation.
+
+Sauber: Eingabetypen weitgehend richtig (Kassenbuch-Betrag ist
+`inputmode=decimal`, Geburtstage `type=number`), keine
+JS-Navigation-Anti-Patterns, Platzhalter mit Beispielen und „…".
+
+Zwei strukturelle Funde, beide als Wunsch ohne Priorität:
+
+- **#246 Formular-Labels:** ~20 Felder haben weder `<label>` noch
+  `aria-label` – Beschriftung nur als Platzhalter (verschwindet beim
+  Tippen) oder als danebenstehendes, unverknüpftes `.field-label`-div.
+  Dazu Suchfelder als `type=text` und dreimal `autofocus` (Tastatur
+  springt auf dem Handy sofort auf).
+- **#247 Überschriften-Semantik:** Außer der 403-Seite gibt es im ganzen
+  Portal kein einziges `h1`–`h6` – Titel und Abschnitte sind divs.
+  Screenreader-Überschriften-Navigation läuft ins Leere. Fix wäre rein
+  semantisch (Optik liefern die bestehenden Klassen).
+
 ## 2026-09-01 – portal-v233: Feinschliff-Wünsche #243–#245
 
 Die zwei Wünsche aus dem Vercel-Checklisten-Durchgang (beide `hoch`) plus
