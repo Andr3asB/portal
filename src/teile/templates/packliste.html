@@ -13,7 +13,7 @@
   background:var(--surface); color:var(--text); cursor:pointer;
   text-decoration:none; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.ziel-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.ziel-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 /* Eingabe */
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 /* Wunsch #178: Zieh-Griff und Platzhalter beim Umsortieren */
@@ -38,14 +38,14 @@
 }
 .filter-banner.sichtbar { display:flex; }
 .filter-banner-reset {
-  background:none; border:none; color:var(--farbe); font-size:13px;
+  background:none; border:none; color:var(--farbe-kontrast); font-size:13px;
   font-weight:600; font-family:inherit; text-decoration:underline;
   cursor:pointer; flex-shrink:0;
 }
 body.packmodus .filter-banner { display:none !important; }
 .btn-neu-toggle, .btn-filter-toggle, .btn-packen-start {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
-  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  color:var(--farbe-kontrast); border-radius:12px; padding:12px 10px; font-size:14px;
   font-weight:600; cursor:pointer; white-space:nowrap;
 }
 .add-card, .filter-card {
@@ -58,12 +58,12 @@ body.packmodus .filter-banner { display:none !important; }
 .btn-los:disabled { opacity:.4; cursor:default; }
 /* Packmodus (analog Einkaufsmodus, Wunsch #87 Teil 2) */
 #packmodus-leiste {
-  display:none; position:sticky; top:0; z-index:5; background:var(--farbe); color:#fff;
+  display:none; position:sticky; top:0; z-index:5; background:var(--farbe-band); color:#fff;
   align-items:center; justify-content:space-between; padding:10px 14px;
   border-radius:12px; margin-bottom:14px; font-weight:600;
 }
 .btn-packmodus-beenden {
-  background:#fff; color:var(--farbe); border:none; border-radius:8px;
+  background:#fff; color:var(--farbe-kontrast); border:none; border-radius:8px;
   padding:7px 16px; font-weight:600; cursor:pointer;
 }
 body.packmodus .top-aktionen, body.packmodus .add-card, body.packmodus .ziel-row,
@@ -83,7 +83,7 @@ body.packmodus .item-name { font-size:18px; }
 }
 .add-input:focus { border-color:var(--farbe); }
 .btn-add {
-  background:var(--farbe); color:#fff; border:none;
+  background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
   white-space:nowrap; width:100%; margin-top:4px;
 }
@@ -99,7 +99,7 @@ body.packmodus .item-name { font-size:18px; }
   padding:9px 14px; font-size:14px; font-family:inherit; font-weight:500;
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
-.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.chip-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 /* Kategorie-Gruppen */
 .kat-label {
   font-size:12px; font-weight:700; color:var(--text-2);
@@ -113,7 +113,7 @@ body.packmodus .item-name { font-size:18px; }
 /* Wunsch #219: Direkt in DIESE Kategorie etwas hinzufuegen, ohne erst nach
    oben zu scrollen und die Kategorie von Hand zu waehlen. */
 .kat-plus {
-  background:none; border:1.5px solid var(--border); color:var(--farbe);
+  background:none; border:1.5px solid var(--border); color:var(--farbe-kontrast);
   border-radius:50%; width:26px; height:26px; line-height:1;
   font-size:17px; font-weight:700; font-family:inherit;
   cursor:pointer; flex-shrink:0; padding:0;
@@ -125,7 +125,7 @@ body.packmodus .item-name { font-size:18px; }
 .nach-oben {
   display:none; position:fixed; right:16px; bottom:16px; z-index:6;
   width:44px; height:44px; border-radius:50%;
-  background:var(--farbe); color:#fff; border:none;
+  background:var(--farbe-band); color:#fff; border:none;
   font-size:20px; line-height:1; font-family:inherit;
   cursor:pointer; box-shadow:0 2px 8px var(--shadow);
 }
@@ -159,15 +159,21 @@ body.packmodus .item-name { font-size:18px; }
   border-top:1px solid var(--border);
 }
 .btn-save {
-  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  background:var(--farbe-band); color:#fff; border:none; border-radius:8px;
   padding:7px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
   align-self:flex-start;
 }
 .btn-loeschen-inline {
-  background:none; border:none; color:#ff3b30; font-size:13px;
+  background:none; border:none; color:var(--rot-text); font-size:13px;
   cursor:pointer; padding:4px 0; align-self:flex-start;
 }
 .gepackt-section { margin-top:20px; }
+/* Wunsch #234: Weg zurueck zu den ausgeblendeten aelteren Eintraegen */
+.gepackt-aeltere {
+  display:block; text-align:center; text-decoration:none;
+  border:1.5px solid var(--border); border-radius:12px;
+  color:var(--text-2); padding:11px 10px; font-size:13px; font-weight:600;
+}
 .gepackt-label { font-size:12px; color:var(--text-2); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:.6px; }
 {% endblock %}
 
@@ -254,7 +260,7 @@ body.packmodus .item-name { font-size:18px; }
 
   <div class="ziel-row">
     {% for z in ziele %}
-    <a class="ziel-btn{% if z.id == aktives_ziel_id %} active{% endif %}" href="?ziel={{ z.id }}">{{ z.name }}</a>
+    <a class="ziel-btn knopf{% if z.id == aktives_ziel_id %} active{% endif %}" href="?ziel={{ z.id }}">{{ z.name }}</a>
     {% endfor %}
   </div>
 
@@ -395,6 +401,15 @@ body.packmodus .item-name { font-size:18px; }
   <div class="gepackt-section">
     <div class="gepackt-label">✓ Gepackt</div>
     {% for item in gepackte %}{{ item_card(item, token, kategorien, personen, item.kategorie_id or '') }}{% endfor %}
+  </div>
+  {% endif %}
+  {# Wunsch #234: Laenger als 7 Tage Gepacktes ist ausgeblendet, nicht weg -
+     der Hinweis nennt die Zahl und den Weg zurueck. #}
+  {% if gepackt_gesamt > gepackte|length %}
+  <div class="gepackt-section">
+    <a class="gepackt-aeltere knopf" href="?{% if aktives_ziel_id %}ziel={{ aktives_ziel_id }}&amp;{% endif %}gepackt=alle">
+      {{ gepackt_gesamt - gepackte|length }} vor mehr als 7 Tagen gepackte Einträge anzeigen
+    </a>
   </div>
   {% endif %}
 

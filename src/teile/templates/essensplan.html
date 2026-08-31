@@ -42,17 +42,17 @@
 .gekocht-form { margin-top:4px; }
 .gekocht-btn {
   background:none; border:1px solid var(--border); border-radius:8px;
-  padding:3px 9px; font-size:11px; font-weight:600; cursor:pointer;
+  padding:3px 9px; font-size:12px; font-weight:600; cursor:pointer;
   color:var(--text-2); font-family:inherit;
 }
-.gekocht-btn.aktiv { border-color:#34c759; color:#34c759; }
+.gekocht-btn.aktiv { border-color:var(--gruen-text); color:var(--gruen-text); }
 /* Wunsch #163: Sprung zum Rezept - als Link erkennbar, ohne die Zeile zu
    verunstalten (die Unterstreichung erst beim Antippen/Hovern). */
 .mahlzeit-rezept-link { color:inherit; text-decoration:none; }
 .mahlzeit-rezept-link:hover, .mahlzeit-rezept-link:active { text-decoration:underline; }
 .mahlzeit-kopf { display:flex; align-items:center; gap:8px; }
 .mahlzeit-label {
-  font-size:11px; font-weight:700; color:var(--text-2);
+  font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px; flex:1;
 }
 .mahlzeit-drag-handle { background:none; border:none; padding:0; font-family:inherit; font-size:15px; color:var(--text-2); cursor:grab; touch-action:none; }
@@ -75,7 +75,7 @@
 }
 .tag-select:focus, .tag-input:focus { border-color:var(--farbe); }
 .tag-save {
-  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  background:var(--farbe-band); color:#fff; border:none; border-radius:8px;
   padding:12px 14px; font-size:14px; font-weight:600; cursor:pointer;
   width:100%; margin-top:6px;
 }

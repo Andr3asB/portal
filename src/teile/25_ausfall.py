@@ -73,13 +73,19 @@ def _koordinate(wert, grenze):
 def index(token):
     user = _user(token)
     db = get_db()
-    zeilen = db.execute("""
+    # Wunsch #241: Standard sind die letzten 20 - mit 71 Eintraegen war die
+    # Seite 7.500px hoch. ?alle=1 holt weiterhin die komplette Liste.
+    zeige_alle = request.args.get("alle") == "1"
+    sql = """
         SELECT a.id, a.user_id, a.zeitpunkt, a.lat, a.lon, a.genauigkeit, a.notiz,
                u.name AS melder, u.farbe AS melder_farbe
         FROM   ausfaelle a
         LEFT   JOIN users u ON u.id = a.user_id
         ORDER  BY a.zeitpunkt DESC, a.id DESC
-    """).fetchall()
+    """
+    if not zeige_alle:
+        sql += " LIMIT 20"
+    zeilen = db.execute(sql).fetchall()
 
     eintraege = []
     for z in zeilen:
@@ -90,7 +96,7 @@ def index(token):
 
     # Zahlen fuer die Werkstatt: "wie oft" ist die erste Frage, die dort
     # gestellt wird - die soll nicht jeder selbst abzaehlen muessen.
-    gesamt = len(eintraege)
+    gesamt = db.execute("SELECT COUNT(*) FROM ausfaelle").fetchone()[0]
     letzte_30 = db.execute(
         "SELECT COUNT(*) FROM ausfaelle WHERE zeitpunkt >= datetime('now','-30 days')"
     ).fetchone()[0]

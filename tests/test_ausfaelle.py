@@ -268,3 +268,49 @@ def test_jede_verdrahtete_aktion_existiert_auch():
     quelle = AUSFAELLE.read_text(encoding="utf-8")
     for name in set(re.findall(r'data-(?:klick|aendern|eingabe)="(\w+)"', quelle)):
         assert re.search(rf"function\s+{re.escape(name)}\s*\(", quelle), name
+
+
+# --- Wunsch #241: Standard sind die letzten 20 Eintraege --------------------
+
+def _viele_eintraege(db, user_id, anzahl):
+    v = db["verbindung"]
+    for i in range(anzahl):
+        v.execute(
+            "INSERT INTO ausfaelle(user_id, zeitpunkt) "
+            "VALUES(?, datetime('now', ?))", (user_id, f"-{i} hours"))
+    v.commit()
+
+
+def test_standard_zeigt_hoechstens_20_eintraege(client, db, app_tokens):
+    """71 Eintraege ergaben live eine 7.500px hohe Seite (UI-Review
+    31.08.2026) - die Werkstatt braucht die juengsten, nicht alle."""
+    _viele_eintraege(db, db["familie"]["TestAdmin"]["id"], 25)
+    seite = client.get(f"/a/ausfaelle/{app_tokens['TestAdmin']}/").get_data(as_text=True)
+    assert seite.count('class="eintrag"') == 20
+    assert "Alle 25 Einträge anzeigen" in seite
+
+
+def test_alle_1_holt_die_komplette_liste(client, db, app_tokens):
+    _viele_eintraege(db, db["familie"]["TestAdmin"]["id"], 25)
+    seite = client.get(
+        f"/a/ausfaelle/{app_tokens['TestAdmin']}/?alle=1").get_data(as_text=True)
+    assert seite.count('class="eintrag"') == 25
+    assert "Einträge anzeigen" not in seite
+
+
+def test_die_gesamtzahl_zaehlt_weiterhin_alles(client, db, app_tokens):
+    """Die Zahl oben ist fuer die Werkstatt-Frage "wie oft?" da - sie darf
+    nicht zur Zahl der GERENDERTEN Eintraege werden."""
+    _viele_eintraege(db, db["familie"]["TestAdmin"]["id"], 25)
+    seite = client.get(f"/a/ausfaelle/{app_tokens['TestAdmin']}/").get_data(as_text=True)
+    assert "25 Einträge" in seite
+
+
+def test_der_kartensprung_ist_ein_knopf(client, db, app_tokens):
+    """103x17px Textlink war als Tippziel zu klein - jetzt eine .karte-link
+    mit der 44px-Klasse `knopf` aus Wunsch #239."""
+    daten = _melden(client, app_tokens["TestAdmin"])
+    client.post(f"/a/ausfaelle/{app_tokens['TestAdmin']}/{daten['id']}/position",
+                json={"lat": 48.9, "lon": 9.3})
+    seite = client.get(f"/a/ausfaelle/{app_tokens['TestAdmin']}/").get_data(as_text=True)
+    assert 'class="karte-link knopf"' in seite

@@ -361,3 +361,31 @@ def test_jede_verdrahtete_aktion_existiert_auch():
     assert verdrahtet, "Muster kaputt - gar keine Aktion gefunden"
     for name in verdrahtet:
         assert re.search(rf"function\s+{re.escape(name)}\s*\(", quelle + gemeinsam), name
+
+
+# --- Wunsch #236: Spaltenbreite auf dem Desktop ----------------------------
+
+def test_spalten_haben_auf_dem_desktop_eine_mindestbreite():
+    """Vier Spalten in 720px ergaben je ~165px - Woerter brachen mitten im
+    Wort um. Jede Spalte braucht ab 700px mindestens 240px Basisbreite;
+    reicht das Fenster nicht, scrollt das Brett waagerecht weiter."""
+    quelle = BRETT.read_text(encoding="utf-8")
+    block = quelle[quelle.index("@media (min-width:700px)"):]
+    block = block[:block.index("}\n}") + 3]
+    m = re.search(r"\.spalte\s*\{[^}]*flex:\s*\d+\s+\d+\s+(\d+)px", block)
+    assert m and int(m.group(1)) >= 240, (
+        "Die Desktop-Mindestbreite der Spalten fehlt (Wunsch #236)."
+    )
+
+
+def test_brett_tritt_aus_der_lesebreite_heraus():
+    """Der Full-Bleed (margin: 50% - 50vw) ist der Kern von #236: Ohne ihn
+    zwaengt .main die vier Spalten wieder in 720px. .main selbst bleibt
+    unangetastet - die Regel aus #173 gilt weiter."""
+    quelle = BRETT.read_text(encoding="utf-8")
+    assert "calc(50% - 50vw)" in quelle
+    styles = quelle.split("{% block extra_styles %}")[1].split("{% endblock %}")[0]
+    assert not re.search(r"^\s*\.main\s*[{,]", styles, re.MULTILINE), (
+        "Die Vorlage uebersteuert .main - verboten (Wunsch #173); der "
+        "Full-Bleed gehoert ans .brett."
+    )

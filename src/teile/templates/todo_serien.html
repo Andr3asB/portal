@@ -8,7 +8,7 @@
   margin-bottom:16px; box-shadow:0 1px 3px var(--shadow);
 }
 .form-label {
-  font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase;
   letter-spacing:.5px; margin:10px 0 6px;
 }
 .form-label:first-child { margin-top:0; }
@@ -24,9 +24,9 @@
   padding:8px 14px; font-size:14px; font-family:inherit; font-weight:500;
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
-.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.chip-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .btn-add {
-  margin-top:14px; width:100%; background:var(--farbe); color:#fff; border:none;
+  margin-top:14px; width:100%; background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:11px 0; font-size:15px; font-weight:600; cursor:pointer;
 }
 .btn-add:disabled { opacity:.4; cursor:default; }
@@ -42,7 +42,7 @@
 .badge-pool {
   display:inline-flex; align-items:center; gap:3px;
   background:#d4edda; color:#155724; border-radius:8px;
-  padding:2px 8px; font-size:11px; font-weight:600; white-space:nowrap;
+  padding:2px 8px; font-size:12px; font-weight:600; white-space:nowrap;
 }
 body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
 .btn-toggle {
@@ -50,7 +50,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
   padding:6px 10px; font-size:13px; cursor:pointer; color:var(--text-2); white-space:nowrap;
 }
 .btn-loeschen-inline {
-  background:none; border:none; color:#ff3b30; font-size:13px;
+  background:none; border:none; color:var(--rot-text); font-size:13px;
   cursor:pointer; padding:4px 0;
 }
 {% endblock %}

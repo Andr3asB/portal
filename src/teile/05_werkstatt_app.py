@@ -86,9 +86,17 @@ def index(token):
     offen = db.execute(
         _SELECT + " WHERE w.erledigt = 0 ORDER BY " + _PRIO_ORDER
     ).fetchall()
-    erledigt = db.execute(
-        _SELECT + " WHERE w.erledigt = 1 ORDER BY COALESCE(w.erledigt_am, w.erstellt) DESC"
-    ).fetchall()
+    # Wunsch #240: Nicht mehr alle erledigten Wuensche rendern - mit 230
+    # Stueck war die Seite 51.000px hoch. Standard sind die letzten 15,
+    # ?erledigt=alle holt bewusst weiterhin alles (fuer die Suche im Browser
+    # und die Filter, die ueber dem gerenderten Bestand arbeiten).
+    zeige_alle_erledigten = request.args.get("erledigt") == "alle"
+    erledigt_gesamt = db.execute(
+        "SELECT COUNT(*) FROM wuensche WHERE erledigt = 1").fetchone()[0]
+    sql = _SELECT + " WHERE w.erledigt = 1 ORDER BY COALESCE(w.erledigt_am, w.erstellt) DESC"
+    if not zeige_alle_erledigten:
+        sql += " LIMIT 15"
+    erledigt = db.execute(sql).fetchall()
 
     # Wunsch #141: Filterkriterien. Bewusst NUR aus den tatsächlich
     # vorkommenden Werten gebaut statt aus festen Listen - eine App oder ein
@@ -105,7 +113,7 @@ def index(token):
 
     return render_template("werkstatt_app.html",
         user=user, token=token, farbe=user["farbe"],
-        offen=offen, erledigt=erledigt,
+        offen=offen, erledigt=erledigt, erledigt_gesamt=erledigt_gesamt,
         aktionen=_aktionen_je_wunsch(db), aktions_arten=AKTIONS_ARTEN,
         urheber_ids=_urheber_ids(db),
         prios_vorhanden=prios_vorhanden, prio_labels=_PRIO_LABELS,

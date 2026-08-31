@@ -2528,6 +2528,21 @@ python -m venv .venv                                   # einmalig
   beim Laden von conftest gesetzt, nicht erst im Fixture** – sonst scheitern
   Testmodule mit `from teile.kern import …` auf Modulebene schon beim
   Einsammeln.
+- `test_farbkontrast.py` – Wuensche #237/#238. Waechtert die serverseitigen
+  Farb-Helfer (`farbe_kontrast`/`farbe_kontrast_hell`, gerechnet gegen --bg
+  #f5f5f7 - exakt 4,5 gegen Weiss ergab auf dem Seitengrau nur 4,28) und
+  drei Vorlagen-Regeln: keine rohe Nutzerfarbe als Textfarbe, kein weisser
+  Text auf roher Nutzerfarbe, keine Schrift unter 12px. Die erste Fassung
+  biss sich am eigenen Erklaerkommentar in base.html fest.
+- `test_hilfe_kapitel.py` – Wunsch #242. Jedes Hilfe-Kapitel ist ein
+  `<details>`, das Inhaltsverzeichnis kennt alle Anker, und das Skript
+  oeffnet das Zielkapitel auch bei direkten `#kapitel-N`-Links.
+- `test_werkstatt_erledigte_grenze.py` – Wunsch #240. Standard sind 15
+  erledigte Wuensche, `?erledigt=alle` holt alle, die Kopfzeile nennt
+  weiterhin die Gesamtzahl, unter der Grenze gibt es keinen Nachlade-Link.
+- `test_packliste_gepackt_frist.py` – Wunsch #234. Gepacktes verschwindet
+  nach 7 Tagen aus der Ansicht (nicht aus der DB), `?gepackt=alle` und der
+  Zaehl-Link holen es zurueck, offene Eintraege kennen keine Frist.
 - `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
   Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
   wieder gruen sein.

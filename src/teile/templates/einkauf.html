@@ -9,10 +9,10 @@
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 .btn-neu-toggle, .btn-filter-toggle, .btn-einkauf-start {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
-  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  color:var(--farbe-kontrast); border-radius:12px; padding:12px 10px; font-size:14px;
   font-weight:600; cursor:pointer; white-space:nowrap;
 }
-.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.btn-filter-toggle.aktiv { background:var(--farbe-band); color:#fff; }
 .add-card, .filter-card {
   background:var(--surface); border-radius:16px; padding:14px 16px;
   margin-bottom:14px; box-shadow:0 1px 3px var(--shadow);
@@ -29,16 +29,16 @@
 .btn-barcode:disabled { opacity:.6; cursor:default; }
 .barcode-status { font-size:13px; margin-bottom:10px; line-height:1.45; }
 .barcode-status.fehler { color:#ff9500; }
-.barcode-status.ok { color:#34c759; }
+.barcode-status.ok { color:var(--gruen-text); }
 .btn-los:disabled { opacity:.4; cursor:default; }
 /* Einkaufsmodus (Wunsch #87): grössere Tap-Flächen, Bedienelemente ausgeblendet */
 #einkaufsmodus-leiste {
-  display:none; position:sticky; top:0; z-index:5; background:var(--farbe); color:#fff;
+  display:none; position:sticky; top:0; z-index:5; background:var(--farbe-band); color:#fff;
   align-items:center; justify-content:space-between; padding:10px 14px;
   border-radius:12px; margin-bottom:14px; font-weight:600;
 }
 .btn-einkaufsmodus-beenden {
-  background:#fff; color:var(--farbe); border:none; border-radius:8px;
+  background:#fff; color:var(--farbe-kontrast); border:none; border-radius:8px;
   padding:7px 16px; font-weight:600; cursor:pointer;
 }
 body.einkaufsmodus .top-aktionen, body.einkaufsmodus .add-card, body.einkaufsmodus .filter-card {
@@ -55,7 +55,7 @@ body.einkaufsmodus .item-name { font-size:18px; }
 }
 .add-input:focus { border-color:var(--farbe); }
 .btn-add {
-  background:var(--farbe); color:#fff; border:none;
+  background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer;
   white-space:nowrap; width:100%; margin-top:4px;
 }
@@ -74,7 +74,7 @@ body.einkaufsmodus .item-name { font-size:18px; }
   padding:9px 14px; font-size:14px; font-family:inherit; font-weight:500;
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
-.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.chip-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .chip-btn-sm { padding:6px 12px; font-size:13px; }
 .angebot-row { display:flex; gap:10px; align-items:center; margin:10px 0; }
 /* Kategorie-Gruppen */
@@ -126,17 +126,17 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   border-top:1px solid var(--border);
 }
 .angebot-form-label {
-  font-size:11px; font-weight:700; color:var(--text-2);
+  font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px;
 }
 .btn-angebot-submit {
-  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  background:var(--farbe-band); color:#fff; border:none; border-radius:8px;
   padding:7px 14px; font-size:13px; cursor:pointer; flex-shrink:0;
   align-self:flex-start;
 }
 .btn-angebot-submit:disabled { opacity:.4; cursor:default; }
 .btn-loeschen-inline {
-  background:none; border:none; color:#ff3b30; font-size:13px;
+  background:none; border:none; color:var(--rot-text); font-size:13px;
   cursor:pointer; padding:4px 0; align-self:flex-start;
 }
 .erledigt-section { margin-top:20px; }

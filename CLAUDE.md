@@ -350,7 +350,20 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
 - **Tippfläche:** jeder `button` hat via `base.html` mindestens 44×44 px
   unsichtbare Trefferfläche (Wunsch #169). Nie ein eigenes
   `button::before`/`::after` in einer Vorlage definieren –
-  `tests/test_tippflaeche.py` wächtert das.
+  `tests/test_tippflaeche.py` wächtert das. **Als Link gebaute Knöpfe**
+  (Pills, Bearbeiten-Links) bekommen zusätzlich die Klasse `knopf` –
+  dieselbe Regel, gleicher Wächter (Wunsch #239).
+- **Farben mit Kontrastgarantie** (Wunsch #237, `tests/test_farbkontrast.py`):
+  Text nie in `var(--farbe)` – immer `var(--farbe-kontrast)` (im Dunkelmodus
+  automatisch aufgehellt). Weiße Schrift nie auf `var(--farbe)` – immer auf
+  `var(--farbe-band)`. Grün/Rot als Text über `var(--gruen-text)`/
+  `var(--rot-text)`, nie roh `#34c759`/`#ff3b30`. Text in der Farbe einer
+  PERSON über die Klasse `farbtext` mit `--ft-dunkel`/`--ft-hell` am Element
+  (Inline-Farben können den Dunkelmodus nicht mitmachen). Serverseitig
+  rechnen `farbe_kontrast()`/`farbe_kontrast_hell()` (00_kern, in jeder
+  Vorlage verfügbar) beliebige Nutzerfarben kontrastfest.
+- **Schrift nie unter 12px** (Wunsch #238) – auch für Badges, Etiketten und
+  Achsenbeschriftungen; `tests/test_farbkontrast.py` wächtert alle Vorlagen.
 - **Löschen trägt im ganzen Portal 🗑️** – nie ✕, nie nur Text (Wunsch #160).
   Gilt für jedes Bedienelement, das einen Datensatz wirklich entfernt;
   `tests/test_loeschen_symbol.py` wächtert es über alle Vorlagen. Ausgenommen

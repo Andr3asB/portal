@@ -4,7 +4,7 @@
 
 {% block extra_styles %}
 .kb-saldo-card {
-  background:var(--farbe); color:#fff; border-radius:18px;
+  background:var(--farbe-band); color:#fff; border-radius:18px;
   padding:22px 20px; margin-bottom:16px; text-align:center;
 }
 .kb-saldo-label { font-size:13px; opacity:.85; }
@@ -40,7 +40,7 @@
   background:var(--surface); color:var(--text);
 }
 .kb-art-btn input { position:absolute; opacity:0; pointer-events:none; }
-.kb-art-btn.kb-art-aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.kb-art-btn.kb-art-aktiv { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .kb-feld { margin-bottom:10px; }
 .kb-feld label {
   display:block; font-size:12px; font-weight:700; color:var(--text-2);
@@ -53,7 +53,7 @@
 }
 .kb-input:focus { border-color:var(--farbe); }
 .kb-submit {
-  width:100%; background:var(--farbe); color:#fff; border:none;
+  width:100%; background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:12px; font-size:16px; font-weight:600; cursor:pointer;
 }
 .kb-eintrag {
@@ -68,14 +68,14 @@
 .kb-eintrag-zweck.kb-leer { color:var(--text-2); font-weight:400; font-style:italic; }
 .kb-eintrag-meta { font-size:12px; color:var(--text-2); margin-top:2px; }
 .kb-eintrag-betrag { font-size:16px; font-weight:700; white-space:nowrap; }
-.kb-eintrag-betrag.kb-plus { color:#34c759; }
-.kb-eintrag-betrag.kb-minus { color:#ff3b30; }
+.kb-eintrag-betrag.kb-plus { color:var(--gruen-text); }
+.kb-eintrag-betrag.kb-minus { color:var(--rot-text); }
 .kb-storno-btn {
   background:none; border:none; color:var(--text-2); font-size:19px;
   cursor:pointer; padding:2px 4px; flex-shrink:0;
 }
 .kb-badge-storniert {
-  font-size:11px; font-weight:700; color:var(--text-2);
+  font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px;
 }
 .kb-leerzustand { text-align:center; color:var(--text-2); font-size:14px; padding:24px 0; }

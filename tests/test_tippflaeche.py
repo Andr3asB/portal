@@ -49,6 +49,21 @@ def test_buttons_sind_bezugsrahmen():
     assert re.search(r"button\s*\{\s*position:\s*relative", BASE)
 
 
+def test_link_knoepfe_haben_dieselbe_trefferflaeche():
+    """Wunsch #239: Die 44px-Zusage hing nur am button-Element - als Link
+    gebaute Knöpfe (Personen-Pills 33px, Bearbeiten-Links 29px) fielen durch.
+    `a.knopf` bekommt dieselbe Regel; bewusst nicht jedes <a>, weil sich die
+    unsichtbaren Flächen in Fließtext und dichten Listen überlappen und
+    Tipps falsch zuordnen würden."""
+    assert "a.knopf::before {" in BASE
+    regel = BASE[BASE.index("a.knopf::before {"):]
+    regel = regel[:regel.index("}")]
+    glatt = " ".join(regel.split())
+    assert "width: max(100%, 44px)" in glatt
+    assert "height: max(100%, 44px)" in glatt
+    assert re.search(r"a\.knopf\s*\{\s*position:\s*relative", BASE)
+
+
 @pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)
 def test_keine_vorlage_ersetzt_die_trefferflaeche(datei):
     """Ein template-eigenes `button::before` (oder auf einer Button-Klasse)
@@ -56,7 +71,7 @@ def test_keine_vorlage_ersetzt_die_trefferflaeche(datei):
     if datei.name == "base.html":
         return
     inhalt = datei.read_text(encoding="utf-8")
-    treffer = re.findall(r"[\w.-]*(?:button|btn)[\w-]*::(?:before|after)", inhalt)
+    treffer = re.findall(r"[\w.-]*(?:button|btn|knopf)[\w-]*::(?:before|after)", inhalt)
     assert not treffer, (
         f"{datei.name} definiert {treffer} - das ersetzt die 44px-Trefferflaeche "
         f"aus base.html. Anderes Pseudo-Element nehmen oder die Flaeche im "
@@ -106,7 +121,9 @@ def test_fokus_ring_nur_fuer_tastatur():
     glatt = " ".join(BASE.split())
     assert ":focus:not(:focus-visible) { outline: none; }" in glatt
     assert ":focus-visible {" in glatt
-    assert "outline: 2px solid var(--farbe)" in glatt
+    # Wunsch #237: --farbe-kontrast statt roher Nutzerfarbe - der Ring muss
+    # auch bei hellen Farben 3:1 gegen den Grund erreichen.
+    assert "outline: 2px solid var(--farbe-kontrast)" in glatt
 
 
 @pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)

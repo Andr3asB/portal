@@ -8,11 +8,11 @@
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 .btn-zurueck, .btn-neu-toggle, .btn-filter-toggle {
   flex:1; display:block; text-align:center; background:none;
-  border:1.5px solid var(--farbe); color:var(--farbe); border-radius:12px;
+  border:1.5px solid var(--farbe); color:var(--farbe-kontrast); border-radius:12px;
   padding:12px 10px; font-size:14px; font-weight:600; text-decoration:none;
   font-family:inherit; cursor:pointer; white-space:nowrap;
 }
-.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.btn-filter-toggle.aktiv { background:var(--farbe-band); color:#fff; }
 .section-label { font-size:13px; font-weight:600; color:var(--text-2); margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
 /* Wunsch #224: Vier Spalten nebeneinander. Auf dem Telefon passt das nicht
    auf einen Bildschirm - deshalb scrollt das BRETT waagerecht, nicht die
@@ -27,7 +27,25 @@
   background:var(--surface-2); border-radius:14px; padding:10px;
   display:flex; flex-direction:column; min-height:140px;
 }
-@media (min-width:700px) { .spalte { flex:1 1 0; max-width:none; } }
+/* Wunsch #236: Auf dem Desktop zwaengten sich vier Spalten in die 720px von
+   .main - je ~165px, Woerter brachen mitten im Wort um. Das BRETT (und nur
+   es) tritt deshalb per Full-Bleed aus der Lesebreite heraus; .main selbst
+   bleibt bei 720px, die Regel aus #173 ist nicht angetastet. Jede Spalte
+   bekommt mindestens 240px - reicht die Fensterbreite nicht fuer alle vier,
+   scrollt das Brett waagerecht wie auf dem Handy. */
+@media (min-width:700px) {
+  .brett {
+    margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);
+    padding-left: 16px; padding-right: 16px;
+  }
+  .spalte { flex:1 0 240px; max-width:380px; }
+}
+/* Ab hier passen alle vier Spalten samt Mindestbreite hinein - erst dann
+   zentrieren (frueher wuerde justify-content:center den linken Rand eines
+   uebergelaufenen Bretts unerreichbar abschneiden). */
+@media (min-width:1120px) {
+  .brett { justify-content:center; }
+}
 .spalte-kopf {
   display:flex; align-items:center; justify-content:space-between; gap:6px;
   font-size:12px; font-weight:700; color:var(--text-2);
@@ -52,7 +70,7 @@
 .karte-meta { font-size:12px; color:var(--text-2); margin-top:4px; }
 .badge-person {
   display:inline-flex; align-items:center; gap:3px;
-  border-radius:8px; padding:1px 7px; font-size:11px; font-weight:600;
+  border-radius:8px; padding:1px 7px; font-size:12px; font-weight:600;
   white-space:nowrap;
 }
 .karte-griff { background:none; border:none; padding:0; font-family:inherit;
@@ -141,7 +159,7 @@
               {{ t.inhalt }}
               <div class="karte-meta">
                 {% if t.fuer_name %}
-                <span class="badge-person" style="background:{{ t.fuer_farbe }}22; color:{{ t.fuer_farbe }}">{{ t.fuer_name }}</span>
+                <span class="badge-person" style="background:{{ farbe_kontrast(t.fuer_farbe) }}; color:#fff">{{ t.fuer_name }}</span>
                 {% elif t.zugewiesen_rollen %}
                 <span>für {{ t.zugewiesen_rollen }}</span>
                 {% endif %}

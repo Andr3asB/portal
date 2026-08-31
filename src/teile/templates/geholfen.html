@@ -21,7 +21,7 @@
 .aufgabe-btn:active { transform:scale(.94); box-shadow:0 1px 3px var(--shadow); }
 .aufgabe-btn.flash  { background:var(--farbe); }
 .aufgabe-emoji { font-size:26px; line-height:1; pointer-events:none; }
-.aufgabe-name  { font-size:11px; font-weight:600; color:var(--text-3); pointer-events:none; text-align:center; }
+.aufgabe-name  { font-size:12px; font-weight:600; color:var(--text-3); pointer-events:none; text-align:center; }
 .aufgabe-btn.flash .aufgabe-name { color:#fff; }
 
 /* Tablet-Optimierung: wenn Bildschirm breit genug, mehr Spalten */
@@ -54,7 +54,7 @@
   display:flex; align-items:center; gap:6px;
   border:none; border-radius:20px; padding:7px 14px;
   font-size:14px; font-weight:600; cursor:pointer;
-  background:var(--chip-bg); color:var(--text-2);
+  background:var(--chip-bg); color:var(--chip-text);
   transition:background .15s, color .15s;
   -webkit-tap-highlight-color:transparent;
 }
@@ -76,8 +76,8 @@
       {% for n in alle_nutzer %}
       <button class="nutzer-pill {% if n.id == user.id %}aktiv{% endif %}"
               data-uid="{{ n.id }}" data-farbe="{{ n.farbe }}"
-              style="{% if n.id == user.id %}background:{{ n.farbe }}{% endif %}"
-              data-klick="waehleNutzer" data-args='[{{ n.id }}, "{{ n.farbe }}"]'>
+              style="{% if n.id == user.id %}background:{{ farbe_kontrast(n.farbe) }}{% endif %}"
+              data-klick="waehleNutzer" data-args='[{{ n.id }}, "{{ farbe_kontrast(n.farbe) }}"]'>
         {{ n.name }}
       </button>
       {% endfor %}
@@ -98,7 +98,7 @@
     <div class="heatmap-title">📊 Letzte 10 Tage</div>
     {% for n in heatmap_nutzer %}
     <div class="heatmap-row">
-      <span class="heatmap-name" style="color:{{ n.farbe }}">{{ n.name }}</span>
+      <span class="heatmap-name farbtext" style="--ft-dunkel:{{ farbe_kontrast(n.farbe) }};--ft-hell:{{ farbe_kontrast_hell(n.farbe) }}">{{ n.name }}</span>
       <div class="heatmap-cells">
         {% for tag in tage %}
         <span class="heatmap-cell{% if tag in geholfen_tage.get(n.id, []) %} gruen{% endif %}"
@@ -114,7 +114,7 @@
 <!-- Erfolgs-Toast -->
 <div id="toast" style="
   display:none; position:fixed; top:calc(20px + var(--st)); left:50%; transform:translateX(-50%);
-  background:#34c759; color:#fff; border-radius:20px; padding:12px 24px;
+  background:#217f39; color:#fff; border-radius:20px; padding:12px 24px;
   font-size:17px; font-weight:600; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.2);
   white-space:nowrap;
 "></div>

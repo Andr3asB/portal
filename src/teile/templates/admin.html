@@ -15,19 +15,19 @@
 }
 .user-name   { font-size:17px; font-weight:600; }
 .badge-admin {
-  display:inline-block; font-size:11px; padding:2px 7px;
-  border-radius:20px; background:#ff9500; color:#fff; font-weight:600;
+  display:inline-block; font-size:12px; padding:2px 7px;
+  border-radius:20px; background:#ad6500; color:#fff; font-weight:600;
   margin-left:6px; vertical-align:middle;
 }
 .badge-rolle {
-  display:inline-block; font-size:11px; padding:2px 7px;
+  display:inline-block; font-size:12px; padding:2px 7px;
   border-radius:20px; background:var(--chip-bg); color:var(--chip-text); font-weight:600;
   margin-left:4px; vertical-align:middle;
 }
 .badge-push {
   display:inline-flex; align-items:center; gap:3px;
-  font-size:11px; padding:2px 7px;
-  border-radius:20px; background:#e5f6ec; color:#34c759; font-weight:600;
+  font-size:12px; padding:2px 7px;
+  border-radius:20px; background:#e5f6ec; color:#217f39; font-weight:600;
   margin-left:4px; vertical-align:middle;
 }
 .user-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
@@ -39,7 +39,7 @@
    dieses Nutzers sofort ungültig macht. */
 .btn-neue-tokens {
   font-size:13px; padding:6px 12px; border-radius:8px;
-  background:var(--surface-2); color:#ff3b30; border:none; cursor:pointer;
+  background:var(--surface-2); color:var(--rot-text); border:none; cursor:pointer;
   font-family:inherit;
 }
 .grants-label { font-size:12px; color:var(--text-2); margin-bottom:6px; font-weight:500; }
@@ -49,14 +49,14 @@
   padding:6px 10px; border-radius:20px; font-size:13px; font-weight:500;
   border:none; cursor:pointer;
 }
-.grant-chip.active   { background:#34c759; color:#fff; }
+.grant-chip.active   { background:#217f39; color:#fff; }
 .grant-chip.inactive { background:var(--chip-bg); color:var(--chip-text); }
 .grant-chip.inactive:hover { background:var(--surface-2); }
 /* Wunsch #155: gleiche Bauart wie .top-aktionen in todo.html/rezepte.html */
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 .top-aktion {
   flex:1; display:block; text-align:center; text-decoration:none;
-  background:none; border:1.5px solid var(--farbe); color:var(--farbe);
+  background:none; border:1.5px solid var(--farbe); color:var(--farbe-kontrast);
   border-radius:12px; padding:12px 10px; font-size:14px; font-weight:600;
   white-space:nowrap;
 }
@@ -81,7 +81,7 @@
   {% set u_grants = grants.get(u.id, []) %}
   <div class="user-card">
     <div class="user-header">
-      <div class="avatar" style="background:{{ u.farbe }}">{{ u.name[0] }}</div>
+      <div class="avatar" style="background:{{ farbe_kontrast(u.farbe) }}">{{ u.name[0] }}</div>
       <div>
         <div class="user-name">
           {{ u.name }}
@@ -95,7 +95,7 @@
     </div>
 
     <div class="user-actions">
-      <a class="btn-edit" href="/a/admin{{ tp }}user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
+      <a class="btn-edit knopf" href="/a/admin{{ tp }}user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
       {# Wunsch #131: Notfallknopf. Macht in einem Schritt ALLE Adressen dieses
          Nutzers ungültig - für "Handy weg" oder "Link aus Versehen
          weitergegeben". Sicherheitsabfrage, weil danach kein alter Link mehr

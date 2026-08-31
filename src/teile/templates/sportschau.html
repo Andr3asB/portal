@@ -10,7 +10,7 @@
   background:var(--surface); color:var(--text); cursor:pointer;
   text-decoration:none; display:block;
 }
-.zeitraum-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.zeitraum-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .heatmap-section {
   background:var(--surface); border-radius:14px; padding:14px 16px;
   box-shadow:0 1px 3px var(--shadow); margin-top:4px;
@@ -54,7 +54,7 @@
   position:absolute; left:0; right:0; border-top:1px dashed var(--border-subtle);
 }
 .steps-gridline-label {
-  position:absolute; left:0; top:-14px; font-size:10px; color:var(--text-2);
+  position:absolute; left:0; top:-14px; font-size:12px; color:var(--text-2);
   background:var(--surface); padding-right:4px;
 }
 .steps-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
@@ -81,7 +81,7 @@
 .steps-bar-training    { width:100%; background:#34c759; }
 .steps-labels { display:flex; gap:3px; margin-top:4px; }
 .steps-bar-label-col { flex:1; text-align:center; min-width:0; }
-.steps-bar-label { font-size:9px; color:var(--text-2); }
+.steps-bar-label { font-size:12px; color:var(--text-2); }
 
 /* Wunsch #110: Wochenansicht (GitHub-Stil) fuer schmale Bildschirme - per
    Media Query umgeschaltet, Umschaltpunkt haengt von tage_anzahl ab (mehr
@@ -121,7 +121,7 @@
 
 <div class="zeitraum-row">
   {% for t in tage_optionen %}
-  <a class="zeitraum-btn{% if t == tage_anzahl %} active{% endif %}" href="?tage={{ t }}">{{ t }} Tage</a>
+  <a class="zeitraum-btn knopf{% if t == tage_anzahl %} active{% endif %}" href="?tage={{ t }}">{{ t }} Tage</a>
   {% endfor %}
 </div>
 

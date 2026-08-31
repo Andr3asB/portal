@@ -146,14 +146,26 @@ def index(token):
             -- dieselbe Position und springen bei jedem Laden umher).
             ORDER  BY e.position ASC, e.name COLLATE NOCASE ASC
         """, (aktives_ziel_id,)).fetchall()
+        # Wunsch #234: Laenger als 7 Tage Gepacktes verschwindet aus der
+        # Ansicht - waehrend der Reise ist der Abschnitt nuetzlich, Wochen
+        # danach nur noch Ballast. ?gepackt=alle holt weiterhin alles;
+        # geloescht wird nichts, und der Zaehler unten sagt, was fehlt.
+        zeige_alle_gepackten = request.args.get("gepackt") == "alle"
+        frist = "" if zeige_alle_gepackten else \
+            " AND e.gepackt_am >= datetime('now', '-7 days')"
         gepackte = db.execute("""
             SELECT e.id, e.name, e.kategorie_id, e.person_id, e.gepackt, e.gepackt_am,
                    u.name AS person_name, u.farbe AS person_farbe
             FROM   packlisten_eintraege e
             LEFT JOIN users u ON u.id = e.person_id
-            WHERE  e.ziel_id = ? AND e.gepackt = 1
+            WHERE  e.ziel_id = ? AND e.gepackt = 1""" + frist + """
             ORDER  BY e.gepackt_am DESC
         """, (aktives_ziel_id,)).fetchall()
+        gepackt_gesamt = db.execute(
+            "SELECT COUNT(*) FROM packlisten_eintraege "
+            "WHERE ziel_id = ? AND gepackt = 1", (aktives_ziel_id,)).fetchone()[0]
+    else:
+        gepackt_gesamt = 0
 
     gruppen = {k["id"]: [] for k in kategorien}
     unsortiert = []
@@ -167,7 +179,7 @@ def index(token):
         user=user, token=token, farbe=user["farbe"],
         ziele=ziele, aktives_ziel_id=aktives_ziel_id,
         kategorien=kategorien, gruppen=gruppen, unsortiert=unsortiert,
-        gepackte=gepackte, personen=personen,
+        gepackte=gepackte, gepackt_gesamt=gepackt_gesamt, personen=personen,
     )
 
 

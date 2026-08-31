@@ -14,14 +14,14 @@
 .btn-neues-rezept {
   flex:1 1 auto; min-width:0;
   display:flex; align-items:center; justify-content:center; min-height:44px;
-  text-align:center; background:var(--farbe); color:#fff;
+  text-align:center; background:var(--farbe-band); color:#fff;
   border-radius:12px; padding:10px 12px; font-size:15px; font-weight:600;
   text-decoration:none;
 }
 .btn-importieren {
   flex:0 0 auto;
   display:flex; align-items:center; justify-content:center; min-height:44px;
-  text-align:center; background:none; color:var(--farbe);
+  text-align:center; background:none; color:var(--farbe-kontrast);
   border:1.5px solid var(--farbe); border-radius:12px; padding:10px 12px;
   font-size:14px; font-weight:600; text-decoration:none; white-space:nowrap;
 }
@@ -45,13 +45,13 @@
   background:var(--surface-2); border:1.5px solid transparent; border-radius:20px;
   padding:7px 14px; font-size:14px; color:var(--text); cursor:pointer;
 }
-.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.chip-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .btn-wunsch {
   background:var(--surface-2); border:1.5px solid var(--border); border-radius:20px;
   cursor:pointer; flex-shrink:0; padding:5px 10px; font-size:12px; font-weight:600;
   color:var(--text-2); white-space:nowrap;
 }
-.btn-wunsch.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.btn-wunsch.aktiv { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .wunsch-anzahl { font-weight:700; }
 {% endblock %}
 

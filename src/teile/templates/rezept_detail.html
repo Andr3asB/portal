@@ -23,20 +23,20 @@
 }
 .portionen-btn {
   width:34px; height:34px; border:1.5px solid var(--farbe); background:none;
-  color:var(--farbe); border-radius:10px; font-size:18px; font-weight:700;
+  color:var(--farbe-kontrast); border-radius:10px; font-size:18px; font-weight:700;
   cursor:pointer; line-height:1; flex-shrink:0;
 }
 .portionen-mitte { display:flex; align-items:baseline; gap:5px; }
 .portionen-zahl { font-size:19px; font-weight:700; }
 .portionen-text { font-size:13px; color:var(--text-2); }
 .portionen-schritte { display:flex; align-items:center; gap:5px; flex-basis:100%; }
-.portionen-schritt-label { font-size:11px; color:var(--text-2); margin-right:2px; }
+.portionen-schritt-label { font-size:12px; color:var(--text-2); margin-right:2px; }
 .portionen-schritt {
   border:1px solid var(--border); background:none; color:var(--text-2);
   border-radius:8px; padding:3px 9px; font-size:12px; font-weight:600;
   cursor:pointer; font-family:inherit;
 }
-.portionen-schritt.aktiv { border-color:var(--farbe); color:var(--farbe); }
+.portionen-schritt.aktiv { border-color:var(--farbe); color:var(--farbe-kontrast); }
 .portionen-zurueck {
   background:none; border:none; color:var(--text-2); font-size:12px;
   text-decoration:underline; cursor:pointer; padding:2px 0; font-family:inherit;
@@ -84,21 +84,21 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 }
 .btn-loeschen-rezept {
   flex:1; background:none; border:1.5px solid var(--border); border-radius:10px;
-  color:#ff3b30; font-size:14px; cursor:pointer; padding:10px 0; text-align:center;
+  color:var(--rot-text); font-size:14px; cursor:pointer; padding:10px 0; text-align:center;
 }
 .rezept-info-row {
   display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px;
 }
 .rezept-info-item { font-size:15px; color:var(--text); font-weight:600; }
 .rezept-info-item .info-label {
-  display:block; font-size:11px; font-weight:700; color:var(--text-2);
+  display:block; font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px;
 }
 .btn-wunsch {
   background:var(--surface-2); border:1.5px solid var(--border); border-radius:20px;
   cursor:pointer; padding:5px 14px; font-size:13px; font-weight:600; color:var(--text-2);
 }
-.btn-wunsch.aktiv { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.btn-wunsch.aktiv { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .sterne-picker { display:flex; gap:4px; }
 .stern-btn {
   background:none; border:none; font-size:26px; line-height:1; cursor:pointer;

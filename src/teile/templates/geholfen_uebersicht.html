@@ -21,7 +21,7 @@
 }
 .stats-name   { font-size:14px; font-weight:600; }
 .stats-points { font-size:28px; font-weight:700; margin:4px 0; }
-.stats-label  { font-size:11px; color:var(--text-2); }
+.stats-label  { font-size:12px; color:var(--text-2); }
 .detail-table { width:100%; border-collapse:collapse; font-size:13px; }
 .detail-table th {
   text-align:left; padding:8px 10px; background:var(--surface-2);
@@ -33,7 +33,7 @@
   display:inline-block; background:var(--chip-bg); border-radius:10px;
   padding:2px 8px; font-weight:600; min-width:28px; text-align:center;
 }
-.count-badge.has { background:var(--farbe); color:#fff; }
+.count-badge.has { background:var(--farbe-band); color:#fff; }
 .section-label { font-size:13px; font-weight:600; color:var(--text-2);
   margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
 .section-label-row { display:flex; align-items:center; justify-content:space-between; }
@@ -42,7 +42,7 @@
   font-size:12px; font-weight:600; padding:4px 10px; border-radius:8px;
   border:1.5px solid var(--border); background:none; color:var(--text-2); cursor:pointer;
 }
-.cal-toggle.active { background:var(--farbe); color:#fff; border-color:var(--farbe); }
+.cal-toggle.active { background:var(--farbe-band); color:#fff; border-color:var(--farbe); }
 .cal-table { width:100%; border-collapse:collapse; font-size:13px; }
 .cal-table th { padding:8px 10px; background:var(--surface-2); color:var(--text-2); font-size:12px; text-align:center; }
 .cal-table th:first-child { text-align:left; }
@@ -67,9 +67,9 @@
   <div class="stats-grid">
     {% for u in users %}
     <div class="stats-card">
-      <div class="stats-avatar" style="background:{{ u.farbe }}">{{ u.name[0] }}</div>
+      <div class="stats-avatar" style="background:{{ farbe_kontrast(u.farbe) }}">{{ u.name[0] }}</div>
       <div class="stats-name">{{ u.name }}</div>
-      <div class="stats-points" style="color:{{ u.farbe }}">
+      <div class="stats-points farbtext" style="--ft-dunkel:{{ farbe_kontrast(u.farbe) }};--ft-hell:{{ farbe_kontrast_hell(u.farbe) }}">
         {{ (punkte.get(u.id, 0) * 10 | round | int) / 10 }}
       </div>
       <div class="stats-label">Punkte</div>

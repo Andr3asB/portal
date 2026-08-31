@@ -15,25 +15,25 @@
   padding:12px 14px; font-size:18px; text-align:center; font-family:inherit; background:var(--surface); color:var(--text);
 }
 .frage-input:focus { border-color:var(--farbe); }
-.frage-input.richtig { border-color:#34c759; }
-.frage-input.falsch { border-color:#ff3b30; }
+.frage-input.richtig { border-color:var(--gruen-text); }
+.frage-input.falsch { border-color:var(--rot-text); }
 .antwort-zeile { margin-top:10px; text-align:left; }
 .antwort-zeile:first-child { margin-top:0; }
 .antwort-label {
-  font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase;
+  font-size:12px; font-weight:700; color:var(--text-2); text-transform:uppercase;
   letter-spacing:.5px; margin-bottom:4px;
 }
 .feedback { margin-top:14px; font-size:15px; font-weight:600; min-height:22px; }
 .feedback .loesung { display:block; font-weight:500; font-size:14px; margin-top:4px; }
-.feedback.richtig { color:#34c759; }
-.feedback.falsch { color:#ff3b30; }
+.feedback.richtig { color:var(--gruen-text); }
+.feedback.falsch { color:var(--rot-text); }
 .btn-anhoeren {
   display:none; margin-top:10px; background:var(--surface-2); border:1.5px solid var(--border);
   color:var(--text); border-radius:20px; padding:7px 16px; font-size:14px; cursor:pointer;
 }
 .btn-anhoeren.sichtbar { display:inline-block; }
 .btn-antworten {
-  margin-top:16px; width:100%; background:var(--farbe); color:#fff; border:none;
+  margin-top:16px; width:100%; background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:12px 0; font-size:16px; font-weight:600; cursor:pointer;
 }
 .btn-beenden {
@@ -43,7 +43,7 @@
 .ende-card { text-align:center; padding:40px 20px; }
 .ende-emoji { font-size:48px; margin-bottom:12px; }
 .btn-zurueck {
-  display:inline-block; margin-top:16px; background:var(--farbe); color:#fff;
+  display:inline-block; margin-top:16px; background:var(--farbe-band); color:#fff;
   border-radius:10px; padding:11px 22px; font-size:15px; font-weight:600; text-decoration:none;
 }
 {% endblock %}

@@ -10,10 +10,10 @@
 .top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
 .btn-neu-toggle, .btn-filter-toggle {
   flex:1; display:block; background:none; border:1.5px solid var(--farbe);
-  color:var(--farbe); border-radius:12px; padding:12px 10px; font-size:14px;
+  color:var(--farbe-kontrast); border-radius:12px; padding:12px 10px; font-size:14px;
   font-weight:600; cursor:pointer; white-space:nowrap;
 }
-.btn-filter-toggle.aktiv { background:var(--farbe); color:#fff; }
+.btn-filter-toggle.aktiv { background:var(--farbe-band); color:#fff; }
 .section-label { font-size:13px; font-weight:600; color:var(--text-2); margin:16px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
 .todo-item {
   background:var(--surface); border-radius:14px; padding:14px 16px;
@@ -27,7 +27,7 @@
 .todo-meta { font-size:12px; color:var(--text-2); margin-top:4px; }
 .todo-meta .chip {
   display:inline-block; padding:2px 8px; border-radius:10px;
-  font-size:11px; font-weight:600; color:#fff; margin-right:4px;
+  font-size:12px; font-weight:600; color:#fff; margin-right:4px;
 }
 .todo-del {
   background:none; border:none; color:var(--text-2); cursor:pointer;
@@ -37,9 +37,9 @@
 .status-picker { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .status-chip {
   border:1.5px solid var(--border); border-radius:14px; background:var(--surface);
-  color:var(--text-2); font-size:11px; font-weight:600; padding:5px 10px; cursor:pointer;
+  color:var(--text-2); font-size:12px; font-weight:600; padding:5px 10px; cursor:pointer;
 }
-.status-chip.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.status-chip.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .status-chip:disabled { opacity:.5; cursor:default; }
 .todo-edit-toggle {
   background:none; border:none; font-size:16px; cursor:pointer;
@@ -66,7 +66,7 @@
       {% if t.zugewiesen_rollen %}
         <span class="chip" style="background:#8e8e93">→ {% if t.zugewiesen_rollen == 'alle' %}Alle{% else %}{% for r in t.zugewiesen_rollen.split(',') %}{{ rollen_labels.get(r, r) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</span>
       {% elif t.fuer_name and t.zugewiesen_an != user.id %}
-        <span class="chip" style="background:{{ t.fuer_farbe }}">→ {{ t.fuer_name }}</span>
+        <span class="chip" style="background:{{ farbe_kontrast(t.fuer_farbe) }}">→ {{ t.fuer_name }}</span>
       {% elif t.zugewiesen_an == user.id and t.von_name %}
         <span class="chip" style="background:{{ t.von_farbe }}">von {{ t.von_name }}</span>
       {% endif %}

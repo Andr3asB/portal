@@ -4,7 +4,7 @@
 
 {% block extra_styles %}
 .gb-neu-toggle {
-  width:100%; background:none; border:1.5px solid var(--farbe); color:var(--farbe);
+  width:100%; background:none; border:1.5px solid var(--farbe); color:var(--farbe-kontrast);
   border-radius:12px; padding:12px; font-size:15px; font-weight:600;
   cursor:pointer; margin-bottom:14px;
 }
@@ -27,7 +27,7 @@
 .gb-datum-row { display:flex; gap:8px; }
 .gb-datum-row .gb-feld { flex:1; margin-bottom:0; }
 .gb-submit {
-  width:100%; background:var(--farbe); color:#fff; border:none; border-radius:10px;
+  width:100%; background:var(--farbe-band); color:#fff; border:none; border-radius:10px;
   padding:12px; font-size:16px; font-weight:600; cursor:pointer; margin-top:10px;
 }
 .gb-karte {
@@ -40,8 +40,8 @@
   padding:6px 4px; background:var(--surface-2);
 }
 .gb-tage-zahl { font-size:18px; font-weight:700; line-height:1.1; }
-.gb-tage-text { font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
-.gb-heute .gb-tage { background:var(--farbe); color:#fff; }
+.gb-tage-text { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.gb-heute .gb-tage { background:var(--farbe-band); color:#fff; }
 .gb-heute .gb-tage-text { color:#fff; opacity:.85; }
 .gb-mitte { flex:1; min-width:0; }
 .gb-name { font-size:16px; font-weight:600; }
@@ -66,11 +66,11 @@
 }
 .gb-panel-aktionen { display:flex; gap:8px; align-items:center; }
 .gb-speichern {
-  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  background:var(--farbe-band); color:#fff; border:none; border-radius:8px;
   padding:8px 14px; font-size:14px; cursor:pointer;
 }
 .gb-loeschen {
-  background:none; border:none; color:#ff3b30; font-size:13px; cursor:pointer;
+  background:none; border:none; color:var(--rot-text); font-size:13px; cursor:pointer;
 }
 .gb-abschnitt { font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px; margin:20px 0 8px; }

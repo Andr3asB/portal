@@ -23,7 +23,7 @@
   flex:1; background:var(--surface); border-radius:14px; padding:12px;
   text-align:center; box-shadow:0 1px 3px var(--shadow);
 }
-.zahl-wert  { font-size:24px; font-weight:700; color:var(--farbe); }
+.zahl-wert  { font-size:24px; font-weight:700; color:var(--farbe-kontrast); }
 .zahl-label { font-size:12px; color:var(--text-2); margin-top:2px; }
 
 .eintrag {
@@ -38,7 +38,20 @@
   white-space:nowrap;
 }
 .eintrag-meta { font-size:13px; color:var(--text-2); margin-top:4px; }
-.eintrag-meta a { color:var(--farbe); }
+.eintrag-meta a { color:var(--farbe-kontrast); }
+/* Wunsch #241: Der Kartensprung ist ein Knopf, kein Fliesstext-Link -
+   103x17px waren als Tippziel zu klein. Dazu die Klasse `knopf` (#239). */
+.karte-link {
+  display:inline-block; border:1px solid var(--border); border-radius:10px;
+  padding:7px 10px; margin:2px 0; font-weight:600; text-decoration:none;
+}
+/* Wunsch #241: Nachlade-Link unter den letzten 20 Eintraegen */
+.mehr-eintraege {
+  display:block; text-align:center; text-decoration:none;
+  background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe-kontrast); border-radius:12px; padding:12px 10px;
+  font-size:14px; font-weight:600; margin-top:12px;
+}
 .eintrag-notiz { font-size:14px; margin-top:6px; white-space:pre-wrap; }
 .notiz-fehlt { font-size:13px; color:var(--text-2); font-style:italic; margin-top:6px; }
 .notiz-panel { display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
@@ -50,7 +63,7 @@
 }
 .notiz-feld:focus { border-color:var(--farbe); }
 .btn-speichern {
-  margin-top:10px; background:var(--farbe); color:#fff; border:none;
+  margin-top:10px; background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer;
 }
 .eintrag-knopf {
@@ -58,7 +71,7 @@
   color:var(--text-2); flex-shrink:0;
 }
 .btn-loeschen-inline {
-  background:none; border:none; color:#ff3b30; font-size:13px;
+  background:none; border:none; color:var(--rot-text); font-size:13px;
   cursor:pointer; padding:6px 0; margin-top:8px;
 }
 .empty { text-align:center; padding:40px 20px; color:var(--text-2); font-size:15px; }
@@ -94,7 +107,7 @@
     <div class="eintrag-kopf">
       <span class="eintrag-zeit">{{ e.zeit_lokal }}</span>
       {% if e.melder %}
-      <span class="badge-person" style="background:{{ e.melder_farbe }}22; color:{{ e.melder_farbe }}">{{ e.melder }}</span>
+      <span class="badge-person" style="background:{{ farbe_kontrast(e.melder_farbe) }}; color:#fff">{{ e.melder }}</span>
       {% endif %}
       {% if e.darf_aendern %}
       <button class="eintrag-knopf" type="button"
@@ -105,8 +118,9 @@
 
     <div class="eintrag-meta">
       {% if e.lat is not none and e.lon is not none %}
-      📌 <a href="https://www.openstreetmap.org/?mlat={{ '%.5f'|format(e.lat) }}&mlon={{ '%.5f'|format(e.lon) }}#map=17/{{ '%.5f'|format(e.lat) }}/{{ '%.5f'|format(e.lon) }}"
-            target="_blank" rel="noopener noreferrer">{{ '%.5f'|format(e.lat) }}, {{ '%.5f'|format(e.lon) }}</a>
+      {# Wunsch #241: ein richtiger Knopf statt eines 17px hohen Textlinks #}
+      <a class="karte-link knopf" href="https://www.openstreetmap.org/?mlat={{ '%.5f'|format(e.lat) }}&mlon={{ '%.5f'|format(e.lon) }}#map=17/{{ '%.5f'|format(e.lat) }}/{{ '%.5f'|format(e.lon) }}"
+         target="_blank" rel="noopener noreferrer">📌 {{ '%.5f'|format(e.lat) }}, {{ '%.5f'|format(e.lon) }}</a>
       {%- if e.genauigkeit %} <span>(±{{ e.genauigkeit|round|int }} m)</span>{% endif %}
       {% else %}
       📌 <span>kein Ort erfasst</span>
@@ -133,6 +147,10 @@
     {% endif %}
   </div>
   {% endfor %}
+  {# Wunsch #241: Standard sind die letzten 20 - der Rest auf Wunsch. #}
+  {% if gesamt > eintraege|length %}
+  <a class="mehr-eintraege knopf" href="?alle=1">Alle {{ gesamt }} Einträge anzeigen</a>
+  {% endif %}
   {% else %}
   <div class="empty">
     Noch kein Ausfall protokolliert 🚗<br>

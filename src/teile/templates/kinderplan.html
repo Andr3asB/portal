@@ -13,7 +13,7 @@
   display:inline-flex; align-items:center; gap:6px;
   border:none; border-radius:20px; padding:7px 14px;
   font-size:14px; font-weight:600; cursor:pointer;
-  background:var(--chip-bg); color:var(--text-2);
+  background:var(--chip-bg); color:var(--chip-text);
   text-decoration:none; -webkit-tap-highlight-color:transparent;
 }
 .nutzer-pill.aktiv { color:#fff; }
@@ -47,7 +47,7 @@
 .tag-header { display:flex; align-items:baseline; gap:8px; }
 .tag-name { font-size:15px; font-weight:700; }
 .tag-datum { font-size:12px; color:var(--text-2); flex:1; }
-.lock-badge { font-size:11px; color:var(--text-2); white-space:nowrap; }
+.lock-badge { font-size:12px; color:var(--text-2); white-space:nowrap; }
 .tag-edit-toggle {
   background:none; border:none; font-size:16px; cursor:pointer; color:var(--text-2);
 }
@@ -77,7 +77,7 @@
   padding-top:10px; border-top:1px solid var(--border);
 }
 .angebot-form-label {
-  font-size:11px; font-weight:700; color:var(--text-2);
+  font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px;
 }
 .btn-row { display:flex; flex-wrap:wrap; gap:8px; }
@@ -86,7 +86,7 @@
   padding:8px 12px; font-size:13px; font-family:inherit; font-weight:500;
   background:var(--surface); color:var(--text); cursor:pointer; white-space:nowrap;
 }
-.chip-btn.active { background:var(--farbe); border-color:var(--farbe); color:#fff; }
+.chip-btn.active { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 {% endblock %}
 
 {% block nav_title %}
@@ -184,8 +184,8 @@
     <div class="nutzer-picker-label">Wessen Plan?</div>
     <div class="nutzer-pills">
       {% for k in kinder %}
-      <a class="nutzer-pill{% if ziel and k.id == ziel.id %} aktiv{% endif %}"
-         style="{% if ziel and k.id == ziel.id %}background:{{ k.farbe }}{% endif %}"
+      <a class="nutzer-pill knopf{% if ziel and k.id == ziel.id %} aktiv{% endif %}"
+         style="{% if ziel and k.id == ziel.id %}background:{{ farbe_kontrast(k.farbe) }}{% endif %}"
          href="?fuer={{ k.id }}">{{ k.name }}</a>
       {% endfor %}
     </div>

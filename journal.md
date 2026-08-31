@@ -2,6 +2,64 @@
 
 ---
 
+## 2026-08-31 – portal-v230–v232: Die UI-Review-Wünsche umgesetzt (#234, #236–#242)
+
+Andi hat alle sechs Review-Wünsche freigegeben (fünf `hoch`, plus #241
+`mittel`) und zwei eigene dazugelegt (#234 Packliste, #236 Brett-Spalten).
+Alle acht in einer Session, drei Deploys, am Ende im echten Browser in
+BEIDEN Modi nachgemessen: 0 Kontrastverstöße auf Startseite, Verwaltung,
+Werkstatt.
+
+**#237 Kontrast – die größte Baustelle, mit einer Erkenntnis:** Die
+Kopfband-Farbe hängt am NUTZER (`users.farbe`), nicht an der App – deshalb
+maß der Review überall exakt 3,15:1. Eine frei wählbare Farbe kann kein
+CSS-Trick kontrastfest machen, also rechnet der Server:
+`farbe_kontrast()` dunkelt ab, bis 4,5:1 gegen `--bg` #f5f5f7 steht
+(NICHT gegen Weiß – das Ziel „exakt 4,5 auf Weiß" ergab auf dem Seitengrau
+nur 4,28, erst die Nachmessung hat das gezeigt); `farbe_kontrast_hell()`
+hellt fürs Dunkle auf. Daraus: `--farbe-band` (Flächen mit weißer Schrift),
+`--farbe-kontrast` (Textfarbe, themenabhängig), `--gruen-text`/`--rot-text`
+(die rohen iOS-Töne #34c759/#ff3b30 taugen als Schrift in keinem Modus),
+dunkleres `--text-2`/`--chip-text`. Für Text in PERSONEN-Farbe (Heatmap,
+Wunsch-Urheber) die Klasse `.farbtext` mit `--ft-dunkel`/`--ft-hell` am
+Element – eine Inline-Farbe kann den Dunkelmodus prinzipbedingt nicht
+mitmachen, das fiel erst auf, weil der Prüf-Browser dunkel stand.
+Mechanik: 20 Textstellen, 74 Weiß-auf-Farbe-Flächen, alle Badges.
+
+**#238:** 36 Stellen mit 9–11px in 26 Vorlagen auf ≥12px. Neue Untergrenze
+als Konvention in CLAUDE.md.
+
+**#239:** `a.knopf` bekommt dieselbe unsichtbare 44px-Fläche wie `button`.
+Bewusst keine Pauschalregel für jedes `<a>` – in dichten Listen würden sich
+die Flächen überlappen und Tipps FALSCH zuordnen.
+
+**#240/#242/#241 – die langen Seiten:** Werkstatt zeigt 15 erledigte
+(51.781 → 5.890px), die Hilfe klappt ihre 24 Kapitel ein (29.943 → 2.801px,
+Inhaltsverzeichnis-Klick öffnet das Ziel), Ausfälle zeigen 20 Einträge
+(7.521px → kurz) und der Koordinaten-Link ist ein echter Knopf. Überall
+dasselbe Muster: LIMIT im Modul, „Alle N anzeigen"-Link, Gesamtzahl bleibt
+sichtbar.
+
+**#234:** Gepacktes verschwindet 7 Tage nach dem Abhaken aus der Ansicht –
+gelöscht wird nichts, der Zähl-Link holt es zurück, Offenes kennt keine
+Frist.
+
+**#236:** Das Brett tritt per Full-Bleed (`margin: calc(50% - 50vw)`) aus
+der 720px-Lesebreite – Spalten min. 240px statt ~165px, `.main` selbst
+bleibt unangetastet (Regel #173 gilt weiter, der Wächter prüft das jetzt
+ausdrücklich).
+
+**Wächter:** `test_farbkontrast.py` (Helfer-Mathematik + drei
+Vorlagen-Verbote), `test_hilfe_kapitel.py`, `test_werkstatt_erledigte_grenze.py`,
+`test_packliste_gepackt_frist.py`, Erweiterungen in `test_tippflaeche.py`,
+`test_todo_kanban.py`, `test_ausfaelle.py`. Alle per Gegenprobe ausgelöst.
+Suite: 1727 Tests grün. Die drei neuen Regeln (Farb-Token, 12px, `knopf`)
+stehen als Konventionen in CLAUDE.md.
+
+Alle acht Wünsche mit `wunsch_erledigt` samt Umsetzungstext abgehakt.
+Sitzungsdisziplin: jede Browser-Messrunde lief über EINE Prüfsitzung,
+jeweils im Anschluss gelöscht (Zähler stets 1).
+
 ## 2026-08-31 – UI-Review: alle 17 Seiten vermessen, 6 Wünsche (#237–#242)
 
 Andis Anlass: „Ich habe nicht das Gefühl, dass wir bereits das beste UI

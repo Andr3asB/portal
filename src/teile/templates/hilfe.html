@@ -13,6 +13,17 @@
   font-size:17px; font-weight:700; margin-bottom:10px;
   display:flex; align-items:center; gap:8px;
 }
+/* Wunsch #242: Die Kapitel sind eingeklappt (details/summary) - die Seite
+   war sonst ~30.000px hoch. Der Pfeil ersetzt den Standard-Marker, den
+   display:flex am summary verschluckt. */
+summary.section-title { cursor:pointer; margin-bottom:0; list-style:none; }
+summary.section-title::-webkit-details-marker { display:none; }
+summary.section-title::after {
+  content:"›"; margin-left:auto; color:var(--text-2);
+  transition:transform .15s; transform:rotate(90deg); font-weight:400;
+}
+details[open] > summary.section-title { margin-bottom:10px; }
+details[open] > summary.section-title::after { transform:rotate(-90deg); }
 .section p { font-size:15px; line-height:1.6; color:var(--text); margin-bottom:8px; }
 .section p:last-child { margin-bottom:0; }
 .steps { list-style:none; padding:0; margin:0; }
@@ -48,7 +59,7 @@
 .nach-oben-btn {
   position:fixed; bottom:24px; right:20px; z-index:50;
   width:48px; height:48px; border-radius:50%;
-  background:var(--farbe); color:#fff; border:none;
+  background:var(--farbe-band); color:#fff; border:none;
   font-size:20px; line-height:1; box-shadow:0 2px 8px rgba(0,0,0,.25); cursor:pointer;
 }
 {% endblock %}
@@ -97,19 +108,20 @@
     </ul>
   </div>
 
-  <div class="section" id="kapitel-1">
-    <div class="section-title">🏠 Was ist das Portal?</div>
+  <details class="section" id="kapitel-1">
+    <summary class="section-title">🏠 Was ist das Portal?</summary>
     <p>Das ist unser privates Familienportal – nur für uns. Wer einen persönlichen Link hat, kommt herein. Den Link bekommt jedes Familienmitglied von Andi.</p>
     <p>Jeder hat seine eigene Seite mit seiner Lieblingsfarbe und den Apps, die für ihn freigeschaltet sind.</p>
     <p><strong>Nach unten ziehen lädt neu:</strong> Stehst du ganz oben auf einer Seite und ziehst mit dem Finger nach unten, erscheint „Loslassen zum Neuladen" – und die Seite holt ihre Daten frisch vom Server. Deine Stelle in der Liste bleibt dabei erhalten. Praktisch vor allem in der installierten App: Dort gibt es keine Adresszeile und damit auch keinen Neu-laden-Knopf.</p>
     <p><strong>Die farbige Leiste oben bleibt immer stehen</strong>, auch wenn du weit nach unten scrollst. Das ⌂ zurück auf deine Startseite und das ☰-Menü sind damit auf jeder Seite und an jeder Stelle einen Tipp entfernt – vorher musste man auf langen Seiten erst wieder ganz nach oben wischen.</p>
+    <div class="tip">📖 <strong>Diese Hilfe ist in Kapitel eingeklappt:</strong> Ein Tipp auf eine Überschrift (oder auf einen Eintrag im Inhaltsverzeichnis) klappt das Kapitel auf, ein zweiter wieder zu. So bleibt die Seite kurz, obwohl alles drinsteht.</div>
     <div class="tip">⚠️ Teile deinen Link nicht mit anderen – er gehört nur dir.</div>
     <div class="tip">🌗 <strong>Hell oder dunkel:</strong> Im Menü (☰) schaltet ein Knopf die Darstellung im Kreis: ☀️ <strong>Hell</strong> → 🌙 <strong>Dunkel</strong> → 🌗 <strong>Wie das Gerät</strong>. Der Knopf zeigt immer den Zustand, der gerade gilt. „Wie das Gerät“ heißt: Stellt dein iPhone abends auf Dunkelmodus um, wird auch das Portal dunkel – ganz ohne Zutun. Die Einstellung gilt nur für dich.</div>
     <div class="tip">🗑️ <strong>Überall gleich:</strong> Wenn du etwas endgültig entfernen kannst, steht dort ein <strong>Mülleimer</strong> – in jeder App, an jeder Stelle. Vor dem Entfernen fragt das Portal immer nach. Ein <strong>Auge mit Strich</strong> oder „Für mich ausblenden“ ist etwas anderes: Da verschwindet der Eintrag nur bei dir und bleibt für alle anderen stehen. Und im Kassenbuch gibt es bewusst gar kein Löschen – dort wird <strong>storniert</strong>, der Eintrag bleibt sichtbar und zählt nur nicht mehr mit.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-2">
-    <div class="section-title">📱 Als App auf dem Handy speichern</div>
+  <details class="section" id="kapitel-2">
+    <summary class="section-title">📱 Als App auf dem Handy speichern</summary>
     <p>Das Portal lässt sich wie eine echte App auf dem Home-Bildschirm speichern – kein App Store nötig.</p>
     <ul class="steps">
       <li>
@@ -122,10 +134,10 @@
       </li>
     </ul>
     <div class="tip">💡 Danach öffnet sich das Portal direkt ohne Browser-Leiste – wie eine richtige App.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-3">
-    <div class="section-title">🗂️ Die Apps</div>
+  <details class="section" id="kapitel-3">
+    <summary class="section-title">🗂️ Die Apps</summary>
     <ul class="app-list">
       <li>
         <span class="app-emoji">🏠</span>
@@ -208,25 +220,25 @@
         </div>
       </li>
     </ul>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-4">
-    <div class="section-title">🔔 Benachrichtigungen</div>
+  <details class="section" id="kapitel-4">
+    <summary class="section-title">🔔 Benachrichtigungen</summary>
     <p>Wenn jemand dir eine Aufgabe zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
     <p>Beim ersten Öffnen des Portals erscheint ein Banner – einfach <strong>„Aktivieren"</strong> tippen. Fertig.</p>
     <div class="tip">Benachrichtigungen funktionieren nur, wenn das Portal als App auf dem Home-Bildschirm gespeichert oder im Browser geöffnet ist.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-5">
-    <div class="section-title">🙋 Geholfen – Heatmap, Verlauf & Statistik</div>
+  <details class="section" id="kapitel-5">
+    <summary class="section-title">🙋 Geholfen – Heatmap, Verlauf & Statistik</summary>
     <p>Unter den Kacheln zeigt eine <strong>Heatmap</strong> für jedes Familienmitglied die letzten 10 Tage: grün, wenn an dem Tag geholfen wurde, sonst grau. Nach dem Antippen einer Kachel färbt sich das heutige Feld sofort ein – ohne Neuladen der Seite.</p>
     <p>Die Liste der letzten Eintragungen findest du unter <strong>„📜 Zuletzt geholfen"</strong> im Menü (☰ oben rechts). Eltern können dort mit ✏️ Datum, Person und Hilfsleistung eines Eintrags nachträglich korrigieren oder den Eintrag löschen.</p>
     <p>In der <strong>Statistik</strong> (📊, im Menü, nur für Admins) gibt es einen Kalender, der zeigt, wer in den letzten 10 oder 30 Tagen an welchem Tag geholfen hat. Mit den Buttons oben rechts kannst du zwischen den Zeiträumen wechseln.</p>
     <p>Unter <strong>„⚙️ Aufgaben"</strong> (Statistik-Seite, nur für Admins) lassen sich Aufgaben hinzufügen, deaktivieren und mit ✏️ auch umbenennen.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-6">
-    <div class="section-title">🛒 Einkaufsliste</div>
+  <details class="section" id="kapitel-6">
+    <summary class="section-title">🛒 Einkaufsliste</summary>
     <p>Alle Familienmitglieder können gleichzeitig die Liste bearbeiten. Einträge lassen sich einer Kategorie zuordnen (Obst & Gemüse, Kühlregal usw.).</p>
     <ul class="steps">
       <li>
@@ -271,16 +283,16 @@
       </li>
     </ul>
     <div class="tip">🗂️ Admins finden „Kategorien verwalten" im Menü (☰) – dort lassen sich Kategorien anlegen, umbenennen und deaktivieren.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-7">
-    <div class="section-title">🙋 Geholfen – Für andere eintragen</div>
+  <details class="section" id="kapitel-7">
+    <summary class="section-title">🙋 Geholfen – Für andere eintragen</summary>
     <p>Eltern können in der Geholfen-App Einträge auch für andere Familienmitglieder machen. Dazu erscheint oben auf der Seite ein <strong>„Als wer?"</strong>-Selector.</p>
     <p>Einfach das richtige Familienmitglied antippen – alle folgenden Kachel-Taps werden dann für diese Person eingetragen.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-8">
-    <div class="section-title">🗂️ Apps sortieren &amp; gruppieren</div>
+  <details class="section" id="kapitel-8">
+    <summary class="section-title">🗂️ Apps sortieren &amp; gruppieren</summary>
     <p>Auf der Startseite kannst du deine Apps selbst ordnen – und in Gruppen aufteilen.</p>
     <ul class="steps">
       <li>
@@ -301,10 +313,10 @@
       </li>
     </ul>
     <div class="tip">💡 Die Reihenfolge wird für dich gespeichert und gilt auf allen Geräten.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-9">
-    <div class="section-title">🍲 Rezepte</div>
+  <details class="section" id="kapitel-9">
+    <summary class="section-title">🍲 Rezepte</summary>
     <p>Jedes Rezept hat einen Namen, optional die Portionenzahl, eine Zutatenliste und die Zubereitung als einzelne Schritte. Über „+ Neues Rezept" öffnet sich die Eingabemaske auf einer eigenen Seite – beim Anlegen einfach jede Zutat bzw. jeden Zubereitungsschritt in eine eigene Zeile schreiben. Ganz oben stehen alle drei Wege nebeneinander in einer Zeile: „+ Neues Rezept", „🔗 URL" und „📷 Bild". Vorher belegten sie drei volle Zeilen und schoben die Rezeptliste nach unten.</p>
     <p><strong>Das Symbol vor jedem Rezept</strong> sagt, worum es geht: 🍳 zum Kochen, 🍰 zum Backen. Es folgt der Kategorie, die beim Anlegen oder Bearbeiten gewählt wird – dieselben Zeichen wie auf den Filter-Chips darüber. Rezepte ohne Kategorie behalten den neutralen Topf 🍲; daran erkennst du auf einen Blick, wo die Einordnung noch fehlt. Im Essensplan steht dasselbe Zeichen vor dem Rezeptnamen.</p>
     <p>🔍 Ab 3 Buchstaben im Suchfeld wird die Liste sofort gefiltert – gesucht wird sowohl im Rezeptnamen als auch in den Zutaten. Über die Chips "Kochen"/"Backen" lässt sich die Liste zusätzlich nach Kategorie filtern (im Formular beim Anlegen/Bearbeiten wählbar).</p>
@@ -318,10 +330,10 @@
     <p><strong>🍽️ Portionen umrechnen:</strong> Über den Zutaten steht ein Regler mit − und +. Stell ein, für wie viele Personen du kochen willst – alle Mengen rechnen sich sofort um. „zurück auf 4“ stellt die Originalangabe wieder her. Darunter lässt sich die <strong>Schrittweite</strong> umstellen: <strong>1</strong> für ganze Portionen, <strong>0,25</strong> und <strong>0,1</strong> für feine Abstufungen – etwa wenn ein Kind mitisst oder der Kuchen in eine etwas grössere Form soll (1,25× statt 2×). Es wird <strong>nichts gespeichert</strong>: Das Rezept behält seine ursprüngliche Portionszahl, du änderst nur deine Ansicht. Setzt du eine Zutat danach mit 🛒 auf die Einkaufsliste, wandert die <strong>umgerechnete</strong> Menge dorthin – nicht die ursprüngliche.</p>
     <div class="tip">✋ Zutaten ohne Mengenangabe („Salz“, „Pfeffer“) bleiben stehen, wie sie sind – die skaliert man ohnehin nach Geschmack. Und krumme Ergebnisse sind normal: 3 Eier für 4 Personen werden bei 6 Personen zu 4,5 Eiern. Das Portal rechnet ehrlich; runden musst du selbst. Bei Rezepten ohne Portionsangabe erscheint der Regler gar nicht erst, weil es keinen Ausgangswert gäbe.</div>
     <p><strong>Auf die Wunschliste:</strong> Bis zu 5 Rezepte gleichzeitig mit "Wünschen?" markieren, die bald mal wieder auf den Essensplan sollen – der Knopf zeigt "✓ Gewünscht", wenn du es markiert hast, und in Klammern, wie viele Personen sich das Rezept insgesamt wünschen. Über den Chip "📌 Gewünscht" in der Übersicht lässt sich die Liste auf die eigenen Wünsche eingrenzen. Sobald das Rezept auf dem Essensplan stand und der Tag vorbei ist, verschwindet die Markierung automatisch wieder.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-10">
-    <div class="section-title">🍽️ Essensplan</div>
+  <details class="section" id="kapitel-10">
+    <summary class="section-title">🍽️ Essensplan</summary>
     <p>Zeigt immer die aktuelle und die folgende Woche (mit eigenen Überschriften "Aktuelle Woche"/"Nächste Woche"), mit einem Mittag- und einem Abend-Feld pro Tag.</p>
     <p>✏️ öffnet ein bestehendes Rezept zum Auswählen oder ein freies Textfeld – nur eins von beiden pro Feld. Beide leer lassen und speichern entfernt die Planung wieder.</p>
     <p><strong>⠿ Verschieben:</strong> Ein Eintrag lässt sich per Ziehen auf ein beliebiges anderes Feld legen – anderer Tag, andere Mahlzeit (Mittag ↔ Abend) oder beides. Ist dort schon etwas geplant, werden beide Einträge einfach getauscht.</p>
@@ -329,40 +341,40 @@
     <p><strong>✅ Gekocht abhaken:</strong> Unter einem geplanten <strong>Rezept</strong> steht ein kleiner Knopf „gekocht?“. Antippen hält fest, dass es an diesem Tag tatsächlich gekocht wurde; nochmal antippen nimmt es zurück. Das ist mehr als ein Häkchen: Beim Rezept selbst lässt sich später nachsehen, wann es zuletzt auf dem Tisch stand. Bei <strong>frei eingetragenem Text</strong> gibt es den Knopf nicht – ohne Rezept gäbe es nichts, woran sich das merken liesse.</p>
     <div class="tip">📚 Der Vermerk hängt am Rezept, nicht am Plan: Wird das Feld später überschrieben oder der ganze Tag gelöscht, bleibt „am 5.8. gab es Linsen“ trotzdem erhalten.</div>
     <div class="tip">💡 Vergangene Tage werden zu einem Block zusammengefasst ("N vergangene Tage") – antippen klappt sie auf, die Tage selbst sind wie gewohnt grau dargestellt. Der heutige Tag ist mit deiner Profilfarbe umrandet.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-11">
-    <div class="section-title">🗓️ Aufgabenplan</div>
+  <details class="section" id="kapitel-11">
+    <summary class="section-title">🗓️ Aufgabenplan</summary>
     <p>Zeigt die aktuelle und die nächste Woche als Liste mit echten Kalendertagen (wie der Essensplan) – vergangene Tage der aktuellen Woche lassen sich zu einem Block einklappen. Oben lässt sich auswählen, wessen Plan gerade angezeigt wird – auch Eltern haben inzwischen einen eigenen Plan, nicht nur die Kinder. Bearbeiten (✏️) geht beim eigenen Plan; Eltern und Admin dürfen zusätzlich jeden anderen Plan bearbeiten.</p>
     <p>Im Bearbeiten-Modus einfach auf eine Aufgabe tippen, um sie für diesen einen Tag zuzuweisen – nochmal tippen entfernt sie wieder. Die Zuweisung gilt nur für die eine Tageskarte, auf der getippt wurde, nicht automatisch auch für andere Tage mit demselben Wochentag – für eine feste Routine muss die Aufgabe jede Woche neu zugewiesen werden.</p>
     <p>Am heutigen Tag lässt sich jede zugewiesene Aufgabe direkt abhaken – das zählt automatisch als Eintrag in der Geholfen-App mit.</p>
     <p><strong>🔁 Aus Pool holen:</strong> Im Bearbeiten-Modus erscheint zusätzlich eine Liste mit wiederkehrenden Aufgaben-Vorlagen (angelegt in der Aufgaben-App unter „🔁 Wiederkehrende Aufgaben"), die für GENAU diesen Tag verfügbar sind. Antippen sortiert sie für diesen einen Kalendertag ein – sie erscheint dann ganz normal in der Liste und zählt auch in der Aufgaben-App mit. Über ↩️ neben einem eingeplanten Pool-Eintrag lässt sich die Einplanung auch wieder rückgängig machen ("zurück in den Pool legen") – die Vorlage wird dadurch wieder verfügbar. Ein Tag mit „Intervall" (z. B. „alle 2 Tage") lässt sich wiederholt einplanen, sobald der Abstand zum zuletzt eingeplanten Tag ein Vielfaches des Intervalls ist – bei „alle 2 Tage" ab Montag also Mittwoch, Freitag, Sonntag usw., nicht jeden Tag dazwischen. Das geht auch mehrere Tage im Voraus, ohne dass die vorherige Instanz schon erledigt sein muss. Ein Tag mit „Fester Wochentag" erscheint an jedem passenden Wochentag – beim Anlegen der Vorlage lassen sich auch mehrere Wochentage gleichzeitig auswählen.</p>
     <div class="tip">🔒 Ab 20 Uhr abends (deutsche Zeit) ist der jeweils nächste Kalendertag für Kinder gesperrt; Eltern und Admin können jederzeit ändern, auch am eigenen Plan.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-12">
-    <div class="section-title">🌙 Hell / Dunkel</div>
+  <details class="section" id="kapitel-12">
+    <summary class="section-title">🌙 Hell / Dunkel</summary>
     <p>Mit dem <strong>🌙-Knopf</strong> im Menü (☰ oben rechts) wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-13">
-    <div class="section-title">🏃 Sportschau</div>
+  <details class="section" id="kapitel-13">
+    <summary class="section-title">🏃 Sportschau</summary>
     <p>Zeigt Andis Trainings als Heatmap – eine Zeile pro Trainingsart (z. B. "Outdoor Laufen", "Outdoor Gehen"), grün markiert der Tag, an dem trainiert wurde. Oben lässt sich der Zeitraum umschalten: 14 (Standard), 30, 60 oder 90 Tage – Heatmap und Schritte-Diagramm passen sich entsprechend an.</p>
     <p>Im <strong>Schritte-Diagramm</strong> zeigt jeder Balken die Schritte eines Tages, unterteilt in "beim Training" und "sonstige Schritte". Rechts neben der Überschrift steht der Durchschnitt für den gewählten Zeitraum – der heutige Tag zählt dabei bewusst nicht mit, da er meist noch nicht vorbei ist und den Schnitt verfälschen würde.</p>
     <p>Die Daten kommen live von Andis hae-Server, es wird nichts im Portal gespeichert – ist der Server gerade nicht erreichbar, erscheint stattdessen ein Hinweis.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-14">
-    <div class="section-title">🐾 Tierbaukasten</div>
+  <details class="section" id="kapitel-14">
+    <summary class="section-title">🐾 Tierbaukasten</summary>
     <p>Ein eigener Assistent in drei Schritten: 1) Mensch oder Tier auswählen, 2) bei Tier zusätzlich die Tierart (Katze, Hund, Hase, Bär, Vogel oder Fisch), 3) anpassen. Der Pfeil unten rechts blättert weiter, der Pfeil links zurück.</p>
     <p><strong>🐾 Tier:</strong> Farbe, ein Muster mit eigener Farbe (Streifen, Punkte oder Flecken, in allen Ansichten sichtbar), Körperbau (schlank bis kräftig) und beliebig viele Accessoires gleichzeitig (Hut, Schleife und/oder Brille kombinierbar). Mit ◀ ▶ lässt sich die Vorschau von vorne, von der Seite und von hinten ansehen.</p>
     <p><strong>🧍 Mensch:</strong> Hautfarbe, Frisur, Haarfarbe, Augen, Augenbrauen, Mund, Bart, Kleidung samt Farbe und Accessoire (Brille) – deutlich detaillierter als bei den Tieren, da hier eine bewährte, extra dafür gemachte Zeichnungsbibliothek verwendet wird. Nur eine Ansicht (von vorne) verfügbar.</p>
     <p>"Speichern" legt die Figur in der eigenen Galerie "Meine Figuren" ab – die sieht nur der jeweilige Nutzer selbst, keine gemeinsame Pinnwand. Mit 🗑️ rechts oben an der Figur lässt sie sich wieder löschen.</p>
     <p><strong>✏️ Ändern statt neu bauen:</strong> Links oben an jeder gespeicherten Figur sitzt ein Bleistift. Ein Tipp darauf holt die Figur zurück in den Assistenten – mit allem, was eingestellt war. Oben erscheint ein Hinweis, welche Figur gerade bearbeitet wird, und aus "Speichern" wird "Änderungen speichern": es entsteht also keine zweite Figur, die alte wird geändert. "Abbrechen" verwirft alles und stellt den Assistenten wieder auf eine neue Figur. Auch die Tierart lässt sich dabei wechseln – über den Zurück-Pfeil ← bis zur Auswahl; aus einem Tier kann sogar ein Mensch werden.</p>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-15">
-    <div class="section-title">📚 Vokabeln</div>
+  <details class="section" id="kapitel-15">
+    <summary class="section-title">📚 Vokabeln</summary>
     <p><strong>🔤 Unregelmäßige Verben:</strong> Beim Anlegen einer Vokabel gibt es zwei zusätzliche Felder – <strong>simple past</strong> und <strong>Perfect</strong>. Füllst du <em>beide</em> aus, wird aus der Vokabel ein unregelmäßiges Verb; das fremdsprachige Wort ist dann der Infinitiv. Nur eines von beiden reicht nicht: Das Portal verwirft eine halbe Angabe, weil im Training sonst eine Frage ohne Antwort stünde. In der Liste erkennst du Verben an der Zeile mit den beiden Formen.</p>
     <p>Die Felder erscheinen <strong>nur bei Englisch</strong> – nur dort gibt es diese drei Stammformen zum Auswendiglernen. Bei Dänisch, Latein, Italienisch oder Französisch sind sie gar nicht erst da. Und auch in Englisch stehen sie <strong>zugeklappt</strong> hinter „🔤 Unregelmäßiges Verb"; ein Tipp öffnet sie. Bearbeitest du ein Wort, das bereits Formen hat, ist der Bereich von vornherein offen. Dasselbe gilt für die Auswahl im Training und den Schalter beim Foto-Import: Beide zeigen sich nur, wenn Englisch gewählt ist.</p>
     <p><strong>Im Training</strong> stehen unter „Unregelmäßige Verben" sechs Abfrageformen zur Auswahl – zum Beispiel „Deutsch → alle drei Formen" oder „Infinitiv → simple past + Perfect". Kreuzt du mindestens eine an, übt das Training <strong>nur unregelmäßige Verben</strong>, und zwar in genau diesen Richtungen; ohne Kreuz läuft alles wie bisher. Mehrere Kreuze heißen: Jedes Verb kommt mehrfach dran, aus jeder gewählten Richtung. Gefragt wird streng – erst wenn <em>alle</em> Felder einer Aufgabe stimmen, gilt sie als gekonnt, sonst kommt sie später noch einmal. Bei den falschen Feldern steht die richtige Lösung darunter.</p>
@@ -379,10 +391,10 @@
     <p><strong>🔊 Anhören:</strong> Im Trainer erscheint nach jeder Antwort ein Knopf, der das fremdsprachige Wort per KI-Aussprache vorliest – hilfreich zum Einprägen der korrekten Aussprache. Auch in der Vokabelliste auf der Hauptseite steht neben jeder Vokabel ein 🔊-Knopf, damit man sich die Aussprache jederzeit anhören kann, nicht nur während des Trainings. <strong>Der Lautsprecher zeigt an, ob die Aussprache schon bereitliegt:</strong> kräftig heißt fertig, blass heißt, dass sie beim ersten Antippen erst erzeugt wird – das dauert einen Moment. Vorgelesen wird immer in der Sprache, der die Vokabel zugeordnet ist; ist eine Vokabel versehentlich in der falschen Sprache eingetragen, klingt sie entsprechend falsch. Jeder Nutzer hat dafür ein eigenes monatliches Zeichen-Kontingent (im Admin-Bereich einstellbar, unabhängig vom KI-Kontingent für Rezepte/Import) – einmal vorgelesene Wörter werden dauerhaft gespeichert und kosten beim nächsten Anhören nichts mehr. Ist das Kontingent ausnahmsweise aufgebraucht, erscheint eine kurze Meldung.</p>
     <p><strong>📖 Lernen:</strong> Erst Sprache und Kapitel (eins, mehrere oder "Alle") wählen, dann startet der Trainer: Er zeigt zufällig entweder das deutsche oder das fremdsprachige Wort, du tippst das Gegenstück ein. Richtig beantwortete Vokabeln kommen in dieser Runde nicht noch mal dran, falsch beantwortete etwas später erneut – bis alle einmal richtig saßen.</p>
     <div class="tip">💡 Jeder Lerndurchgang wird als eigene Sitzung mit Start- und Endzeitpunkt gespeichert, ebenso jeder einzelne Versuch. "Training beenden" schließt die Sitzung sauber ab, genauso wie das Verlassen der Seite.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-16">
-    <div class="section-title">🔗 Dein Zugang und dein Link</div>
+  <details class="section" id="kapitel-16">
+    <summary class="section-title">🔗 Dein Zugang und dein Link</summary>
     <p>Beim <strong>ersten Mal</strong> öffnest du deinen persönlichen Link oder scannst deinen QR-Code. Danach merkt sich dein Gerät, dass du es bist – <strong>der lange Zeichensalat verschwindet aus der Adresszeile</strong>. Du musst nichts eingeben, nichts anklicken, und du bleibst angemeldet.</p>
     <ul class="steps">
       <li>
@@ -404,21 +416,21 @@
     </ul>
     <div class="tip">💡 Auf einem Gerät, das keine Cookies speichern darf (z. B. im privaten Modus), bleibt der Zeichensalat in der Adresse stehen. Das ist Absicht und kein Fehler – so kommst du auch dort immer rein.</div>
     <div class="tip">🔒 Im Portal ist von deinem Zugang nur eine <strong>Prüfsumme</strong> gespeichert, nicht der Link selbst. Selbst wenn jemand die ganze Datenbank in die Hände bekäme, käme er damit in kein einziges Konto. Die Kehrseite: Der Link lässt sich nirgends nachschlagen – ist er weg, gibt es einen neuen.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-17">
-    <div class="section-title">📡 Offline nutzen</div>
+  <details class="section" id="kapitel-17">
+    <summary class="section-title">📡 Offline nutzen</summary>
     <p>Ohne Empfang (z. B. im Supermarkt) zeigt eine Leiste oben "📡 Offline – manche Funktionen sind eingeschränkt". Auf der Startseite werden dann alle Apps grau und lassen sich nicht öffnen – außer den wenigen, die extra dafür vorbereitet sind (aktuell "Hilfe" und "Einkauf"). Das kommt nach und nach für weitere Apps dazu.</p>
     <p><strong>🛒 Einkauf:</strong> Abhaken und neue Artikel eintragen funktionieren ohne Empfang – die Änderung wird sofort angezeigt (neue Artikel mit einem "⏳ wartet"-Zeichen) und automatisch übertragen, sobald wieder Verbindung da ist. Bearbeiten und Löschen brauchen weiterhin eine Verbindung – dafür gibt es einen kurzen Hinweis oben statt eines wirren Browser-Fehlers.</p>
     <div class="tip">💡 Eine Seite, die man schon mal besucht hatte, während Empfang da war, kann trotzdem noch offline angezeigt werden – dann aber mit dem letzten Stand von damals, nicht aktuell.</div>
     <div class="tip">📥 Eine Seite ist erst dann offline verfügbar, wenn du sie <strong>einmal mit Empfang</strong> geöffnet hattest. Wenn nach einer Aktualisierung des Portals offline zunächst nichts da ist, ist das normal – es füllt sich von selbst wieder auf, sobald du die Seiten das nächste Mal mit Empfang benutzt.</div>
     <div class="tip">🏠 Findet das Portal offline nichts zu der Adresse, die du aufgerufen hast, zeigt es deine Startseite statt einer Fehlermeldung. Das greift vor allem, wenn du die App vom Homescreen oder ein altes Lesezeichen ohne Empfang öffnest.</div>
     <div class="tip">👥 Auf einem gemeinsam genutzten Gerät werden die gespeicherten Seiten gelöscht, sobald jemand anderes seinen Link öffnet. Du siehst dort also nie offline die Seiten von jemand anderem – dafür ist nach einem Wechsel zunächst nichts mehr offline verfügbar, bis die Seiten einmal mit Empfang geladen wurden.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-18">
-    <div class="section-title">✨ Werkstatt</div>
-    <p>Hier landen alle Wünsche und Ideen fürs Portal, egal in welcher App man den ✨-Knopf im Menü (☰) antippt. Offene Wünsche stehen oben, erledigte darunter.</p>
+  <details class="section" id="kapitel-18">
+    <summary class="section-title">✨ Werkstatt</summary>
+    <p>Hier landen alle Wünsche und Ideen fürs Portal, egal in welcher App man den ✨-Knopf im Menü (☰) antippt. Offene Wünsche stehen oben, erledigte darunter. Von den erledigten zeigt die Seite die <strong>letzten 15</strong> – darunter steht ein Knopf, der bei Bedarf alle holt; bei über 200 erledigten Wünschen wäre die Seite sonst endlos lang.</p>
     <p><strong>Jeder Wunsch trägt eine Überschrift.</strong> Normalerweise formuliert sie eine KI beim Eintragen aus deinem Text – das dauert ein paar Sekunden und passiert im Hintergrund, du wartest nicht darauf. Klappt das nicht (kein Guthaben, keine Verbindung, anonym eingetragen), steht stattdessen der <strong>erste Satz</strong> deines Wunsches als Überschrift da, etwas blasser dargestellt. So steht über jeder Karte etwas, woran man sie wiedererkennt. Der vollständige Text steht immer darunter – die Überschrift ersetzt ihn nicht.</p>
     <p>Auf einen Wunsch tippen klappt eine Detailansicht auf: der ursprüngliche Wunschtext, wer ihn eingetragen hat, an welchem Tag, und – sobald umgesetzt – an welchem Tag, was dabei genau gemacht wurde ("Umsetzung") und wie viele <strong>Tokens</strong> die Umsetzung gekostet hat. Die Zahl wird beim Abhaken eingetragen, also <em>nach</em> getaner Arbeit; es ist keine Vorab-Schätzung. Steht keine Zahl da, wurde sie nicht erfasst – bei allen Wünschen von vor August 2026 ist das der Normalfall. Eine 0 bedeutet dagegen wirklich null. So bleibt nachvollziehbar, was sich hinter einem erledigten Wunsch verbirgt, ohne im Code suchen zu müssen.</p>
     <ul class="steps">
@@ -443,10 +455,10 @@
         <div><strong>Filtern:</strong> Bei über hundert Wünschen wird die Liste lang. „🔍 Filtern" blendet die Kriterien ein: Priorität, Status (offen/erledigt), App und wer den Wunsch eingetragen hat. Innerhalb einer Zeile wirkt die Auswahl als „oder" (Hoch <em>oder</em> Sehr hoch), zwischen den Zeilen als „und" (offen <em>und</em> aus der Rezepte-App). Die Auswahl bleibt beim Blättern erhalten und lässt sich mit „Filter zurücksetzen" wieder leeren.</div>
       </li>
     </ul>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-19">
-    <div class="section-title">🧳 Packliste</div>
+  <details class="section" id="kapitel-19">
+    <summary class="section-title">🧳 Packliste</summary>
     <p>Packlisten für Reisen und Ausflüge – ähnlich aufgebaut wie die Einkaufsliste, aber mit eigenen Zielen statt Märkten. Oben wählst du, für welches Ziel (z. B. "Sommerurlaub") du gerade die Liste siehst – es ist immer nur ein Ziel gleichzeitig aktiv. Beim nächsten Öffnen der App ist automatisch wieder das zuletzt von dir angesehene Ziel ausgewählt.</p>
     <ul class="steps">
       <li>
@@ -486,11 +498,12 @@
         <div><strong>Packen starten:</strong> Person auswählen (oder „🌐 Allgemein"), auf „Los geht's" tippen – zeigt dann nur noch die Einträge dieser Person plus die allgemeinen (bei „Allgemein" nur die allgemeinen). Häkchen und Namen werden größer für die Bedienung beim Packen. „Beenden" oben schaltet zurück zur normalen Ansicht.</div>
       </li>
     </ul>
+    <div class="tip">🧳 <strong>Gepackt räumt sich selbst auf:</strong> Was vor mehr als 7 Tagen abgehakt wurde, verschwindet aus dem „Gepackt“-Abschnitt – gelöscht ist es nicht, ein Knopf darunter holt die älteren Einträge jederzeit zurück. Abhaken zurücknehmen macht den Eintrag sofort wieder normal sichtbar.</div>
     <div class="tip">🎯 Eltern und Admins finden „Ziele verwalten" und „Kategorien verwalten" im Menü (☰) – dort lassen sich Ziele/Kategorien anlegen und deaktivieren, Kategorien zusätzlich umbenennen und per Ziehen am ⠿-Symbol umsortieren.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-20">
-    <div class="section-title">🤾 TVB Stuttgart</div>
+  <details class="section" id="kapitel-20">
+    <summary class="section-title">🤾 TVB Stuttgart</summary>
     <p>Zeigt die nächsten Spiele, die bisherigen Ergebnisse und die Tabelle – mit der eigenen Mannschaft farblich hervorgehoben. Alles zum Ansehen, nichts zum Eintragen.</p>
     <ul class="steps">
       <li>
@@ -520,10 +533,10 @@
     <div class="tip">📅 Über dem Kader steht immer, aus welcher Saison die Werte stammen. Solange eine neue Saison noch läuft, ohne dass gespielt wurde, gibt es dafür noch keine Werte – dann zeigt die Seite die Zahlen der Vorsaison. Neuzugänge tauchen also erst auf, wenn sie ihr erstes Spiel gemacht haben.</div>
     <div class="tip">🤝 <strong>Testspiele stehen hier nicht.</strong> Der TVB spielt in der Sommervorbereitung durchaus Testspiele – etwa beim Sparkassen-Cup in Altensteig. Sie tauchen im Portal trotzdem nicht auf: Das Datenportal des Handballbunds führt ausschließlich Pflichtspiele, und auch sonst gibt es keine Stelle, die diese Spiele in maschinenlesbarer Form veröffentlicht – sie stehen nur als Fließtext in Nachrichten. Wer sie verfolgen will, schaut auf tvbstuttgart.de.</div>
     <div class="tip">⏳ In der Sommerpause sind Spielplan und Tabelle der Amateur- und Jugendmannschaften noch leer – die Ligen veröffentlichen beides erst kurz vor dem Saisonstart im September. Dass dort „keine Spiele" bzw. „noch keine Tabelle" steht, ist dann also richtig und kein Fehler.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-21">
-    <div class="section-title">🐷 Kassenbuch</div>
+  <details class="section" id="kapitel-21">
+    <summary class="section-title">🐷 Kassenbuch</summary>
     <p>Jedes Kind hat sein eigenes Kassenbuch für sein Taschengeld – Einnahmen und Ausgaben eintragen, und immer auf einen Blick sehen, wie viel gerade im Sparschwein ist.</p>
     <ul class="steps">
       <li>
@@ -557,10 +570,10 @@
     </ul>
     <div class="tip">🔒 Das Kind sieht sein eigenes Prüfprotokoll nicht – es braucht es auch nicht: In seinem Kassenbuch stehen ohnehin alle Einträge, auch die stornierten. Die Prüfsicht ist die Perspektive der Aufsicht.</div>
     <div class="tip">✍️ Niemand kann etwas nachträglich ändern – auch die Eltern nicht. Es gibt im ganzen Kassenbuch keinen Bearbeiten- und keinen Löschen-Knopf, nur Anlegen und Stornieren. Genau das macht das Protokoll erst aussagekräftig. <strong>Auch das Richtigstellen des Startbetrags ist keine Ausnahme davon:</strong> Dabei wird nichts überschrieben, sondern der alte Betrag storniert und ein neuer angelegt – im Protokoll stehen anschliessend beide.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-22">
-    <div class="section-title">🎂 Geburtstage</div>
+  <details class="section" id="kapitel-22">
+    <summary class="section-title">🎂 Geburtstage</summary>
     <p>Die gemeinsame Geburtstagsliste. Jeder trägt ein, alle sehen es – sortiert danach, was als Nächstes ansteht.</p>
     <ul class="steps">
       <li>
@@ -590,10 +603,10 @@
     </ul>
     <div class="tip">🔔 Eine Korrektur bringt die Erinnerungen nicht durcheinander: Wird ein Datum berichtigt, kommt die Erinnerung am neuen Termin – auch dann, wenn für denselben Eintrag am selben Tag schon eine Vorlauf-Meldung unterwegs war.</div>
     <div class="tip">📅 Am 29. Februar Geborene werden in Jahren ohne Schalttag am 1. März gefeiert – die Erinnerung kommt dann auch an diesem Tag.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-23">
-    <div class="section-title">🚗 Ausfälle</div>
+  <details class="section" id="kapitel-23">
+    <summary class="section-title">🚗 Ausfälle</summary>
     <p>Ein Protokoll für die Werkstatt: Wie oft ist das Infotainment im Enyaq ausgestiegen, wann, wo – und was ging dabei nicht mehr. Die App hat genau einen wichtigen Knopf, damit sie im Auto bedienbar ist.</p>
     <ul class="steps">
       <li>
@@ -613,12 +626,12 @@
         <div><strong>Alle sehen alles:</strong> Die Liste zeigt jeden Eintrag mit dem Namen dessen, der ihn gemeldet hat. Ändern oder löschen kann jeder nur seine eigenen – Admin darf aufräumen, falls jemand versehentlich gedrückt hat.</div>
       </li>
     </ul>
-    <div class="tip">📊 Oben stehen zwei Zahlen: alle Einträge und die der letzten 30 Tage. „Wie oft?" ist die erste Frage in der Werkstatt – die soll niemand abzählen müssen.</div>
+    <div class="tip">📊 Oben stehen zwei Zahlen: alle Einträge und die der letzten 30 Tage. „Wie oft?" ist die erste Frage in der Werkstatt – die soll niemand abzählen müssen. Die Liste selbst zeigt die letzten 20 Einträge; ein Knopf darunter holt bei Bedarf alle. Der 📌-Knopf mit den Koordinaten springt zur Karte.</div>
     <div class="tip">📡 Die Meldung braucht in dem Moment Netz. Ohne Empfang lässt sich der Ausfall nicht speichern – dann lieber kurz danach nachtragen, sobald wieder Verbindung da ist, und die Uhrzeit in die Notiz schreiben.</div>
-  </div>
+  </details>
 
-  <div class="section" id="kapitel-24">
-    <div class="section-title">📋 Aufgaben als Brett</div>
+  <details class="section" id="kapitel-24">
+    <summary class="section-title">📋 Aufgaben als Brett</summary>
     <p>Dieselben Aufgaben wie in der Liste, nur anders angeordnet: vier Spalten für die vier Stufen <strong>Backlog · Offen · In Arbeit · Erledigt</strong>. Erreichbar über „📋 Brett" oben in der Aufgaben-App, zurück geht es über „☰ Liste". Beide Ansichten zeigen denselben Bestand – was du hier schiebst, steht sofort auch in der Liste.</p>
     <p><strong>Beide Ansichten können dasselbe.</strong> Auf dem Brett findest du „+ Neue Aufgabe", „🔍 Filtern", den Stift zum Bearbeiten und den Mülleimer genauso wie in der Liste. Nur den <em>Status</em>-Filter gibt es hier nicht – die Spalten <em>sind</em> der Status. Der Personen-Filter gilt für beide Ansichten gemeinsam: Was du in der Liste einstellst, findest du auf dem Brett wieder.</p>
     <p><strong>Das Portal merkt sich, wo du zuletzt warst.</strong> Öffnest du die Aufgaben-App das nächste Mal, kommt automatisch die Ansicht, die du zuletzt benutzt hast – Liste oder Brett. Das gilt pro Person, nicht pro Gerät: Wer zuhause am Rechner aufs Brett wechselt, bekommt es auch am Telefon.</p>
@@ -640,11 +653,33 @@
         <div><strong>Neue Aufgaben</strong> landen immer <strong>am Ende</strong> ihrer Spalte, damit sie deine Priorisierung nicht durcheinanderbringen. Angelegt werden sie wie bisher in der Liste.</div>
       </li>
     </ul>
-    <div class="tip">📱 Auf dem Handy passen nicht alle vier Spalten nebeneinander – das Brett selbst lässt sich seitlich schieben und rastet dabei je Spalte ein.</div>
+    <div class="tip">📱 Auf dem Handy passen nicht alle vier Spalten nebeneinander – das Brett selbst lässt sich seitlich schieben und rastet dabei je Spalte ein. Am Rechner nutzt das Brett die volle Fensterbreite, damit die Aufgabentexte nicht mitten im Wort umbrechen; reicht auch die nicht für alle vier Spalten, lässt es sich wie am Handy seitlich schieben.</div>
     <div class="tip">🙈 Das Brett zeigt genau das, was du auch in der Liste siehst. Private Aufgaben anderer tauchen hier so wenig auf wie dort.</div>
-  </div>
+  </details>
 
 </main>
 
 <button class="nach-oben-btn" data-klick="nachObenScrollen" title="Nach oben" aria-label="Nach oben">↑</button>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Wunsch #242: Ein Tipp im Inhaltsverzeichnis klappt das Zielkapitel auf -
+// sonst spraenge man zu einer zugeklappten Ueberschrift und muesste nochmal
+// tippen. Gilt auch fuer direkte Links mit #kapitel-N (z. B. aus einer
+// Push-Nachricht oder einem Lesezeichen).
+(function() {
+  function oeffneKapitel(hash) {
+    if (!hash || hash.length < 2) return;
+    var ziel = document.getElementById(hash.slice(1));
+    if (ziel && ziel.tagName === 'DETAILS') ziel.open = true;
+  }
+  document.querySelectorAll('.toc-list a').forEach(function(a) {
+    a.addEventListener('click', function() {
+      oeffneKapitel(a.getAttribute('href'));
+    });
+  });
+  oeffneKapitel(location.hash);
+})();
+</script>
 {% endblock %}

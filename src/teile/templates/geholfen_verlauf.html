@@ -21,7 +21,7 @@
   border-top:1px solid var(--border);
 }
 .verlauf-edit-label {
-  font-size:11px; font-weight:700; color:var(--text-2);
+  font-size:12px; font-weight:700; color:var(--text-2);
   text-transform:uppercase; letter-spacing:.5px;
 }
 .verlauf-edit-input, .verlauf-edit-select {
@@ -31,11 +31,11 @@
 }
 .verlauf-edit-input:focus, .verlauf-edit-select:focus { border-color:var(--farbe); }
 .verlauf-edit-save {
-  background:var(--farbe); color:#fff; border:none; border-radius:8px;
+  background:var(--farbe-band); color:#fff; border:none; border-radius:8px;
   padding:8px 14px; font-size:13px; cursor:pointer; align-self:flex-start;
 }
 .verlauf-loeschen-btn {
-  background:none; border:none; color:#ff3b30; font-size:13px;
+  background:none; border:none; color:var(--rot-text); font-size:13px;
   cursor:pointer; padding:4px 0; align-self:flex-start;
 }
 {% endblock %}
@@ -55,7 +55,7 @@
     <div class="verlauf-item" id="verlauf-{{ e.id }}">
       <div class="verlauf-row">
         <span class="verlauf-emoji">{{ e.emoji }}</span>
-        <span class="verlauf-text"><strong style="color:{{ e.farbe }}">{{ e.name }}</strong>: {{ e.aufgabe }}</span>
+        <span class="verlauf-text"><strong class="farbtext" style="--ft-dunkel:{{ farbe_kontrast(e.farbe) }};--ft-hell:{{ farbe_kontrast_hell(e.farbe) }}">{{ e.name }}</strong>: {{ e.aufgabe }}</span>
         <span class="verlauf-time">{{ e.zeitstempel[:16] }}</span>
         {% if darf_bearbeiten %}
         <button class="verlauf-edit-btn" type="button"

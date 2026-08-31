@@ -1016,6 +1016,64 @@ def to_int(value, default=None):
         return default
 
 
+def _leuchtdichte(r, g, b):
+    """Relative Leuchtdichte nach WCAG (0 = schwarz, 1 = weiss)."""
+    def f(v):
+        v /= 255
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+
+
+def _farbe_rgb(farbe):
+    """#rrggbb -> (r, g, b) oder None bei kaputtem Wert."""
+    try:
+        if len(farbe) != 7 or farbe[0] != "#":
+            return None
+        return tuple(int(farbe[i:i + 2], 16) for i in (1, 3, 5))
+    except (ValueError, TypeError):
+        return None
+
+
+def farbe_kontrast(farbe):
+    """Wunsch #237: dunkelt eine Farbe ab, bis weisser Text darauf UND sie
+    selbst als Text auf dem hellsten hellen Grund die WCAG-Grenze von 4,5:1
+    erreichen. Gerechnet wird gegen --bg (#f5f5f7), nicht gegen Weiss - die
+    Aktionsknoepfe stehen auf dem Seitengrau, und ein Ziel von exakt 4,5 auf
+    Weiss ergab dort nur 4,28 (live nachgemessen am 31.08.2026). Der Farbton
+    bleibt erhalten, bereits dunkle Farben kommen unveraendert zurueck. Ein
+    unbrauchbarer Wert faellt auf die Eingabe zurueck, damit eine kaputte
+    Farbe in der DB nicht die ganze Seite zerlegt."""
+    rgb = _farbe_rgb(farbe)
+    if rgb is None:
+        return farbe
+    l_grund = _leuchtdichte(0xf5, 0xf5, 0xf7)
+    faktor = 1.0
+    while faktor > 0:
+        r, g, b = (round(x * faktor) for x in rgb)
+        if (l_grund + 0.05) / (_leuchtdichte(r, g, b) + 0.05) >= 4.5:
+            return f"#{r:02x}{g:02x}{b:02x}"
+        faktor -= 0.02
+    return "#000000"
+
+
+def farbe_kontrast_hell(farbe):
+    """Gegenstueck fuer den Dunkelmodus (Wunsch #237): hellt eine Farbe auf
+    (Mischung Richtung Weiss), bis sie als Text auf der dunklen Karte
+    (--surface #2c2c2e) 4,5:1 erreicht. Dieselben Rueckfaelle wie bei
+    farbe_kontrast()."""
+    rgb = _farbe_rgb(farbe)
+    if rgb is None:
+        return farbe
+    l_grund = _leuchtdichte(0x2c, 0x2c, 0x2e)
+    anteil = 0.0
+    while anteil <= 1.0:
+        r, g, b = (round(x + (255 - x) * anteil) for x in rgb)
+        if (_leuchtdichte(r, g, b) + 0.05) / (l_grund + 0.05) >= 4.5:
+            return f"#{r:02x}{g:02x}{b:02x}"
+        anteil += 0.02
+    return "#ffffff"
+
+
 def bereinige_erfuellte_rezeptwuensche(db):
     """Wunsch #65: Wenn ein gewünschtes Rezept inzwischen auf dem Essensplan
     stand UND dieser Tag vorbei ist, gilt der Wunsch als erfüllt und wird
@@ -2338,6 +2396,9 @@ def init_app(app):
             "app_pfad":      app_pfad,
             "start_pfad":    start_pfad,
             "manifest_pfad": manifest_pfad,
+            # Wunsch #237: kontrastfeste Farbvarianten, siehe base.html.
+            "farbe_kontrast":      farbe_kontrast,
+            "farbe_kontrast_hell": farbe_kontrast_hell,
         }
 
     @app.route("/health")
