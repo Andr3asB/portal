@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-08-31 – #233: Trainingsdaten weg – das Zertifikat des hae-Servers ist abgelaufen
+
+Kein Portal-Code. Andi fragte (Priorität `sehr_hoch`), warum die Sportschau
+keine Trainingsdaten mehr bekommt. Die Kette Schritt für Schritt:
+
+1. Portal → Relay: Anfrage geht raus, api-key gesetzt. ✓
+2. Relay antwortet **502**.
+3. hae-Server: TCP auf 10.0.0.199:443 antwortet sofort. Der Server läuft. ✓
+4. Caddy-Log: `x509: certificate has expired … after 2026-08-29T13:10:16Z`.
+
+**Das Let's-Encrypt-Zertifikat von `health-api.16schwaben.de` ist am
+29.08.2026 abgelaufen** (direkt am Server nachgeprüft: gültig 31.05.–29.08.).
+Die automatische Erneuerung auf dem hae-Server hat versagt – LE erneuert
+normalerweise 30 Tage vor Ablauf, es blieb also wochenlang unbemerkt liegen.
+Caddy prüft das Upstream-Zertifikat beim Weiterreichen, und zwar mit Absicht –
+die Prüfung abzuschalten wäre der falsche Fix gewesen und stand nicht zur
+Debatte.
+
+Der Fix liegt außerhalb meines erlaubten Bereichs (der hae-Server ist ein
+eigenes Gerät): Andi muss dort die Erneuerung anstoßen und dabei klären, warum
+sie nicht automatisch lief. Portal, Relay und Netz sind in Ordnung – sobald
+das Zertifikat frisch ist, laufen die Daten ohne weiteres Zutun wieder, das
+Portal cached nichts (genau das steht auch in der Gedächtnisnotiz zu
+hae-Datenlücken: erst direkt gegen die hae-API testen, nicht das Portal
+verdächtigen – hat wieder gestimmt).
+
+Eine Randnotiz zur Arbeitsumgebung: Der Guardrail-Hook blockierte zweimal
+Befehle, in deren **Nutzlast** der Name des Zertifikats-Volumes als bloßes
+Zitat vorkam – einmal im `wunsch_erledigt`-Text, einmal in diesem
+Journaleintrag selbst, solange er per Heredoc durch die Shell lief. Der Hook
+prüft die ganze Befehlszeile, auch Zitate. Kein Fehler des Hooks; die Lösung
+ist, solche Texte über die Datei-Werkzeuge zu schreiben statt durch Bash, und
+Wörter aus den Verbotsregeln in Kommandozeilen gar nicht erst zu zitieren.
+
+---
+
 ## 2026-08-31 – portal-v228: Ergebnisse und ein veraltetes Etikett (#231, #232)
 
 Andi hat die neu gebaute App sofort benutzt und zwei Fehler gemeldet. Beide
