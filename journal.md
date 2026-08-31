@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-08-31 – #230: Württemberg kommt noch – abwarten statt Ersatzquelle bauen
+
+Andi klärt die offene Frage aus dem Neubau: Die neue handball.net-API hat
+schlicht **noch nicht alle Ligen integriert**. Auf der Verbandsübersicht
+(`/spielbetrieb/verbaende?season_id=2627`) sind viele Bundesländer und
+Regionalkreise weiße Flecken – Württemberg ist einer davon und kommt noch.
+
+Damit ändert sich die Natur von #230: aus „Ersatzquelle finden" wird
+„ein paar Wochen warten und wieder nachsehen". Das passt zum Aufbau des
+Neubaus besser, als es geplant war: Die Mannschaftsliste entsteht aus
+`matches?club_id=…`, und die Vereins-ID gilt für alle Mannschaften – sobald
+die württembergischen Ligen angesetzt sind, kommen ihre Spiele in derselben
+Antwort mit, und die Mannschaften erscheinen **ohne Codeänderung** wieder im
+Umschalter. Zum Nachschauen genügt ein Blick in die TVB-App.
+
+Als Notiz am Wunsch festgehalten (kein Push, Andi weiß es ja selbst); der
+Wunsch bleibt bewusst ohne Priorität liegen. Erst wenn die Mannschaften trotz
+Integration nicht auftauchen, ist dort wirklich etwas zu tun.
+
+---
+
 ## 2026-08-31 – #233: Trainingsdaten weg – das Zertifikat des hae-Servers ist abgelaufen
 
 Kein Portal-Code. Andi fragte (Priorität `sehr_hoch`), warum die Sportschau

@@ -2242,7 +2242,12 @@ Der Datenstrom selbst geht **weiterhin unverschlüsselt** aufs NAS (zweiter Teil
   `/api/new/`-API kennt **11 Verbände, HANDBALL WÜRTTEMBERG ist nicht
   darunter** – vom Verein liegen dort nur die überregionalen Mannschaften
   (3. Liga, Jugendbundesliga). Die rund 14 württembergischen Bezirks- und
-  Jugendmannschaften haben keine Quelle mehr; Ersatzsuche läuft als **#230**.
+  Jugendmannschaften haben keine Quelle mehr – laut Andi (31.08.2026) nur
+  vorübergehend: handball.net hat noch nicht alle Ligen integriert (auf
+  `/spielbetrieb/verbaende?season_id=2627` sind viele Verbände weiße Flecken),
+  Württemberg kommt noch. **Keine Ersatzquelle bauen, nur abwarten** (#230);
+  sobald die Ligen angesetzt sind, erscheinen die Mannschaften von selbst
+  wieder, weil die Liste aus `matches?club_id=…` entsteht.
   Ihr Bestand steht weiter in der Datenbank, und weil die Mannschaftsliste aus
   den SPIELEN entsteht, tauchen sie von selbst wieder auf, sobald es für sie
   Spiele gibt. **Wer hier weiterarbeitet, zwei Fallen:** (1) Eine Quelle immer
