@@ -47,7 +47,7 @@ def test_die_regel_steht_in_base_und_nicht_je_vorlage():
     """Sie betrifft jede Vorlage, die je etwas per `hidden` ausblendet."""
     treffer = [f.name for f in TPL.glob("*.html")
                if f.name != "base.html" and "[hidden]" in
-               re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.S)]
+               re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.DOTALL)]
     assert not treffer, f"{treffer} regeln [hidden] selbst - das gehoert in base.html"
 
 
@@ -86,7 +86,7 @@ def test_der_fotoschalter_ist_abgesetzt():
 
 @pytest.fixture()
 def vok(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='vokabeln'").fetchone()["id"]

@@ -16,8 +16,7 @@ Die beiden Dinge, die dabei nicht kaputtgehen dürfen:
   sich jeder spätere Kontostand rückwirkend verschieben.
 """
 import pytest
-
-from teile.kern import token_lookup, new_token
+from teile.kern import new_token, token_lookup
 
 
 @pytest.fixture()

@@ -15,10 +15,9 @@ besserung.
 """
 import pathlib
 import re
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
-
 from teile.kern import heute_lokal
 
 TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates"
@@ -30,7 +29,7 @@ KUCHEN = "\U0001F370"   # 🍰 backen
 
 @pytest.fixture()
 def rezepte_token(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='rezepte'").fetchone()["id"]
@@ -73,7 +72,7 @@ def test_ohne_kategorie_bleibt_der_neutrale_topf():
 
 def test_symbol_und_kategorie_label_verwenden_dasselbe_zeichen():
     """Zwei verschiedene Symbole für dieselbe Sache müsste man erst lernen."""
-    from teile.rezepte import KATEGORIEN, KATEGORIE_SYMBOL
+    from teile.rezepte import KATEGORIE_SYMBOL, KATEGORIEN
     for wert, label in KATEGORIEN.items():
         assert label.startswith(KATEGORIE_SYMBOL[wert]), (
             f"Kategorie {wert}: Filterchip zeigt {label!r}, "
@@ -90,17 +89,17 @@ def test_liste_zeigt_je_kategorie_ein_anderes_symbol(client, db, rezepte_token):
     # Je Karte das Paar (Symbol, Name) einsammeln - nicht "steht das Zeichen
     # irgendwo auf der Seite": alle drei Zeichen stehen dort ohnehin, sobald
     # drei Rezepte da sind. Nur die Zuordnung ist die Aussage.
-    karten = dict(
-        (name, zeichen) for zeichen, name in re.findall(
+    karten = {
+        name: zeichen for zeichen, name in re.findall(
             r'class="rezept-emoji"[^>]*>([^<]+)</span>.*?'
-            r'class="rezept-name">([^<\s]+)', text, re.S)
-    )
+            r'class="rezept-name">([^<\s]+)', text, re.DOTALL)
+    }
     assert karten == {"Testkuchen": KUCHEN, "Testlinsen": PFANNE, "Testrest": TOPF}, karten
 
 
 def test_essensplan_zeigt_dasselbe_symbol_wie_die_liste(app, client, db):
     """Der eigentliche Punkt: EIN Rezept, ZWEI Seiten, dasselbe Zeichen."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     ids = _drei_rezepte(v)
     tag = date.fromisoformat(heute_lokal()).isoformat()
@@ -145,7 +144,7 @@ def test_die_drei_stehen_in_einer_zeile(client, db, rezepte_token):
     wird die gemeinsame Flex-Zeile, nicht nur ihre Existenz: ohne sie fielen
     die Knöpfe wieder in drei Zeilen zurück."""
     text = client.get(f"/a/rezepte/{rezepte_token}/").get_data(as_text=True)
-    zeile = re.search(r'<div class="anlegen-zeile">(.*?)</div>', text, re.S)
+    zeile = re.search(r'<div class="anlegen-zeile">(.*?)</div>', text, re.DOTALL)
     assert zeile, "Die Anlegezeile fehlt."
     assert zeile.group(1).count("<a ") == 3, "Nicht alle drei stehen in der Zeile."
 

@@ -5,8 +5,10 @@ damit das erneuerte Zertifikat sofort gilt.
 
 Admin-API liegt auf 172.30.0.10:2019 (internes Bridge-Netz, nicht im macvlan).
 """
-import logging, requests
+import logging
 from pathlib import Path
+
+import requests
 
 CERT    = Path("/certs/fullchain.pem")
 # IP-Adresse statt Hostname – Caddys Admin-API prüft den Host-Header

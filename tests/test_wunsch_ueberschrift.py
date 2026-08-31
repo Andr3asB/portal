@@ -21,9 +21,7 @@ abgedeckt war: **kein Titel da.**
 import re
 
 import pytest
-
 from teile.werkstatt import ersatz_titel
-
 
 # --- Die abgeleitete Überschrift -------------------------------------------
 
@@ -79,7 +77,7 @@ def test_doppelpunkt_trennt_gerade_nicht():
 
 @pytest.fixture()
 def werkstatt_token(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='werkstatt'").fetchone()["id"]

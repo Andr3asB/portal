@@ -82,8 +82,8 @@ def test_push_zieladresse_ist_tokenfrei(app, db, admin, monkeypatch):
         (admin["id"], "https://web.push.apple.com/test", "p", "a", "iPhone"))
     db["verbindung"].commit()
 
+    from teile.kern import get_db, push_send
     from teile.todo import _todo_url
-    from teile.kern import push_send, get_db
     app.config["VAPID_PRIVATE_KEY"] = "test-key"
     try:
         with app.app_context():

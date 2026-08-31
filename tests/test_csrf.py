@@ -96,12 +96,12 @@ def test_ohne_jede_kopfzeile_wird_abgelehnt(client, admin, scharf):
 # --- Origin als Ersatz, wenn Sec-Fetch-Site fehlt ---------------------------
 
 def test_passende_origin_genuegt(client, admin, scharf):
-    antwort = _darkmode(client, admin, **{"Origin": "http://localhost"})
+    antwort = _darkmode(client, admin, Origin="http://localhost")
     assert antwort.status_code == 200
 
 
 def test_fremde_origin_wird_abgelehnt(client, admin, scharf):
-    antwort = _darkmode(client, admin, **{"Origin": "https://boese.example"})
+    antwort = _darkmode(client, admin, Origin="https://boese.example")
     assert antwort.status_code == 403
 
 
@@ -130,7 +130,7 @@ def test_x_forwarded_proto_zaehlt_fuer_die_erwartete_origin(client, admin, schar
     # Ohne den Kopf muss weiterhin das tatsächliche Anfrage-Schema gelten
     # (hier http, wie der Test-Client es sendet) – sonst würde ein simulierter
     # Vorwärts-Kopf jede Herkunft akzeptieren.
-    antwort = _darkmode(client, admin, **{"Origin": "https://localhost"})
+    antwort = _darkmode(client, admin, Origin="https://localhost")
     assert antwort.status_code == 403
 
 

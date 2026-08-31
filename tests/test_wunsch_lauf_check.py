@@ -74,7 +74,8 @@ def ausgabe(tmp_path_factory):
 
     umgebung = dict(os.environ, DB_PATH=str(pfad))
     fertig = subprocess.run([sys.executable, str(SKRIPT)], env=umgebung,
-                            capture_output=True, text=True, encoding="utf-8")
+                            capture_output=True, text=True, encoding="utf-8",
+                            check=False)
     assert fertig.returncode == 0, fertig.stderr
     return fertig.stdout
 
@@ -84,7 +85,7 @@ def _abschnitt(text, ueberschrift):
     import re
     teil = text.split(ueberschrift, 1)[1]
     teil = re.split(r"\n=== ", teil)[0]
-    return {int(m) for m in re.findall(r"^\s+#(\d+)", teil, re.M)}
+    return {int(m) for m in re.findall(r"^\s+#(\d+)", teil, re.MULTILINE)}
 
 
 def test_zaehler_und_listen_sagen_dasselbe(ausgabe):
@@ -153,6 +154,7 @@ def test_bei_null_bleibt_es_bei_einer_zeile(tmp_path):
 
     fertig = subprocess.run([sys.executable, str(SKRIPT)],
                             env=dict(os.environ, DB_PATH=str(pfad)),
-                            capture_output=True, text=True, encoding="utf-8")
+                            capture_output=True, text=True, encoding="utf-8",
+                            check=False)
     assert fertig.returncode == 0, fertig.stderr
     assert fertig.stdout.startswith("ARBEIT: 0")

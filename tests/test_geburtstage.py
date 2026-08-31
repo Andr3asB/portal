@@ -23,7 +23,7 @@ def modul(app):
 def gb_token(app, db):
     """Grant für alle Testnutzer (die Familie in conftest bekommt gezielte
     Listen, nicht die Auto-Grants)."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     verbindung = db["verbindung"]
     with app.app_context():
         app_id = verbindung.execute(
@@ -157,7 +157,6 @@ def test_erinnerung_am_tag_wird_faellig(app, modul, db, admin):
     heute = date(2026, 5, 17)
     _mit_erinnerung(db, admin["id"], "Heute", 17, 5, erinnerung=1)
     with app.app_context():
-        from teile.kern import get_db
         faellig = modul.faellige_erinnerungen(db["verbindung"], heute)
     assert [f["art"] for f in faellig] == ["tag"]
 

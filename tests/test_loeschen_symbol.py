@@ -33,9 +33,9 @@ def _loeschen_knoepfe(inhalt):
     Test nur, was ohnehin schon richtig heisst."""
     gefunden = []
     for m in re.finditer(r'<form[^>]*action="([^"]*loeschen[^"]*)"[^>]*>(.*?)</form>',
-                         inhalt, re.S):
+                         inhalt, re.DOTALL):
         aktion, rumpf = m.group(1), m.group(2)
-        for b in re.finditer(r"<button[^>]*>(.*?)</button>", rumpf, re.S):
+        for b in re.finditer(r"<button[^>]*>(.*?)</button>", rumpf, re.DOTALL):
             gefunden.append((re.sub(r"\s+", " ", b.group(1)).strip(), aktion))
     return gefunden
 

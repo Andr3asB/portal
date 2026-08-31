@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-08-31 – Lint eingeführt: ruff über den ganzen Baum, 242 Funde behoben
+
+Auftrag: „fix lint errors". Es gab bislang gar keinen Linter – also ruff
+(0.16.5, in `requirements-dev.txt` gepinnt, nur Entwicklungsrechner) samt
+`ruff.toml` im Repo-Root eingeführt und alles behoben: 207 automatische
+Fixes (Import-Sortierung, `re.I` → `re.IGNORECASE`, ungenutzte Importe) plus
+35 von Hand. Suite danach komplett grün (1541 Tests).
+
+Die `ruff.toml` ignoriert **nur** Regeln, die mit dokumentierten
+Projektkonventionen kollidieren, jede mit Begründung im Kommentar: `N999`
+(nummerierte Modulnamen sind die Architektur), `BLE001`/`S110` (bewusste
+breite excepts in Migrationen und Threads), `DTZ` (eigene Zeit-Helfer in
+`00_kern.py`), `TRY004` (ValueError nach `json.loads` bleibt, weil
+`JSONDecodeError` dessen Unterklasse ist und Aufrufer ValueError fangen).
+
+Erwähnenswerte Einzelfunde:
+
+- `25_ausfall.py`: der NaN-Check `zahl != zahl` war korrekt und kommentiert,
+  liest sich jetzt als `math.isnan(zahl)`.
+- `14_sportschau.py`: `.replace("Z", "+00:00")` vor `fromisoformat()` ist
+  seit Python 3.11 unnötig, entfernt.
+- `17_packliste.py` (Sortier-Route): `user = _user(token)` → `_user(token)` –
+  der Aufruf bleibt (403-Check!), nur die ungenutzte Variable fiel.
+- 5× `subprocess.run` explizit mit `check=False` markiert (Verhalten
+  unverändert, alle prüfen den returncode selbst).
+- 7 implizite `Optional`-Annotationen (`str = None`) auf `str | None`
+  gebracht (00_kern, 04_todo, 23_geburtstage).
+
+Kein Deploy: keine funktionale Änderung, der laufende Container bleibt auf
+dem alten Stand und bekommt die kosmetischen Fixes mit dem nächsten
+regulären `--build` mit.
+
 ## 2026-08-31 – #235: 151 vergessene Images – der Deploy räumt jetzt hinter sich auf
 
 Andi sah in Portainer „hunderte unused Images" und fragte, ob die von mir

@@ -4,7 +4,6 @@ Der Kern dieser Stufe ist eine Negativaussage: Das Cookie darf noch KEINE
 Wirkung haben. Diese Tests halten beides fest.
 """
 import pytest
-
 from teile.kern import token_lookup
 
 

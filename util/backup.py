@@ -75,7 +75,11 @@ Konfiguration via .env:
   BACKUP_NAS_PORT        SSH-Port           (default: 2222)
   BACKUP_AGE_RECIPIENT   öffentlicher age-Schlüssel (age1…), leer = unverschlüsselt
 """
-import logging, os, re, subprocess, tempfile
+import logging
+import os
+import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 import db_snapshot
@@ -251,7 +255,7 @@ def _packen(ziel: Path) -> Path:
         # Modul-Docstring. Das Muster trifft nur die oberste Ebene - die
         # Snapshots heissen ./snapshots/portal-*.db und bleiben drin.
         ["tar", "czf", str(ziel), "--exclude=./portal.db*", "-C", DATA_DIR, "."],
-        capture_output=True,
+        capture_output=True, check=False,
     )
 
     # GNU tar unterscheidet: 1 = Warnungen ("some files differ", typisch wenn
@@ -288,7 +292,7 @@ def _verschluesseln(quelle: Path) -> Path:
     ziel = quelle.with_name(quelle.name + ".age")
     ergebnis = subprocess.run(
         ["age", "-r", AGE_RECIPIENT, "-o", str(ziel), str(quelle)],
-        capture_output=True,
+        capture_output=True, check=False,
     )
     if ergebnis.returncode != 0:
         text = ergebnis.stderr.decode("utf-8", "replace").strip()

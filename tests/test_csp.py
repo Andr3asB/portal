@@ -8,7 +8,6 @@ mehr. Genau diese Sorte Fehler fällt beim Entwickeln nicht auf, weil dort
 `CSP_MODUS=aus` steht.
 """
 import glob
-import io
 import os
 import re
 
@@ -47,7 +46,7 @@ def _ohne_skriptbloecke(text: str) -> str:
     Fehlalarme, und ein Test, dem man nicht glaubt, wird abgeschaltet."""
     def leeren(m):
         return m.group(0)[:0] + "\n" * m.group(0).count("\n")
-    return re.sub(r"<script[^>]*>.*?</script>", leeren, text, flags=re.S)
+    return re.sub(r"<script[^>]*>.*?</script>", leeren, text, flags=re.DOTALL)
 
 
 # Attribut im Markup: Leerzeichen davor, Anführungszeichen dahinter. Damit
@@ -65,7 +64,8 @@ def test_keine_inline_handler_mehr():
     `data-absenden="fnName"` für eine eigene Prüfung."""
     treffer = []
     for pfad in sorted(glob.glob(VORLAGEN)):
-        text = _ohne_skriptbloecke(io.open(pfad, encoding="utf-8").read())
+        with open(pfad, encoding="utf-8") as f:
+            text = _ohne_skriptbloecke(f.read())
         for nr, zeile in enumerate(text.split("\n"), 1):
             for m in _ATTRIBUT.finditer(zeile):
                 treffer.append(f"{os.path.basename(pfad)}:{nr} {m.group(0).strip()}")
@@ -82,7 +82,8 @@ def test_jeder_inline_skriptblock_hat_ein_nonce():
     nicht mehr. Das fällt beim Entwickeln nicht auf."""
     ohne = []
     for pfad in sorted(glob.glob(VORLAGEN)):
-        text = io.open(pfad, encoding="utf-8").read()
+        with open(pfad, encoding="utf-8") as f:
+            text = f.read()
         for m in re.finditer(r"<script(?![^>]*\bsrc=)([^>]*)>", text):
             if "csp_nonce" not in m.group(1):
                 nr = text[:m.start()].count("\n") + 1
@@ -187,7 +188,7 @@ def test_media_src_erlaubt_blob(client, admin, scharf):
     antwort = client.get(f"/p/{admin['tokens']['home']}")
     regel = antwort.headers["Content-Security-Policy"]
     assert "media-src" in regel, "kein media-src – blob:-Audio wird blockiert"
-    media = [t for t in regel.split(";") if "media-src" in t][0]
+    media = next(t for t in regel.split(";") if "media-src" in t)
     assert "blob:" in media, f"blob: fehlt in {media.strip()!r}"
 
 

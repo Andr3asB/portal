@@ -88,8 +88,8 @@ def test_keine_vorlage_baut_die_kopfzeile_um(datei):
     if datei.name == "base.html":
         return
     inhalt = datei.read_text(encoding="utf-8")
-    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.S)
-    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.S)
+    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.DOTALL)
+    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.DOTALL)
     assert ".app-header" not in ohne_kommentar, (
         f"{datei.name} fasst .app-header an - das gehoert in base.html."
     )

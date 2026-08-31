@@ -84,7 +84,7 @@ def test_keine_vorlage_setzt_schrift_unter_16px_auf_felder(datei):
     # selbst nutzt `max(16px, 1em)` und wird vom Muster nicht erfasst.
     inhalt = datei.read_text(encoding="utf-8")
     for m in re.finditer(r"\.([\w-]*(?:input|select|textarea|feld)[\w-]*)\s*(?:,[^{]*)?\{([^}]*)\}",
-                         inhalt, re.I):
+                         inhalt, re.IGNORECASE):
         fs = re.search(r"font-size:\s*(\d+)px", m.group(2))
         assert not (fs and int(fs.group(1)) < 16), (
             f"{datei.name}: .{m.group(1)} setzt {fs.group(1)}px – "

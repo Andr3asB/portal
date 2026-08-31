@@ -42,9 +42,11 @@ import json
 import re
 from importlib.resources import files as importlib_files
 
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
 from dicebear import Avatar, Style
-from teile.kern import get_db, grant as check_grant, to_int
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, to_int
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("tierbaukasten_app", __name__)
 APP = "tierbaukasten"

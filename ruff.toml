@@ -1,0 +1,27 @@
+# Lint-Konfiguration (ruff, in requirements-dev.txt gepinnt).
+# Werkzeug nur fuer den Entwicklungsrechner - geht nie ins Container-Image.
+#
+#   .venv/Scripts/python -m ruff check src/ util/ tests/ scripts/
+#
+# Ignoriert sind ausschliesslich Regeln, die mit dokumentierten
+# Projektkonventionen kollidieren - nicht, was nur laestig waere.
+target-version = "py312"
+
+[lint]
+ignore = [
+    # teile/NN_name.py: nummerierte Modulnamen SIND die Architektur
+    # (app.py laedt sie per importlib in Nummernreihenfolge, CLAUDE.md).
+    "N999",
+    # Breite excepts sind bewusst: idempotente ALTER-TABLE-Migrationen in
+    # _init_db(), Push-/Hintergrund-Threads, die nie den Request reissen duerfen.
+    "BLE001",
+    "S110",
+    # Eigene Zeit-Konvention: gespeichert wird UTC, angezeigt Europe/Berlin
+    # ueber heute_lokal()/utc_zu_lokal() aus 00_kern.py. Die DTZ-Regeln wuerden
+    # tz-Argumente an Stellen erzwingen, deren Semantik die Helfer regeln.
+    "DTZ",
+    # ValueError nach json.loads bleibt ValueError: Aufrufer fangen ValueError,
+    # und json.JSONDecodeError ist dessen Unterklasse - ein TypeError fiele
+    # dort durch.
+    "TRY004",
+]

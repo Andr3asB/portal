@@ -6,7 +6,6 @@ ersten Änderung grün sein und nach jeder Stufe wieder grün sein. Wenn eine
 Stufe sie rot macht, ist entweder die Stufe falsch oder der Test muss bewusst
 angepasst werden – beides soll auffallen.
 """
-import pytest
 
 
 # --- grant(): Token + App-Slug -> Nutzer ------------------------------------
@@ -151,7 +150,7 @@ def test_verschluesselung_bleibt_fuer_die_alt_migration_nutzbar(app):
     mehr aufgerufen, müssen aber funktionsfähig bleiben: Die #129-Migration
     liest damit eine Datenbank aus jener Zeit. Wer sie entfernt, macht ein
     altes Backup unlesbar."""
-    from teile.kern import token_verschluesseln, token_entschluesseln
+    from teile.kern import token_entschluesseln, token_verschluesseln
     with app.test_request_context():
         assert token_entschluesseln(token_verschluesseln("hallo-welt")) == "hallo-welt"
         assert token_entschluesseln("kein-gueltiger-geheimtext") == ""

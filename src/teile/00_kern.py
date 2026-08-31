@@ -1,8 +1,16 @@
-import sqlite3, secrets, logging, base64, hashlib, hmac, threading, time
+import base64
+import hashlib
+import hmac
+import logging
+import secrets
+import sqlite3
+import threading
+import time
 from contextlib import contextmanager
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from flask import g, current_app, jsonify, request
+
+from flask import current_app, g, jsonify, request
 
 log = logging.getLogger("portal.kern")
 
@@ -721,7 +729,7 @@ def sitzung_vormerken(user_id: int):
         pass
 
 
-def aktueller_nutzer(token: str = None):
+def aktueller_nutzer(token: str | None = None):
     """Nutzer für die vier Endpunkte OHNE <token> im Pfad, sonst None.
 
     Betrifft `/wunsch`, `/push/subscribe`, `/push/unsubscribe` und
@@ -887,13 +895,13 @@ def _token_key() -> bytes:
     return base64.urlsafe_b64decode(key_b64)
 
 
-def token_lookup(token: str, key: bytes = None) -> str:
+def token_lookup(token: str, key: bytes | None = None) -> str:
     """Deterministischer Suchwert zu einem Token (HMAC, nicht umkehrbar)."""
     key = key if key is not None else _token_key()
     return hmac.new(key, token.encode(), hashlib.sha256).hexdigest()
 
 
-def token_verschluesseln(token: str, key: bytes = None) -> str:
+def token_verschluesseln(token: str, key: bytes | None = None) -> str:
     """Token -> base64(Nonce + Geheimtext), AES-GCM."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     key = key if key is not None else _token_key()
@@ -902,7 +910,7 @@ def token_verschluesseln(token: str, key: bytes = None) -> str:
     return base64.urlsafe_b64encode(nonce + ct).decode()
 
 
-def token_entschluesseln(blob: str, key: bytes = None) -> str:
+def token_entschluesseln(blob: str, key: bytes | None = None) -> str:
     """Umkehrung von token_verschluesseln. Leerer String bei kaputtem Wert,
     damit ein einzelner defekter Grant nicht die ganze Seite zerlegt."""
     if not blob:
@@ -963,7 +971,7 @@ def utc_zu_lokal(text, mit_zeit: bool = True):
             continue
     else:
         return str(text)  # unbekanntes Format lieber roh zeigen als schlucken
-    lokal = wann.replace(tzinfo=timezone.utc).astimezone(LOKAL_TZ)
+    lokal = wann.replace(tzinfo=UTC).astimezone(LOKAL_TZ)
     return lokal.strftime("%d.%m.%Y, %H:%M") if mit_zeit else lokal.strftime("%d.%m.%Y")
 
 
@@ -977,7 +985,7 @@ def utc_zu_lokal_datum(text):
         wann = datetime.strptime(roh[:19], "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return str(text)[:10]
-    return wann.replace(tzinfo=timezone.utc).astimezone(LOKAL_TZ).date().isoformat()
+    return wann.replace(tzinfo=UTC).astimezone(LOKAL_TZ).date().isoformat()
 
 
 def antwort_oder_weiter(ziel_url: str, **daten):
@@ -1126,8 +1134,9 @@ def rate_ueberschritten(schluessel: str, max_anfragen: int, fenster_sekunden: in
 # Pruefung nutzt statt einer zweiten, moeglicherweise abweichenden Kopie.
 def ist_oeffentliche_url(url: str) -> bool:
     """SSRF-Schutz: nur http/https, und die Ziel-IP darf nicht intern/privat sein."""
+    import ipaddress
+    import socket
     from urllib.parse import urlparse
-    import socket, ipaddress
 
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
@@ -1160,7 +1169,10 @@ def ip_ist_oeffentlich(ip) -> bool:
 def push_send(user_id: int, title: str, body: str,
               app_slug: str = "", url: str = "", dedup_key: str = ""):
     """Push-Benachrichtigung an alle Geräte von user_id. Nicht-blockierend (Thread)."""
-    import json, threading, sqlite3
+    import json
+    import sqlite3
+    import threading
+
     from flask import current_app
 
     private_key = current_app.config.get("VAPID_PRIVATE_KEY", "")
@@ -1174,7 +1186,7 @@ def push_send(user_id: int, title: str, body: str,
     payload = json.dumps({"title": title, "body": body, "url": url, "app": app_slug})
 
     def _send():
-        from pywebpush import webpush, WebPushException
+        from pywebpush import WebPushException, webpush
         try:
             db = sqlite3.connect(db_path)
             db.row_factory = sqlite3.Row
@@ -1382,7 +1394,10 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     `bilder` (Wunsch #80, OCR-Import): optionale Liste aus (mime_type,
     base64_daten)-Tupeln fuer Bildeingabe (Vision) – OpenRouter/OpenAI-
     kompatibles content-Array statt reinem Text."""
-    import json, urllib.request, urllib.error
+    import json
+    import urllib.error
+    import urllib.request
+
     from flask import current_app
 
     platzhalter_id = _kontingent_reservieren(
@@ -1433,7 +1448,8 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
 
 
 def _tts_anfrage(text, modell, stimme, key, response_format):
-    import json, urllib.request
+    import json
+    import urllib.request
 
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/audio/speech",
@@ -1493,7 +1509,10 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
     abgerechnet), eine Korrektur danach ist deshalb nicht nötig. Ein
     Fehlversuch beim Anbieter gibt die Reservierung zurück - das Kontingent
     soll dadurch nicht schmälern."""
-    import io, urllib.error, wave
+    import io
+    import urllib.error
+    import wave
+
     from flask import current_app
 
     platzhalter_id = _kontingent_reservieren(

@@ -25,7 +25,6 @@ import socket
 
 import pytest
 
-
 ENDPUNKT = "https://fcm.googleapis.com/fcm/send/gemeinsames-tablet"
 
 

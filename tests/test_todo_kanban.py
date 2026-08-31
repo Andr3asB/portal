@@ -32,7 +32,7 @@ BRETT = TPL / "todo_kanban.html"
 @pytest.fixture()
 def brett(app, db):
     """Vier Aufgaben in zwei Spalten, dazu eine private fremde."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
     tokens = {}
@@ -109,7 +109,7 @@ def _spalte(seite, status):
     die Spalte schon bei ihrer ersten Karte."""
     treffer = re.search(
         rf'<div class="spalte" data-status="{status}">'
-        rf'.*?(?=<div class="spalte" data-status=|</div>\s*</main>)', seite, re.S)
+        rf'.*?(?=<div class="spalte" data-status=|</div>\s*</main>)', seite, re.DOTALL)
     assert treffer, f"Spalte {status} nicht gefunden"
     return treffer.group(0)
 
@@ -332,7 +332,7 @@ def test_nur_wer_darf_bekommt_einen_griff(client, brett):
     """Ein Griff, der zu 403 führt, wäre schlechte Bedienung – die Sperre
     steht serverseitig ohnehin."""
     seite = client.get(f"/a/todo/{brett['tokens']['TestKind']}/kanban").get_data(as_text=True)
-    karte = re.search(r'<div class="karte"[^>]*>.*?Geschenk besorgen', seite, re.S)
+    karte = re.search(r'<div class="karte"[^>]*>.*?Geschenk besorgen', seite, re.DOTALL)
     assert karte, "Aufgabe fehlt auf dem Brett"
     # Nur die Karte selbst ansehen, nicht alles davor: der Treffer beginnt bei
     # der LETZTEN Karten-Eroeffnung vor dem Text.
@@ -344,7 +344,7 @@ def test_nur_wer_darf_bekommt_einen_griff(client, brett):
 
     # Gegenprobe, damit der Test nicht bloss deshalb gruen ist, weil er die
     # falsche Karte ansieht: die EIGENE Aufgabe hat sehr wohl einen Griff.
-    eigene = re.search(r'<div class="karte"[^>]*>.*?Müll rausbringen', seite, re.S).group(0)
+    eigene = re.search(r'<div class="karte"[^>]*>.*?Müll rausbringen', seite, re.DOTALL).group(0)
     assert "karte-griff" in eigene[eigene.rindex('<div class="karte"'):]
 
 
@@ -360,4 +360,4 @@ def test_jede_verdrahtete_aktion_existiert_auch():
                                 quelle + gemeinsam))
     assert verdrahtet, "Muster kaputt - gar keine Aktion gefunden"
     for name in verdrahtet:
-        assert re.search(r"function\s+%s\s*\(" % re.escape(name), quelle + gemeinsam), name
+        assert re.search(rf"function\s+{re.escape(name)}\s*\(", quelle + gemeinsam), name

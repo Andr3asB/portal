@@ -1,9 +1,21 @@
 from flask import (
-    Blueprint, render_template, abort, request, jsonify, redirect, url_for,
+    Blueprint,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
 )
+
 from teile.kern import (
-    get_db, to_int, token_lookup, sitzung_vormerken,
-    sitzung_nutzer_id, sitzung_konsumieren_an, _nutzer_aufbereiten,
+    _nutzer_aufbereiten,
+    get_db,
+    sitzung_konsumieren_an,
+    sitzung_nutzer_id,
+    sitzung_vormerken,
+    to_int,
+    token_lookup,
     tokenfreie_urls_an,
 )
 

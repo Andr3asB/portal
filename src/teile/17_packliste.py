@@ -37,8 +37,10 @@ Wunsch #117/#118: Ziele UND Kategorien dürfen jetzt Eltern UND Admin
 verwalten (_darf_verwalten()), nicht mehr nur Admin - Menü-Sichtbarkeit
 in base.html entsprechend angepasst.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, to_int
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, to_int
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("packliste_app", __name__)
 APP = "packliste"
@@ -356,7 +358,7 @@ def reorder(token):
     OFFENEN Eintraege - gepackte stehen ohnehin in einem eigenen Abschnitt
     nach Packzeitpunkt sortiert.
     """
-    user = _user(token)
+    _user(token)
     daten = request.get_json(silent=True) or {}
     order = daten.get("order", [])
     if not isinstance(order, list):

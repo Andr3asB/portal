@@ -78,5 +78,5 @@ def test_coop_und_corp_fehlen_noch_absichtlich():
         z for z in CADDYFILE.read_text(encoding="utf-8").splitlines()
         if not z.strip().startswith("#")
     )
-    assert not re.search(r"^\s*Cross-Origin-Opener-Policy\s", ohne_kommentare, re.M)
-    assert not re.search(r"^\s*Cross-Origin-Resource-Policy\s", ohne_kommentare, re.M)
+    assert not re.search(r"^\s*Cross-Origin-Opener-Policy\s", ohne_kommentare, re.MULTILINE)
+    assert not re.search(r"^\s*Cross-Origin-Resource-Policy\s", ohne_kommentare, re.MULTILINE)

@@ -64,7 +64,7 @@ def test_der_griff_sieht_weiter_aus_wie_ein_griff(datei, klasse):
     """Ein `button` bringt Rahmen, Hintergrund und Systemschrift mit. Ohne
     Zurücksetzen sähe aus jedem Griff plötzlich ein grauer Kasten."""
     quelle = (TPL / datei).read_text(encoding="utf-8")
-    regel = re.search(rf"\.{re.escape(klasse)} \{{(.*?)\}}", quelle, re.S)
+    regel = re.search(rf"\.{re.escape(klasse)} \{{(.*?)\}}", quelle, re.DOTALL)
     assert regel, f"Keine CSS-Regel für {klasse}"
     for eigenschaft in ("background:none", "border:none", "font-family:inherit"):
         assert eigenschaft in regel.group(1).replace(" ", ""), (
@@ -76,7 +76,7 @@ def test_der_griff_bleibt_beim_ziehen_scrollfest(datei, klasse):
     """`touch-action:none` verhindert, dass iOS die Bewegung als Scrollen
     übernimmt und den Zug mit `pointercancel` abbricht."""
     quelle = (TPL / datei).read_text(encoding="utf-8")
-    regel = re.search(rf"\.{re.escape(klasse)} \{{(.*?)\}}", quelle, re.S)
+    regel = re.search(rf"\.{re.escape(klasse)} \{{(.*?)\}}", quelle, re.DOTALL)
     assert "touch-action:none" in regel.group(1).replace(" ", "")
 
 
@@ -101,7 +101,7 @@ def ohne_kommentare(text: str) -> str:
     """
     for muster in (r"/\*.*?\*/", r"//[^\n]*", r"\{#.*?#\}"):
         text = re.sub(muster, lambda m: " " * len(m.group(0)), text,
-                      flags=re.S | re.M)
+                      flags=re.DOTALL | re.MULTILINE)
     return text
 
 

@@ -13,9 +13,10 @@ Drei Dinge, die getrennt schiefgehen können und deshalb getrennt geprüft werde
 OpenRouter wird durchgehend über `_openrouter` ersetzt statt über
 `urllib.request` – der Test soll die Auswertung prüfen, nicht das HTTP.
 """
+import importlib
+
 import pytest
 
-import importlib
 budget = importlib.import_module("teile.24_ki_budget")
 
 
@@ -208,7 +209,7 @@ def test_nur_admins(client, db, monkeypatch):
     `is_admin`. Ohne ihn blieb der Test grün, als der is_admin-Check entfernt
     war: der Grant fehlte ja ohnehin.
     """
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     monkeypatch.setattr(budget, "guthaben_lesen", lambda key: None)
     kind = db["familie"]["TestKind"]
     v = db["verbindung"]

@@ -43,9 +43,11 @@ drückt – und das kann Wochen dauern.
 import re
 import secrets
 
-from flask import current_app, g, request, Blueprint
+from flask import Blueprint, current_app, g, request
+
 # Flask 3 reicht Markup nicht mehr durch - es kommt aus markupsafe.
 from markupsafe import Markup
+
 from teile.kern import rate_ueberschritten
 
 # Wunsch #205 (Sicherheitsaudit 11.08.2026): Steuerzeichen aus den drei

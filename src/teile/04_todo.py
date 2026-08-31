@@ -55,9 +55,12 @@ Eine Serie, die an einem bestimmten Tag schon eine eigene Instanz hat,
 wird für GENAU diesen Tag nicht nochmal angeboten (unabhängig vom
 Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
-from datetime import date, datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, new_token, push_send, to_int
+from datetime import date
+
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, push_send, to_int
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("todo_app", __name__)
 APP = "todo"
@@ -123,8 +126,8 @@ def _todo_url(db, user_id: int) -> str:
     return "https://portal.16schwaben.de/a/todo/" if row else ""
 
 
-def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int = None,
-              privat: bool = False, zugewiesen_rollen: str = None):
+def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int | None = None,
+              privat: bool = False, zugewiesen_rollen: str | None = None):
     """Programmatische Schnittstelle für andere Apps (z. B. Geholfen, Scanner).
 
     Ohne konkrete Personen-Zuweisung, aber mit Rollen/Alle-Ziel (Wunsch #39)

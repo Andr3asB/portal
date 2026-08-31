@@ -14,7 +14,6 @@ geöffnet hat (also ein Sitzungs-Cookie besitzt), kann weiterhin Wünsche
 einreichen - für sie ändert sich nichts, weil `aktueller_nutzer()` sie
 findet. Blockiert wird nur, wer weder Token noch Cookie mitbringt.
 """
-import pytest
 
 
 def test_ohne_token_und_ohne_cookie_gibt_es_403(client, db):

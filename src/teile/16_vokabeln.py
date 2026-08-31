@@ -31,13 +31,29 @@ import hashlib
 import json
 import os
 import random
+
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, jsonify, abort,
-    current_app, send_file,
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+
+from teile.kern import (
+    KiFehler,
+    KiLimitError,
+    get_db,
+    ki_anfrage,
+    ki_text_zu_sprache,
+    to_int,
 )
 from teile.kern import (
-    get_db, grant as check_grant, to_int,
-    ki_anfrage, ki_text_zu_sprache, KiLimitError, KiFehler,
+    grant as check_grant,
 )
 
 _FOTO_MAX_BYTES = 8 * 1024 * 1024  # 8 MB - Handyfotos passen bequem, schuetzt vor Ausreissern

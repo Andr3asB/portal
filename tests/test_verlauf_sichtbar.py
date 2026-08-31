@@ -21,7 +21,6 @@ irgendwo im Verlauf.
 import re
 
 import pytest
-
 from teile.werkstatt_app import verlauf_stand
 
 
@@ -71,7 +70,7 @@ def test_die_anzahl_zaehlt_alles():
 
 @pytest.fixture()
 def werkstatt_token(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='werkstatt'").fetchone()["id"]

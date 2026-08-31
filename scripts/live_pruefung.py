@@ -57,7 +57,7 @@ def auf_dem_server(python_code: str) -> str:
     Host darf laut CLAUDE.md nicht verändert werden."""
     befehl = SSH + ["docker", "exec", "-i", "portal", "python", "-"]
     fertig = subprocess.run(befehl, input=python_code, capture_output=True,
-                            text=True, encoding="utf-8")
+                            text=True, encoding="utf-8", check=False)
     if fertig.returncode != 0:
         raise RuntimeError(f"Fehler auf dem Server:\n{fertig.stderr.strip()}")
     return fertig.stdout.strip()

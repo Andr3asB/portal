@@ -68,7 +68,7 @@ def test_jedes_update_betrifft_nur_das_storno():
     """
     anweisungen = re.findall(
         r"UPDATE\s+kassenbuch_eintraege\s+SET\s+(.*?)\s+WHERE",
-        QUELLE, re.S | re.I)
+        QUELLE, re.DOTALL | re.IGNORECASE)
     assert anweisungen, "Kein UPDATE gefunden - greift das Muster noch?"
 
     for anweisung in anweisungen:
@@ -88,7 +88,7 @@ def eintrag(app, db):
 
     conftest schaltet `kassenbuch` nicht frei (die Testfamilie bekommt nur
     home/hilfe/einkauf), deshalb hier ein eigener Grant."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     kind = db["familie"]["TestKind"]["id"]
 

@@ -43,7 +43,7 @@ def zugaenge(db):
 @pytest.fixture()
 def werkstatt_token(app, db):
     """Die Werkstatt-App ist nicht Teil der Standard-Testfamilie."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     tokens = {}
     with app.app_context():
@@ -88,7 +88,6 @@ def test_ohne_api_schluessel_wird_gar_nicht_gefragt(client, db, zugaenge, monkey
 
 def test_ki_ausfall_kostet_nur_den_titel(client, db, zugaenge, monkeypatch):
     """Der wichtigste Test der Sache: Die KI wirft, der Wunsch bleibt."""
-    import teile.kern as kern
     modul = importlib.import_module("teile.02_werkstatt")
 
     def kaputt(*a, **kw):

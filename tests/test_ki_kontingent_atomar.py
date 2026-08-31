@@ -35,11 +35,10 @@ def test_reservierung_schlaegt_fehl_wenn_das_kontingent_nicht_reicht(app, kern, 
     v = db["verbindung"]
     v.execute("UPDATE users SET ki_token_limit=100 WHERE id=?", (admin["id"],))
     v.commit()
-    with app.app_context():
-        with pytest.raises(kern.KiLimitError):
-            kern._kontingent_reservieren(
-                "ki_nutzung", "tokens", admin["id"], "ki_token_limit", 100000,
-                150, "test")
+    with app.app_context(), pytest.raises(kern.KiLimitError):
+        kern._kontingent_reservieren(
+            "ki_nutzung", "tokens", admin["id"], "ki_token_limit", 100000,
+            150, "test")
 
 
 def test_reservierung_legt_bei_erfolg_eine_zeile_an(app, kern, admin, db):
@@ -135,9 +134,8 @@ def test_ki_anfrage_gibt_reservierung_bei_fehler_frei(app, kern, admin, db, monk
                         "urlopen", kaputt)
     app.config["OPENROUTER_API_KEY"] = "test-key"
     try:
-        with app.app_context():
-            with pytest.raises(kern.KiFehler):
-                kern.ki_anfrage(admin["id"], "test", "system", "prompt", max_tokens=50)
+        with app.app_context(), pytest.raises(kern.KiFehler):
+            kern.ki_anfrage(admin["id"], "test", "system", "prompt", max_tokens=50)
     finally:
         app.config["OPENROUTER_API_KEY"] = ""
     # Keine verwaiste Zeile - weder als Platzhalter noch sonst irgendeine.
@@ -163,9 +161,8 @@ def test_ki_anfrage_gibt_reservierung_bei_http_fehler_frei(app, kern, admin, db,
                         "urlopen", http_fehler)
     app.config["OPENROUTER_API_KEY"] = "test-key"
     try:
-        with app.app_context():
-            with pytest.raises(kern.KiFehler):
-                kern.ki_anfrage(admin["id"], "test", "system", "prompt", max_tokens=50)
+        with app.app_context(), pytest.raises(kern.KiFehler):
+            kern.ki_anfrage(admin["id"], "test", "system", "prompt", max_tokens=50)
     finally:
         app.config["OPENROUTER_API_KEY"] = ""
     assert db["verbindung"].execute(

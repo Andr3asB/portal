@@ -21,3 +21,6 @@ pip-audit==2.10.1
 # Wunsch #143: nur zum ERZEUGEN eines Test-Barcodes. Im Betrieb wird gelesen
 # (zxing-cpp), nicht erzeugt - deshalb bewusst nicht in src/requirements.txt.
 python-barcode==0.16.1
+# Linter (Konfiguration in ruff.toml im Repo-Root):
+#   .venv/Scripts/python -m ruff check src/ util/ tests/ scripts/
+ruff==0.16.5

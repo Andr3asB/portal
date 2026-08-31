@@ -2,7 +2,8 @@
 Stündlicher SQLite-Snapshot (hält die letzten 24 Slots).
 Nutzt sqlite3.Connection.backup() – korrekt auch im WAL-Modus.
 """
-import logging, sqlite3
+import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 

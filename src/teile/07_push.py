@@ -5,9 +5,9 @@ GET  /push/vapid-public-key  → {"key": "<base64url>"}
 POST /push/subscribe         → {"subscription":{...}, "token":"...", "geraet":"iPhone"}
 POST /push/unsubscribe       → {"endpoint":"...", "token":"..."}
 """
-from flask import Blueprint, jsonify, request, current_app, abort
-from teile.kern import (get_db, grant as check_grant, token_lookup, aktueller_nutzer,
-                        ist_oeffentliche_url)
+from flask import Blueprint, abort, current_app, jsonify, request
+
+from teile.kern import aktueller_nutzer, get_db, ist_oeffentliche_url
 
 bp = Blueprint("push", __name__)
 

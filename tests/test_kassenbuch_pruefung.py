@@ -22,7 +22,7 @@ import pytest
 def buch(app, db):
     """Ein Kind mit vier Einträgen: Start, Einnahme, nachgetragene Ausgabe und
     eine stornierte Ausgabe."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
     kind    = familie["TestKind"]["id"]
@@ -172,7 +172,8 @@ def test_heute_lokal_kennt_die_zeitzone(app):
     den Vortag - für ein Kassenbuch heißt das: Eintrag auf den falschen Tag,
     und die "kein Nachtragen in die Zukunft"-Regel schiebt ihn stumm zurück."""
     from datetime import datetime
-    from teile.kern import heute_lokal, LOKAL_TZ
+
+    from teile.kern import LOKAL_TZ, heute_lokal
     assert heute_lokal() == datetime.now(LOKAL_TZ).date().isoformat()
 
 

@@ -76,8 +76,8 @@ def test_jedes_data_fetch_hat_eine_funktion(datei):
     # ersten Lauf genau daran fest. Dritter Fall dieser Art im Projekt
     # (vgl. header_extra in test_kopfleiste.py, button::before in
     # test_tippflaeche.py) - Beispiele in Kommentaren sind kein Code.
-    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.S)
-    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.S)
+    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.DOTALL)
+    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.DOTALL)
     ohne_kommentar = re.sub(r"//.*", "", ohne_kommentar)
     for m in re.finditer(r'data-fetch="(\w+)"', ohne_kommentar):
         assert f"function {m.group(1)}(" in ohne_kommentar, (
@@ -120,7 +120,7 @@ def test_die_sprungziele_existieren(datei, muster):
 def test_ohne_accept_kopf_wird_weitergeleitet(client, db):
     """`antwort_oder_weiter` darf nicht zu einem reinen JSON-Endpunkt werden -
     ohne Javascript (und bei der Zurueck-Taste) zaehlt die Weiterleitung."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with client.application.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='essensplan'").fetchone()["id"]

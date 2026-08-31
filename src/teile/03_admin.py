@@ -14,10 +14,19 @@ Service Worker cachte sie mit.
 import base64
 import io
 import re
+
 import segno
-from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import (get_db, grant as check_grant, to_int, grant_anlegen,
-                        token_lookup, new_token, utc_zu_lokal)
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+
+from teile.kern import (
+    get_db,
+    grant_anlegen,
+    new_token,
+    to_int,
+    token_lookup,
+    utc_zu_lokal,
+)
+from teile.kern import grant as check_grant
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 

@@ -68,9 +68,12 @@ werden (Gegenteil der Wunsch-#92-Entscheidung, bewusst so gewählt).
 """
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, to_int
-from teile.todo import serien_pool_fuer_tag, serie_einsortieren
+
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, to_int
+from teile.kern import grant as check_grant
+from teile.todo import serie_einsortieren, serien_pool_fuer_tag
 
 bp  = Blueprint("kinderplan_app", __name__)
 APP = "kinderplan"

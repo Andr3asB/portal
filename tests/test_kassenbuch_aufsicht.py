@@ -17,8 +17,7 @@ dass ein fehlender Grant sperrt - und bliebe grün, während die Routen selbst
 weiterhin jeden hereinliessen.
 """
 import pytest
-
-from teile.kern import token_lookup, new_token
+from teile.kern import new_token, token_lookup
 
 
 @pytest.fixture()
@@ -95,7 +94,7 @@ def test_aufsicht_bleibt_moeglich(client, db, buecher, wer, weg):
 
 def test_eltern_sehen_die_eintraege_wirklich(client, db, buecher):
     antwort = client.get(_wege(buecher, "TestEltern")["fremdes Buch"])
-    assert "Geheimes Eis".encode() in antwort.data
+    assert b"Geheimes Eis" in antwort.data
 
 
 def test_kind_sieht_sein_eigenes_buch(client, db, buecher):

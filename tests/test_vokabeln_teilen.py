@@ -15,7 +15,7 @@ import pytest
 @pytest.fixture()
 def vok(app, db):
     """Andi (Admin) hat ein Kapitel mit zwei Vokabeln; das Kind hat nichts."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
     besitzer = familie["TestAdmin"]["id"]
@@ -118,7 +118,7 @@ def test_versuch_mit_geteilter_vokabel_wird_gezaehlt(client, vok, db):
 def test_audio_mit_freigabe_erlaubt(client, vok, db, monkeypatch):
     """„die Media-Dateien anhören" steht ausdrücklich im Wunsch."""
     _teilen(db, vok["kid"], vok["empfaenger"])
-    import teile.kern as kern
+    from teile import kern
     monkeypatch.setattr(kern, "_tts_anfrage", lambda *a, **kw: b"RIFF----WAVEfake")
     client.application.config["OPENROUTER_API_KEY"] = "test-key"
     try:

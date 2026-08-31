@@ -81,7 +81,8 @@ def _rate_limit_zuruecksetzen():
 def db(app):
     """Leert die Datenbank und legt die Testfamilie an. Läuft vor jedem Test."""
     import sqlite3
-    from teile.kern import token_lookup, new_token
+
+    from teile.kern import new_token, token_lookup
 
     verbindung = sqlite3.connect(app.config["DB_PATH"])
     verbindung.row_factory = sqlite3.Row

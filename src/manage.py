@@ -18,7 +18,13 @@ Aufruf im Container:
   docker exec portal python manage.py listpush
   docker exec portal python manage.py testpush 1 "Test von Andi"
 """
-import os, sys, sqlite3, secrets, base64, hashlib, hmac
+import base64
+import hashlib
+import hmac
+import os
+import secrets
+import sqlite3
+import sys
 from pathlib import Path
 
 DB = Path(os.environ.get("DB_PATH", "/data/portal.db"))
@@ -434,7 +440,8 @@ def cmd_testpush(args):
                  "angemeldet (im Portal ueber das Menue aktivieren).")
 
     import json
-    from pywebpush import webpush, WebPushException
+
+    from pywebpush import WebPushException, webpush
 
     payload = json.dumps({
         "title": "Test 🔔",
@@ -543,8 +550,9 @@ def cmd_wunsch_aktion(args):
         wer = int(args[args.index("--wer") + 1])
 
     sys.path.insert(0, str(Path(__file__).parent))
+    from teile.kern import get_db
+
     from app import app
-    from teile.kern import get_db, push_send
 
     with app.app_context():
         db = get_db()
@@ -616,9 +624,10 @@ def cmd_titel_nachtragen(args):
     db.close()
 
     sys.path.insert(0, str(Path(__file__).parent))
-    from app import app
     from teile.kern import ki_anfrage
-    from teile.werkstatt import _TITEL_SYSTEM, _TITEL_MAX
+    from teile.werkstatt import _TITEL_MAX, _TITEL_SYSTEM
+
+    from app import app
 
     geschafft = 0
     with app.app_context():

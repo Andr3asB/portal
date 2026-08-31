@@ -48,7 +48,7 @@ def test_es_gibt_ueberhaupt_eine_sperre():
     """Fängt ab, dass die Prüfungen unten ins Leere greifen."""
     quelle = BASE.read_text(encoding="utf-8")
     assert "body.zieht" in quelle
-    assert re.search(r"body\.zieht[^{]*\{[^}]*user-select:\s*none", quelle, re.S), (
+    assert re.search(r"body\.zieht[^{]*\{[^}]*user-select:\s*none", quelle, re.DOTALL), (
         "Die Klasse `zieht` schaltet die Textauswahl gar nicht ab")
 
 

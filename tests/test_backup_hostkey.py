@@ -29,7 +29,6 @@ UTIL = pathlib.Path(__file__).resolve().parents[1] / "util" / "backup.py"
 def backup(monkeypatch):
     """`backup.py` importiert `db_snapshot` – beide liegen in util/, das nicht
     im sys.path der Tests steht."""
-    import sys
     monkeypatch.syspath_prepend(str(UTIL.parent))
     spec = importlib.util.spec_from_file_location("backup_test", UTIL)
     modul = importlib.util.module_from_spec(spec)

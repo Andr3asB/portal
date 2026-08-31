@@ -32,7 +32,7 @@ def liste(app, db):
     """Eine Liste mit allem, was die Filter unterscheiden müssen: zwei
     Kategorien, ein Eintrag ohne Kategorie, ein gepackter, ein persönlicher
     und ein allgemeiner."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
 
@@ -81,7 +81,7 @@ def _karte(seite, name):
     treffer = re.search(
         r'(<div class="item-card[^>]*>)(?:(?!</div>).)*?'
         r'<span class="item-name">' + re.escape(name) + '</span>',
-        seite, re.S)
+        seite, re.DOTALL)
     assert treffer, f"Eintrag {name!r} nicht auf der Seite"
     return treffer.group(1)
 
@@ -94,14 +94,14 @@ def test_filter_hat_alle_drei_zeilen(seite):
 
 
 def test_jede_aktive_kategorie_ist_waehlbar(seite, liste):
-    zeile = re.search(r'id="filter-kategorie-row".*?</div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-kategorie-row".*?</div>', seite, re.DOTALL).group(0)
     for kat in liste["kategorien"]:
         assert f'data-value="{kat["id"]}"' in zeile, (
             f"Kategorie {kat['name']!r} fehlt im Filter")
 
 
 def test_packstatus_ist_waehlbar(seite):
-    zeile = re.search(r'id="filter-status-row".*?</div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-status-row".*?</div>', seite, re.DOTALL).group(0)
     assert 'data-value="offen"' in zeile
     assert 'data-value="gepackt"' in zeile
 
@@ -134,7 +134,7 @@ def test_eintraege_ohne_kategorie_passen_zu_ihrer_ueberschrift(seite):
 def test_ohne_kategorie_chip_nur_wenn_es_solche_eintraege_gibt(client, liste, db):
     zeile = re.search(r'id="filter-kategorie-row".*?</div>',
                       client.get(f"/a/packliste/{liste['token']}/?ziel={liste['ziel']}")
-                            .get_data(as_text=True), re.S).group(0)
+                            .get_data(as_text=True), re.DOTALL).group(0)
     assert "Ohne Kategorie" in zeile
 
     # Denselben Eintrag einsortieren -> der Chip muss verschwinden, sonst
@@ -146,7 +146,7 @@ def test_ohne_kategorie_chip_nur_wenn_es_solche_eintraege_gibt(client, liste, db
 
     zeile = re.search(r'id="filter-kategorie-row".*?</div>',
                       client.get(f"/a/packliste/{liste['token']}/?ziel={liste['ziel']}")
-                            .get_data(as_text=True), re.S).group(0)
+                            .get_data(as_text=True), re.DOTALL).group(0)
     assert "Ohne Kategorie" not in zeile
 
 
@@ -162,7 +162,7 @@ def test_der_pfeil_braucht_keine_twemoji_grafik():
     dahinter, wäre es plötzlich ein Emoji und die Kachel unter Linux/Chrome
     leer (siehe test_emoji.py). Genau diese Falle hat Wunsch #147 ausgelöst."""
     quelle = PACKLISTE.read_text(encoding="utf-8")
-    treffer = re.search(r'id="nach-oben-btn".*?</button>', quelle, re.S)
+    treffer = re.search(r'id="nach-oben-btn".*?</button>', quelle, re.DOTALL)
     assert treffer, "Knopf nicht gefunden"
     assert "↑️" not in treffer.group(0), (
         "Varianten-Selektor hinter dem Pfeil – dann braucht es 2191.svg")
@@ -172,9 +172,10 @@ def test_der_pfeil_braucht_keine_twemoji_grafik():
 
 def test_jede_kategorie_mit_eintraegen_hat_einen_plus_knopf(seite, liste):
     for kat in liste["kategorien"]:
+        kat_id = kat["id"]
         block = re.search(
-            r'<div class="kat-label" data-kategorie-label="%d">.*?</div>' % kat["id"],
-            seite, re.S)
+            rf'<div class="kat-label" data-kategorie-label="{kat_id}">.*?</div>',
+            seite, re.DOTALL)
         assert block, f"Überschrift für {kat['name']!r} fehlt"
         assert 'class="kat-plus"' in block.group(0), (
             f"Kein Plus-Knopf bei {kat['name']!r} – Wunsch #219")
@@ -187,7 +188,7 @@ def test_ohne_kategorie_hat_keinen_plus_knopf(seite):
     verlangt eine Kategorie. Ein Knopf, der nichts vorbelegen kann, wäre eine
     Sackgasse."""
     block = re.search(r'<div class="kat-label" data-kategorie-label="">.*?</div>',
-                      seite, re.S)
+                      seite, re.DOTALL)
     assert block, 'Überschrift „Ohne Kategorie“ fehlt'
     assert "kat-plus" not in block.group(0)
 
@@ -197,7 +198,7 @@ def test_der_plus_knopf_sagt_welche_kategorie(seite, liste):
     allein hilft nicht, wenn er zehnmal auf der Seite steht."""
     name = liste["kategorien"][0]["name"]
     block = re.search(
-        r'<button[^>]*class="kat-plus".*?</button>', seite, re.S).group(0)
+        r'<button[^>]*class="kat-plus".*?</button>', seite, re.DOTALL).group(0)
     aria = re.search(r'aria-label="([^"]*)"', block)
     titel = re.search(r'title="([^"]*)"', block)
     assert aria and titel, "aria-label oder title fehlt"
@@ -230,7 +231,7 @@ def test_der_gemerkte_filter_wird_beim_laden_angewandt():
     zeigte aber wieder alles – und nach dem Anlegen eines Eintrags (Redirect,
     also Neuladen) wäre er jedes Mal weg. Genau das war die Beschwerde."""
     quelle = _skript()
-    assert re.search(r"^\s*filterWiederherstellen\(\);", quelle, re.M), (
+    assert re.search(r"^\s*filterWiederherstellen\(\);", quelle, re.MULTILINE), (
         "filterWiederherstellen() wird beim Laden nicht aufgerufen")
 
 
@@ -272,7 +273,7 @@ def test_konstanten_stehen_vor_ihrer_benutzung():
     # erhalten (gleiche Laenge, Inhalt durch Leerzeichen ersetzt), damit der
     # Vergleich unten weiter stimmt.
     def _ohne(muster, text):
-        return re.sub(muster, lambda m: " " * len(m.group(0)), text, flags=re.S | re.M)
+        return re.sub(muster, lambda m: " " * len(m.group(0)), text, flags=re.DOTALL | re.MULTILINE)
     skript = _ohne(r"/\*.*?\*/", _ohne(r"//[^\n]*", skript))
 
     for name in ("TOKEN", "TP"):
@@ -296,6 +297,6 @@ def test_jede_verdrahtete_aktion_existiert_auch():
     verdrahtet = set(re.findall(r'data-(?:klick|aendern|eingabe)="(\w+)"', quelle))
     assert verdrahtet, "Muster kaputt – es wurde gar keine Aktion gefunden"
     for name in verdrahtet:
-        assert re.search(r'function\s+%s\s*\(' % re.escape(name), quelle), (
+        assert re.search(rf'function\s+{re.escape(name)}\s*\(', quelle), (
             f"data-klick=\"{name}\" zeigt auf eine Funktion, die es in "
             f"packliste.html nicht gibt")

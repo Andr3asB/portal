@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify, abort, make_response
-from teile.kern import get_db, token_lookup, aktueller_nutzer, start_pfad
+from flask import Blueprint, abort, jsonify, request
+
+from teile.kern import aktueller_nutzer, get_db, start_pfad, token_lookup
 
 bp = Blueprint("settings", __name__)
 

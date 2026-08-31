@@ -37,8 +37,10 @@ import threading
 import time
 from datetime import date, timedelta
 
-from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import get_db, grant as check_grant, to_int, new_db, push_send
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+
+from teile.kern import get_db, new_db, push_send, to_int
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("geburtstage_app", __name__)
 APP = "geburtstage"
@@ -61,7 +63,7 @@ def _user(token):
     return u
 
 
-def _tage_bis(tag: int, monat: int, heute: date = None) -> int:
+def _tage_bis(tag: int, monat: int, heute: date | None = None) -> int:
     """Tage bis zum nächsten Vorkommen dieses Tag/Monat-Paares.
 
     0 = heute. Über den Jahreswechsel hinweg korrekt, weil bei einem bereits
@@ -84,7 +86,7 @@ def _tage_bis(tag: int, monat: int, heute: date = None) -> int:
     return 999
 
 
-def _alter_am_geburtstag(jahr, tag, monat, heute: date = None):
+def _alter_am_geburtstag(jahr, tag, monat, heute: date | None = None):
     """Wie alt die Person am nächsten Geburtstag wird - None ohne Jahresangabe.
 
     Rechnet über `_tage_bis()` statt selbst am Kalender: Damit gilt hier
@@ -279,7 +281,7 @@ def einstellung(token, gid):
 # Erinnerungen
 # ---------------------------------------------------------------------------
 
-def faellige_erinnerungen(db, heute: date = None):
+def faellige_erinnerungen(db, heute: date | None = None):
     """(user_id, geburtstag_id, art, name, tage_bis) für alles, was heute
     rausgehen muss und noch nicht vermerkt ist.
 
@@ -314,29 +316,28 @@ def faellige_erinnerungen(db, heute: date = None):
     return faellig
 
 
-def erinnerungen_verschicken(app, heute: date = None):
+def erinnerungen_verschicken(app, heute: date | None = None):
     """Ein Durchlauf. Gibt die Zahl der verschickten Erinnerungen zurück."""
     heute = heute or date.today()
-    with app.app_context():
-        with new_db() as db:
-            faellig = faellige_erinnerungen(db, heute)
-            for f in faellig:
-                if f["art"] == "tag":
-                    titel = "🎂 Geburtstag heute"
-                    text  = f"{f['name']} hat heute Geburtstag!"
-                else:
-                    tage = f["tage_bis"]
-                    titel = "🎁 Geburtstag in Sicht"
-                    text  = (f"{f['name']} hat in {tage} "
-                             f"{'Tag' if tage == 1 else 'Tagen'} Geburtstag.")
-                push_send(f["user_id"], titel, text, "geburtstage",
-                          "https://portal.16schwaben.de/a/geburtstage/")
-                db.execute("""
+    with app.app_context(), new_db() as db:
+        faellig = faellige_erinnerungen(db, heute)
+        for f in faellig:
+            if f["art"] == "tag":
+                titel = "🎂 Geburtstag heute"
+                text  = f"{f['name']} hat heute Geburtstag!"
+            else:
+                tage = f["tage_bis"]
+                titel = "🎁 Geburtstag in Sicht"
+                text  = (f"{f['name']} hat in {tage} "
+                         f"{'Tag' if tage == 1 else 'Tagen'} Geburtstag.")
+            push_send(f["user_id"], titel, text, "geburtstage",
+                      "https://portal.16schwaben.de/a/geburtstage/")
+            db.execute("""
                     INSERT OR IGNORE INTO geburtstag_gesendet
                         (user_id, geburtstag_id, art, datum)
                     VALUES (?,?,?,?)
                 """, (f["user_id"], f["geburtstag_id"], f["art"], heute.isoformat()))
-            db.commit()
+        db.commit()
     return len(faellig)
 
 

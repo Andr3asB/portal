@@ -113,6 +113,7 @@ def test_beide_module_nutzen_dieselbe_liste(app):
     still: ein Wert, den nur eine Seite kennt, wird von der anderen
     wortlos verworfen."""
     import importlib
+
     from teile.kern import WUNSCH_PRIORITAETEN
     werkstatt = importlib.import_module("teile.05_werkstatt_app")
     assert werkstatt._PRIORITAETEN is WUNSCH_PRIORITAETEN

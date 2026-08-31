@@ -17,7 +17,6 @@ auf der Seite. Der Test wurde dann nicht falsch - er prueste nichts mehr.
 from datetime import date, timedelta
 
 import pytest
-
 from teile.kern import heute_lokal
 
 # Heute liegt immer im angezeigten Fenster (laufende + kommende Woche), morgen
@@ -33,7 +32,7 @@ TAG_OHNE_EINTRAG = (_HEUTE + timedelta(days=2)).isoformat()
 @pytest.fixture()
 def plan(app, db):
     """Zwei Planeinträge: einer mit Rezept, einer als Freitext."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["familie"] and db["verbindung"]
     familie = db["familie"]
 
@@ -194,14 +193,15 @@ def test_rezept_im_plan_ist_verlinkt(client, db, plan):
     seite = client.get(
         f"/a/essensplan/{plan['tokens']['TestAdmin']}/").get_data(as_text=True)
     assert seite.count('class="mahlzeit-rezept-link"') == 1
-    assert f'href="/a/rezepte' in seite
+    assert 'href="/a/rezepte' in seite
 
 
 def test_der_link_fuehrt_zu_einer_echten_seite(client, db, plan):
     """Ein Link, der ins Leere zeigt, faellt im Alltag erst auf, wenn ihn
     jemand antippt - deshalb hier einmal wirklich hingehen."""
     import re
-    from teile.kern import token_lookup, new_token
+
+    from teile.kern import new_token, token_lookup
 
     seite = client.get(
         f"/a/essensplan/{plan['tokens']['TestAdmin']}/").get_data(as_text=True)

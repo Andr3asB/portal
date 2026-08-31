@@ -1,4 +1,5 @@
-import importlib, sys
+import importlib
+import sys
 
 # 00_kern als 'teile.kern' verfügbar machen, damit andere Module
 # `from teile.kern import get_db` schreiben können.

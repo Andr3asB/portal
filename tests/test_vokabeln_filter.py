@@ -29,7 +29,7 @@ VOKABELN = TPL / "vokabeln.html"
 def vok(app, db):
     """Friederike (Kind) teilt ein Kapitel mit dem Admin. Der Admin hat
     ausserdem eigene Vokabeln, eine davon ohne Kapitel."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
     besitzer  = familie["TestKind"]["id"]
@@ -94,7 +94,7 @@ def _item(seite, wort):
     treffer = re.search(
         r'<div class="vokabel-item"[^>]*>(?:(?!vokabel-item).)*?'
         r'<span class="vokabel-fremd">' + re.escape(wort) + '</span>',
-        seite, re.S)
+        seite, re.DOTALL)
     assert treffer, f"{wort!r} steht nicht auf der Seite"
     return re.match(r'<div class="vokabel-item"[^>]*>', treffer.group(0)).group(0)
 
@@ -103,7 +103,7 @@ def _item(seite, wort):
 
 def test_der_filterknopf_steht_zwischen_eintragen_und_lernen(seite):
     """Im Wunsch ausdrücklich so verlangt."""
-    zeile = re.search(r'<div class="top-aktionen">.*?</div>', seite, re.S).group(0)
+    zeile = re.search(r'<div class="top-aktionen">.*?</div>', seite, re.DOTALL).group(0)
     eintragen = zeile.index("neu-toggle-btn")
     filtern   = zeile.index("filter-toggle-btn")
     lernen    = zeile.index("btn-lernen")
@@ -114,7 +114,7 @@ def test_der_filterknopf_steht_zwischen_eintragen_und_lernen(seite):
 # ── Was der Filter anbietet ────────────────────────────────────────────────
 
 def test_alle_zugaenglichen_sprachen_stehen_im_filter(seite, vok):
-    zeile = re.search(r'id="filter-sprache-row".*?\n    </div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-sprache-row".*?\n    </div>', seite, re.DOTALL).group(0)
     for sid in vok["sprachen"].values():
         assert f'data-value="{sid}"' in zeile
 
@@ -123,7 +123,7 @@ def test_geteilte_kapitel_stehen_im_filter(seite, vok):
     """Der Kern des Wunsches. Ein Filter aus `_eigene_kapitel` kennt genau das
     nicht, was man am ehesten sucht - die 8 geteilten Vokabeln stehen wegen
     der Sortierung ganz unten und sind sonst praktisch unauffindbar."""
-    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.DOTALL).group(0)
     assert f'data-value="{vok["eigen_kid"]}"' in zeile, "eigenes Kapitel fehlt"
     assert f'data-value="{vok["fremd_kid"]}"' in zeile, (
         "geteiltes Kapitel fehlt im Filter - genau das war der Anlass")
@@ -132,14 +132,14 @@ def test_geteilte_kapitel_stehen_im_filter(seite, vok):
 def test_geteilte_kapitel_nennen_ihren_besitzer(seite):
     """Sonst stünden zwei gleichnamige Kapitel ununterscheidbar nebeneinander
     und man wüsste nicht, wessen Vokabeln man da filtert."""
-    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.DOTALL).group(0)
     assert "TestKind" in zeile
 
 
 def test_ohne_kapitel_ist_filterbar(seite):
     """Ausdrücklich im Wunsch. Ohne diesen Chip sind genau die Vokabeln
     unauffindbar, die noch niemand einsortiert hat."""
-    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.S).group(0)
+    zeile = re.search(r'id="filter-kapitel-row".*?\n    </div>', seite, re.DOTALL).group(0)
     assert 'data-value="ohne"' in zeile
 
 
@@ -232,7 +232,7 @@ def test_ohne_eigene_sprache_kein_eintragen(client, vok, db):
 def test_wer_gar_nichts_hat_bekommt_weiter_den_hinweis(client, db):
     """Der Leer-Hinweis darf nicht verschwinden - nur nicht mehr im falschen
     Moment kommen. Nichts geteilt, keine eigene Sprache: dann ist er richtig."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     eltern = db["familie"]["TestEltern"]["id"]
     with client.application.app_context():

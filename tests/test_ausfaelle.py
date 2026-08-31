@@ -29,7 +29,7 @@ AUSFAELLE = TPL / "ausfaelle.html"
 @pytest.fixture()
 def app_tokens(app, db):
     """Alle drei aus der Testfamilie bekommen die App."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     tokens = {}
     with app.app_context():
@@ -267,4 +267,4 @@ def test_jede_verdrahtete_aktion_existiert_auch():
     """Ein Tippfehler im data-klick ergibt einen Knopf, der still nichts tut."""
     quelle = AUSFAELLE.read_text(encoding="utf-8")
     for name in set(re.findall(r'data-(?:klick|aendern|eingabe)="(\w+)"', quelle)):
-        assert re.search(r"function\s+%s\s*\(" % re.escape(name), quelle), name
+        assert re.search(rf"function\s+{re.escape(name)}\s*\(", quelle), name

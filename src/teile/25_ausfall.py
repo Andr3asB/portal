@@ -27,9 +27,12 @@ Anfrage unmittelbar aus, der Unterschied liegt im Millisekundenbereich - und
 eine falsch gestellte Handy-Uhr kann so kein Protokoll verfaelschen, das
 spaeter jemand in der Werkstatt vorlegt.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, abort
+import math
 
-from teile.kern import get_db, grant as check_grant, to_int, utc_zu_lokal
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, utc_zu_lokal
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("ausfaelle_app", __name__)
 APP = "ausfaelle"
@@ -60,7 +63,7 @@ def _koordinate(wert, grenze):
         zahl = float(wert)
     except (TypeError, ValueError):
         return None
-    if zahl != zahl or abs(zahl) > grenze:      # NaN faellt hier mit heraus
+    if math.isnan(zahl) or abs(zahl) > grenze:
         return None
     return zahl
 

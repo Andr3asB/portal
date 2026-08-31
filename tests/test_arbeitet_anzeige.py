@@ -70,7 +70,7 @@ def test_markierte_formulare_haben_einen_absendeknopf(datei):
     """`data-arbeitet` an einem Formular ohne Submit-Knopf wäre wirkungslos -
     und zwar lautlos."""
     inhalt = datei.read_text(encoding="utf-8")
-    for m in re.finditer(r"<form[^>]*data-arbeitet[^>]*>(.*?)</form>", inhalt, re.S):
+    for m in re.finditer(r"<form[^>]*data-arbeitet[^>]*>(.*?)</form>", inhalt, re.DOTALL):
         assert re.search(r'<button[^>]*type="submit"', m.group(1)), (
             f"{datei.name}: Formular mit data-arbeitet hat keinen "
             f"Submit-Knopf - die Anzeige liefe ins Leere."

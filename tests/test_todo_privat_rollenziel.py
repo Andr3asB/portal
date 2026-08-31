@@ -17,8 +17,7 @@ unveränderbar. Getrennt geprüft wäre der Befund wieder möglich, sobald jeman
 nur eine der beiden Funktionen anfasst.
 """
 import pytest
-
-from teile.kern import token_lookup, new_token
+from teile.kern import new_token, token_lookup
 
 
 @pytest.fixture()
@@ -138,7 +137,7 @@ def test_ohne_die_privat_bedingung_stuende_es_offen(client, todos, monkeypatch):
     einer Datei steht, in der sie jemand committen könnte."""
     import importlib
     modul = importlib.import_module("teile.04_todo")
-    alt = lambda user, row: (                                    # noqa: E731
+    alt = lambda user, row: (
         user["is_admin"] or user["rolle"] == "eltern"
         or row["erstellt_von"] == user["id"] or row["zugewiesen_an"] == user["id"]
         or (row["zugewiesen_an"] is None and modul._rolle_passt(row, user))

@@ -16,7 +16,7 @@ def kb_token(app, db):
     """Vergibt allen drei Testnutzern einen Grant für 'kassenbuch' - die
     Familie aus conftest.py bekommt es nicht automatisch, weil das dortige
     Setup gezielte Grant-Listen je Nutzer verwendet, nicht _auto_grant_all()."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     verbindung = db["verbindung"]
     with app.app_context():
         app_id = verbindung.execute(
@@ -70,7 +70,7 @@ def test_eltern_koennen_kassenbuch_eines_kindes_ansehen(client, kb_token, kind):
     _start(client, kb_token["TestKind"])
     antwort = client.get(f"/a/kassenbuch/{kb_token['TestEltern']}/kind/{kind['id']}")
     assert antwort.status_code == 200
-    assert "10,00".encode() in antwort.data
+    assert b"10,00" in antwort.data
 
 
 def test_eltern_koennen_keinen_eintrag_fuer_ein_kind_anlegen(client, kb_token, kind):

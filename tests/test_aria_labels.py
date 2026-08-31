@@ -26,7 +26,7 @@ NUR_ZEICHEN = re.compile(r"^[\W\d_]{1,4}$")
 def _icon_knoepfe(inhalt):
     """(Attribute, Beschriftung) je Knopf, dessen Aufschrift kein Wort ist."""
     aus = []
-    for m in re.finditer(r"<button([^>]*)>(.*?)</button>", inhalt, re.S):
+    for m in re.finditer(r"<button([^>]*)>(.*?)</button>", inhalt, re.DOTALL):
         attrs, label = m.group(1), re.sub(r"\s+", " ", m.group(2)).strip()
         if "{" in label or not label:      # Jinja-Ausdruck: Text kommt erst zur Laufzeit
             continue

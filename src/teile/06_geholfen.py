@@ -5,8 +5,11 @@ URL-Präfix: /a/geholfen/<token>/
 Design: große Kacheln, auch als Küchen-Tablet-Daueranzeige geeignet.
 """
 from datetime import date, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import get_db, grant as check_grant, to_int
+
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import get_db, to_int
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("geholfen_app", __name__)
 APP = "geholfen"

@@ -42,7 +42,7 @@ def test_alle_seiten_mit_token_erreichbar(app, client, admin, db):
     # Datenbank zurückholen - dieser Test merkt sie sich deshalb beim Anlegen,
     # genau wie es der Produktivcode inzwischen tut (grant_anlegen()).
     verbindung = db["verbindung"]
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     tokens = dict(admin["tokens"])
     with app.app_context():
         for app_id, slug in verbindung.execute(
@@ -93,7 +93,7 @@ def test_alle_seiten_auch_ohne_token_erreichbar(app, client, admin, db, stufe4):
     weil die token-freie Form dann gar nicht existiert (404) oder niemanden
     autorisiert (403)."""
     verbindung = db["verbindung"]
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     with app.app_context():
         for (app_id,) in verbindung.execute(
             "SELECT id FROM apps WHERE id NOT IN "
@@ -164,7 +164,7 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
     Funktion kann in der Vorlage selbst oder in `base.html` stehen, und erst im
     fertigen HTML ist beides beisammen."""
     verbindung = db["verbindung"]
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     with app.app_context():
         for (app_id,) in verbindung.execute(
             "SELECT id FROM apps WHERE id NOT IN "
@@ -178,7 +178,7 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
 
     import re
     aktion_re = re.compile(r'data-(?:klick|aendern|eingabe|absenden)="([^"]+)"')
-    skript_re = re.compile(r"<script[^>]*>.*?</script>", re.S)
+    skript_re = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL)
     fehler = []
     geprueft = 0
     for regel in _seiten_routen(app):
@@ -194,7 +194,7 @@ def test_jede_aktion_zeigt_auf_eine_vorhandene_funktion(app, client, admin, db, 
         for name in set(aktion_re.findall(markup)):
             geprueft += 1
             # Funktionsdeklaration oder Zuweisung an window.
-            if not re.search(r"(function\s+%s\s*\(|window\.%s\s*=)" % (name, name), seite):
+            if not re.search(rf"(function\s+{name}\s*\(|window\.{name}\s*=)", seite):
                 fehler.append(f"{tokenfrei[0]}: '{name}' ist nirgends definiert")
 
     # Die Schwelle sichert nur ab, dass der Filter oben nicht ins Leere greift

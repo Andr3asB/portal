@@ -33,7 +33,7 @@ TEILE = TPL / "todo_teile.html"
 
 @pytest.fixture()
 def tokens(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     aus = {}
     with app.app_context():

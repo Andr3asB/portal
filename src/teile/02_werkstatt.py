@@ -30,9 +30,16 @@ POST /wunsch  { text, app, token, pfad, prioritaet }
 import re
 import threading
 
-from flask import Blueprint, current_app, request, jsonify
-from teile.kern import (get_db, token_lookup, aktueller_nutzer, new_db,
-                        ki_anfrage, WUNSCH_PRIORITAETEN, rate_ueberschritten)
+from flask import Blueprint, current_app, jsonify, request
+
+from teile.kern import (
+    WUNSCH_PRIORITAETEN,
+    aktueller_nutzer,
+    get_db,
+    ki_anfrage,
+    new_db,
+    rate_ueberschritten,
+)
 
 bp = Blueprint("werkstatt", __name__)
 

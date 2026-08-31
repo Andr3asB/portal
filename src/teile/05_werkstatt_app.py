@@ -17,9 +17,15 @@ gesetzt (siehe manage.py), nicht über die Web-UI. Klickt man in der
 Werkstatt-App auf einen Wunsch, klappt eine Detailansicht mit Wunsch,
 Benutzer, Wunsch-/Implementierungsdatum und dieser Umsetzung auf.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import (get_db, grant as check_grant, to_int, push_send,
-                        antwort_oder_weiter, WUNSCH_PRIORITAETEN)
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+
+from teile.kern import (
+    WUNSCH_PRIORITAETEN,
+    get_db,
+    push_send,
+)
+from teile.kern import grant as check_grant
+
 # Wunsch #187: Ersatz-Ueberschrift aus dem Wunschtext. Sie steht in
 # 02_werkstatt.py, wo auch der KI-Titel entsteht - zwei Regeln fuer dieselbe
 # Ueberschrift an zwei Orten waeren genau das Duplikat, das auseinanderlaeuft.

@@ -106,16 +106,16 @@ def init_app(app):
     @app.before_request
     def csrf_pruefen():
         if request.method not in UNSICHERE_METHODEN:
-            return None
+            return
         if request.path in AUSGENOMMEN:
-            return None
+            return
         modus = _modus()
         if modus == "aus":
-            return None
+            return
 
         ok, grund = _ist_eigene_anfrage()
         if ok:
-            return None
+            return
 
         # Ein Wort, nach dem sich greppen lässt: "CSRF-Verdacht".
         current_app.logger.warning(
@@ -124,5 +124,5 @@ def init_app(app):
             (request.headers.get("User-Agent") or "")[:60],
         )
         if modus == "beobachten":
-            return None          # protokollieren, aber durchlassen
+            return          # protokollieren, aber durchlassen
         abort(403)

@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture()
 def kern():
-    import teile.kern as kern
+    from teile import kern
     return kern
 
 
@@ -116,8 +116,8 @@ def test_cache_schluessel_ist_versioniert(app, vokabeln):
     with app.app_context():
         pfad = vokabeln._audio_pfad(3, "God morgen")
     import hashlib
-    alt = hashlib.sha256("3:god morgen".encode()).hexdigest()
-    neu = hashlib.sha256("v2:3:god morgen".encode()).hexdigest()
+    alt = hashlib.sha256(b"3:god morgen").hexdigest()
+    neu = hashlib.sha256(b"v2:3:god morgen").hexdigest()
     assert neu in pfad
     assert alt not in pfad
 
@@ -151,7 +151,7 @@ def test_liste_meldet_ob_audio_vorliegt(app, client, admin, db):
               "VALUES(?,?,'Hej','Hallo')", (admin["id"], sid))
     v.commit()
 
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='vokabeln'").fetchone()["id"]
         klartext = new_token()

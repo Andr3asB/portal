@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, abort
+from flask import Blueprint, abort, render_template
+
 from teile.kern import grant as check_grant
 
 bp  = Blueprint("hilfe_app", __name__)

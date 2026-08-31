@@ -82,11 +82,13 @@ import re
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, redirect, render_template, request
-from teile.kern import grant as check_grant, get_db, to_int, utc_zu_lokal
+
+from teile.kern import get_db, to_int, utc_zu_lokal
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("tvb_app", __name__)
 APP = "tvb"
@@ -668,7 +670,7 @@ def _sr_spiel(eintrag, wettbewerb):
         # Beide Endpunkte liefern UTC OHNE Zeitzonenangabe. Wird das als
         # Ortszeit gelesen, liegt jeder Anwurf zwei Stunden daneben.
         anstoss = datetime.fromisoformat(zeit).replace(
-            tzinfo=timezone.utc).astimezone(_TZ).isoformat()
+            tzinfo=UTC).astimezone(_TZ).isoformat()
     except Exception:
         return None
 

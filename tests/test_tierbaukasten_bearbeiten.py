@@ -20,9 +20,7 @@ kaputtgehen, und die hier festgenagelt sind:
 import json
 
 import pytest
-
-from teile.kern import token_lookup, new_token
-
+from teile.kern import new_token, token_lookup
 
 TIER = {"tier_typ": "katze", "koerper_farbe": "#112233", "muster": "punkte",
         "muster_farbe": "#ffeedd", "accessoire": "hut", "koerperbau": "70",

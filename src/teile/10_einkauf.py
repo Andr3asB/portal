@@ -16,9 +16,17 @@ import re
 import urllib.error
 import urllib.request
 
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
 from teile.kern import (
-    get_db, grant as check_grant, to_int, ki_anfrage, KiLimitError, KiFehler,
+    KiFehler,
+    KiLimitError,
+    get_db,
+    ki_anfrage,
+    to_int,
+)
+from teile.kern import (
+    grant as check_grant,
 )
 
 bp  = Blueprint("einkauf_app", __name__)
@@ -109,8 +117,8 @@ def _barcode_aus_bild(rohdaten: bytes):
     `zxing-cpp` liefert alle gefundenen Codes; auf einer Packung ist meist nur
     einer, gelegentlich aber auch ein QR-Code daneben. Bevorzugt wird deshalb
     ein Produktcode (EAN/UPC), erst danach irgendein anderer."""
-    from PIL import Image
     import zxingcpp
+    from PIL import Image
 
     # Wunsch #213: Pillows eigene Bombensperre reicht hier NICHT. Sie warnt bei
     # MAX_IMAGE_PIXELS und bricht erst beim DOPPELTEN hart ab - das Fenster

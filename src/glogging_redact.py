@@ -4,6 +4,7 @@ Pfade wie /p/<token> und /a/<app>/<token>/... werden zu /p/<redacted> gekürzt.
 Betrifft die Atome r (Request-Zeile), U (Pfad) und f (Referer).
 """
 import re
+
 from gunicorn.glogging import Logger
 
 _TOKEN_RE = re.compile(r'(/(?:p|a/[a-z]+))/[A-Za-z0-9_\-]{10,}')

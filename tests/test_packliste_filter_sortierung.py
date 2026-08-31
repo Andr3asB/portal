@@ -22,7 +22,7 @@ TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates
 
 @pytest.fixture()
 def liste(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     familie = db["familie"]
     with app.app_context():

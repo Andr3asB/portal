@@ -1,5 +1,8 @@
-import os, importlib, secrets
+import importlib
+import os
+import secrets
 from pathlib import Path
+
 from flask import Flask
 
 app = Flask(

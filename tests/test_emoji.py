@@ -20,7 +20,6 @@ Vorgehen bei einem Treffer: Die Datei von
 holen und unter `src/static/twemoji/svg/` ablegen.
 """
 import glob
-import io
 import os
 import re
 
@@ -47,7 +46,8 @@ def _verwendete_emoji():
     """(codepoint, datei, zeile, zeichen) für jedes Zeichen, das Twemoji
     tatsächlich ersetzen würde."""
     for pfad in _quelldateien():
-        text = io.open(pfad, encoding="utf-8").read()
+        with open(pfad, encoding="utf-8") as f:
+            text = f.read()
         for nr, zeile in enumerate(text.split("\n"), 1):
             for treffer in _EMOJI.finditer(zeile):
                 zeichen = treffer.group(0)
@@ -62,7 +62,7 @@ def _verwendete_emoji():
                 folgt_vs16 = zeile[treffer.end():treffer.end() + 1] == _VS16
                 if ord(zeichen) < 0x1F000 and not folgt_vs16:
                     continue
-                yield ("%x" % ord(zeichen), os.path.basename(pfad), nr, zeichen)
+                yield (f"{ord(zeichen):x}", os.path.basename(pfad), nr, zeichen)
 
 
 def test_svg_verzeichnis_ist_da():
@@ -113,8 +113,8 @@ def test_alle_app_emoji_haben_eine_grafik(app, db):
         for zeichen in emoji or "":
             if zeichen == _VS16 or ord(zeichen) < 0x1F000:
                 continue
-            if "%x" % ord(zeichen) not in vorhanden:
-                fehlend.append(f"{slug}: {'%x' % ord(zeichen)}")
+            if f"{ord(zeichen):x}" not in vorhanden:
+                fehlend.append(f"{slug}: {ord(zeichen):x}")
     assert not fehlend, (
         "App-Kacheln ohne lokale Grafik (unter Linux/Chrome leer):\n  "
         + "\n  ".join(fehlend))

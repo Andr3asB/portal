@@ -7,7 +7,8 @@ Aufgaben:
   - Täglich 03:00 Uhr:  rsync-Backup auf NAS
   - Täglich 04:00 Uhr:  Zertifikats-Watcher (Caddy-Reload bei Erneuerung)
 """
-import logging, time
+import logging
+import time
 from datetime import datetime
 
 import backup

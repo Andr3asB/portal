@@ -7,7 +7,6 @@ import json
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Wunsch #137: strikte Schema-Prüfung der Rezept-Extraktion
 # ---------------------------------------------------------------------------
@@ -130,7 +129,7 @@ def test_leere_listeneintraege_werden_verworfen(validieren):
 
 @pytest.fixture()
 def kern():
-    import teile.kern as kern
+    from teile import kern
     return kern
 
 

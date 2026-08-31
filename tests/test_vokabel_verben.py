@@ -16,15 +16,13 @@ oder keine.** Ein halb ausgefülltes Paar würde im Verbtraining eine Frage
 mit leerer Antwort erzeugen.
 """
 import pytest
-
-from teile.vokabeln import (VERB_ABFRAGEN, VERB_ABFRAGEN_STANDARD,
-                            verb_aufgaben)
+from teile.vokabeln import VERB_ABFRAGEN, VERB_ABFRAGEN_STANDARD, verb_aufgaben
 
 
 @pytest.fixture()
 def vok(app, db):
     """Token für die Vokabel-App + die Sprach-ID von Englisch."""
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='vokabeln'").fetchone()["id"]

@@ -51,6 +51,7 @@ def test_liegt_jetzt_im_kern_und_bleibt_in_rezepte_importierbar():
     """Der Umzug darf 11_rezepte.py nicht kaputt machen - der alte Name
     bleibt dort als Import erhalten."""
     import importlib
+
     from teile.kern import ist_oeffentliche_url
     rezepte = importlib.import_module("teile.11_rezepte")
     assert rezepte._ist_oeffentliche_url is ist_oeffentliche_url

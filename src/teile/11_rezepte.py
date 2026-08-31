@@ -54,12 +54,23 @@ import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
 from teile.kern import (
-    get_db, grant as check_grant, to_int, ki_anfrage, KiLimitError, KiFehler,
+    KiLimitError,
     bereinige_erfuellte_rezeptwuensche,
-    ist_oeffentliche_url as _ist_oeffentliche_url,
+    get_db,
+    ki_anfrage,
+    to_int,
+)
+from teile.kern import (
+    grant as check_grant,
+)
+from teile.kern import (
     ip_ist_oeffentlich as _ip_ist_oeffentlich,
+)
+from teile.kern import (
+    ist_oeffentliche_url as _ist_oeffentliche_url,
 )
 
 MAX_REZEPT_WUENSCHE = 5
@@ -112,7 +123,7 @@ def _user(token):
 
 class _TextExtractor(HTMLParser):
     """Simple Textextraktion für die KI-Eingabe – ignoriert Script/Style/Nav."""
-    _IGNORE_TAGS = {"script", "style", "nav", "header", "footer", "noscript"}
+    _IGNORE_TAGS = frozenset({"script", "style", "nav", "header", "footer", "noscript"})
 
     def __init__(self):
         super().__init__()

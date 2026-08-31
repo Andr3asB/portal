@@ -33,7 +33,7 @@ def test_keine_knoepfe_am_header(datei):
     definiert, würde nichts rendern – der Knopf verschwände lautlos."""
     inhalt = datei.read_text(encoding="utf-8")
     # Der Hinweis-Kommentar in base.html/admin.html darf den Namen nennen.
-    ohne_kommentare = re.sub(r"\{#.*?#\}", "", inhalt, flags=re.S)
+    ohne_kommentare = re.sub(r"\{#.*?#\}", "", inhalt, flags=re.DOTALL)
     assert "header_extra" not in ohne_kommentare, (
         f"{datei.name} benutzt den entfernten Block `header_extra`. "
         f"Aktionen gehören oben ins <main>, siehe .top-aktionen in todo.html."
@@ -60,9 +60,9 @@ def test_kein_knopf_zwischen_header_und_main(datei):
     # nennt, liess diesen Waechter sonst anschlagen. VIERTER Fall dieser Art
     # im Projekt (header_extra, button::before, data-fetch) - Beispiele in
     # Kommentaren sind kein Markup.
-    inhalt = re.sub(r"\{#.*?#\}", "", datei.read_text(encoding="utf-8"), flags=re.S)
-    inhalt = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.S)
-    inhalt = re.sub(r"^\s*//.*$", "", inhalt, flags=re.M)
+    inhalt = re.sub(r"\{#.*?#\}", "", datei.read_text(encoding="utf-8"), flags=re.DOTALL)
+    inhalt = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.DOTALL)
+    inhalt = re.sub(r"^\s*//.*$", "", inhalt, flags=re.MULTILINE)
     if "<main" not in inhalt:
         return
     if "</header>" in inhalt:

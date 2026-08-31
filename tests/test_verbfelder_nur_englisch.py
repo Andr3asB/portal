@@ -23,7 +23,6 @@ import pathlib
 import re
 
 import pytest
-
 from teile.vokabeln import SPRACHEN_MIT_VERBFORMEN, sprachen_mit_verbformen
 
 TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates"
@@ -31,7 +30,7 @@ TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates
 
 @pytest.fixture()
 def vok(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='vokabeln'").fetchone()["id"]

@@ -33,7 +33,7 @@ def manage(app, monkeypatch):
 
 @pytest.fixture()
 def werkstatt_token(app, db):
-    from teile.kern import token_lookup, new_token
+    from teile.kern import new_token, token_lookup
     v = db["verbindung"]
     with app.app_context():
         app_id = v.execute("SELECT id FROM apps WHERE slug='werkstatt'").fetchone()["id"]
@@ -118,9 +118,8 @@ def test_null_ist_ein_erlaubter_wert(manage, db):
 
 def test_die_zahl_steht_in_den_details(client, db, werkstatt_token):
     v = db["verbindung"]
-    wid = v.execute(
-        "INSERT INTO wuensche(text, erledigt, tokens) VALUES('X', 1, 35000) "
-        "RETURNING id").fetchone()["id"]
+    v.execute(
+        "INSERT INTO wuensche(text, erledigt, tokens) VALUES('X', 1, 35000)")
     v.commit()
     text = client.get(f"/a/werkstatt/{werkstatt_token}/").get_data(as_text=True)
     assert "Tokenverbrauch" in text

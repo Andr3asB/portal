@@ -10,9 +10,12 @@ nächste Woche haben eigene Überschriften (Wunsch #40/#41), vergangene Tage
 sind zu einem Block einklappbar (Wunsch #42).
 """
 from datetime import date, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, abort, jsonify
-from teile.kern import (get_db, grant as check_grant, to_int,
-                        antwort_oder_weiter)
+
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+
+from teile.kern import antwort_oder_weiter, get_db, to_int
+from teile.kern import grant as check_grant
+
 # Wunsch #184: Das Symbol vor einem Rezept haengt an dessen Kategorie. Der
 # Essensplan zeigt dieselben Rezepte - stuende hier weiter ein fester Topf,
 # haette dasselbe Rezept je nach Seite ein anderes Zeichen.

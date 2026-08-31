@@ -41,7 +41,7 @@ import secrets
 
 from flask import current_app, g, request
 
-from teile.kern import get_db, token_lookup, SITZUNG_COOKIE
+from teile.kern import SITZUNG_COOKIE, get_db, token_lookup
 
 # Der Name liegt im Kern, weil grant() das Cookie ab Stufe 3 selbst liest -
 # ein Import in die andere Richtung waere ein Ringschluss.

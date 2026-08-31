@@ -15,7 +15,6 @@ Zwei Aenderungen, beide hier gewaechtert:
    gekuerzt da.
 """
 import pathlib
-import re
 
 TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates"
 INHALT = (TPL / "werkstatt_app.html").read_text(encoding="utf-8")

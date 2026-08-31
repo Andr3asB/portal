@@ -12,7 +12,6 @@ Bestehende Konten werden bewusst NICHT migriert: Das würde die Einstellung
 anderer Familienmitglieder ohne Rückfrage ändern. Neue Konten starten auf
 Automatik (Spalten-Default), alle anderen tippen einmal.
 """
-import importlib
 
 import pytest
 

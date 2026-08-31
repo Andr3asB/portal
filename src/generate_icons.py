@@ -5,7 +5,9 @@ Motiv: weiße "16" auf Marken-Blau – Anspielung auf die Hausnummer
 (Schwabenstr. 16), siehe Wunsch #12. Die Ziffern sind ein handgeschriebenes
 5x7-Pixelraster, das per Nearest-Neighbor auf jede Icon-Größe skaliert wird.
 """
-import struct, zlib, os
+import os
+import struct
+import zlib
 
 os.makedirs("static", exist_ok=True)
 

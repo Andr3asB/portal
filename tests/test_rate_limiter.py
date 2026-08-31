@@ -67,7 +67,7 @@ def test_verschiedene_adressen_teilen_sich_kein_kontingent(app):
 def test_altes_faellt_aus_dem_fenster(app, monkeypatch):
     """Ohne das gleitende Fenster bliebe eine Bremse fuer immer scharf, statt
     sich nach Ablauf der Zeitspanne wieder zu oeffnen."""
-    import teile.kern as kern
+    from teile import kern
     jetzt = [1000.0]
     monkeypatch.setattr(kern.time, "monotonic", lambda: jetzt[0])
     with app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4"}):

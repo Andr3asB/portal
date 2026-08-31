@@ -65,7 +65,7 @@ def test_die_browsereigene_geste_ist_abgeschaltet():
     Geprueft wird die REGEL, nicht die Zeichenkette: Der Erklaerkommentar
     darueber nennt sie ebenfalls, und der erste Versuch blieb deshalb gruen,
     als die Regel selbst entfernt war."""
-    ohne_kommentar = re.sub(r"/\*.*?\*/", "", BASE, flags=re.S)
+    ohne_kommentar = re.sub(r"/\*.*?\*/", "", BASE, flags=re.DOTALL)
     assert re.search(r"body\s*\{[^}]*overscroll-behavior-y:\s*contain",
                      ohne_kommentar), "die CSS-Regel an body fehlt"
 
@@ -142,8 +142,8 @@ def test_keine_vorlage_baut_die_geste_nach(datei):
     if datei.name == "base.html":
         return
     inhalt = datei.read_text(encoding="utf-8")
-    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.S)
-    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.S)
+    ohne_kommentar = re.sub(r"/\*.*?\*/", "", inhalt, flags=re.DOTALL)
+    ohne_kommentar = re.sub(r"\{#.*?#\}", "", ohne_kommentar, flags=re.DOTALL)
     assert "ptr-anzeige" not in ohne_kommentar, (
         f"{datei.name} baut die Ziehgeste nach - sie steht in base.html."
     )

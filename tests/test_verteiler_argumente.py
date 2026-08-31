@@ -58,10 +58,10 @@ def _aufrufe_mit_args(inhalt: str):
     aus = []
     for m in re.finditer(
             r'data-(?:klick|aendern|eingabe|absenden)="(\w+)"[^>]*?'
-            r"data-args='(\[[^']*\])'", inhalt, re.S):
+            r"data-args='(\[[^']*\])'", inhalt, re.DOTALL):
         roh = m.group(2)
         # Jinja-Ausdruecke darin durch eine Zahl ersetzen, damit json sie liest.
-        roh = re.sub(r"\{\{.*?\}\}", "0", roh, flags=re.S)
+        roh = re.sub(r"\{\{.*?\}\}", "0", roh, flags=re.DOTALL)
         try:
             aus.append((m.group(1), len(json.loads(roh))))
         except ValueError:

@@ -68,11 +68,13 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, render_template, request
-from teile.kern import grant as check_grant, to_int
+
+from teile.kern import grant as check_grant
+from teile.kern import to_int
 
 bp  = Blueprint("sportschau_app", __name__)
 APP = "sportschau"
@@ -155,7 +157,7 @@ def _tages_schritte(steps_roh, workout_fenster, tage):
     ergebnis = {t: {"gesamt": 0.0, "training": 0.0} for t in tage}
     for eintrag in (steps_roh or []):
         try:
-            stunde_start = datetime.fromisoformat(eintrag["date"].replace("Z", "+00:00"))
+            stunde_start = datetime.fromisoformat(eintrag["date"])
         except (ValueError, KeyError, TypeError):
             continue
         stunde_ende = stunde_start + timedelta(hours=1)
@@ -248,8 +250,8 @@ def index(token):
     for w in (workouts or []):
         art = _art_anzeige(w.get("workout_type") or "Sonstiges")
         try:
-            start_utc = datetime.fromisoformat((w.get("start_time") or "").replace("Z", "+00:00"))
-            ende_utc  = datetime.fromisoformat((w.get("end_time")   or "").replace("Z", "+00:00"))
+            start_utc = datetime.fromisoformat(w.get("start_time") or "")
+            ende_utc  = datetime.fromisoformat(w.get("end_time")   or "")
         except ValueError:
             continue
         tag = start_utc.astimezone(_TZ).date().isoformat()
@@ -258,7 +260,7 @@ def index(token):
 
     trainingsarten = sorted(trainings_tage.keys())
 
-    now_ms   = int(datetime.now(timezone.utc).timestamp() * 1000)
+    now_ms   = int(datetime.now(UTC).timestamp() * 1000)
     start_ms = now_ms - tage_anzahl * 24 * 3600 * 1000
     steps_roh = _hae_steps(start_ms, now_ms)
     fehler_schritte = steps_roh is None

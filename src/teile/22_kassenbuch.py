@@ -32,9 +32,16 @@ folgende Kontostand rückwirkend bedeutungslos).
 """
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, render_template, request, redirect, url_for, abort
-from teile.kern import (get_db, grant as check_grant, heute_lokal, utc_zu_lokal,
-                        utc_zu_lokal_datum, antwort_oder_weiter)
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+
+from teile.kern import (
+    antwort_oder_weiter,
+    get_db,
+    heute_lokal,
+    utc_zu_lokal,
+    utc_zu_lokal_datum,
+)
+from teile.kern import grant as check_grant
 
 bp  = Blueprint("kassenbuch_app", __name__)
 APP = "kassenbuch"
