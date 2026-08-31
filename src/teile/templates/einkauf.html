@@ -144,7 +144,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🛒 Einkaufsliste</div>
+<h1 class="nav-title">🛒 Einkaufsliste</h1>
 <div class="nav-sub">Für alle</div>
 {% endblock %}
 
@@ -153,7 +153,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
 <div class="item-card{% if item.erledigt %} erledigt{% endif %}" id="item-{{ item.id }}"
      data-kategorie="{{ item.kategorie_id }}" data-angebot="{{ 1 if item.angebot else 0 }}"
      data-laeden="{{ item.laden_ids or '' }}">
-  <input class="item-check" type="checkbox"
+  <input aria-label="{{ item.name }} abhaken" class="item-check" type="checkbox"
          data-aendern="toggleErledigt" data-args='[{{ item.id }}]'
          {% if item.erledigt %}checked{% endif %}>
   <span class="item-name">{{ item.name }}</span>
@@ -171,7 +171,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     <form method="post" action="/a/einkauf{{ tp }}bearbeiten/{{ item.id }}" class="edit-form"
           data-absenden="pruefeVerbindungOderZeigeHinweis" data-args='["Bearbeiten"]'>
       <div class="angebot-form-label">Name</div>
-      <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
+      <input aria-label="Artikelname" class="add-input" type="text" name="name" value="{{ item.name }}" required>
 
       <div class="angebot-form-label">Kategorie</div>
       <div class="btn-row kat-row">
@@ -233,13 +233,13 @@ body.dark .badge-pending { background:#333; color:#bbb; }
     <button type="button" class="btn-barcode" data-klick="barcodeStarten">
       📷 Barcode scannen
     </button>
-    <input type="file" id="barcode-datei" accept="image/*"
+    <input aria-label="Barcode-Foto wählen" type="file" id="barcode-datei" accept="image/*"
            style="display:none" data-aendern="barcodeFotoGewaehlt">
     <div class="barcode-status" id="barcode-status"></div>
 
     <form method="post" action="/a/einkauf{{ tp }}add" id="add-form">
       <div class="add-row">
-        <input class="add-input" type="text" name="name" id="add-name"
+        <input aria-label="Artikel" class="add-input" type="text" name="name" id="add-name"
                placeholder="Was brauchst du?" required autocomplete="off"
                list="vorschlaege-list">
         <datalist id="vorschlaege-list">

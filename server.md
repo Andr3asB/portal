@@ -2547,6 +2547,13 @@ python -m venv .venv                                   # einmalig
   erledigte Aufgaben, in BEIDEN Ansichten (Liste + Brett); Altbestand ohne
   erledigt_am bleibt sichtbar, und die Weiterleitung auf die gemerkte
   Brett-Ansicht darf `?erledigt=alle` nicht verlieren.
+- `test_formular_labels.py` – Wunsch #246. JEDES input/textarea/select in
+  allen Vorlagen braucht eine programmatische Beschriftung (label-for,
+  umschliessendes label oder aria-label). Der Waechter entstand VOR den
+  Fixes und fand ~75 Felder statt der ~20 aus dem Hand-Scan.
+- `test_ueberschriften.py` – Wunsch #247. Seitentitel als h1 (nav_title-
+  Block, base.html ausgenommen - sie definiert ihn nur leer), Hilfe-Kapitel
+  mit h2 im summary, Mindestzahl an h2 im Bestand.
 - `test_system_feinschliff.py` – Wuensche #244/#245. Acht unsichtbare
   base.html-Zusagen: reduced-motion (0,01ms statt none, sonst haengen
   transitionend-Skripte), color-scheme in der ERSTEN html-Regel (eine

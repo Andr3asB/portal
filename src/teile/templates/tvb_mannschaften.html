@@ -47,7 +47,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🗂️ Mannschaften</div>
+<h1 class="nav-title">🗂️ Mannschaften</h1>
 <div class="nav-sub">Was im Umschalter erscheint</div>
 {% endblock %}
 
@@ -80,7 +80,7 @@
         {# Die Profis stehen bewusst fest drin: wäre auch die 1. Mannschaft
            abwählbar, könnte der Umschalter komplett leer werden. #}
         <div class="klassen-zeile">
-          <input type="checkbox" checked disabled>
+          <input aria-label="Profis, immer sichtbar" type="checkbox" checked disabled>
           <div class="klassen-text">
             <div class="klassen-name">Profis (1. Mannschaft)</div>
             <div class="klassen-anzahl">{{ profi_anzahl }} Mannschaft</div>

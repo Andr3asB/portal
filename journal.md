@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-09-01 – portal-v234: Screenreader-Wünsche #246/#247
+
+Die beiden Funde des dritten UI-Durchgangs, beide unsichtbar für Sehende,
+beide grundlegend für Screenreader.
+
+**#246 Formular-Beschriftungen – der Wächter zuerst:** Statt die ~20
+bekannten Stellen zu fixen, entstand zuerst der Wächter
+(`test_formular_labels.py`: jedes input/textarea/select braucht label-for,
+umschließendes label oder aria-label) – und der fand **~75 Felder in 26
+Vorlagen**, fast das Vierfache des ersten Scans (der war an einem
+Windows-Encoding-Abbruch mittendrin gescheitert, ohne dass es auffiel).
+Die Reihenfolge „Wächter vor Fix" ist die Lehre des Eintrags: Der Test
+definiert die Vollständigkeit, nicht das Auge. Abhak-Kästchen bekamen
+dynamische Labels (`{{ item.name }} abhaken` – live geprüft: „3 Fl. Wein
+abhaken"), die Suchfelder wurden `type=search`, `autofocus` blieb bewusst
+(Zweck-Formulare).
+
+**#247 Überschriften:** 46 Seitentitel als h1, Inhalts-Abschnitte als h2 –
+auch die 24 Hilfe-Kapitel (h2 IM summary, Schrift per `font:inherit`
+geerbt; live geprüft: 17px/700, Zeilenhöhe unverändert) und das per JS
+erzeugte Gepackt-Label der Packliste. Filter-Etiketten bleiben bewusst
+divs. Zwei Stolperer: `startseite.html` hatte den einzigen nav-title mit
+Zusatz-Attribut (id fürs Begrüßungs-Update per JS – getElementById ist
+tag-agnostisch, nichts brach), und der Wächter musste base.html ausnehmen
+(die definiert den Block nur leer).
+
+Nebenbei ein übersehener #237-Rest in todo.html („von {{ name }}"-Chip mit
+roher Nutzerfarbe) gefixt. Suite: 1891 Tests. Damit ist das Backlog wieder
+leer.
+
 ## 2026-09-01 – Dritter UI-Durchgang (Vercel-Checkliste): #246/#247
 
 Auf Andis Wunsch der erste Lauf nach dem Ablauf des neuen Skills

@@ -40,7 +40,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">{% if bearbeiten %}✏️ Rezept bearbeiten{% else %}🍲 Neues Rezept{% endif %}</div>
+<h1 class="nav-title">{% if bearbeiten %}✏️ Rezept bearbeiten{% else %}🍲 Neues Rezept{% endif %}</h1>
 {% endblock %}
 
 {% block body %}
@@ -53,12 +53,12 @@
   <div class="add-card">
     <form method="post" action="{% if bearbeiten %}/a/rezepte{{ tp }}{{ bearbeiten }}/bearbeiten{% else %}/a/rezepte{{ tp }}neu{% endif %}">
       <div class="field-label">Name</div>
-      <input class="rezept-input" type="text" name="name"
+      <input aria-label="Rezeptname" class="rezept-input" type="text" name="name"
              value="{{ vorbelegt.name if vorbelegt else '' }}"
              placeholder="z. B. Spaghetti Bolognese" required autocomplete="off" autofocus>
 
       <div class="field-label">Portionen</div>
-      <input class="rezept-input" type="text" name="portionen"
+      <input aria-label="Portionen" class="rezept-input" type="text" name="portionen"
              value="{{ vorbelegt.portionen if vorbelegt and vorbelegt.portionen else '' }}"
              placeholder="z. B. 4">
 
@@ -73,7 +73,7 @@
       <input type="hidden" name="quelle_url" value="{{ vorbelegt.quelle_url if vorbelegt and vorbelegt.quelle_url else '' }}">
 
       <div class="field-label">Zutaten (eine pro Zeile)</div>
-      <textarea class="rezept-textarea" name="zutaten" rows="4"
+      <textarea aria-label="Zutaten, je Zeile eine" class="rezept-textarea" name="zutaten" rows="4"
                 placeholder="500g Hackfleisch
 1 Zwiebel
 1 Dose Tomaten">{{ vorbelegt.zutaten|join('\n') if vorbelegt else '' }}</textarea>
@@ -84,7 +84,7 @@
          entsprechen etwa einem halben Handybildschirm; groesser waere auf dem
          Telefon unhandlich, und `resize:vertical` (schon vorhanden) laesst am
          PC ohnehin jede Groesse zu. #}
-      <textarea class="rezept-textarea" name="anleitung" rows="14"
+      <textarea aria-label="Zubereitung, je Zeile ein Schritt" class="rezept-textarea" name="anleitung" rows="14"
                 placeholder="Schritt für Schritt, wie es gemacht wird…">{{ vorbelegt.schritte|join('\n') if vorbelegt else '' }}</textarea>
 
       <button class="btn-add" type="submit">{% if bearbeiten %}Änderungen speichern{% else %}+ Rezept speichern{% endif %}</button>

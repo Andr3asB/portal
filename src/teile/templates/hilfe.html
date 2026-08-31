@@ -17,6 +17,12 @@
    war sonst ~30.000px hoch. Der Pfeil ersetzt den Standard-Marker, den
    display:flex am summary verschluckt. */
 summary.section-title { cursor:pointer; margin-bottom:0; list-style:none; }
+/* Wunsch #247: Die Kapitel-Ueberschrift ist ein echtes h2 IM summary -
+   Schrift kommt vom summary, sonst rendert das h2 im Browser-Standard. */
+summary.section-title h2 {
+  font-size:inherit; font-weight:inherit; margin:0;
+  display:flex; align-items:center; gap:8px; flex:1;
+}
 summary.section-title::-webkit-details-marker { display:none; }
 summary.section-title::after {
   content:"›"; margin-left:auto; color:var(--text-2);
@@ -65,7 +71,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">❓ Hilfe</div>
+<h1 class="nav-title">❓ Hilfe</h1>
 <div class="nav-sub">Alles über das Familienportal</div>
 {% endblock %}
 
@@ -100,7 +106,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     ('kapitel-24', '📋 Aufgaben als Brett'),
   ] %}
   <div class="section toc">
-    <div class="section-title">📑 Inhalt</div>
+    <h2 class="section-title">📑 Inhalt</h2>
     <ul class="toc-list">
       {% for anchor, label in kapitel %}
       <li><a href="#{{ anchor }}">{{ label }}</a></li>
@@ -109,7 +115,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </div>
 
   <details class="section" id="kapitel-1">
-    <summary class="section-title">🏠 Was ist das Portal?</summary>
+    <summary class="section-title"><h2>🏠 Was ist das Portal?</h2></summary>
     <p>Das ist unser privates Familienportal – nur für uns. Wer einen persönlichen Link hat, kommt herein. Den Link bekommt jedes Familienmitglied von Andi.</p>
     <p>Jeder hat seine eigene Seite mit seiner Lieblingsfarbe und den Apps, die für ihn freigeschaltet sind.</p>
     <p><strong>Nach unten ziehen lädt neu:</strong> Stehst du ganz oben auf einer Seite und ziehst mit dem Finger nach unten, erscheint „Loslassen zum Neuladen" – und die Seite holt ihre Daten frisch vom Server. Deine Stelle in der Liste bleibt dabei erhalten. Praktisch vor allem in der installierten App: Dort gibt es keine Adresszeile und damit auch keinen Neu-laden-Knopf.</p>
@@ -121,7 +127,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-2">
-    <summary class="section-title">📱 Als App auf dem Handy speichern</summary>
+    <summary class="section-title"><h2>📱 Als App auf dem Handy speichern</h2></summary>
     <p>Das Portal lässt sich wie eine echte App auf dem Home-Bildschirm speichern – kein App Store nötig.</p>
     <ul class="steps">
       <li>
@@ -137,7 +143,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-3">
-    <summary class="section-title">🗂️ Die Apps</summary>
+    <summary class="section-title"><h2>🗂️ Die Apps</h2></summary>
     <ul class="app-list">
       <li>
         <span class="app-emoji">🏠</span>
@@ -223,14 +229,14 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-4">
-    <summary class="section-title">🔔 Benachrichtigungen</summary>
+    <summary class="section-title"><h2>🔔 Benachrichtigungen</h2></summary>
     <p>Wenn jemand dir eine Aufgabe zuweist, kannst du eine Benachrichtigung auf dein Handy bekommen.</p>
     <p>Beim ersten Öffnen des Portals erscheint ein Banner – einfach <strong>„Aktivieren"</strong> tippen. Fertig.</p>
     <div class="tip">Benachrichtigungen funktionieren nur, wenn das Portal als App auf dem Home-Bildschirm gespeichert oder im Browser geöffnet ist.</div>
   </details>
 
   <details class="section" id="kapitel-5">
-    <summary class="section-title">🙋 Geholfen – Heatmap, Verlauf & Statistik</summary>
+    <summary class="section-title"><h2>🙋 Geholfen – Heatmap, Verlauf & Statistik</h2></summary>
     <p>Unter den Kacheln zeigt eine <strong>Heatmap</strong> für jedes Familienmitglied die letzten 10 Tage: grün, wenn an dem Tag geholfen wurde, sonst grau. Nach dem Antippen einer Kachel färbt sich das heutige Feld sofort ein – ohne Neuladen der Seite.</p>
     <p>Die Liste der letzten Eintragungen findest du unter <strong>„📜 Zuletzt geholfen"</strong> im Menü (☰ oben rechts). Eltern können dort mit ✏️ Datum, Person und Hilfsleistung eines Eintrags nachträglich korrigieren oder den Eintrag löschen.</p>
     <p>In der <strong>Statistik</strong> (📊, im Menü, nur für Admins) gibt es einen Kalender, der zeigt, wer in den letzten 10 oder 30 Tagen an welchem Tag geholfen hat. Mit den Buttons oben rechts kannst du zwischen den Zeiträumen wechseln.</p>
@@ -238,7 +244,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-6">
-    <summary class="section-title">🛒 Einkaufsliste</summary>
+    <summary class="section-title"><h2>🛒 Einkaufsliste</h2></summary>
     <p>Alle Familienmitglieder können gleichzeitig die Liste bearbeiten. Einträge lassen sich einer Kategorie zuordnen (Obst & Gemüse, Kühlregal usw.).</p>
     <ul class="steps">
       <li>
@@ -286,13 +292,13 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-7">
-    <summary class="section-title">🙋 Geholfen – Für andere eintragen</summary>
+    <summary class="section-title"><h2>🙋 Geholfen – Für andere eintragen</h2></summary>
     <p>Eltern können in der Geholfen-App Einträge auch für andere Familienmitglieder machen. Dazu erscheint oben auf der Seite ein <strong>„Als wer?"</strong>-Selector.</p>
     <p>Einfach das richtige Familienmitglied antippen – alle folgenden Kachel-Taps werden dann für diese Person eingetragen.</p>
   </details>
 
   <details class="section" id="kapitel-8">
-    <summary class="section-title">🗂️ Apps sortieren &amp; gruppieren</summary>
+    <summary class="section-title"><h2>🗂️ Apps sortieren &amp; gruppieren</h2></summary>
     <p>Auf der Startseite kannst du deine Apps selbst ordnen – und in Gruppen aufteilen.</p>
     <ul class="steps">
       <li>
@@ -316,7 +322,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-9">
-    <summary class="section-title">🍲 Rezepte</summary>
+    <summary class="section-title"><h2>🍲 Rezepte</h2></summary>
     <p>Jedes Rezept hat einen Namen, optional die Portionenzahl, eine Zutatenliste und die Zubereitung als einzelne Schritte. Über „+ Neues Rezept" öffnet sich die Eingabemaske auf einer eigenen Seite – beim Anlegen einfach jede Zutat bzw. jeden Zubereitungsschritt in eine eigene Zeile schreiben. Ganz oben stehen alle drei Wege nebeneinander in einer Zeile: „+ Neues Rezept", „🔗 URL" und „📷 Bild". Vorher belegten sie drei volle Zeilen und schoben die Rezeptliste nach unten.</p>
     <p><strong>Das Symbol vor jedem Rezept</strong> sagt, worum es geht: 🍳 zum Kochen, 🍰 zum Backen. Es folgt der Kategorie, die beim Anlegen oder Bearbeiten gewählt wird – dieselben Zeichen wie auf den Filter-Chips darüber. Rezepte ohne Kategorie behalten den neutralen Topf 🍲; daran erkennst du auf einen Blick, wo die Einordnung noch fehlt. Im Essensplan steht dasselbe Zeichen vor dem Rezeptnamen.</p>
     <p>🔍 Ab 3 Buchstaben im Suchfeld wird die Liste sofort gefiltert – gesucht wird sowohl im Rezeptnamen als auch in den Zutaten. Über die Chips "Kochen"/"Backen" lässt sich die Liste zusätzlich nach Kategorie filtern (im Formular beim Anlegen/Bearbeiten wählbar).</p>
@@ -333,7 +339,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-10">
-    <summary class="section-title">🍽️ Essensplan</summary>
+    <summary class="section-title"><h2>🍽️ Essensplan</h2></summary>
     <p>Zeigt immer die aktuelle und die folgende Woche (mit eigenen Überschriften "Aktuelle Woche"/"Nächste Woche"), mit einem Mittag- und einem Abend-Feld pro Tag.</p>
     <p>✏️ öffnet ein bestehendes Rezept zum Auswählen oder ein freies Textfeld – nur eins von beiden pro Feld. Beide leer lassen und speichern entfernt die Planung wieder.</p>
     <p><strong>⠿ Verschieben:</strong> Ein Eintrag lässt sich per Ziehen auf ein beliebiges anderes Feld legen – anderer Tag, andere Mahlzeit (Mittag ↔ Abend) oder beides. Ist dort schon etwas geplant, werden beide Einträge einfach getauscht.</p>
@@ -344,7 +350,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-11">
-    <summary class="section-title">🗓️ Aufgabenplan</summary>
+    <summary class="section-title"><h2>🗓️ Aufgabenplan</h2></summary>
     <p>Zeigt die aktuelle und die nächste Woche als Liste mit echten Kalendertagen (wie der Essensplan) – vergangene Tage der aktuellen Woche lassen sich zu einem Block einklappen. Oben lässt sich auswählen, wessen Plan gerade angezeigt wird – auch Eltern haben inzwischen einen eigenen Plan, nicht nur die Kinder. Bearbeiten (✏️) geht beim eigenen Plan; Eltern und Admin dürfen zusätzlich jeden anderen Plan bearbeiten.</p>
     <p>Im Bearbeiten-Modus einfach auf eine Aufgabe tippen, um sie für diesen einen Tag zuzuweisen – nochmal tippen entfernt sie wieder. Die Zuweisung gilt nur für die eine Tageskarte, auf der getippt wurde, nicht automatisch auch für andere Tage mit demselben Wochentag – für eine feste Routine muss die Aufgabe jede Woche neu zugewiesen werden.</p>
     <p>Am heutigen Tag lässt sich jede zugewiesene Aufgabe direkt abhaken – das zählt automatisch als Eintrag in der Geholfen-App mit.</p>
@@ -353,19 +359,19 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-12">
-    <summary class="section-title">🌙 Hell / Dunkel</summary>
+    <summary class="section-title"><h2>🌙 Hell / Dunkel</h2></summary>
     <p>Mit dem <strong>🌙-Knopf</strong> im Menü (☰ oben rechts) wechselst du zwischen hellem und dunklem Design. Die Einstellung gilt für dich auf allen Geräten.</p>
   </details>
 
   <details class="section" id="kapitel-13">
-    <summary class="section-title">🏃 Sportschau</summary>
+    <summary class="section-title"><h2>🏃 Sportschau</h2></summary>
     <p>Zeigt Andis Trainings als Heatmap – eine Zeile pro Trainingsart (z. B. "Outdoor Laufen", "Outdoor Gehen"), grün markiert der Tag, an dem trainiert wurde. Oben lässt sich der Zeitraum umschalten: 14 (Standard), 30, 60 oder 90 Tage – Heatmap und Schritte-Diagramm passen sich entsprechend an.</p>
     <p>Im <strong>Schritte-Diagramm</strong> zeigt jeder Balken die Schritte eines Tages, unterteilt in "beim Training" und "sonstige Schritte". Rechts neben der Überschrift steht der Durchschnitt für den gewählten Zeitraum – der heutige Tag zählt dabei bewusst nicht mit, da er meist noch nicht vorbei ist und den Schnitt verfälschen würde.</p>
     <p>Die Daten kommen live von Andis hae-Server, es wird nichts im Portal gespeichert – ist der Server gerade nicht erreichbar, erscheint stattdessen ein Hinweis.</p>
   </details>
 
   <details class="section" id="kapitel-14">
-    <summary class="section-title">🐾 Tierbaukasten</summary>
+    <summary class="section-title"><h2>🐾 Tierbaukasten</h2></summary>
     <p>Ein eigener Assistent in drei Schritten: 1) Mensch oder Tier auswählen, 2) bei Tier zusätzlich die Tierart (Katze, Hund, Hase, Bär, Vogel oder Fisch), 3) anpassen. Der Pfeil unten rechts blättert weiter, der Pfeil links zurück.</p>
     <p><strong>🐾 Tier:</strong> Farbe, ein Muster mit eigener Farbe (Streifen, Punkte oder Flecken, in allen Ansichten sichtbar), Körperbau (schlank bis kräftig) und beliebig viele Accessoires gleichzeitig (Hut, Schleife und/oder Brille kombinierbar). Mit ◀ ▶ lässt sich die Vorschau von vorne, von der Seite und von hinten ansehen.</p>
     <p><strong>🧍 Mensch:</strong> Hautfarbe, Frisur, Haarfarbe, Augen, Augenbrauen, Mund, Bart, Kleidung samt Farbe und Accessoire (Brille) – deutlich detaillierter als bei den Tieren, da hier eine bewährte, extra dafür gemachte Zeichnungsbibliothek verwendet wird. Nur eine Ansicht (von vorne) verfügbar.</p>
@@ -374,7 +380,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-15">
-    <summary class="section-title">📚 Vokabeln</summary>
+    <summary class="section-title"><h2>📚 Vokabeln</h2></summary>
     <p><strong>🔤 Unregelmäßige Verben:</strong> Beim Anlegen einer Vokabel gibt es zwei zusätzliche Felder – <strong>simple past</strong> und <strong>Perfect</strong>. Füllst du <em>beide</em> aus, wird aus der Vokabel ein unregelmäßiges Verb; das fremdsprachige Wort ist dann der Infinitiv. Nur eines von beiden reicht nicht: Das Portal verwirft eine halbe Angabe, weil im Training sonst eine Frage ohne Antwort stünde. In der Liste erkennst du Verben an der Zeile mit den beiden Formen.</p>
     <p>Die Felder erscheinen <strong>nur bei Englisch</strong> – nur dort gibt es diese drei Stammformen zum Auswendiglernen. Bei Dänisch, Latein, Italienisch oder Französisch sind sie gar nicht erst da. Und auch in Englisch stehen sie <strong>zugeklappt</strong> hinter „🔤 Unregelmäßiges Verb"; ein Tipp öffnet sie. Bearbeitest du ein Wort, das bereits Formen hat, ist der Bereich von vornherein offen. Dasselbe gilt für die Auswahl im Training und den Schalter beim Foto-Import: Beide zeigen sich nur, wenn Englisch gewählt ist.</p>
     <p><strong>Im Training</strong> stehen unter „Unregelmäßige Verben" sechs Abfrageformen zur Auswahl – zum Beispiel „Deutsch → alle drei Formen" oder „Infinitiv → simple past + Perfect". Kreuzt du mindestens eine an, übt das Training <strong>nur unregelmäßige Verben</strong>, und zwar in genau diesen Richtungen; ohne Kreuz läuft alles wie bisher. Mehrere Kreuze heißen: Jedes Verb kommt mehrfach dran, aus jeder gewählten Richtung. Gefragt wird streng – erst wenn <em>alle</em> Felder einer Aufgabe stimmen, gilt sie als gekonnt, sonst kommt sie später noch einmal. Bei den falschen Feldern steht die richtige Lösung darunter.</p>
@@ -394,7 +400,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-16">
-    <summary class="section-title">🔗 Dein Zugang und dein Link</summary>
+    <summary class="section-title"><h2>🔗 Dein Zugang und dein Link</h2></summary>
     <p>Beim <strong>ersten Mal</strong> öffnest du deinen persönlichen Link oder scannst deinen QR-Code. Danach merkt sich dein Gerät, dass du es bist – <strong>der lange Zeichensalat verschwindet aus der Adresszeile</strong>. Du musst nichts eingeben, nichts anklicken, und du bleibst angemeldet.</p>
     <ul class="steps">
       <li>
@@ -419,7 +425,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-17">
-    <summary class="section-title">📡 Offline nutzen</summary>
+    <summary class="section-title"><h2>📡 Offline nutzen</h2></summary>
     <p>Ohne Empfang (z. B. im Supermarkt) zeigt eine Leiste oben "📡 Offline – manche Funktionen sind eingeschränkt". Auf der Startseite werden dann alle Apps grau und lassen sich nicht öffnen – außer den wenigen, die extra dafür vorbereitet sind (aktuell "Hilfe" und "Einkauf"). Das kommt nach und nach für weitere Apps dazu.</p>
     <p><strong>🛒 Einkauf:</strong> Abhaken und neue Artikel eintragen funktionieren ohne Empfang – die Änderung wird sofort angezeigt (neue Artikel mit einem "⏳ wartet"-Zeichen) und automatisch übertragen, sobald wieder Verbindung da ist. Bearbeiten und Löschen brauchen weiterhin eine Verbindung – dafür gibt es einen kurzen Hinweis oben statt eines wirren Browser-Fehlers.</p>
     <div class="tip">💡 Eine Seite, die man schon mal besucht hatte, während Empfang da war, kann trotzdem noch offline angezeigt werden – dann aber mit dem letzten Stand von damals, nicht aktuell.</div>
@@ -429,7 +435,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-18">
-    <summary class="section-title">✨ Werkstatt</summary>
+    <summary class="section-title"><h2>✨ Werkstatt</h2></summary>
     <p>Hier landen alle Wünsche und Ideen fürs Portal, egal in welcher App man den ✨-Knopf im Menü (☰) antippt. Offene Wünsche stehen oben, erledigte darunter. Von den erledigten zeigt die Seite die <strong>letzten 15</strong> – darunter steht ein Knopf, der bei Bedarf alle holt; bei über 200 erledigten Wünschen wäre die Seite sonst endlos lang.</p>
     <p><strong>Jeder Wunsch trägt eine Überschrift.</strong> Normalerweise formuliert sie eine KI beim Eintragen aus deinem Text – das dauert ein paar Sekunden und passiert im Hintergrund, du wartest nicht darauf. Klappt das nicht (kein Guthaben, keine Verbindung, anonym eingetragen), steht stattdessen der <strong>erste Satz</strong> deines Wunsches als Überschrift da, etwas blasser dargestellt. So steht über jeder Karte etwas, woran man sie wiedererkennt. Der vollständige Text steht immer darunter – die Überschrift ersetzt ihn nicht.</p>
     <p>Auf einen Wunsch tippen klappt eine Detailansicht auf: der ursprüngliche Wunschtext, wer ihn eingetragen hat, an welchem Tag, und – sobald umgesetzt – an welchem Tag, was dabei genau gemacht wurde ("Umsetzung") und wie viele <strong>Tokens</strong> die Umsetzung gekostet hat. Die Zahl wird beim Abhaken eingetragen, also <em>nach</em> getaner Arbeit; es ist keine Vorab-Schätzung. Steht keine Zahl da, wurde sie nicht erfasst – bei allen Wünschen von vor August 2026 ist das der Normalfall. Eine 0 bedeutet dagegen wirklich null. So bleibt nachvollziehbar, was sich hinter einem erledigten Wunsch verbirgt, ohne im Code suchen zu müssen.</p>
@@ -458,7 +464,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-19">
-    <summary class="section-title">🧳 Packliste</summary>
+    <summary class="section-title"><h2>🧳 Packliste</h2></summary>
     <p>Packlisten für Reisen und Ausflüge – ähnlich aufgebaut wie die Einkaufsliste, aber mit eigenen Zielen statt Märkten. Oben wählst du, für welches Ziel (z. B. "Sommerurlaub") du gerade die Liste siehst – es ist immer nur ein Ziel gleichzeitig aktiv. Beim nächsten Öffnen der App ist automatisch wieder das zuletzt von dir angesehene Ziel ausgewählt.</p>
     <ul class="steps">
       <li>
@@ -503,7 +509,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-20">
-    <summary class="section-title">🤾 TVB Stuttgart</summary>
+    <summary class="section-title"><h2>🤾 TVB Stuttgart</h2></summary>
     <p>Zeigt die nächsten Spiele, die bisherigen Ergebnisse und die Tabelle – mit der eigenen Mannschaft farblich hervorgehoben. Alles zum Ansehen, nichts zum Eintragen.</p>
     <ul class="steps">
       <li>
@@ -536,7 +542,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-21">
-    <summary class="section-title">🐷 Kassenbuch</summary>
+    <summary class="section-title"><h2>🐷 Kassenbuch</h2></summary>
     <p>Jedes Kind hat sein eigenes Kassenbuch für sein Taschengeld – Einnahmen und Ausgaben eintragen, und immer auf einen Blick sehen, wie viel gerade im Sparschwein ist.</p>
     <ul class="steps">
       <li>
@@ -573,7 +579,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-22">
-    <summary class="section-title">🎂 Geburtstage</summary>
+    <summary class="section-title"><h2>🎂 Geburtstage</h2></summary>
     <p>Die gemeinsame Geburtstagsliste. Jeder trägt ein, alle sehen es – sortiert danach, was als Nächstes ansteht.</p>
     <ul class="steps">
       <li>
@@ -606,7 +612,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-23">
-    <summary class="section-title">🚗 Ausfälle</summary>
+    <summary class="section-title"><h2>🚗 Ausfälle</h2></summary>
     <p>Ein Protokoll für die Werkstatt: Wie oft ist das Infotainment im Enyaq ausgestiegen, wann, wo – und was ging dabei nicht mehr. Die App hat genau einen wichtigen Knopf, damit sie im Auto bedienbar ist.</p>
     <ul class="steps">
       <li>
@@ -631,7 +637,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   </details>
 
   <details class="section" id="kapitel-24">
-    <summary class="section-title">📋 Aufgaben als Brett</summary>
+    <summary class="section-title"><h2>📋 Aufgaben als Brett</h2></summary>
     <p>Dieselben Aufgaben wie in der Liste, nur anders angeordnet: vier Spalten für die vier Stufen <strong>Backlog · Offen · In Arbeit · Erledigt</strong>. Erreichbar über „📋 Brett" oben in der Aufgaben-App, zurück geht es über „☰ Liste". Beide Ansichten zeigen denselben Bestand – was du hier schiebst, steht sofort auch in der Liste.</p>
     <p><strong>Beide Ansichten können dasselbe.</strong> Auf dem Brett findest du „+ Neue Aufgabe", „🔍 Filtern", den Stift zum Bearbeiten und den Mülleimer genauso wie in der Liste. Nur den <em>Status</em>-Filter gibt es hier nicht – die Spalten <em>sind</em> der Status. Der Personen-Filter gilt für beide Ansichten gemeinsam: Was du in der Liste einstellst, findest du auf dem Brett wieder.</p>
     <p><strong>Das Portal merkt sich, wo du zuletzt warst.</strong> Öffnest du die Aufgaben-App das nächste Mal, kommt automatisch die Ansicht, die du zuletzt benutzt hast – Liste oder Brett. Das gilt pro Person, nicht pro Gerät: Wer zuhause am Rechner aufs Brett wechselt, bekommt es auch am Telefon.</p>

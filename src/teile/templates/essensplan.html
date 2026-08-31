@@ -82,7 +82,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🍽️ Essensplan</div>
+<h1 class="nav-title">🍽️ Essensplan</h1>
 <div class="nav-sub">{{ tage[0].datum.strftime('%d.%m.') }} – {{ tage[-1].datum.strftime('%d.%m.%Y') }}</div>
 {% endblock %}
 
@@ -135,13 +135,13 @@
             <form method="post" action="/a/essensplan{{ tp }}eintrag">
               <input type="hidden" name="tag" value="{{ tag.iso }}">
               <input type="hidden" name="mahlzeit" value="{{ mahlzeit }}">
-              <select class="tag-select" name="rezept_id">
+              <select aria-label="Rezept wählen" class="tag-select" name="rezept_id">
                 <option value="">– Kein Rezept –</option>
                 {% for r in rezepte %}
                 <option value="{{ r.id }}" {% if eintrag and eintrag.rezept_id == r.id %}selected{% endif %}>{{ r.name }}</option>
                 {% endfor %}
               </select>
-              <input class="tag-input" type="text" name="text" placeholder="…oder frei eintragen"
+              <input aria-label="Freier Eintrag" class="tag-input" type="text" name="text" placeholder="…oder frei eintragen"
                      value="{{ eintrag.text if eintrag and not eintrag.rezept_id else '' }}">
               <button type="submit" class="tag-save">Speichern</button>
             </form>

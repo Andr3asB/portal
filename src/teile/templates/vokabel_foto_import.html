@@ -53,7 +53,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">📷 Foto-Import</div>
+<h1 class="nav-title">📷 Foto-Import</h1>
 {% endblock %}
 
 {% block body %}
@@ -88,7 +88,7 @@
       </label>
 
       <div class="field-label">Foto</div>
-      <input class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" required>
+      <input aria-label="Foto wählen" class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" required>
 
       <button class="btn-add" type="submit">Vokabeln erkennen</button>
       <div class="import-lade" id="import-lade">⏳ Foto wird gelesen …</div>

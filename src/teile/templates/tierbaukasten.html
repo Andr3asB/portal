@@ -314,7 +314,7 @@ input[type="text"].rezept-input {
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🐾 Tierbaukasten</div>
+<h1 class="nav-title">🐾 Tierbaukasten</h1>
 <div class="nav-sub">Bau deine eigene Figur</div>
 {% endblock %}
 
@@ -436,7 +436,7 @@ input[type="text"].rezept-input {
         <div id="tier-anpassung">
         <div class="field-label">Farbe</div>
         <div class="farbe-row">
-          <input type="color" name="koerper_farbe" id="koerper_farbe" value="#e8b04b">
+          <input aria-label="Körperfarbe" type="color" name="koerper_farbe" id="koerper_farbe" value="#e8b04b">
         </div>
 
         <div class="field-label">Muster</div>
@@ -448,11 +448,11 @@ input[type="text"].rezept-input {
         <input type="hidden" name="muster" id="muster-hidden" value="keins">
         <div class="field-label">Musterfarbe</div>
         <div class="farbe-row" id="musterfarbe-row">
-          <input type="color" name="muster_farbe" id="muster_farbe" value="#ffffff">
+          <input aria-label="Musterfarbe" type="color" name="muster_farbe" id="muster_farbe" value="#ffffff">
         </div>
 
         <div class="field-label">Körperbau</div>
-        <input type="range" name="koerperbau" id="koerperbau" min="0" max="100" value="50">
+        <input aria-label="Körperbau" type="range" name="koerperbau" id="koerperbau" min="0" max="100" value="50">
         <div class="regler-labels"><span>schlank</span><span>kräftig</span></div>
 
         <div class="field-label">Accessoires (mehrere möglich)</div>
@@ -474,7 +474,7 @@ input[type="text"].rezept-input {
           <input type="hidden" name="mensch_haut" value="{{ mensch_haut[0] }}">
 
           <div class="field-label">Frisur</div>
-          <select name="mensch_frisur" class="mensch-select">
+          <select aria-label="Frisur" name="mensch_frisur" class="mensch-select">
             {% for wert, label in mensch_frisur.items() %}
             <option value="{{ wert }}">{{ label }}</option>
             {% endfor %}
@@ -489,21 +489,21 @@ input[type="text"].rezept-input {
           <input type="hidden" name="mensch_haarfarbe" value="{{ mensch_haarfarben[0] }}">
 
           <div class="field-label">Augen</div>
-          <select name="mensch_augen" class="mensch-select">
+          <select aria-label="Augen" name="mensch_augen" class="mensch-select">
             {% for wert, label in mensch_augen.items() %}
             <option value="{{ wert }}">{{ label }}</option>
             {% endfor %}
           </select>
 
           <div class="field-label">Augenbrauen</div>
-          <select name="mensch_augenbrauen" class="mensch-select">
+          <select aria-label="Augenbrauen" name="mensch_augenbrauen" class="mensch-select">
             {% for wert, label in mensch_augenbrauen.items() %}
             <option value="{{ wert }}">{{ label }}</option>
             {% endfor %}
           </select>
 
           <div class="field-label">Mund</div>
-          <select name="mensch_mund" class="mensch-select">
+          <select aria-label="Mund" name="mensch_mund" class="mensch-select">
             {% for wert, label in mensch_mund.items() %}
             <option value="{{ wert }}">{{ label }}</option>
             {% endfor %}
@@ -553,7 +553,7 @@ input[type="text"].rezept-input {
         </div>
 
         <div class="field-label">Name (optional)</div>
-        <input type="text" class="rezept-input" name="name" maxlength="40" placeholder="z. B. Bommel" autocomplete="off">
+        <input aria-label="Name der Figur" type="text" class="rezept-input" name="name" maxlength="40" placeholder="z. B. Bommel" autocomplete="off">
 
         <div class="pfeil-nav">
           <button type="button" class="btn-pfeil" id="pfeil-3-zurueck" title="Zurück" aria-label="Zurück">←</button>
@@ -566,7 +566,7 @@ input[type="text"].rezept-input {
   </div>
 
   <div class="section">
-    <div class="section-title">🖼️ Meine Figuren</div>
+    <h2 class="section-title">🖼️ Meine Figuren</h2>
     {% if eigene %}
     <div class="galerie-grid">
       {% for k in eigene %}

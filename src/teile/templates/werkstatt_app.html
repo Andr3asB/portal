@@ -180,7 +180,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">💡 Werkstatt</div>
+<h1 class="nav-title">💡 Werkstatt</h1>
 <div class="nav-sub">{{ offen|length }} offen{% if erledigt_gesamt %}, {{ erledigt_gesamt }} erledigt{% endif %}</div>
 {% endblock %}
 
@@ -239,7 +239,7 @@
 
   {% if user.is_admin or urheber_ids.get(w.id) == user.id %}
   <form class="aktion-form" method="post" action="/a/werkstatt{{ tp }}aktion/{{ w.id }}">
-    <select name="art" class="aktion-select">
+    <select aria-label="Art des Eintrags" name="art" class="aktion-select">
       <option value="antwort">💬 Antwort</option>
       <option value="frage">❓ Rückfrage</option>
       <option value="notiz">📝 Notiz</option>
@@ -248,7 +248,7 @@
       <option value="umsetzung">🔨 Umsetzung</option>
       {% endif %}
     </select>
-    <textarea class="aktion-textarea" name="text" rows="3" maxlength="2000"
+    <textarea aria-label="Text" class="aktion-textarea" name="text" rows="3" maxlength="2000"
               placeholder="Rückfrage beantworten oder etwas festhalten …" required></textarea>
     <button class="aktion-submit" type="submit">Hinzufügen</button>
   </form>
@@ -317,7 +317,7 @@
 {% endif %}
 
 {% if offen %}
-<div class="section-label" data-abschnitt="offen">Offen</div>
+<h2 class="section-label" data-abschnitt="offen">Offen</h2>
 {% for w in offen %}
 {# Wunsch #141: Die data-Attribute sind das, wonach das Skript unten filtert. #}
 <div class="wunsch-card" id="wunsch-{{ w.id }}" data-prio="{{ w.prioritaet or '' }}" data-status="offen"
@@ -363,7 +363,7 @@
   {% if user.is_admin %}
   <div class="wunsch-actions">
     <form method="post" action="/a/werkstatt{{ tp }}prioritaet/{{ w.id }}">
-      <select name="prioritaet" class="prio-select" data-aendern="formularAbsenden">
+      <select aria-label="Priorität" name="prioritaet" class="prio-select" data-aendern="formularAbsenden">
         <option value="">– Prio –</option>
         <option value="niedrig"  {% if w.prioritaet == 'niedrig'  %}selected{% endif %}>Niedrig</option>
         <option value="mittel"   {% if w.prioritaet == 'mittel'   %}selected{% endif %}>Mittel</option>
@@ -388,7 +388,7 @@
 {% endif %}
 
 {% if erledigt %}
-<div class="section-label" data-abschnitt="erledigt">Erledigt</div>
+<h2 class="section-label" data-abschnitt="erledigt">Erledigt</h2>
 {% for w in erledigt %}
 <div class="wunsch-card done" id="wunsch-{{ w.id }}" data-prio="{{ w.prioritaet or '' }}" data-status="erledigt"
      data-app="{{ w.app_slug or '' }}" data-urheber="{{ w.urheber_name or '' }}">

@@ -55,7 +55,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">✅ Aufgaben</div>
+<h1 class="nav-title">✅ Aufgaben</h1>
 <div class="nav-sub">{{ todos|selectattr('status','eq','offen')|list|length }} offen</div>
 {% endblock %}
 
@@ -75,7 +75,7 @@
       {% elif t.fuer_name and t.zugewiesen_an != user.id %}
         <span class="chip" style="background:{{ farbe_kontrast(t.fuer_farbe) }}">→ {{ t.fuer_name }}</span>
       {% elif t.zugewiesen_an == user.id and t.von_name %}
-        <span class="chip" style="background:{{ t.von_farbe }}">von {{ t.von_name }}</span>
+        <span class="chip" style="background:{{ farbe_kontrast(t.von_farbe) }}">von {{ t.von_name }}</span>
       {% endif %}
       Erstellt: {{ t.erstellt[:10] }}{% if t.erledigt and t.erledigt_am %} · Erledigt: {{ t.erledigt_am[:10] }}{% endif %}
     </div>
@@ -127,7 +127,7 @@
   {% for status in status_order %}
     {% set gruppe = todos|selectattr('status','eq',status)|list %}
     {% if gruppe %}
-    <div class="section-label">{{ status_labels[status] }}</div>
+    <h2 class="section-label">{{ status_labels[status] }}</h2>
     {% for t in gruppe %}{{ todo_item(t, token, user, darf_loeschen, historie, status_order, status_labels, rollen_labels, users, rollen) }}{% endfor %}
     {% endif %}
   {% endfor %}

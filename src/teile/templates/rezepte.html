@@ -56,7 +56,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🍲 Rezepte</div>
+<h1 class="nav-title">🍲 Rezepte</h1>
 <div class="nav-sub">{{ rezepte|length }} gespeichert</div>
 {% endblock %}
 
@@ -79,7 +79,7 @@
       {% endfor %}
       <button type="button" class="chip-btn" id="chip-gewuenscht">📌 Gewünscht</button>
     </div>
-    <input class="rezept-suche" id="rezept-suche" type="text"
+    <input aria-label="Rezept oder Zutat suchen" class="rezept-suche" id="rezept-suche" type="search"
            placeholder="🔍 Rezept oder Zutat suchen…" autocomplete="off">
 
     {% for r in rezepte %}

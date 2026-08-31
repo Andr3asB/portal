@@ -78,7 +78,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🚗 Ausfälle</div>
+<h1 class="nav-title">🚗 Ausfälle</h1>
 <div class="nav-sub">{{ gesamt }} Eintrag{{ 'e' if gesamt != 1 else '' }}</div>
 {% endblock %}
 
@@ -136,7 +136,7 @@
     {% if e.darf_aendern %}
     <div class="notiz-panel" id="notiz-panel-{{ e.id }}">
       <form method="post" action="/a/ausfaelle{{ tp }}{{ e.id }}/notiz">
-        <textarea class="notiz-feld" name="notiz" placeholder="Was ist passiert? Was ging nicht mehr?">{{ e.notiz or '' }}</textarea>
+        <textarea aria-label="Notiz zum Ausfall" class="notiz-feld" name="notiz" placeholder="Was ist passiert? Was ging nicht mehr?">{{ e.notiz or '' }}</textarea>
         <button type="submit" class="btn-speichern">Notiz speichern</button>
       </form>
       <form method="post" action="/a/ausfaelle{{ tp }}{{ e.id }}/loeschen"

@@ -112,7 +112,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">{{ rezept.name }}</div>
+<h1 class="nav-title">{{ rezept.name }}</h1>
 {% endblock %}
 
 {% block body %}
@@ -137,7 +137,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
         </button>
       </div>
     </div>
-    <div class="section-title">Deine Bewertung</div>
+    <h2 class="section-title">Deine Bewertung</h2>
     <div class="sterne-picker" id="sterne-picker">
       {% for i in range(1, 6) %}
       <button type="button" class="stern-btn{% if eigene_bewertung and i <= eigene_bewertung %} aktiv{% endif %}"
@@ -178,7 +178,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 
   {% if zutaten %}
   <div class="section">
-    <div class="section-title">🥕 Zutaten</div>
+    <h2 class="section-title">🥕 Zutaten</h2>
     {# Wunsch #164: Nur anzeigen, wenn die Portionsangabe eine Zahl enthält –
        ohne Ausgangswert lässt sich nichts umrechnen, und ein Regler, der
        nichts tut, wäre schlimmer als keiner. #}
@@ -225,7 +225,7 @@ body.dark .btn-zutat-kaufen.added { background:#0f3d1f; border-color:#1e5631; co
 
   {% if schritte %}
   <div class="section">
-    <div class="section-title">👩‍🍳 Zubereitung</div>
+    <h2 class="section-title">👩‍🍳 Zubereitung</h2>
     <ol class="schritte-liste">
       {% for s in schritte %}
       <li>{{ s.text }}</li>

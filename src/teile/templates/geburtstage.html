@@ -78,7 +78,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🎂 Geburtstage</div>
+<h1 class="nav-title">🎂 Geburtstage</h1>
 <div class="nav-sub">{{ sichtbare|length }} in der Liste</div>
 {% endblock %}
 
@@ -158,7 +158,7 @@
         Am Geburtstag erinnern
       </label>
       <div class="gb-vorlauf-row">
-        <input type="number" name="vorlauf_tage" min="1" max="60" placeholder="–"
+        <input aria-label="Tage vorher" type="number" name="vorlauf_tage" min="1" max="60" placeholder="–"
                value="{{ e.vorlauf_tage if e.vorlauf_tage else '' }}">
         <span>Tage vorher zusätzlich erinnern</span>
       </div>
@@ -180,18 +180,18 @@
     <form method="post" action="/a/geburtstage{{ tp }}{{ e.id }}/bearbeiten">
       <div class="gb-feld">
         <label for="gb-edit-name-{{ e.id }}">Wer?</label>
-        <input class="gb-input" id="gb-edit-name-{{ e.id }}" type="text" name="name"
+        <input aria-label="Name" class="gb-input" id="gb-edit-name-{{ e.id }}" type="text" name="name"
                required maxlength="80" value="{{ e.name }}">
       </div>
       <div class="gb-datum-row">
         <div class="gb-feld">
           <label for="gb-edit-tag-{{ e.id }}">Tag</label>
-          <input class="gb-input" id="gb-edit-tag-{{ e.id }}" type="number" name="tag"
+          <input aria-label="Tag" class="gb-input" id="gb-edit-tag-{{ e.id }}" type="number" name="tag"
                  min="1" max="31" required inputmode="numeric" value="{{ e.tag }}">
         </div>
         <div class="gb-feld">
           <label for="gb-edit-monat-{{ e.id }}">Monat</label>
-          <select class="gb-select" id="gb-edit-monat-{{ e.id }}" name="monat" required>
+          <select aria-label="Monat" class="gb-select" id="gb-edit-monat-{{ e.id }}" name="monat" required>
             {% for m in monate %}
             <option value="{{ loop.index }}" {% if loop.index == e.monat %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
@@ -200,14 +200,14 @@
       </div>
       <div class="gb-feld">
         <label for="gb-edit-jahr-{{ e.id }}">Geburtsjahr (freiwillig)</label>
-        <input class="gb-input" id="gb-edit-jahr-{{ e.id }}" type="number" name="jahr"
+        <input aria-label="Jahr" class="gb-input" id="gb-edit-jahr-{{ e.id }}" type="number" name="jahr"
                min="1900" max="{{ heute_jahr | default(2026) }}" inputmode="numeric"
                value="{{ e.jahr if e.jahr else '' }}"
                placeholder="leer lassen, wenn unbekannt">
       </div>
       <div class="gb-feld">
         <label for="gb-edit-notiz-{{ e.id }}">Notiz (freiwillig)</label>
-        <input class="gb-input" id="gb-edit-notiz-{{ e.id }}" type="text" name="notiz"
+        <input aria-label="Notiz" class="gb-input" id="gb-edit-notiz-{{ e.id }}" type="text" name="notiz"
                maxlength="200" value="{{ e.notiz if e.notiz else '' }}">
       </div>
       <div class="gb-panel-aktionen">

@@ -45,7 +45,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">⚙️ Aufgaben</div>
+<h1 class="nav-title">⚙️ Aufgaben</h1>
 {% endblock %}
 
 {% block body %}
@@ -54,11 +54,11 @@
     <form method="post">
       <input type="hidden" name="action" value="neu">
       <div class="form-row">
-        <input class="form-input" type="text" name="emoji" placeholder="Emoji" style="max-width:70px">
-        <input class="form-input" type="text" name="name" placeholder="Aufgabenname" required>
+        <input aria-label="Emoji" class="form-input" type="text" name="emoji" placeholder="Emoji" style="max-width:70px">
+        <input aria-label="Aufgabenname" class="form-input" type="text" name="name" placeholder="Aufgabenname" required>
       </div>
       <div class="form-row">
-        <input class="form-input" type="number" name="gewichtung" placeholder="Punkte" value="1.0" min="0.5" max="10" step="0.5" style="max-width:100px">
+        <input aria-label="Punkte" class="form-input" type="number" name="gewichtung" placeholder="Punkte" value="1.0" min="0.5" max="10" step="0.5" style="max-width:100px">
         <button class="btn-add" type="submit">+ Hinzufügen</button>
       </div>
     </form>
@@ -81,7 +81,7 @@
       <form method="post" style="display:flex; gap:8px; flex:1">
         <input type="hidden" name="action" value="umbenennen">
         <input type="hidden" name="id" value="{{ a.id }}">
-        <input class="form-input" type="text" name="name" value="{{ a.name }}" required>
+        <input aria-label="Aufgabenname" class="form-input" type="text" name="name" value="{{ a.name }}" required>
         <button type="submit" class="aufg-save">Speichern</button>
       </form>
     </div>

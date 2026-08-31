@@ -32,7 +32,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🎯 Ziele</div>
+<h1 class="nav-title">🎯 Ziele</h1>
 {% endblock %}
 
 {% block body %}
@@ -41,7 +41,7 @@
     <form method="post">
       <input type="hidden" name="action" value="neu">
       <div class="form-row">
-        <input class="form-input" type="text" name="name" placeholder="z. B. Sommerurlaub Ostsee" required>
+        <input aria-label="Zielname" class="form-input" type="text" name="name" placeholder="z. B. Sommerurlaub Ostsee" required>
         <button class="btn-add" type="submit">+ Hinzufügen</button>
       </div>
     </form>

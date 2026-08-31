@@ -580,7 +580,7 @@
 <div id="wunsch-overlay">
   <div class="wunsch-modal-card">
     <h3>✨ Verbesserungswunsch</h3>
-    <textarea id="wunsch-text" rows="4" placeholder="Was soll besser werden?"></textarea>
+    <textarea aria-label="Verbesserungswunsch" id="wunsch-text" rows="4" placeholder="Was soll besser werden?"></textarea>
     {% if user is defined and user and user.is_admin %}
     {# Wunsch #152: nur fuer Admins. Voreinstellung "Zurueckgestellt" - ein
        neuer Wunsch soll erst umgesetzt werden, wenn er ausdruecklich

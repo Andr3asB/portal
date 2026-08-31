@@ -97,7 +97,7 @@
 
 
 {% block nav_title %}
-<div class="nav-title">🐷 {{ "Kassenbuch" if eigenes_buch else kind.name }}</div>
+<h1 class="nav-title">🐷 {{ "Kassenbuch" if eigenes_buch else kind.name }}</h1>
 {% if not eigenes_buch %}<div class="nav-sub">Nur zum Ansehen – Einträge kann nur {{ kind.name }} selbst anlegen</div>{% endif %}
 {% endblock %}
 

@@ -178,7 +178,7 @@ body.packmodus .item-name { font-size:18px; }
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🧳 Packliste</div>
+<h1 class="nav-title">🧳 Packliste</h1>
 <div class="nav-sub">{% if aktives_ziel_id %}{{ ziele|selectattr("id","equalto",aktives_ziel_id)|map(attribute="name")|first }}{% else %}Kein Ziel{% endif %}</div>
 {% endblock %}
 
@@ -192,7 +192,7 @@ body.packmodus .item-name { font-size:18px; }
 <div class="item-card{% if item.gepackt %} gepackt{% endif %}" id="item-{{ item.id }}"
      data-kategorie="{{ gruppe }}" data-person="{{ item.person_id or '' }}"
      data-gepackt="{{ 1 if item.gepackt else 0 }}">
-  <input class="item-check" type="checkbox"
+  <input aria-label="{{ item.name }} abhaken" class="item-check" type="checkbox"
          data-aendern="toggleGepackt" data-args='[{{ item.id }}]'
          {% if item.gepackt %}checked{% endif %}>
   {# Wunsch #178: nur bei offenen Einträgen – gepackte stehen in einem eigenen
@@ -211,7 +211,7 @@ body.packmodus .item-name { font-size:18px; }
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
     <form method="post" action="/a/packliste{{ tp }}bearbeiten/{{ item.id }}" class="edit-form">
       <div class="field-label">Name</div>
-      <input class="add-input" type="text" name="name" value="{{ item.name }}" required>
+      <input aria-label="Eintragsname" class="add-input" type="text" name="name" value="{{ item.name }}" required>
 
       <div class="field-label">Kategorie</div>
       <div class="btn-row kat-row">
@@ -338,7 +338,7 @@ body.packmodus .item-name { font-size:18px; }
     <form method="post" action="/a/packliste{{ tp }}add" id="add-form">
       <input type="hidden" name="ziel_id" value="{{ aktives_ziel_id }}">
       <div class="add-row">
-        <input class="add-input" type="text" name="name" id="add-name"
+        <input aria-label="Gegenstand" class="add-input" type="text" name="name" id="add-name"
                placeholder="Was muss mit?" required autocomplete="off">
       </div>
 
@@ -399,7 +399,7 @@ body.packmodus .item-name { font-size:18px; }
 
   {% if gepackte %}
   <div class="gepackt-section">
-    <div class="gepackt-label">✓ Gepackt</div>
+    <h2 class="gepackt-label">✓ Gepackt</h2>
     {% for item in gepackte %}{{ item_card(item, token, kategorien, personen, item.kategorie_id or '') }}{% endfor %}
   </div>
   {% endif %}
@@ -650,7 +650,8 @@ function moveToGepacktTop(card) {
   if (!section) {
     section = document.createElement('div');
     section.className = 'gepackt-section';
-    const label = document.createElement('div');
+    // Wunsch #247: dieselbe Ueberschriften-Ebene wie das serverseitige h2
+    const label = document.createElement('h2');
     label.className = 'gepackt-label';
     label.textContent = '✓ Gepackt';
     section.appendChild(label);

@@ -60,7 +60,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🔁 Wiederkehrende Aufgaben</div>
+<h1 class="nav-title">🔁 Wiederkehrende Aufgaben</h1>
 {% endblock %}
 
 {% block body %}
@@ -70,7 +70,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
     <form method="post" id="serie-form">
       <input type="hidden" name="action" value="neu">
       <div class="form-label">Aufgabe</div>
-      <input class="form-input" type="text" name="inhalt" placeholder="z.B. Blumen gießen" required>
+      <input aria-label="Aufgabentext" class="form-input" type="text" name="inhalt" placeholder="z.B. Blumen gießen" required>
 
       <div class="form-label">Wiederkehr</div>
       <div class="btn-row">
@@ -81,7 +81,7 @@ body.dark .badge-pool { background:#1e3a24; color:#5cd67a; }
 
       <div id="intervall-feld" style="display:none">
         <div class="form-label">Alle wie viele Tage?</div>
-        <input class="form-input" type="number" name="intervall_tage" min="1" placeholder="z.B. 7">
+        <input aria-label="Intervall in Tagen" class="form-input" type="number" name="intervall_tage" min="1" placeholder="z.B. 7">
       </div>
 
       <div id="wochentag-feld" style="display:none">

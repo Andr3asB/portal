@@ -39,7 +39,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🔗 Rezept importieren</div>
+<h1 class="nav-title">🔗 Rezept importieren</h1>
 {% endblock %}
 
 {% block body %}
@@ -52,7 +52,7 @@
   <div class="add-card">
     <form method="post" id="import-form" data-arbeitet="Wird gelesen …">
       <div class="field-label">Rezept-URL</div>
-      <input class="rezept-input" type="url" name="url"
+      <input aria-label="Rezept-URL" class="rezept-input" type="url" name="url"
              placeholder="https://…" required autocomplete="off" autofocus>
       <button class="btn-add" type="submit">Rezept holen</button>
       <div class="import-lade" id="import-lade">⏳ Seite wird gelesen und Rezept erkannt…</div>

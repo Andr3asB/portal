@@ -94,7 +94,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">📚 Vokabeln</div>
+<h1 class="nav-title">📚 Vokabeln</h1>
 <div class="nav-sub">{{ vokabeln|length }} Vokabel{{ 'n' if vokabeln|length != 1 else '' }}</div>
 {% endblock %}
 
@@ -171,10 +171,10 @@
       <input type="hidden" name="sprache_id" id="neu-sprache-id" required>
 
       <div class="form-label">Fremdsprachiges Wort</div>
-      <input class="form-input" type="text" name="fremd" id="neu-fremd" required autocomplete="off">
+      <input aria-label="Fremdsprachiges Wort" class="form-input" type="text" name="fremd" id="neu-fremd" required autocomplete="off">
 
       <div class="form-label">Deutsch</div>
-      <input class="form-input" type="text" name="deutsch" required autocomplete="off">
+      <input aria-label="Deutsche Übersetzung" class="form-input" type="text" name="deutsch" required autocomplete="off">
 
       {# Wunsch #194: Unregelmäßige Verben. Beide Formen oder keine - ein
          halb ausgefülltes Paar wird serverseitig verworfen, damit es im
@@ -188,11 +188,11 @@
         <div class="verb-felder">
           <div>
             <div class="verb-formlabel">simple past</div>
-            <input class="form-input" type="text" name="simple_past" value="" autocomplete="off">
+            <input aria-label="simple past" class="form-input" type="text" name="simple_past" value="" autocomplete="off">
           </div>
           <div>
             <div class="verb-formlabel">Perfect</div>
-            <input class="form-input" type="text" name="perfect" value="" autocomplete="off">
+            <input aria-label="Perfect" class="form-input" type="text" name="perfect" value="" autocomplete="off">
           </div>
         </div>
       </details>
@@ -212,7 +212,7 @@
   {% endif %}
 
   {% if vokabeln %}
-  <input class="vokabel-suche" id="vokabel-suche" type="text"
+  <input aria-label="Vokabel suchen" class="vokabel-suche" id="vokabel-suche" type="search"
          placeholder="🔍 Vokabel suchen…" autocomplete="off">
 
   {# data-kapitel traegt die IDs kommagetrennt; leer heisst "ohne Kapitel" -
@@ -257,10 +257,10 @@
         <input type="hidden" name="sprache_id" id="edit-{{ v.id }}-sprache-id" value="{{ v.sprache_id }}" required>
 
         <div class="form-label">Fremdsprachiges Wort</div>
-        <input class="form-input" type="text" name="fremd" value="{{ v.fremd }}" required autocomplete="off">
+        <input aria-label="Fremdsprachiges Wort" class="form-input" type="text" name="fremd" value="{{ v.fremd }}" required autocomplete="off">
 
         <div class="form-label">Deutsch</div>
-        <input class="form-input" type="text" name="deutsch" value="{{ v.deutsch }}" required autocomplete="off">
+        <input aria-label="Deutsche Übersetzung" class="form-input" type="text" name="deutsch" value="{{ v.deutsch }}" required autocomplete="off">
 
         {# Wunsch #194/#195: siehe oben. Beim Bearbeiten steht der Block
            OFFEN, wenn schon Formen drinstehen - sonst sähe es aus, als wären
@@ -271,11 +271,11 @@
           <div class="verb-felder">
             <div>
               <div class="verb-formlabel">simple past</div>
-              <input class="form-input" type="text" name="simple_past" value="{{ v.simple_past or '' }}" autocomplete="off">
+              <input aria-label="simple past" class="form-input" type="text" name="simple_past" value="{{ v.simple_past or '' }}" autocomplete="off">
             </div>
             <div>
               <div class="verb-formlabel">Perfect</div>
-              <input class="form-input" type="text" name="perfect" value="{{ v.perfect or '' }}" autocomplete="off">
+              <input aria-label="Perfect" class="form-input" type="text" name="perfect" value="{{ v.perfect or '' }}" autocomplete="off">
             </div>
           </div>
         </details>

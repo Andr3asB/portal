@@ -39,7 +39,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">✓ {{ "Verben" if verbmodus else "Vokabeln" }} prüfen</div>
+<h1 class="nav-title">✓ {{ "Verben" if verbmodus else "Vokabeln" }} prüfen</h1>
 <div class="nav-sub">{{ paare|length }} erkannt · {{ sprache.name }}</div>
 {% endblock %}
 
@@ -72,20 +72,20 @@ function paarVerwerfen(box) {
 
     {% for p in paare %}
     <div class="paar-row" id="paar-{{ loop.index0 }}">
-      <input class="paar-check" type="checkbox" name="behalten" value="{{ loop.index0 }}"
+      <input aria-label="Zeile übernehmen" class="paar-check" type="checkbox" name="behalten" value="{{ loop.index0 }}"
              checked data-aendern="paarVerwerfen">
       {% if verbmodus %}
       {# Wunsch #194: Vier Felder je Zeile. Sie stehen untereinander statt
          nebeneinander - vier Eingaben auf 375px waeren je 70px breit. #}
       <div class="verb-spalten">
-        <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Infinitiv">
-        <input class="paar-input" type="text" name="simple_past" value="{{ p.simple_past }}" placeholder="simple past">
-        <input class="paar-input" type="text" name="perfect" value="{{ p.perfect }}" placeholder="Perfect">
-        <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
+        <input aria-label="Infinitiv" class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Infinitiv">
+        <input aria-label="simple past" class="paar-input" type="text" name="simple_past" value="{{ p.simple_past }}" placeholder="simple past">
+        <input aria-label="Perfect" class="paar-input" type="text" name="perfect" value="{{ p.perfect }}" placeholder="Perfect">
+        <input aria-label="Deutsch" class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
       </div>
       {% else %}
-      <input class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Fremdsprache">
-      <input class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
+      <input aria-label="Fremdsprachiges Wort" class="paar-input" type="text" name="fremd" value="{{ p.fremd }}" placeholder="Fremdsprache">
+      <input aria-label="Deutsch" class="paar-input" type="text" name="deutsch" value="{{ p.deutsch }}" placeholder="Deutsch">
       {% endif %}
     </div>
     {% endfor %}

@@ -51,7 +51,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">🗂️ Kategorien</div>
+<h1 class="nav-title">🗂️ Kategorien</h1>
 {% endblock %}
 
 {% block body %}
@@ -60,7 +60,7 @@
     <form method="post">
       <input type="hidden" name="action" value="neu">
       <div class="form-row">
-        <input class="form-input" type="text" name="name" placeholder="Kategoriename" required>
+        <input aria-label="Kategoriename" class="form-input" type="text" name="name" placeholder="Kategoriename" required>
         <button class="btn-add" type="submit">+ Hinzufügen</button>
       </div>
     </form>
@@ -82,7 +82,7 @@
       <form method="post" style="display:flex; gap:8px; flex:1">
         <input type="hidden" name="action" value="umbenennen">
         <input type="hidden" name="id" value="{{ k.id }}">
-        <input class="form-input" type="text" name="name" value="{{ k.name }}" required>
+        <input aria-label="Kategoriename" class="form-input" type="text" name="name" value="{{ k.name }}" required>
         <button type="submit" class="kat-save">Speichern</button>
       </form>
     </div>

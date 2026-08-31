@@ -32,7 +32,7 @@ input[type=text]:focus { border-color:var(--farbe); }
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">{% if edit %}✏️ {{ edit.name }}{% else %}👤 Neues Mitglied{% endif %}</div>
+<h1 class="nav-title">{% if edit %}✏️ {{ edit.name }}{% else %}👤 Neues Mitglied{% endif %}</h1>
 {% endblock %}
 
 {% block body %}
@@ -42,14 +42,14 @@ input[type=text]:focus { border-color:var(--farbe); }
   <form method="post">
     <div class="form-group">
       <label>Name</label>
-      <input type="text" name="name" value="{{ edit.name if edit else '' }}"
+      <input aria-label="Name" type="text" name="name" value="{{ edit.name if edit else '' }}"
              placeholder="z. B. Andi" required autofocus>
     </div>
 
     <div class="form-group">
       <label>Farbe</label>
       <div class="color-row">
-        <input type="text" id="farbe-hex" name="farbe"
+        <input aria-label="Farbe als Hex-Wert" type="text" id="farbe-hex" name="farbe"
                value="{{ edit.farbe if edit else '#4a90d9' }}"
                pattern="^#[0-9a-fA-F]{6}$" placeholder="#4a90d9"
                data-eingabe="syncFarbe" data-args='[this.value]'>
@@ -89,14 +89,14 @@ input[type=text]:focus { border-color:var(--farbe); }
 
     <div class="form-group">
       <label>KI-Token-Limit pro Monat</label>
-      <input type="text" inputmode="numeric" name="ki_token_limit"
+      <input aria-label="KI-Token-Limit pro Monat" type="text" inputmode="numeric" name="ki_token_limit"
              value="{{ edit.ki_token_limit if edit else 100000 }}"
              pattern="^[0-9]+$" placeholder="100000">
     </div>
 
     <div class="form-group">
       <label>Sprachausgabe-Zeichen pro Monat</label>
-      <input type="text" inputmode="numeric" name="ki_tts_zeichen_limit"
+      <input aria-label="Sprachausgabe-Zeichen pro Monat" type="text" inputmode="numeric" name="ki_tts_zeichen_limit"
              value="{{ edit.ki_tts_zeichen_limit if edit else 50000 }}"
              pattern="^[0-9]+$" placeholder="50000">
     </div>

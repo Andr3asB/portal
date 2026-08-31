@@ -100,7 +100,7 @@
 {# Wunsch #123: Verein und Liga richten sich nach der gewählten Mannschaft -
    "TVB Stuttgart"/"Handball-Bundesliga" gilt nur für die 1. Mannschaft. #}
 {% block nav_title %}
-<div class="nav-title">🤾 {{ kopf_verein }}</div>
+<h1 class="nav-title">🤾 {{ kopf_verein }}</h1>
 <div class="nav-sub">{{ kopf_liga }}</div>
 {% endblock %}
 
@@ -148,7 +148,7 @@
   {% endif %}
 
   <div class="tvb-section">
-    <div class="tvb-section-title">📅 Nächste Spiele</div>
+    <h2 class="tvb-section-title">📅 Nächste Spiele</h2>
     {% if fehler_spiele %}
       <div class="empty">📡 Spielplan gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
     {% elif not kommende %}
@@ -173,7 +173,7 @@
   </div>
 
   <div class="tvb-section">
-    <div class="tvb-section-title">🏐 Ergebnisse</div>
+    <h2 class="tvb-section-title">🏐 Ergebnisse</h2>
     {% if fehler_spiele and not vergangene %}
       <div class="empty">📡 Ergebnisse gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
     {% elif not vergangene %}
@@ -202,7 +202,7 @@
   </div>
 
   <div class="tvb-section">
-    <div class="tvb-section-title">📊 Tabelle</div>
+    <h2 class="tvb-section-title">📊 Tabelle</h2>
     {% if fehler_tabelle %}
       <div class="empty">📡 Tabelle gerade nicht abrufbar.<br>Versuch's später nochmal.</div>
     {% elif not tabelle %}

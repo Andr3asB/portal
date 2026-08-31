@@ -45,7 +45,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">📜 Zuletzt geholfen</div>
+<h1 class="nav-title">📜 Zuletzt geholfen</h1>
 {% endblock %}
 
 {% block body %}
@@ -67,18 +67,18 @@
       <div class="verlauf-edit-panel" id="verlauf-edit-{{ e.id }}">
         <form method="post" action="/a/geholfen{{ tp }}eintrag/{{ e.id }}/bearbeiten">
           <div class="verlauf-edit-label">Datum &amp; Uhrzeit</div>
-          <input class="verlauf-edit-input" type="datetime-local" name="zeitstempel"
+          <input aria-label="Zeitpunkt" class="verlauf-edit-input" type="datetime-local" name="zeitstempel"
                  value="{{ e.zeitstempel[:16].replace(' ', 'T') }}" required>
 
           <div class="verlauf-edit-label">Wer</div>
-          <select class="verlauf-edit-select" name="user_id">
+          <select aria-label="Person" class="verlauf-edit-select" name="user_id">
             {% for n in alle_nutzer %}
             <option value="{{ n.id }}" {% if n.id == e.user_id %}selected{% endif %}>{{ n.name }}</option>
             {% endfor %}
           </select>
 
           <div class="verlauf-edit-label">Hilfsleistung</div>
-          <select class="verlauf-edit-select" name="aufgabe_id">
+          <select aria-label="Hilfsleistung" class="verlauf-edit-select" name="aufgabe_id">
             {% for a in alle_aufgaben %}
             <option value="{{ a.id }}" {% if a.id == e.aufgabe_id %}selected{% endif %}>{{ a.emoji }} {{ a.name }}</option>
             {% endfor %}

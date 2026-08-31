@@ -111,7 +111,7 @@
   </div>
   <div class="todo-options">
     <div class="ziel-person ziel-detail" {% if ziel_typ_aktuell != 'person' %}style="display:none"{% endif %}>
-      <select class="todo-select" name="zugewiesen_an">
+      <select aria-label="Zuweisen an" class="todo-select" name="zugewiesen_an">
         <option value="" {% if not vorbelegt_zugewiesen_an %}selected{% endif %}>Für mich</option>
         {% for u in users %}
         <option value="{{ u.id }}"
@@ -140,7 +140,7 @@
 <div class="new-todo-card" id="new-todo-card">
   <form method="post" action="/a/todo{{ tp }}neu">
     <div class="new-todo-row">
-      <input class="new-todo-input" type="text" name="inhalt"
+      <input aria-label="Neue Aufgabe" class="new-todo-input" type="text" name="inhalt"
              placeholder="Neue Aufgabe…" required autocomplete="off">
       <button class="new-todo-submit" type="submit" title="Hinzufügen" aria-label="Hinzufügen">+</button>
     </div>
@@ -185,7 +185,7 @@
 <div class="todo-edit-panel" id="todo-edit-{{ t.id }}">
   <form method="post" action="/a/todo{{ tp }}bearbeiten/{{ t.id }}">
     <div class="todo-edit-form">
-      <input class="todo-edit-input" type="text" name="inhalt" value="{{ t.inhalt }}" required>
+      <input aria-label="Aufgabentext" class="todo-edit-input" type="text" name="inhalt" value="{{ t.inhalt }}" required>
       <button type="submit" class="todo-edit-save">Speichern</button>
     </div>
     {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}

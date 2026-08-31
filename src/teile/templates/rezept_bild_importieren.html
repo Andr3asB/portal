@@ -34,7 +34,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">📷 Rezept per Foto</div>
+<h1 class="nav-title">📷 Rezept per Foto</h1>
 {% endblock %}
 
 {% block body %}
@@ -47,7 +47,7 @@
   <div class="add-card">
     <form method="post" enctype="multipart/form-data" id="foto-form" data-arbeitet="Wird gelesen …">
       <div class="field-label">Foto des Rezepts</div>
-      <input class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" required>
+      <input aria-label="Rezeptfoto wählen" class="foto-input" type="file" name="foto" accept="image/jpeg,image/png,image/heic" required>
 
       <button class="btn-add" type="submit">Rezept erkennen</button>
       <div class="import-lade" id="import-lade">⏳ Foto wird gelesen und Rezept erkannt…</div>

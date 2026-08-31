@@ -42,7 +42,7 @@
 {% endblock %}
 
 {% block nav_title %}
-<div class="nav-title">📊 Auswertung</div>
+<h1 class="nav-title">📊 Auswertung</h1>
 {% if ziel.id != user.id %}<div class="nav-sub">{{ ziel.name }}</div>{% endif %}
 {% endblock %}
 
@@ -50,7 +50,7 @@
 <main class="main" id="main">
 
   {% if darf_andere_sehen and alle_nutzer|length > 1 %}
-  <div class="section-label">Nutzer</div>
+  <h2 class="section-label">Nutzer</h2>
   <div class="pill-row">
     {% for n in alle_nutzer %}
     <a class="pill{% if n.id == ziel.id %} aktiv{% endif %}"
@@ -59,7 +59,7 @@
   </div>
   {% endif %}
 
-  <div class="section-label">Trainingszeit je Sprache</div>
+  <h2 class="section-label">Trainingszeit je Sprache</h2>
   {% if trainingszeit %}
     {% for t in trainingszeit %}
     <div class="bar-card">
@@ -77,7 +77,7 @@
   {% endif %}
 
   {% if sprachen %}
-  <div class="section-label">Kapitel</div>
+  <h2 class="section-label">Kapitel</h2>
   <div class="pill-row">
     {% for s in sprachen %}
     <a class="pill{% if s.id == sprache_id %} aktiv{% endif %}"
