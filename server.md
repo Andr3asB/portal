@@ -16,9 +16,15 @@ tar xzf portal.tar.gz
 ```
 
 **Ohne diesen Schluessel ist kein Backup wiederherstellbar.** Das ist kein
-Nebeneffekt, sondern der Zweck der Uebung - zusammen mit `TOKEN_KEY` an einem
-zweiten sicheren Ort aufbewahren. Aeltere Dateien ohne `.age` sind noch
-unverschluesselt und brauchen diesen Schritt nicht.
+Nebeneffekt, sondern der Zweck der Uebung. Aeltere Dateien ohne `.age` sind
+noch unverschluesselt und brauchen diesen Schritt nicht.
+
+**Wo alles liegt (seit 31.08.2026):** Andis Bitwarden, EIN Eintrag mit dem
+privaten age-Schluessel (`portal-backup.key`) UND der kompletten `.env` von
+home02 (inkl. `TOKEN_KEY` und VAPID-Schluesseln). Damit reicht fuer einen
+Totalausfall von home02: NAS-Backup + dieser eine Bitwarden-Eintrag. Nach
+jeder inhaltlichen Aenderung an der Server-`.env` (neue Variable, neuer
+Schluessel) den Eintrag aktualisieren - sonst veraltet die Kopie still.
 
 Der Weg ist am 13.08.2026 einmal vollstaendig durchgespielt worden (echtes
 Archiv aufs NAS, zurueckgeholt, entschluesselt, `PRAGMA integrity_check` = ok)

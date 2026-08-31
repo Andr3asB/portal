@@ -45,6 +45,16 @@ seinem privaten. **#130 und #211 sind abgehakt** (`wunsch_erledigt`, mit
 Umsetzungstext). Damit ist die letzte offene Zusage aus dem Audit vom
 11.08.2026 erledigt.
 
+**Zweiter Nachtrag:** Beim Aufräumen fiel auf, dass der `TOKEN_KEY` bislang
+nur in der `.env` auf home02 existierte – nicht im NAS-Backup (das sichert
+bewusst nur `/data`), nirgendwo sonst. Ein Plattentod von home02 hätte also
+trotz funktionierender Backups alle Zugangslinks und Push-Abos entwertet.
+Andi hat daraufhin die **komplette `.env` in denselben Bitwarden-Eintrag
+gelegt wie den privaten age-Schlüssel** (selbst kopiert, in einem eigenen
+Terminal – Schlüsselmaterial läuft nicht durch diese Sitzung). Der
+Wiederherstellungs-Abschnitt in `server.md` beschreibt jetzt beides,
+inklusive der Pflicht, den Eintrag bei `.env`-Änderungen nachzuziehen.
+
 ## 2026-08-31 – Lint eingeführt: ruff über den ganzen Baum, 242 Funde behoben
 
 Auftrag: „fix lint errors". Es gab bislang gar keinen Linter – also ruff
