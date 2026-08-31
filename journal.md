@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-08-31 – Externe UI-Skills geprüft: einer rein (eingefroren), einer nur als Doku
+
+Andis Frage nach externen Skills (Snyk-Artikel „Top Claude Skills for UI/UX
+Engineers"). Beide Kandidaten vollständig gelesen, bevor irgendetwas
+installiert wurde – und beide bestätigten genau die Warnung des Artikels,
+jeweils auf eigene Art:
+
+- **Vercel Web Design Guidelines**: Die SKILL.md selbst ist harmlos (39
+  Zeilen, keine Skripte) – aber sie lädt ihre eigentlichen Regeln **zur
+  Laufzeit frisch von GitHub**. Anweisungen, die sich jederzeit unbemerkt
+  ändern können, führen wir nicht aus. Installiert deshalb mit **lokal
+  eingefrorener Regeldatei** (Commit `e3d624b`, komplett gelesen: ~85 reine
+  Review-Regeln, keinerlei Seiteneffekt-Anweisungen) unter
+  `.claude/skills/web-design-guidelines/` – mit Absprache, die
+  Nicht-ändern-Regel für `.claude/` gilt sonst weiter. Dazu ein
+  „Hausregeln gehen vor"-Abschnitt (deutsch statt Title Case, kein CDN,
+  React-Regeln sinngemäß, localStorage-Filter sind Absicht).
+- **AccessLint**: Fachlich das stärkste Material (echte WCAG-EM-Methodik),
+  aber das Plugin hängt an einem MCP-Server via `npx -y @accesslint/mcp@latest`
+  – ungepinnter npm-Fremdcode bei jedem Start, plus eigener Chrome, plus
+  die Sitzungsfrage beim Prüfen des laufenden Portals. Entscheidung mit
+  Andi: **nur die zwei Methodik-Dokumente** als eingefrorene Referenz nach
+  `docs/a11y/`, kein Fremdcode.
+
+Erster Lauf der eingefrorenen Checkliste über die Vorlagen, nach dem
+Aussieben des Unpassenden: sauber bei `transition:all`, Overscroll,
+Lade-Beschriftungen, Platzhaltern – vier echte Lücken, gebündelt zu zwei
+Wünschen ohne Priorität: **#244** (prefers-reduced-motion fehlt komplett,
+color-scheme nicht am html-Element, touch-action nur punktuell) und
+**#245** (kein Skip-Link, kaum :hover-Zustände – seit dem breiten Brett
+sichtbar –, keine tabular-nums in Zahlenkolonnen, Offline-Banner ohne
+aria-live).
+
 ## 2026-08-31 – portal-v230–v232: Die UI-Review-Wünsche umgesetzt (#234, #236–#242)
 
 Andi hat alle sechs Review-Wünsche freigegeben (fünf `hoch`, plus #241

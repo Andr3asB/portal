@@ -425,8 +425,15 @@ ausschließlich in `.claude/settings.json`.
   in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026).
   `wunsch_lauf_check.py` beantwortet nur lesend, ob der stündliche Lauf gerade
   Arbeit hat (siehe „Prüfung gegen das laufende Portal").
+- `docs/a11y/` – eingefrorene Kopien der AccessLint-Methodik (WCAG-EM,
+  Prüf-Checkpoints; MIT) als Referenz für Hand-Reviews. Bewusst NUR die
+  Dokumente übernommen – der zugehörige MCP-Server (`npx @latest`,
+  ungepinnter Fremdcode) wurde nach Review verworfen (Andi, 31.08.2026).
 - `.claude/` – aktive Berechtigungen und Guardrail-Hook (Kopien der
-  Root-Vorlagen), **nicht ändern**
+  Root-Vorlagen), **nicht ändern**. Ausnahme nach Absprache 31.08.2026:
+  `.claude/skills/web-design-guidelines/` – UI-Review-Checkliste (Vercel,
+  Regeln lokal eingefroren statt Laufzeit-Fetch; Details in dessen SKILL.md).
+  Findings daraus werden Wünsche, nie Direktumbauten.
 
 ## Wünsche abschließen
 
