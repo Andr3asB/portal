@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-09-01 – Vierter (Mini-)Durchgang: die Interaktions-Ebene → #248
+
+Andis Frage „noch ein Durchgang, oder ist jetzt alles sauber?" –
+nachgemessen statt geraten: Die statisch prüfbare Ebene ist durch und
+gewächtert, drei Runden mit sinkendem Ertrag (5 → 4 → 2 Funde). Übrig ist
+genau eine Schicht, die Interaktion: 0× Dialog-Semantik an den Overlays
+(kein role=dialog, kein Escape), 0× aria-expanded an Auf/Zu-Knöpfen,
+Umsortieren nur per Ziehen (keine Tastatur-Alternative), und twemoji lässt
+Screenreader jedes Schmuck-Emoji vorlesen. Als EIN gebündelter Wunsch
+(#248, ohne Priorität) festgehalten. Danach ist der sinnvolle statische
+Review-Zyklus erschöpft – was dann noch kommt, kommt aus echter Nutzung
+oder einer Hand-Prüfung mit echtem Screenreader (docs/a11y/
+accesslint-checkpoints.md beschreibt, wie).
+
 ## 2026-09-01 – portal-v234: Screenreader-Wünsche #246/#247
 
 Die beiden Funde des dritten UI-Durchgangs, beide unsichtbar für Sehende,
