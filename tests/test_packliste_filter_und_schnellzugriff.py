@@ -80,7 +80,7 @@ def _karte(seite, name):
     """Das <div class="item-card …"> eines Eintrags, an seinem Namen gesucht."""
     treffer = re.search(
         r'(<div class="item-card[^>]*>)(?:(?!</div>).)*?'
-        r'<span class="item-name">' + re.escape(name) + '</span>',
+        r'<span class="item-name"[^>]*>' + re.escape(name) + '</span>',
         seite, re.DOTALL)
     assert treffer, f"Eintrag {name!r} nicht auf der Seite"
     return treffer.group(1)

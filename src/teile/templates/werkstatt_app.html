@@ -272,7 +272,8 @@
    damit man sich nicht zwei Bedienlogiken merken muss. #}
 {% if offen or erledigt %}
 <div class="top-aktionen">
-  <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+  {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+  <button type="button" class="btn-filter-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
 </div>
 
 <div class="filter-card" id="filter-card">
@@ -347,11 +348,11 @@
        tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man
        sieht, dass sie nur der erste Satz ist und keine Formulierung. #}
     {% if w.titel %}
-      <div class="wunsch-titel">{{ w.titel }}</div>
+      <div class="wunsch-titel" data-emoji-alt>{{ w.titel }}</div>
     {% else %}
-      <div class="wunsch-titel ersatz">{{ ersatz_titel(w.text) }}</div>
+      <div class="wunsch-titel ersatz" data-emoji-alt>{{ ersatz_titel(w.text) }}</div>
     {% endif %}
-    <div class="wunsch-text secondary">{{ w.text }}</div>
+    <div class="wunsch-text secondary" data-emoji-alt>{{ w.text }}</div>
     <div class="wunsch-meta">
       {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}
@@ -412,11 +413,11 @@
        tritt eine aus dem Text abgeleitete ein - erkennbar blasser, damit man
        sieht, dass sie nur der erste Satz ist und keine Formulierung. #}
     {% if w.titel %}
-      <div class="wunsch-titel">{{ w.titel }}</div>
+      <div class="wunsch-titel" data-emoji-alt>{{ w.titel }}</div>
     {% else %}
-      <div class="wunsch-titel ersatz">{{ ersatz_titel(w.text) }}</div>
+      <div class="wunsch-titel ersatz" data-emoji-alt>{{ ersatz_titel(w.text) }}</div>
     {% endif %}
-    <div class="wunsch-text secondary">{{ w.text }}</div>
+    <div class="wunsch-text secondary" data-emoji-alt>{{ w.text }}</div>
     <div class="wunsch-meta">
       {% if w.ansicht or w.app_slug %}<span class="wunsch-chip">{{ w.ansicht or w.app_slug }}</span>{% endif %}
       {% if w.urheber_name %}

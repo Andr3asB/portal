@@ -1907,6 +1907,36 @@ den niemand sieht.
 `tests/test_aria_labels.py` waechtert Vorhandensein, Gleichheit und dass der
 Name kein Platzhalter ist ("Knopf", "...").
 
+## Interaktions-Ebene (Wunsch #248)
+
+Vier Konventionen, alle zentral in `base.html`, gewaechtert in
+`tests/test_interaktion.py`:
+
+- **Overlays sind Dialoge.** Menue-Panel und ✨-Wunsch-Karte tragen
+  `role="dialog"` + `aria-modal="true"`; `dialogFuehrung()` liefert Fokus auf
+  das erste Bedienelement, Tab-Falle, Escape und Fokus-Rueckgabe an den
+  Ausloeser (Fallback ☰-Knopf). Ein neues Overlay laeuft ueber denselben
+  Helfer, nicht ueber nacktes `classList.toggle('open')`.
+- **Auf/Zu-Knoepfe tragen `data-panel="<id>"`.** `aufzuSync()` setzt daraus
+  nach jedem Klick `aria-expanded` - anhand der SICHTBARKEIT des Panels
+  (`getComputedStyle(...).display`), weil die Panels mal `.open`, mal
+  `hidden`, mal `style.display` nutzen. Wer ein Panel ohne Klick schaltet
+  (Escape), ruft `aufzuSync()` selbst.
+- **Wer ziehen kann, kann tippen.** `ziehSortierung()` ruft
+  `tastaturSortierung(opt)` selbst mit auf (Pfeiltasten am fokussierten
+  ⠿-Griff, beim Brett wechseln ←/→ die Spalte; Ansage ueber `#sr-live`,
+  gespeichert 600 ms nach dem letzten Druck ueber dieselbe
+  `opt.speichern`-Signatur wie das Ziehen). Vorlagen mit EIGENER
+  Zieh-Fassung (`initKatDrag` in den beiden Kategorien-Seiten) rufen den
+  Helfer einzeln. Bewusst ohne Tastatur: der Kacheln-Edit-Modus der
+  Startseite und das Essensplan-Ziehen (dort ist ✏️ je Slot die
+  gleichwertige Alternative).
+- **Emoji: Schmuck ist stumm, Inhalt spricht.** Nach `twemoji.parse()`
+  versteckt base.html jedes Emoji-Bild (`alt=""` + `aria-hidden`), ausser es
+  steht unter einem Element mit `data-emoji-alt` - das sind die App-Kacheln
+  der Startseite, Nutzertexte (Aufgaben, Eintraege, Wuensche, Namen) und der
+  Hilfe-Fliesstext, der die Emoji der Oberflaeche woertlich zitiert.
+
 ## Lange Vorgaenge anzeigen (Wunsch #176)
 
 Formulare, deren Absenden spuerbar dauert (KI-Anfrage), tragen
@@ -2560,6 +2590,14 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_interaktion.py` – Wunsch #248. Die Interaktions-Ebene: beide
+  Overlays als Dialoge (role/aria-modal + dialogFuehrung), jeder
+  Auf/Zu-Knopf traegt `data-panel` (aria-expanded via aufzuSync),
+  eigene Zieh-Fassungen rufen `tastaturSortierung()`, und der
+  twemoji-Nachlauf versteckt Schmuck-Emoji (data-emoji-alt als Ausnahme).
+  Der Waechter fand beim Entstehen sofort einen vergessenen Knopf
+  (vokabeln `+ Vokabel eintragen`) - Gegenprobe mit absichtlichen Fehlern
+  gemacht, alle Teile schlagen an.
 - `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
   Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
   wieder gruen sein.

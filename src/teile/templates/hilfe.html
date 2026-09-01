@@ -77,7 +77,10 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
 
 {% block body %}
 
-<main class="main" id="main">
+{#- Wunsch #248: Die Hilfe SPRICHT ueber die Emoji der Oberflaeche („🔍
+    Filtern" oeffnet …) - hier sind sie Inhalt, nicht Schmuck, und behalten
+    ihren Alt-Text (data-emoji-alt, siehe base.html). -#}
+<main class="main" id="main" data-emoji-alt>
 
   {% set kapitel = [
     ('kapitel-1', '🏠 Was ist das Portal?'),
@@ -123,6 +126,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <div class="tip">📖 <strong>Diese Hilfe ist in Kapitel eingeklappt:</strong> Ein Tipp auf eine Überschrift (oder auf einen Eintrag im Inhaltsverzeichnis) klappt das Kapitel auf, ein zweiter wieder zu. So bleibt die Seite kurz, obwohl alles drinsteht.</div>
     <div class="tip">⚠️ Teile deinen Link nicht mit anderen – er gehört nur dir.</div>
     <div class="tip">🌗 <strong>Hell oder dunkel:</strong> Im Menü (☰) schaltet ein Knopf die Darstellung im Kreis: ☀️ <strong>Hell</strong> → 🌙 <strong>Dunkel</strong> → 🌗 <strong>Wie das Gerät</strong>. Der Knopf zeigt immer den Zustand, der gerade gilt. „Wie das Gerät“ heißt: Stellt dein iPhone abends auf Dunkelmodus um, wird auch das Portal dunkel – ganz ohne Zutun. Die Einstellung gilt nur für dich.</div>
+    <div class="tip">⌨️ <strong>Alles geht auch mit der Tastatur:</strong> Das ☰-Menü und der ✨-Wunsch-Dialog schließen mit <strong>Escape</strong>, und die Tab-Taste bleibt darin, bis du fertig bist. Überall, wo du am ⠿-Griff ziehen kannst (Packliste, Aufgaben-Brett, Kategorien), kannst du den Griff stattdessen mit Tab ansteuern und den Eintrag mit den <strong>Pfeiltasten</strong> verschieben – auf dem Brett wechseln ← und → die Spalte. Gespeichert wird automatisch, wie beim Ziehen.</div>
     <div class="tip">🗑️ <strong>Überall gleich:</strong> Wenn du etwas endgültig entfernen kannst, steht dort ein <strong>Mülleimer</strong> – in jeder App, an jeder Stelle. Vor dem Entfernen fragt das Portal immer nach. Ein <strong>Auge mit Strich</strong> oder „Für mich ausblenden“ ist etwas anderes: Da verschwindet der Eintrag nur bei dir und bleibt für alle anderen stehen. Und im Kassenbuch gibt es bewusst gar kein Löschen – dort wird <strong>storniert</strong>, der Eintrag bleibt sichtbar und zählt nur nicht mehr mit.</div>
   </details>
 
@@ -493,7 +497,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
       </li>
       <li>
         <span class="step-icon">⠿</span>
-        <div><strong>Reihenfolge selbst bestimmen:</strong> Am Griff links neben einem Eintrag ziehen – so lässt sich die Liste in die Reihenfolge bringen, in der du wirklich packst. Sie gilt für alle und bleibt gespeichert. Neue Einträge landen immer <strong>am Ende</strong>, damit sie deine Sortierung nicht durcheinanderbringen. Gepackte Sachen haben keinen Griff – sie stehen ohnehin in ihrem eigenen Abschnitt.</div>
+        <div><strong>Reihenfolge selbst bestimmen:</strong> Am Griff links neben einem Eintrag ziehen – oder den Griff mit Tab anwählen und mit ↑/↓ verschieben – so lässt sich die Liste in die Reihenfolge bringen, in der du wirklich packst. Sie gilt für alle und bleibt gespeichert. Neue Einträge landen immer <strong>am Ende</strong>, damit sie deine Sortierung nicht durcheinanderbringen. Gepackte Sachen haben keinen Griff – sie stehen ohnehin in ihrem eigenen Abschnitt.</div>
       </li>
       <li>
         <span class="step-icon">✏️</span>
@@ -644,7 +648,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <ul class="steps">
       <li>
         <span class="step-icon">⠿</span>
-        <div><strong>Ziehen am Griff:</strong> Links an jeder Karte sitzt der Griff. <strong>Nach oben oder unten</strong> ändert die Reihenfolge innerhalb der Spalte – das ist die Priorität, und sie wird gespeichert. <strong>In eine andere Spalte</strong> ändert den Status. Beides wirkt sofort, ohne Speichern-Knopf.</div>
+        <div><strong>Ziehen am Griff:</strong> Links an jeder Karte sitzt der Griff. <strong>Nach oben oder unten</strong> ändert die Reihenfolge innerhalb der Spalte – das ist die Priorität, und sie wird gespeichert. <strong>In eine andere Spalte</strong> ändert den Status. Beides wirkt sofort, ohne Speichern-Knopf. Mit der Tastatur geht dasselbe: Griff mit Tab anwählen, ↑/↓ sortiert, ←/→ wechselt die Spalte.</div>
       </li>
       <li>
         <span class="step-icon">✅</span>

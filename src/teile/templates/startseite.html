@@ -158,7 +158,7 @@
         {% for app in gruppe.apps %}
         <a class="tile" href="{{ app_pfad(app.slug) }}"
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
-          <span class="tile-emoji">{{ app.emoji }}</span>
+          <span class="tile-emoji" data-emoji-alt>{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
         </a>
         {% endfor %}
@@ -177,7 +177,7 @@
         {% for app in allgemein %}
         <a class="tile" href="{{ app_pfad(app.slug) }}"
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
-          <span class="tile-emoji">{{ app.emoji }}</span>
+          <span class="tile-emoji" data-emoji-alt>{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
         </a>
         {% endfor %}

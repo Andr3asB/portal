@@ -101,7 +101,7 @@ def test_wunsch_ohne_titel_bekommt_trotzdem_eine_ueberschrift(client, db, werkst
     _wunsch(db["verbindung"],
             "Der Kalender soll Feiertage kennen. Sonst plant man daneben.")
     text = client.get(f"/a/werkstatt/{werkstatt_token}/").get_data(as_text=True)
-    assert 'class="wunsch-titel ersatz">Der Kalender soll Feiertage kennen<' in text
+    assert re.search(r'class="wunsch-titel ersatz"[^>]*>Der Kalender soll Feiertage kennen<', text)
 
 
 def test_jede_karte_hat_eine_ueberschrift(client, db, werkstatt_token):
@@ -126,7 +126,7 @@ def test_echter_titel_schlaegt_die_ableitung(client, db, werkstatt_token):
     _wunsch(db["verbindung"], "Ein sehr langer Wunschtext ohne Aussagekraft",
             titel="Feiertage im Kalender")
     text = client.get(f"/a/werkstatt/{werkstatt_token}/").get_data(as_text=True)
-    assert 'class="wunsch-titel">Feiertage im Kalender<' in text
+    assert re.search(r'class="wunsch-titel"[^>]*>Feiertage im Kalender<', text)
     assert "wunsch-titel ersatz" not in text
 
 
@@ -150,4 +150,4 @@ def test_der_volle_text_bleibt_unter_der_ueberschrift(client, db, werkstatt_toke
             "versehentlich am Feiertag ein.")
     _wunsch(db["verbindung"], voll)
     text = client.get(f"/a/werkstatt/{werkstatt_token}/").get_data(as_text=True)
-    assert f'class="wunsch-text secondary">{voll}<' in text
+    assert re.search(r'class="wunsch-text secondary"[^>]*>' + re.escape(voll) + '<', text)

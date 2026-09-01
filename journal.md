@@ -2,6 +2,60 @@
 
 ---
 
+## 2026-09-01 – portal-v235: #248, die Interaktions-Ebene
+
+Der gebündelte Wunsch aus dem vierten Durchgang, alle vier Teile, alle
+zentral in `base.html` (Vollreferenz: server.md, „Interaktions-Ebene").
+
+**1. Overlays sind Dialoge.** `role="dialog"` + `aria-modal` an Menü-Panel
+und ✨-Karte; `dialogFuehrung()` liefert beiden dasselbe Verhalten: Fokus
+aufs erste Bedienelement, Tab-Falle, Escape schließt, Fokus kehrt zum
+Auslöser zurück (Fallback ☰ – der ✨-Eintrag im Menü ist nach dem Schließen
+selbst unsichtbar, `offsetParent === null` erkennt das).
+
+**2. aria-expanded ohne Handarbeit.** Ein Auf/Zu-Knopf trägt
+`data-panel="<id>"`; `aufzuSync()` meldet nach jedem Klick die SICHTBARKEIT
+des Panels (`getComputedStyle`, weil die Panels mal `.open`, mal `hidden`,
+mal `style.display` nutzen) an alle solchen Knöpfe zurück – auch „daneben
+tippen schließt" ist ein Klick, und exklusive Panels (Geburtstage klappen
+das jeweils andere zu) stimmen so ohne Sonderfall. ~25 Knöpfe in 16
+Vorlagen markiert: ☰, alle „+ Neu"/„Filtern", Einkaufsmodus, alle
+✏️-Panel-Toggles, 🔔, Verlauf.
+
+**3. Wer ziehen kann, kann tippen.** `tastaturSortierung(opt)` nimmt
+DIESELBEN Optionen wie `ziehSortierung()` – die ruft sie inzwischen selbst
+auf, Packliste und Brett bekamen die Pfeiltasten damit geschenkt; die zwei
+Kategorien-Seiten mit eigener Zieh-Fassung rufen sie einzeln. ↑/↓ sortiert
+in der eigenen Gruppe (gleiche Kandidatenwahl wie beim Ziehen: #181-Gruppen,
+Gepacktes zählt nie), ←/→ wechselt am Brett die Spalte, Ansage über eine
+`aria-live`-Zeile („Position 2 von 5"), gespeichert wird 600 ms nach dem
+letzten Druck über dieselbe `opt.speichern`-Signatur – fünfmal drücken ist
+EINE Speicherung. Bewusst ohne Tastatur: der Kachel-Edit-Modus der
+Startseite (nicht im Wunsch) und das Essensplan-Ziehen (✏️ je Slot ist die
+gleichwertige Alternative).
+
+**4. Emoji: Schmuck ist stumm, Inhalt spricht.** Nach `twemoji.parse()`
+versteckt ein Nachlauf jedes Emoji-Bild (`alt=""` + `aria-hidden`), außer
+unter einem Element mit `data-emoji-alt`: App-Kacheln (laut Wunsch
+ausdrücklich bedeutungstragend), Nutzertexte (Aufgaben, Einträge, Wünsche,
+Namen, Gerichte) und der Hilfe-Fließtext, der die Emoji der Oberfläche
+wörtlich zitiert („🔍 Filtern" ohne Emoji wäre „ Filtern").
+
+**Der Wächter (`test_interaktion.py`) fand beim Entstehen sofort etwas:**
+den „+ Vokabel eintragen"-Knopf, den der Hand-Durchgang übersehen hatte –
+dieselbe Lehre wie bei #246 („Wächter vor Fix" hätte hier von Anfang an
+gegolten). Gegenprobe mit drei absichtlichen Fehlern: alle Teile schlagen
+an. Stolperer des Abends: Der neue base.html-Kommentar enthielt als
+Beispiel „Haus mit Garten Startseite" – und `test_vokabel_verben` prüft,
+dass „Haus" NICHT auf der Verbtraining-Seite steht. Ein Kommentar im
+Inline-Skript ist eben auch Seiteninhalt. Vier Funktionstests, die exakte
+Markup-Strings wie `class="item-name">` griffen, wurden attribut-tolerant
+(`[^>]*>`) – ihr Prüfzweck blieb unverändert. ⌨️ brauchte eine neue lokale
+Twemoji-Grafik (2328.svg), `test_emoji.py` hatte recht.
+
+Suite: **1997 Tests**. Hilfe um den Tastatur-Tipp ergänzt (Kapitel 1,
+Packliste, Brett). Damit ist das Backlog wieder leer.
+
 ## 2026-09-01 – Vierter (Mini-)Durchgang: die Interaktions-Ebene → #248
 
 Andis Frage „noch ein Durchgang, oder ist jetzt alles sauber?" –

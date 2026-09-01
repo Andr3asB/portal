@@ -100,9 +100,11 @@
           <div class="mahlzeit-kopf">
             <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
             {% if eintrag %}<button type="button" class="mahlzeit-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>{% endif %}
-            <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+            <button class="mahlzeit-edit-toggle" type="button" data-klick="toggleTag" data-args='["{{ slot_id }}"]' data-panel="tag-edit-{{ slot_id }}" title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
           </div>
-          <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}">
+          {#- Wunsch #248: Rezept-/Freitextnamen sind Nutzertext und behalten
+              ihr Emoji-alt (data-emoji-alt, siehe base.html). -#}
+          <div class="mahlzeit-inhalt{% if eintrag and eintrag.gekocht %} ist-gekocht{% endif %}" data-emoji-alt>
             {% if eintrag and eintrag.rezept_name %}
               {# Wunsch #163: direkt zum Rezept. Der Zieh-Anfasser (⠿) ist ein
                  eigenes Element, ein Link im Inhalt kommt ihm nicht in die

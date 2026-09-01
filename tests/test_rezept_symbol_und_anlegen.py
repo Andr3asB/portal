@@ -92,7 +92,7 @@ def test_liste_zeigt_je_kategorie_ein_anderes_symbol(client, db, rezepte_token):
     karten = {
         name: zeichen for zeichen, name in re.findall(
             r'class="rezept-emoji"[^>]*>([^<]+)</span>.*?'
-            r'class="rezept-name">([^<\s]+)', text, re.DOTALL)
+            r'class="rezept-name"[^>]*>([^<\s]+)', text, re.DOTALL)
     }
     assert karten == {"Testkuchen": KUCHEN, "Testlinsen": PFANNE, "Testrest": TOPF}, karten
 

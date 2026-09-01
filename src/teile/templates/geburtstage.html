@@ -85,7 +85,8 @@
 {% block body %}
 <main class="main" id="main">
 
-  <button class="gb-neu-toggle" data-klick="gbFormularUmschalten">+ Geburtstag eintragen</button>
+  {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+  <button class="gb-neu-toggle" data-klick="gbFormularUmschalten" data-panel="gb-form-card">+ Geburtstag eintragen</button>
 
   <div class="gb-form-card" id="gb-form-card">
     <form method="post" action="/a/geburtstage{{ tp }}neu">
@@ -136,7 +137,7 @@
         {% endif %}
       </div>
       <div class="gb-mitte">
-        <div class="gb-name">{{ e.name }}</div>
+        <div class="gb-name" data-emoji-alt>{{ e.name }}</div>
         <div class="gb-datum">
           {{ e.datum_text }}{% if e.wird_alt %} · wird {{ e.wird_alt }}{% endif %}
         </div>
@@ -144,10 +145,12 @@
       </div>
       {% if e.erstellt_von == user.id or user.is_admin or user.rolle == 'eltern' %}
       <button class="gb-glocke" data-klick="gbEditUmschalten" data-args='[{{ e.id }}]'
+              data-panel="gb-edit-{{ e.id }}"
               title="Eintrag bearbeiten" aria-label="Eintrag bearbeiten">✏️</button>
       {% endif %}
       <button class="gb-glocke {% if e.erinnerung or e.vorlauf_tage %}aktiv{% endif %}"
               data-klick="gbPanelUmschalten" data-args='[{{ e.id }}]'
+              data-panel="gb-panel-{{ e.id }}"
               title="Erinnerung und Sichtbarkeit" aria-label="Erinnerung und Sichtbarkeit">🔔</button>
     </div>
 

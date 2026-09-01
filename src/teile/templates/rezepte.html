@@ -90,7 +90,7 @@
       {# Wunsch #184: Kochen 🍳, Backen 🍰, ohne Kategorie weiterhin 🍲. #}
       <span class="rezept-emoji" aria-hidden="true">{{ symbol(r.kategorie) }}</span>
       <div>
-        <div class="rezept-name">{{ r.name }}{% if r.kategorie and r.kategorie in kategorien %} <span style="font-size:13px;color:var(--text-2)">{{ kategorien[r.kategorie] }}</span>{% endif %}</div>
+        <div class="rezept-name" data-emoji-alt>{{ r.name }}{% if r.kategorie and r.kategorie in kategorien %} <span style="font-size:13px;color:var(--text-2)">{{ kategorien[r.kategorie] }}</span>{% endif %}</div>
         <div class="rezept-meta">
           {{ r.anzahl_zutaten }} Zutat{{ 'en' if r.anzahl_zutaten != 1 else '' }}
           {% if r.anzahl_bewertungen %} · ⭐ {{ '%.1f'|format(r.durchschnitt) }} ({{ r.anzahl_bewertungen }}){% endif %}

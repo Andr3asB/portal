@@ -115,10 +115,11 @@
 
   <div class="top-aktionen">
     {% if sprachen %}
-    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Vokabel eintragen</button>
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn" data-panel="neu-form-card">+ Vokabel eintragen</button>
     {% endif %}
     {# Wunsch #220: ausdrücklich ZWISCHEN Eintragen und Lernen. #}
-    <button type="button" class="btn-neu-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+    <button type="button" class="btn-neu-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
     <a class="btn-lernen" href="/a/vokabeln{{ tp }}lernen">📖 Lernen</a>
   </div>
 
@@ -238,7 +239,7 @@
          pruefen das ohnehin serverseitig (user_id), aber ein Knopf, der zu
          403 fuehrt, waere schlechte Bedienung. #}
       {% if v.user_id == user.id %}
-      <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+      <button class="vokabel-edit-btn" type="button" data-klick="toggleEdit" data-args='[{{ v.id }}]' data-panel="edit-{{ v.id }}" title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
       {% else %}
       <span class="vokabel-edit-btn" title="Von {{ v.besitzer }} geteilt">👥</span>
       {% endif %}

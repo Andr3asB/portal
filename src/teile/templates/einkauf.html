@@ -156,7 +156,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   <input aria-label="{{ item.name }} abhaken" class="item-check" type="checkbox"
          data-aendern="toggleErledigt" data-args='[{{ item.id }}]'
          {% if item.erledigt %}checked{% endif %}>
-  <span class="item-name">{{ item.name }}</span>
+  <span class="item-name" data-emoji-alt>{{ item.name }}</span>
 
   {% if item.angebot %}
     <span class="badge-angebot">% {{ item.laden_namen or '' }}</span>
@@ -165,6 +165,7 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   <!-- Bearbeiten-Toggle: Name, Angebot und Löschen stecken alle im Panel -->
   <button class="angebot-toggle-btn" type="button"
           data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
+          data-panel="edit-panel-{{ item.id }}"
           title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
@@ -211,9 +212,10 @@ body.dark .badge-pending { background:#333; color:#bbb; }
   </div>
 
   <div class="top-aktionen">
-    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
-    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
-    <button type="button" class="btn-einkauf-start" id="einkauf-start-btn">🛒 Einkauf starten</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn" data-panel="add-form-card">+ Neu</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
+    <button type="button" class="btn-einkauf-start" id="einkauf-start-btn" data-panel="einkauf-markt-card">🛒 Einkauf starten</button>
   </div>
 
   <div class="filter-card" id="einkauf-markt-card">
