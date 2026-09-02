@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-09-02 – portal-v236: #249, der hereinragende Skip-Link
+
+Andis Fund (sehr_hoch): Der „Zum Inhalt springen"-Knopf aus #245 stand
+oben links dauerhaft im Bild, statt nur bei Tastaturfokus zu erscheinen.
+
+Die Ursache ist ein Rechenfehler im Versteck: `translateY(-200%)` rechnet
+in der **eigenen Hoehe** des Knopfs (~80 px Versatz), der Knopf sitzt aber
+bei `top: calc(var(--st) + 8px)`. Am Schreibtisch ist `--st` 0 und alles
+verschwindet – in der installierten PWA auf dem iPhone ist `--st` die
+Statusleiste (~50 px), und dann reichte der Versatz nicht mehr: der untere
+Rand ragte ins Bild. Ein Versteck, das von Element-Hoehe, Safe-Area und
+Schriftgroesse abhaengt, ist keins.
+
+Fix: seitlich aus dem Bild parken (`left: -999px`), bei `:focus-visible`
+an die Position (`left: 8px`) – das klassische Muster, unabhaengig von
+allem Dreien. `white-space: nowrap` dazu, damit der Text am Parkplatz
+nicht umbricht. Verhalten unveraendert: erster Tab-Stopp, sichtbar nur mit
+Tastatur. Suite 1997 Tests gruen (der #245-Waechter prueft die
+`:focus-visible`-Regel weiter).
+
 ## 2026-09-01 – portal-v235: #248, die Interaktions-Ebene
 
 Der gebündelte Wunsch aus dem vierten Durchgang, alle vier Teile, alle
