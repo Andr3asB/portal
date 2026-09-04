@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-09-03 – portal-v237: #250, das Ausfallprotokoll fuer die Werkstatt
+
+Andi hat einen Werkstatttermin und will das Protokoll (#222) mitgeben –
+mit gekuerzten GPS-Koordinaten: Echtheit erkennbar, Route nicht.
+
+**Die Kuerzung (im Wunsch mir ueberlassen): zwei Nachkommastellen.** Das
+ist ein Raster von ~1,1 × 0,75 km – grob eine Ortslage. Man sieht, dass
+die Ausfaelle wirklich unterwegs an verschiedenen Orten passierten, aber
+weder Wohnadresse noch Fahrstrecke lassen sich ablesen. Eine Stelle mehr
+(~110 m) waere wieder ein Bewegungsprofil, eine weniger (~11 km) saehe
+aus wie ausgedacht. Die Genauigkeit (±x m) bleibt ganz weg (neben einem
+1-km-Raster nur Pseudo-Praezision), Melder-Namen ebenfalls – die
+Werkstatt braucht Zeitpunkte und Haeufigkeit, keine Familienmitglieder.
+
+**Gerundet wird in der Route, nicht in der Vorlage:** `druck()` in
+`25_ausfall.py` gibt der neuen `ausfaelle_druck.html` nur noch die
+fertigen Strings – die Seite KANN die vollen Werte nicht ausgeben. Der
+wichtigste Test in `test_ausfall_druck.py` prueft entsprechend eine
+Abwesenheit (`48.123` darf nirgends im HTML stehen). Export = Drucken:
+Der Druckdialog kann ueberall auch „Als PDF speichern", ein eigener
+Export-Endpunkt waere ein zweiter Weg fuer dasselbe.
+
+**Zweimal hatten die Waechter recht:** Die erste Fassung der Druckvorlage
+versteckte `.app-header` und `.ptr-anzeige` selbst – genau das verbieten
+`test_kopfzeile_bleibt` und `test_ziehen_neuladen` (beides gehoert
+base.html). Deshalb gibt es jetzt zentral in base.html eine
+`druckblatt`-Regel: traegt das `<main>` einer Vorlage diese Klasse,
+versteckt base.html im Druck das Portal-Chrome (`body:has(.druckblatt)`).
+Und 🖨️ brauchte seine lokale Twemoji-Grafik (1f5a8.svg) –
+`test_emoji.py`, wie immer.
+
+In der App selbst aendert sich nichts an der Anzeige: voller Ort samt
+Kartensprung bleibt (auch das gewaechtert). Neuer Knopf „🖨️ Fuer die
+Werkstatt drucken" unter den Zahlen, Hilfe-Kapitel Ausfaelle ergaenzt.
+Suite: **2026 Tests**.
+
 ## 2026-09-02 – portal-v236: #249, der hereinragende Skip-Link
 
 Andis Fund (sehr_hoch): Der „Zum Inhalt springen"-Knopf aus #245 stand

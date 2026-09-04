@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% set app_slug = "ausfaelle" %}
+{% block title %}Ausfallprotokoll drucken{% endblock %}
+
+{% block extra_styles %}
+/* Wunsch #250: Druckansicht fuer die Werkstatt. Am Bildschirm eine normale
+   Unterseite mit Drucken-Knopf; im Druck verschwindet alles Portal-Chrome
+   (Kopfband, Menue, Knoepfe) und uebrig bleibt ein schwarz-weisses Blatt. */
+.druck-hinweis {
+  font-size: 13px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5;
+}
+.btn-drucken {
+  width: 100%; background: var(--farbe-band); color: #fff; border: none;
+  border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600;
+  cursor: pointer; margin-bottom: 18px;
+}
+.blatt-kopf { margin-bottom: 12px; }
+.blatt-titel { font-size: 19px; font-weight: 700; }
+.blatt-meta  { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.blatt-zahlen { font-size: 14px; margin: 10px 0 14px; }
+.tabelle-rahmen { overflow-x: auto; }
+.protokoll {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.protokoll th, .protokoll td {
+  border: 1px solid var(--border); padding: 6px 8px;
+  text-align: left; vertical-align: top;
+}
+.protokoll th {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-2); background: var(--surface-2);
+}
+.protokoll td.ort { white-space: nowrap; }
+.fussnote { font-size: 12px; color: var(--text-2); margin-top: 12px; line-height: 1.5; }
+
+@media print {
+  /* Portal-Chrome versteckt base.html zentral (Klasse `druckblatt` am
+     <main>, siehe dort) - hier nur die eigenen Bedienelemente und die
+     Farben: Werkstatt-Drucker kennen keinen Dunkelmodus. */
+  .btn-drucken, .druck-hinweis { display: none !important; }
+  .main { max-width: none; padding: 0; }
+  .blatt-titel, .protokoll td { color: #000; }
+  .blatt-meta, .blatt-zahlen, .fussnote, .protokoll th { color: #000; }
+  .protokoll th, .protokoll td { border-color: #000; }
+  .protokoll th { background: #fff; }
+  .protokoll tr { break-inside: avoid; }
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/ausfaelle{{ tp }}" title="Zurück" aria-label="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">🖨️ Ausfallprotokoll</h1>
+{% endblock %}
+
+{% block body %}
+<main class="main druckblatt" id="main">
+
+  <p class="druck-hinweis">
+    Diese Seite ist zum Mitgeben an die Werkstatt gedacht. Die Ortsangaben
+    sind bewusst auf zwei Nachkommastellen (≈&nbsp;1&nbsp;km) gerundet und
+    ohne Namen – Zeitpunkte und Häufigkeit bleiben vollständig.
+    Über „Drucken“ lässt sich auch ein PDF sichern (Ziel „Als PDF speichern“).
+  </p>
+  <button type="button" class="btn-drucken" data-klick="druckStarten">🖨️ Drucken / als PDF sichern</button>
+
+  <div class="blatt-kopf">
+    <div class="blatt-titel">Ausfallprotokoll Infotainment – Škoda Enyaq</div>
+    <div class="blatt-meta">Stand: {{ stand }} · erfasst per Knopfdruck zum Zeitpunkt des Ausfalls (Serverzeit)</div>
+  </div>
+
+  <div class="blatt-zahlen">
+    <strong>{{ gesamt }}</strong> Ausfälle insgesamt ·
+    <strong>{{ letzte_30 }}</strong> in den letzten 30 Tagen
+  </div>
+
+  <div class="tabelle-rahmen">
+    <table class="protokoll">
+      <thead>
+        <tr>
+          <th>Nr.</th>
+          <th>Zeitpunkt</th>
+          <th>Ort (gerundet)</th>
+          <th>Notiz</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in eintraege %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ e.zeit_lokal }}</td>
+          <td class="ort">{% if e.ort_kurz %}≈ {{ e.ort_kurz }}{% else %}–{% endif %}</td>
+          <td>{{ e.notiz or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="fussnote">
+    Ortsangaben: GPS-Position zum Zeitpunkt der Meldung, zum Schutz der
+    Privatsphäre auf zwei Nachkommastellen gerundet (Raster ≈ 1,1 × 0,75 km).
+    Das belegt, dass die Ausfälle unterwegs an verschiedenen Orten auftraten,
+    ohne Rückschluss auf Adressen oder Fahrstrecken. „–“ = keine Ortung
+    möglich (z.&nbsp;B. Tiefgarage). Zeitstempel setzt der Server beim
+    Knopfdruck, nicht das Handy.
+  </p>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+function druckStarten() { window.print(); }
+</script>
+{% endblock %}

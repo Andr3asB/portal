@@ -436,6 +436,18 @@
       margin: 0 .05em 0 .1em;
       vertical-align: -0.1em;
     }
+    /* Wunsch #250: Eine Vorlage, deren <main> die Klasse `druckblatt`
+       traegt, ist zum Ausdrucken gedacht - im Druck verschwindet dann das
+       Portal-Chrome. Die Regel steht HIER, weil .app-header und die
+       Neulade-Geste base.html gehoeren (test_kopfzeile_bleibt.py bzw.
+       test_ziehen_neuladen.py lassen Vorlagen nicht daran). */
+    @media print {
+      body:has(.druckblatt) .app-header,
+      body:has(.druckblatt) .skip-link,
+      body:has(.druckblatt) .ptr-anzeige { display: none !important; }
+      body:has(.druckblatt) { background: #fff; color: #000; }
+    }
+
     /* Wunsch #248: unsichtbare Ansage-Zeile fuer Screenreader - das
        Tastatur-Sortieren meldet hier "Position 2 von 5". Klassisches
        visually-hidden: aus dem Fluss, 1x1px, nie display:none (sonst

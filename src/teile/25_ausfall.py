@@ -106,6 +106,54 @@ def index(token):
         eintraege=eintraege, gesamt=gesamt, letzte_30=letzte_30)
 
 
+@bp.route("/a/ausfaelle/druck", defaults={"token": None})
+@bp.route("/a/ausfaelle/<token>/druck")
+def druck(token):
+    """Wunsch #250: Das Protokoll als Ausdruck fuer die Werkstatt.
+
+    Die Ortsangaben werden HIER gerundet, nicht erst in der Vorlage - die
+    Druckseite bekommt die vollen Koordinaten gar nicht zu sehen und kann
+    sie damit auch nicht versehentlich ausgeben.
+
+    Gewaehlte Kuerzung: zwei Nachkommastellen. Das ist ein Raster von rund
+    1,1 km (Breite) x 0,75 km (Laenge, auf unserer Hoehe) - grob eine
+    Ortslage. Man erkennt, dass die Ausfaelle wirklich unterwegs und an
+    verschiedenen Orten passiert sind (Echtheit), aber weder Wohnadresse
+    noch Fahrstrecke lassen sich daraus ablesen. Eine Stelle mehr (~110 m)
+    waere wieder ein Bewegungsprofil, eine weniger (~11 km) saehe aus wie
+    ausgedacht. Die Genauigkeit (+-x m) bleibt im Ausdruck ganz weg - neben
+    einem 1-km-Raster ist sie bedeutungslos.
+
+    Melder-Namen stehen ebenfalls nicht im Ausdruck: Die Werkstatt braucht
+    Zeitpunkte und Zahlen, nicht die Familienmitglieder dahinter."""
+    user = _user(token)
+    db = get_db()
+    zeilen = db.execute("""
+        SELECT zeitpunkt, lat, lon, notiz
+        FROM   ausfaelle
+        ORDER  BY zeitpunkt ASC, id ASC
+    """).fetchall()
+
+    eintraege = []
+    for z in zeilen:
+        d = {"zeit_lokal": utc_zu_lokal(z["zeitpunkt"]), "notiz": z["notiz"]}
+        if z["lat"] is not None and z["lon"] is not None:
+            d["ort_kurz"] = f"{z['lat']:.2f}, {z['lon']:.2f}"
+        else:
+            d["ort_kurz"] = None
+        eintraege.append(d)
+
+    gesamt = len(eintraege)
+    letzte_30 = db.execute(
+        "SELECT COUNT(*) FROM ausfaelle WHERE zeitpunkt >= datetime('now','-30 days')"
+    ).fetchone()[0]
+    stand = utc_zu_lokal(db.execute("SELECT datetime('now')").fetchone()[0])
+
+    return render_template("ausfaelle_druck.html",
+        user=user, token=token, farbe=user["farbe"],
+        eintraege=eintraege, gesamt=gesamt, letzte_30=letzte_30, stand=stand)
+
+
 @bp.route("/a/ausfaelle/melden", defaults={"token": None}, methods=["POST"])
 @bp.route("/a/ausfaelle/<token>/melden", methods=["POST"])
 def melden(token):

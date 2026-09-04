@@ -1332,7 +1332,9 @@ teile/
                        Anfrage mehr durch; nur aufs Konto zu schauen
                        uebersieht ein aufgebrauchtes Monatslimit.
                        Betraege sind USD, nicht EUR (der Wunsch sagt Euro).
-  25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto
+  25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto;
+                       /druck (#250): Werkstatt-Ausdruck, Orte serverseitig
+                       auf 2 Nachkommastellen gerundet, ohne Namen
                        (Wunsch #222). DREI Routen statt eines Formulars, und
                        das ist der Kern: `melden` legt den Eintrag SOFORT an
                        (nur Zeit + Nutzer), `position` haengt die Ortung
@@ -2590,6 +2592,11 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_ausfall_druck.py` – Wunsch #250. Werkstatt-Ausdruck der Ausfaelle:
+  Kernpruefung ist eine ABWESENHEIT (die vollen Koordinaten und die
+  Genauigkeit duerfen im Druck-HTML nirgends stehen), dazu Rundung auf
+  2 Nachkommastellen, Strich ohne Ortung, keine Namen auf dem Blatt,
+  und dass die App selbst weiter den vollen Ort zeigt.
 - `test_interaktion.py` – Wunsch #248. Die Interaktions-Ebene: beide
   Overlays als Dialoge (role/aria-modal + dialogFuehrung), jeder
   Auf/Zu-Knopf traegt `data-panel` (aria-expanded via aufzuSync),
