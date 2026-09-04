@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-09-04 – portal-v238: #251, der Wunschzettel
+
+Neue App `wunschzettel` (🎁, Modul `26_wunschzettel.py`): Geschenkwuensche
+fuer Weihnachten und Geburtstage. Der Wunsch verlangte „sehr einfach
+erfassen" und „andere sollen sehen" – das Eingabefeld steht deshalb ohne
++Neu-Toggle immer offen ganz oben, darunter der eigene Zettel, darunter
+die der anderen (gruppiert, Namens-Badge in Personenfarbe).
+
+**Die eine Regel, die die App traegt: die Ueberraschung.** Andere koennen
+einen fremden Wunsch mit „🎁 Ich besorge das" reservieren (verhindert
+Doppelkaeufe – der eigentliche Zweck vor Weihnachten), aber der
+WUENSCHENDE erfaehrt davon nichts. Durchgesetzt in der Route, nicht in der
+Vorlage: fuer die eigenen Wuensche kommen die Reservierungsfelder gar
+nicht erst ins Template-Dict. Der wichtigste Test prueft entsprechend die
+Abwesenheit im gerenderten HTML (und stolperte dabei zweimal lehrreich
+ueber CSS-Klassen und JS-Festtexte, die IMMER in der Seite stehen – die
+Pruefung haengt jetzt an `id="resv-`, nicht an Woertern).
+
+Berechtigungen: reservieren nie der Wuenschende selbst; freigeben nur der
+Reservierer (oder Admin); bearbeiten NUR der Wuenschende (auch kein Admin
+– auf fremden Zetteln formuliert niemand um); loeschen selbst/Admin.
+Links werden serverseitig auf http(s) gefiltert (`javascript:` waere
+trotz CSP ein vermeidbares Loch). Reservieren laeuft als
+#171-Umschalter (data-fetch + antwort_oder_weiter).
+
+Auto-Grant wie Geburtstage als Familiensache, aber ohne `gast` (#212-
+Lehre: Besuch hat auf Geschenklisten nichts verloren) – beim ersten
+Start nach dem Deploy bekamen alle Eltern/Kinder/Admins die Kachel von
+selbst. Hilfe-Kapitel 25, eine neue Twemoji-Grafik (🤫 1f92b). Suite:
+**2059 Tests**.
+
 ## 2026-09-03 – portal-v237: #250, das Ausfallprotokoll fuer die Werkstatt
 
 Andi hat einen Werkstatttermin und will das Protokoll (#222) mitgeben –

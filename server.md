@@ -1335,6 +1335,10 @@ teile/
   25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto;
                        /druck (#250): Werkstatt-Ausdruck, Orte serverseitig
                        auf 2 Nachkommastellen gerundet, ohne Namen
+  26_wunschzettel.py – /a/wunschzettel/<token>/ Geschenkwuensche (#251).
+                       Ueberraschungs-Regel: Reservierungen verlassen den
+                       Server fuer den Wuenschenden gar nicht. Auto-Grant an
+                       eltern+kind (nicht gast), Tabelle wunschzettel
                        (Wunsch #222). DREI Routen statt eines Formulars, und
                        das ist der Kern: `melden` legt den Eintrag SOFORT an
                        (nur Zeit + Nutzer), `position` haengt die Ortung
@@ -2592,6 +2596,13 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_wunschzettel.py` – Wunsch #251. Der Kern ist die
+  Ueberraschungs-Regel als ABWESENHEITs-Pruefung: Nach einer Reservierung
+  durch ein anderes Mitglied enthaelt die Seite des Wuenschenden weder ein
+  Reservierungs-Element noch den Namen des Reservierers. Dazu die
+  Berechtigungen (Wuenschender reserviert nie, fremde Reservierung
+  unantastbar, bearbeiten nur selbst, loeschen selbst/Admin) und der
+  Link-Filter (nur http/https, javascript: wird verworfen).
 - `test_ausfall_druck.py` – Wunsch #250. Werkstatt-Ausdruck der Ausfaelle:
   Kernpruefung ist eine ABWESENHEIT (die vollen Koordinaten und die
   Genauigkeit duerfen im Druck-HTML nirgends stehen), dazu Rundung auf

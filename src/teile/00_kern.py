@@ -460,6 +460,18 @@ CREATE TABLE IF NOT EXISTS ausfaelle (
   notiz       TEXT,
   erstellt    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+-- Wunsch #251: Geschenkwuensche der Familie. user_id ist der Wuenschende
+-- (CASCADE: der Zettel gehoert zur Person). reserviert_von ist der, der das
+-- Geschenk besorgt - fuer den Wuenschenden UNSICHTBAR (Ueberraschung),
+-- durchgesetzt in 26_wunschzettel.py, nicht erst in der Vorlage.
+CREATE TABLE IF NOT EXISTS wunschzettel (
+  id             INTEGER PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  text           TEXT    NOT NULL,
+  link           TEXT,
+  reserviert_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  erstellt       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS geburtstage (
   id           INTEGER PRIMARY KEY,
   name         TEXT    NOT NULL,
@@ -535,6 +547,7 @@ _CORE_APPS = [
     ("kassenbuch",    "Kassenbuch",    "🐷", "Taschengeld verwalten"),
     ("geburtstage",   "Geburtstage",   "🎂", "Wer wann Geburtstag hat"),
     ("ausfaelle",     "Ausfälle",      "🚗", "Ausfälle des Infotainments protokollieren"),
+    ("wunschzettel",  "Wunschzettel",  "🎁", "Geschenkwünsche der Familie"),
 ]
 
 _DEFAULT_LAEDEN = ["Edeka", "Rewe", "Lidl", "Kaufland", "Aldi", "DM", "Müller", "Penny"]
@@ -2368,6 +2381,10 @@ def _init_db(app):
         # Ausdruck fuer die Werkstatt ist genau dann wertlos, wenn er
         # angezweifelt werden kann.
         _auto_grant_all(db, "ausfaelle", rollen=("eltern",))
+        # Wunsch #251: Der Wunschzettel ist Familiensache wie die Geburtstage
+        # - Kinder wuenschen sich ja gerade etwas. Nur `gast` bleibt aussen
+        # vor: Geschenkwuensche (und wer was besorgt) gehen Besuch nichts an.
+        _auto_grant_all(db, "wunschzettel", rollen=("eltern", "kind"))
         db.commit()
         db.close()
 
