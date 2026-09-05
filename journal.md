@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-09-05 – Ein Branch, keine Worktrees: `EnterWorktree` gesperrt, `git push` erlaubt
+
+Andi: „Die Code-Basis auf GitHub wird mir mit den Branches zu chaotisch, da
+es eigentlich nur eine Session gibt, die entwickelt." Nachgesehen, woher die
+Branches `worktree-init-claude-md` und `worktree-stundenlauf-doku` kamen: In
+beiden Fällen hatte **Claude selbst** `EnterWorktree` aufgerufen – nicht
+Andi (der startet `claude` ohne `-w`). Der Init-Lauf vom 31.08. begründete es
+mit „Pflicht für Edits in diesem Hintergrund-Job", die Session vom 01.09. tat
+es beim Nachtragen des Sitzungsstart-Abschnitts. Ergebnis: zwei Branches,
+zwei PRs (#1, #2), die Andi selbst mergen musste, und ein `main`, das sechs
+Deploys (v235–v240) hinterherhing.
+
+Umgesetzt:
+
+- `settings.json` (Root + `.claude/`): `EnterWorktree` in der deny-Liste,
+  `git push` von ask nach allow (ask-Regeln fragen auch im Auto-Modus, und
+  CLAUDE.md verlangt den Push nach jeder Session – das gab jedes Mal eine
+  Nachfrage).
+- CLAUDE.md, „Arbeitsweise": ein Branch `main`, keine Worktrees, keine
+  Feature-Branches, keine PRs – ausdrücklich auch für Cron-Läufe. Releases
+  wären später Tags auf `main`.
+- Beide `worktree-*`-Branches auf GitHub gelöscht (vollständig in `main`
+  enthalten), Worktree `init-claude-md` entfernt. `stundenlauf-doku` ist
+  noch gesperrt, weil die Session (PID 20164) mit dem Stundenlauf darin
+  lebt – wird entfernt, sobald die beendet ist.
+
+Dazu der `/init`-Durchgang dieser Session: CLAUDE.md gegen den Code
+geprüft, einzige echte Lücke war der Pfad der Vorlagen
+(`src/teile/templates/`, nicht `src/templates/`) samt Hinweis, dass die
+Wächter genau diesen Ordner globben.
+
 ## 2026-09-05 – portal-v240: #254–#257, Feinschliff an TVB und Essensplan
 
 Vier kleine Wuensche aus einer Runde, drei davon TVB, einer Essensplan.

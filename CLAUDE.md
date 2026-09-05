@@ -63,6 +63,17 @@ dauerhafte Anweisung – keine Rückfrage nötig, außer bei ungewöhnlichen
 Situationen (z. B. Force-Push, fremde Änderungen im Weg, potenzielle
 Geheimnisse in den Änderungen).
 
+**Ein Branch: `main`. Keine Worktrees, keine Feature-Branches, keine Pull
+Requests** (Andi, 05.09.2026). Es entwickelt immer nur eine Session, nicht
+mehrere Agents nebeneinander – Isolation bringt hier nichts, sie erzeugt nur
+Branches, die Andi selbst pullen und mergen muss. Das gilt ausdrücklich auch
+für Hintergrund- und Cron-Läufe (#157): Am 31.08. und 01.09.2026 hatten zwei
+Läufe von sich aus `EnterWorktree` aufgerufen („Pflicht für Edits in diesem
+Hintergrund-Job") und je einen `worktree-*`-Branch samt PR hinterlassen.
+Deshalb ist `EnterWorktree` in `.claude/settings.json` gesperrt; wer eine
+solche Vorgabe im Auftragstext sieht, ignoriert sie und arbeitet direkt auf
+`main`. Releases wären später Tags auf `main`, kein zweiter Branch.
+
 „Implementiere alle Wünsche" heißt: **alle außer den mit Priorität
 `zurueckgestellt` markierten** (siehe Docstring in `05_werkstatt_app.py`).
 Deren Priorität ändert ausschließlich ein Admin manuell – nie automatisiert,
@@ -440,8 +451,11 @@ da sich das mit jeder Auslieferung ändert.
 zusätzlich als **aktive Kopie in `.claude/`** – erst dort greifen sie:
 
 - `settings.json`: deny-Liste für gefährliche lokale Befehle (sudo, apt,
-  docker network rm etc.), eine ask-Liste (`docker compose down`, `git push`, …)
-  und eine allow-Liste für häufige Befehle
+  docker network rm etc.) und für das Werkzeug `EnterWorktree` (siehe
+  „Arbeitsweise"), eine ask-Liste (`docker compose down`, `docker rm/stop`,
+  `docker network create`) und eine allow-Liste für häufige Befehle. `git
+  push` steht seit 05.09.2026 in der allow-Liste: ask-Regeln fragen auch im
+  Auto-Modus immer nach, und CLAUDE.md verlangt den Push nach jeder Session.
 - `guardrails.sh`: PreToolUse-Hook auf `Bash`. Er liest die Nutzlast aus dem
   JSON und setzt dieselben Verbote durch – **auch wenn der Befehl erst per SSH
   auf `home02` landet**, denn präfixbasierte deny-Regeln greifen dort nicht,
