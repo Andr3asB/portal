@@ -2596,6 +2596,10 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_rezept_import_gzip.py` – Wunsch #252. Server, die ungefragt gzip
+  schicken (lecker.de seit 09/2026): `_entpacken()` fuer gzip/deflate,
+  unbekannte Kodierung ist ein klarer Fehler, und die Zip-Bomben-Abwehr
+  (Groessen-Check NACH dem Entpacken) wird mit einer echten Bombe belegt.
 - `test_wunschzettel.py` – Wunsch #251. Der Kern ist die
   Ueberraschungs-Regel als ABWESENHEITs-Pruefung: Nach einer Reservierung
   durch ein anderes Mitglied enthaelt die Seite des Wuenschenden weder ein

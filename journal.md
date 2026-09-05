@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-09-05 – portal-v239: #252 (lecker.de-Import) und #253 (TVB-Zeile)
+
+**#252 (sehr_hoch) – „kein Rezept erkannt" bei lecker.de.** Die Diagnose
+von diesem Rechner aus war dreistufig: Seite laedt mit dem Import-UA
+einwandfrei (HTTP 200), die gespeicherte Datei beginnt aber mit `1f 8b` –
+**gzip, obwohl der Import gar kein Accept-Encoding schickt**. lecker.de
+(bzw. dessen CDN) komprimiert seit neuestem bedingungslos; urllib entpackt
+nichts von selbst, der JSON-LD-Parser bekam Binaerbrei. Entpackt ist die
+Seite voellig in Ordnung (Block 7: schema.org/Recipe, 20 Zutaten,
+HowToStep-Liste, „4 Personen").
+
+Fix: `_entpacken()` in `_seite_abrufen()` (11_rezepte.py) - gzip und
+deflate (beide Varianten), alles andere ist ein klarer Fehler statt
+stillem Brei. Dazu der zweite Groessen-Check NACH dem Entpacken: das
+Lese-Limit zaehlt nur die komprimierten Bytes, eine praeparierte
+Mini-Datei koennte sich sonst zu Hunderten MB aufblasen (Zip-Bombe, in
+`test_rezept_import_gzip.py` mit einer echten 3-MB-Bombe belegt). Der
+Import selbst wurde nach dem Deploy aus dem Container heraus nur LESEND
+gegen die gemeldete URL geprueft - das Rezept legt Andi selbst an, kein
+Testmuell in echten Daten.
+
+**#253 (mittel) – die TVB-Zeile fiel nicht auf.** `tr.hervorgehoben` war
+graues `--surface-2` plus fett - neben zehn weissen Zeilen praktisch
+unsichtbar. Jetzt: getoente Flaeche aus der Nutzerfarbe
+(`color-mix(... 16%, transparent)` - laeuft auf allen Familiengeraeten,
+gleiche Baseline wie `:has()`), kraeftiger 3px-Balken links, Schrift in
+`var(--farbe-kontrast)` (#237: nie die rohe Farbe als Text). Suite:
+**2063 Tests**.
+
 ## 2026-09-04 – portal-v238: #251, der Wunschzettel
 
 Neue App `wunschzettel` (🎁, Modul `26_wunschzettel.py`): Geschenkwuensche

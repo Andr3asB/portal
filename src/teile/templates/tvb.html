@@ -32,7 +32,19 @@
 }
 .tvb-tabelle th { color:var(--text-2); font-weight:600; font-size:12px; }
 .tvb-tabelle td.tvb-team-name { text-align:left; white-space:normal; word-break:break-word; }
-.tvb-tabelle tr.hervorgehoben td { background:var(--surface-2); font-weight:700; }
+/* Wunsch #253: Die TVB-Zeile war mit grauem --surface-2 kaum vom Rest zu
+   unterscheiden - jetzt ein farbiger Anstrich aus der Nutzerfarbe: getoente
+   Flaeche (color-mix laeuft auf allen Familiengeraeten, siehe :has in
+   base.html), kraeftiger Balken links, Schrift in der Kontrast-Variante
+   (#237: Text nie in var(--farbe) selbst). */
+.tvb-tabelle tr.hervorgehoben td {
+  background: color-mix(in srgb, var(--farbe) 16%, transparent);
+  color: var(--farbe-kontrast);
+  font-weight: 700;
+}
+.tvb-tabelle tr.hervorgehoben td:first-child {
+  box-shadow: inset 3px 0 0 var(--farbe);
+}
 .tvb-tabelle tr:last-child td { border-bottom:none; }
 .empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
 /* Wunsch #121: Knopf zur Kader-Unterseite, optisch wie die Zeitraum-Knoepfe
