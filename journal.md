@@ -48,6 +48,18 @@ liegt, spricht allerdings dafür, dass die alte Session nicht mehr feuert
 Session 20164 beenden, dann Worktree entfernen und den Lauf aus der
 Haupt-Session neu anlegen.
 
+**Nachtrag, 11:35 – Andi: „follow the recommendations".** Session 20164
+per `taskkill` beendet, Worktree `stundenlauf-doku` entsperrt und entfernt,
+Branch `worktree-stundenlauf-doku` gelöscht (war vollständig in `main`).
+`git worktree list` zeigt nur noch `main`. Der Stundenlauf ist aus dieser
+Session neu angelegt (wörtlicher Text von oben, :23, läuft spätestens am
+12.09.2026 aus) – der nächste Lauf um 12:23 fängt bei #258 an.
+
+Übrig bleibt ein leeres Verzeichnis `.claude/worktrees/init-claude-md/`: kein
+Git-Worktree mehr, aber „Device or resource busy" – irgendeine der zehn
+laufenden `claude.exe` hat es als Arbeitsverzeichnis. Verschwindet, sobald
+die beendet ist; Git kennt es nicht, es stört nichts.
+
 ## 2026-09-05 – Ein Branch, keine Worktrees: `EnterWorktree` gesperrt, `git push` erlaubt
 
 Andi: „Die Code-Basis auf GitHub wird mir mit den Branches zu chaotisch, da
