@@ -419,11 +419,16 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
   Gehört zum „dokumentieren"-Schritt der Arbeitsweise oben, genauso
   verbindlich wie `journal.md`/`server.md`.
 
-**Templates:** je App eine eigene `.html`-Datei mit Inline-CSS/JS,
-`base.html` liefert das gemeinsame Grundlayout (⌂-Include, Hamburger-Menü
-mit Dark Mode/Hilfe/✨, Service-Worker-Registrierung). Kein Build-Schritt,
+**Templates:** liegen in `src/teile/templates/` (nicht `src/templates/` –
+`app.py` setzt `template_folder="teile/templates"`), je App eine eigene
+`.html`-Datei mit Inline-CSS/JS. `base.html` liefert das gemeinsame
+Grundlayout (⌂-Include, Hamburger-Menü mit Dark Mode/Hilfe/✨,
+Service-Worker-Registrierung). Statische Dateien unter `src/static/`
+(`sw.js`, `manifest.json`, lokal gebündeltes `twemoji`). Kein Build-Schritt,
 kein gemeinsames Frontend-Framework – JS-Bibliotheken werden lokal
-gebündelt, nie von einem CDN geladen.
+gebündelt, nie von einem CDN geladen. Die Konventions-Wächter in `tests/`
+lesen genau diesen Ordner per Glob – eine Vorlage an anderer Stelle würde
+von keinem Wächter geprüft.
 
 Den aktuellen Stand von DB-Schema, App-Slugs und Modulen (mit Kurzbeschreibung
 je Datei) pflegt `server.md` – dort nachsehen statt hier zu duplizieren,
