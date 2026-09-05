@@ -136,7 +136,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (1523 Tests, gut eine Minute)
+# Alles (1891 Tests, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -146,10 +146,23 @@ python -m venv .venv
 ```
 
 Werkzeug steht bewusst nur in `requirements-dev.txt` (`pytest`, `pip-audit`,
-`python-barcode` – letzteres nur zum *Erzeugen* eines Testbarcodes, gelesen
-wird im Betrieb mit `zxing-cpp`); `src/requirements.txt` beschreibt die
-Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts Test-Werkzeug
+`ruff`, `python-barcode` – letzteres nur zum *Erzeugen* eines Testbarcodes,
+gelesen wird im Betrieb mit `zxing-cpp`); `src/requirements.txt` beschreibt
+die Laufzeit und ist exakt gepinnt (Wunsch #135) – dort nichts Test-Werkzeug
 hineinschreiben.
+
+**Lint** (ruff, eingeführt 31.08.2026 – journal.md: damals 242 Funde behoben):
+
+```bash
+.venv/Scripts/python -m ruff check src/ util/ tests/ scripts/
+```
+
+Konfiguration in `ruff.toml` im Repo-Root. Die dortigen `ignore`-Einträge
+sind bewusst und jeweils begründet – sie decken dokumentierte
+Projektkonventionen ab (nummerierte Modulnamen, breite excepts in
+Migrationen/Threads, die eigene Zeit-Konvention). Nichts davon „aufräumen",
+und neue Regeln nur ignorieren, wenn eine dokumentierte Konvention
+dagegensteht, nicht weil sie lästig sind.
 
 **CVE-Abgleich gegen den echten Produktionsstand**, nicht gegen die lokale
 `.venv` – die kann abweichen:
@@ -180,7 +193,8 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 
 **Ein großer Teil der Suite sind Konventions-Wächter, keine Funktionstests.**
 `test_tippflaeche.py`, `test_aria_labels.py`, `test_loeschen_symbol.py`,
-`test_kopfleiste.py`, `test_emoji.py` und `test_csp.py` lesen die Vorlagen im
+`test_kopfleiste.py`, `test_emoji.py`, `test_csp.py`,
+`test_formular_labels.py` und `test_ueberschriften.py` lesen die Vorlagen im
 Quelltext und schlagen an, wenn eine neue Vorlage gegen eine der
 UI-Konventionen weiter unten verstößt. Schlägt einer davon an, ist die
 Vorlage falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
@@ -335,6 +349,14 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
 - **Icon-Knöpfe** (Beschriftung nur ein Zeichen) brauchen `aria-label`; steht
   auch ein `title` dran, sind beide Texte identisch (Wunsch #175,
   `tests/test_aria_labels.py`).
+- **Jedes Formularfeld braucht eine programmatische Beschriftung** – `<label
+  for>`, umschließendes `<label>` oder `aria-label`/`aria-labelledby`; ein
+  Platzhalter zählt nicht, er verschwindet beim Tippen (Wunsch #246,
+  `tests/test_formular_labels.py`).
+- **Überschriften sind echte `h1`/`h2`**: der Seitentitel ist ein `h1` (Klasse
+  `nav-title`, Optik unverändert), Inhalts-Abschnitte sind `h2` – kein neues
+  `<div class="nav-title">` (Wunsch #247, `tests/test_ueberschriften.py`).
+  Filter-Etiketten in Filterkarten bleiben bewusst `div`s.
 - **Umschalter ohne Seitensprung** (Wunsch #171): `data-fetch="fn"` am
   Formular, serverseitig `antwort_oder_weiter()`. Aber nur, wenn der
   Umschalter die Listen-Reihenfolge NICHT ändert – sonst Weiterleitung mit
