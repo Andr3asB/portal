@@ -193,7 +193,8 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 
 **Ein großer Teil der Suite sind Konventions-Wächter, keine Funktionstests.**
 `test_tippflaeche.py`, `test_aria_labels.py`, `test_loeschen_symbol.py`,
-`test_kopfleiste.py`, `test_emoji.py` und `test_csp.py` lesen die Vorlagen im
+`test_kopfleiste.py`, `test_emoji.py`, `test_csp.py`,
+`test_formular_labels.py` und `test_ueberschriften.py` lesen die Vorlagen im
 Quelltext und schlagen an, wenn eine neue Vorlage gegen eine der
 UI-Konventionen weiter unten verstößt. Schlägt einer davon an, ist die
 Vorlage falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
@@ -348,6 +349,14 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
 - **Icon-Knöpfe** (Beschriftung nur ein Zeichen) brauchen `aria-label`; steht
   auch ein `title` dran, sind beide Texte identisch (Wunsch #175,
   `tests/test_aria_labels.py`).
+- **Jedes Formularfeld braucht eine programmatische Beschriftung** – `<label
+  for>`, umschließendes `<label>` oder `aria-label`/`aria-labelledby`; ein
+  Platzhalter zählt nicht, er verschwindet beim Tippen (Wunsch #246,
+  `tests/test_formular_labels.py`).
+- **Überschriften sind echte `h1`/`h2`**: der Seitentitel ist ein `h1` (Klasse
+  `nav-title`, Optik unverändert), Inhalts-Abschnitte sind `h2` – kein neues
+  `<div class="nav-title">` (Wunsch #247, `tests/test_ueberschriften.py`).
+  Filter-Etiketten in Filterkarten bleiben bewusst `div`s.
 - **Umschalter ohne Seitensprung** (Wunsch #171): `data-fetch="fn"` am
   Formular, serverseitig `antwort_oder_weiter()`. Aber nur, wenn der
   Umschalter die Listen-Reihenfolge NICHT ändert – sonst Weiterleitung mit
