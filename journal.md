@@ -2,6 +2,52 @@
 
 ---
 
+## 2026-09-05 – `/init`: CLAUDE.md gegen den Code geprüft, sieben Lücken geschlossen
+
+Kein Portal-Code, keine Auslieferung. Zweiter `/init`-Durchgang des Tages,
+diesmal mit Gegenprobe jeder Zahl: 2068 Tests (`--collect-only`), 18
+`manage.py`-Befehle, sechs Aliase in `teile/__init__.py`, 26 Module, beide
+`.claude/`-Kopien identisch mit den Root-Vorlagen – alles stimmt. Keine
+fremden Agent-Konfigurationen (Cursor, Copilot, Codex, Gemini) im Repo oder
+im Home-Verzeichnis, kein README.
+
+Was fehlte, stand jeweils nur in `server.md` oder im Docstring eines
+Wächters – eine neue Session hätte es erst gefunden, nachdem der Wächter rot
+war:
+
+- **Interaktions-Ebene (#248):** `data-panel` an jedem Auf/Zu-Knopf,
+  Overlays über `dialogFuehrung()`, eigene Zieh-Fassungen rufen
+  `tastaturSortierung()` selbst, Emoji im Inhalt brauchen `data-emoji-alt`.
+  Das heutige v240 benutzte die Konvention bereits („data-panel nach #248"),
+  CLAUDE.md kannte sie nicht.
+- **Klick-Verteiler (#200):** `data-klick`/`data-args`, Argumentreihenfolge
+  erst Werte, dann Element, dann Ereignis.
+- **Dunkelmodus (#172):** die dunklen Werte stehen einmal in `dunkle_werte`.
+- **Hilfe-Kapitel (#242):** ein Kapitel ist ein `<details class="section"
+  id="kapitel-N">`, der Wächter prüft das Muster.
+- **Routen-Zwillinge (#140 Stufe 4):** jede Route hat zwei Regeln am selben
+  Endpunkt; eine neue ändernde Route ohne `<token>`-Regel fällt in
+  `test_routen_inventar.py`.
+- **Wächter-Liste** um sieben Vorlagen-Wächter und die drei Struktur-Wächter
+  (`test_routen_inventar`, `test_seiten_erreichbar`, `test_log_grenzen`)
+  ergänzt.
+- **Sitzungsstart:** konkreter Handgriff, um eine liegengebliebene Session
+  zu erkennen, bevor ein zweiter Stundenlauf entsteht (siehe unten).
+
+### Stundenlauf: nicht neu angelegt – die alte Session lebt noch
+
+`CronList` war leer, `wunsch_lauf_check.py` meldet `ARBEIT: 1` (#258,
+Aussprachetraining: Andi hat um 09:01 geantwortet – Option A, EU-gehostetes
+Modell, nicht aus China). Vor dem Neuanlegen nachgesehen: der Worktree
+`stundenlauf-doku` ist weiterhin gesperrt von Session **PID 20164**, und die
+läuft laut `tasklist` noch. Sie hält vermutlich den Lauf vom 01.09. (läuft
+spätestens am 08.09. aus). Zwei Läufe hätten #258 doppelt umgesetzt – also
+kein zweiter Cron aus dieser Session. Dass #258 seit zwei Stunden unbearbeitet
+liegt, spricht allerdings dafür, dass die alte Session nicht mehr feuert
+(Cron-Jobs feuern nur, solange die Session idle ist). **Andi entscheidet:**
+Session 20164 beenden, dann Worktree entfernen und den Lauf aus der
+Haupt-Session neu anlegen.
+
 ## 2026-09-05 – Ein Branch, keine Worktrees: `EnterWorktree` gesperrt, `git push` erlaubt
 
 Andi: „Die Code-Basis auf GitHub wird mir mit den Branches zu chaotisch, da

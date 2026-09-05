@@ -98,6 +98,13 @@ mehrere Claude-Sessions parallel, darf nur die Haupt-Session den Lauf
 halten – sonst arbeiten zwei Läufe dieselben Wünsche doppelt ab. Im
 Zweifel Andi fragen.
 
+Konkret nachsehen, bevor ein zweiter Lauf entsteht: `git worktree list`
+zeigt liegengebliebene Worktrees, `.git/worktrees/<name>/locked` nennt die
+PID der Session, die ihn hält, und `tasklist //FI "PID eq <n>"` (Git Bash)
+sagt, ob die noch lebt. Lebt sie, hält sie vermutlich auch den Stundenlauf –
+dann **nicht** neu anlegen, sondern Andi bitten, die alte Session zu beenden
+(05.09.2026: Session 20164 im Worktree `stundenlauf-doku`).
+
 ## Wichtige Kommandos
 
 ```bash
@@ -224,10 +231,18 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 **Ein großer Teil der Suite sind Konventions-Wächter, keine Funktionstests.**
 `test_tippflaeche.py`, `test_aria_labels.py`, `test_loeschen_symbol.py`,
 `test_kopfleiste.py`, `test_emoji.py`, `test_csp.py`,
-`test_formular_labels.py` und `test_ueberschriften.py` lesen die Vorlagen im
-Quelltext und schlagen an, wenn eine neue Vorlage gegen eine der
-UI-Konventionen weiter unten verstößt. Schlägt einer davon an, ist die
-Vorlage falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
+`test_formular_labels.py`, `test_ueberschriften.py`, `test_farbkontrast.py`,
+`test_interaktion.py`, `test_arbeitet_anzeige.py`,
+`test_verteiler_argumente.py`, `test_darkmode.py`, `test_hilfe_kapitel.py`
+und `test_kopfzeile_bleibt.py` lesen die Vorlagen im Quelltext und schlagen
+an, wenn eine neue Vorlage gegen eine der UI-Konventionen weiter unten
+verstößt. Drei weitere wächtern nicht Vorlagen, sondern Struktur:
+`test_routen_inventar.py` (jede ändernde Route braucht eine Regel mit
+`<token>` im Pfad, siehe „Zugangsmodell"), `test_seiten_erreichbar.py`
+(Rauchtest, ruft jede GET-Seite mit `<token>` als einziger Variable auf)
+und `test_log_grenzen.py` (jeder Dienst in `docker-compose.yml` braucht
+`logging:` mit Obergrenze). Schlägt einer davon an, ist die Vorlage bzw. der
+Code falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
 gegenprüfen, dass er auch wirklich auslöst (absichtlichen Fehler einbauen) –
 ein Wächter, der nicht anschlagen kann, ist schlimmer als keiner.
 
@@ -330,7 +345,12 @@ steht der Token **verschlüsselt** (`TOKEN_KEY`, Wunsch #129); gefunden wird er
 Satz, der in `.env.example` steht und sonst niemand liest: **ohne `TOKEN_KEY`
 kommt niemand mehr ins Portal – auch ein wiederhergestelltes `/data`-Backup
 nützt dann nichts**, denn das NAS-Backup sichert nur `/data`, die `.env` liegt
-bewusst nicht darin.
+bewusst nicht darin. Seit #140 Stufe 4 hat **jede Route zwei Regeln** am
+selben Endpunkt: eine mit `<token>` im Pfad und eine token-freie
+Zwillingsregel, die über das Sitzungs-Cookie autorisiert (`19_sitzung.py`).
+Eine neue ändernde Route (POST/PUT/PATCH/DELETE) ohne Token-Regel lässt
+`tests/test_routen_inventar.py` anschlagen; die Ausnahmen dort sind
+abschließend.
 
 **KI-Schicht.** Jede KI-Nutzung läuft über `ki_anfrage()` bzw.
 `ki_text_zu_sprache()` in `00_kern.py` – nie ein eigener HTTP-Aufruf an
@@ -394,6 +414,25 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
 - **Lange Vorgänge:** Formulare, deren Absenden spürbar dauert (KI-Anfrage),
   tragen `data-arbeitet="Wird gelesen …"` – der Verteiler in `base.html`
   deaktiviert und beschriftet den Knopf um (Wunsch #176).
+- **Klick-Verteiler** (Wunsch #200, `tests/test_verteiler_argumente.py`):
+  Knöpfe rufen ihre Funktion über `data-klick="fn"` auf, Werte kommen aus
+  `data-args='[…]'` (JSON). Die Funktion bekommt **erst die Werte aus
+  `data-args`, dann das Element, dann das Ereignis** – ein erster Parameter,
+  der wie ein Element benutzt wird, ist falsch, wenn `data-args` gesetzt ist.
+- **Interaktions-Ebene** (Wunsch #248, `tests/test_interaktion.py`), alles
+  zentral in `base.html`: Ein Knopf, der ein Panel auf- und zuklappt, trägt
+  `data-panel="<id>"` (`aufzuSync()` hält daraus `aria-expanded` aktuell).
+  Ein neues Overlay läuft über `dialogFuehrung()` (Fokus-Falle, Escape,
+  Fokus-Rückgabe), nie über nacktes `classList.toggle`. Ziehbare Listen über
+  `ziehSortierung()`, das die Tastaturbedienung mitbringt – eine eigene
+  Zieh-Fassung muss `tastaturSortierung()` selbst aufrufen. Emoji sind nach
+  `twemoji.parse()` stumm (`alt=""`), außer unter einem Element mit
+  `data-emoji-alt` (App-Kacheln, Nutzertext).
+- **Dunkelmodus** (Wunsch #172, `tests/test_darkmode.py`): die dunklen
+  Farbwerte stehen in `base.html` **einmal** in der Jinja-Variablen
+  `dunkle_werte` und werden für `body.dark` und für `body.auto` (nur innerhalb
+  `@media (prefers-color-scheme: dark)`) ausgegeben. Keinen zweiten,
+  getippten Block anlegen – zwei Blöcke laufen unbemerkt auseinander.
 - **Vier globale Regeln in `base.html`** (Tippfläche #169, Feldschrift ≥16px
   #170, `.main` max-width 720px #173, `:focus-visible`-Ring #174) – keine
   Vorlage darf sie überschreiben, `tests/test_tippflaeche.py` wächtert alle
@@ -427,8 +466,11 @@ Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
   Wunsch #155 aus `base.html` entfernt; `tests/test_kopfleiste.py` wächtert das.
 - Jede neue Funktion gehört in die Hilfe-App (`09_hilfe.py`/`hilfe.html`),
   bei Bedarf als eigenes Kapitel mit Sprunglink im Inhaltsverzeichnis.
-  Gehört zum „dokumentieren"-Schritt der Arbeitsweise oben, genauso
-  verbindlich wie `journal.md`/`server.md`.
+  Ein Kapitel ist seit Wunsch #242 ein `<details class="section"
+  id="kapitel-N">` (eingeklappt, das Inhaltsverzeichnis klappt per Skript
+  auf; `tests/test_hilfe_kapitel.py` wächtert das Muster). Gehört zum
+  „dokumentieren"-Schritt der Arbeitsweise oben, genauso verbindlich wie
+  `journal.md`/`server.md`.
 
 **Templates:** liegen in `src/teile/templates/` (nicht `src/templates/` –
 `app.py` setzt `template_folder="teile/templates"`), je App eine eigene
