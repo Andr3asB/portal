@@ -50,7 +50,7 @@ def liste(app, db):
 def _namen_in_reihenfolge(client, liste):
     seite = client.get(f"/a/packliste/{liste['token']}/?ziel={liste['ziel']}") \
                   .get_data(as_text=True)
-    return re.findall(r'<span class="item-name">([^<]+)</span>', seite)
+    return re.findall(r'<span class="item-name"[^>]*>([^<]+)</span>', seite)
 
 
 # --- Umsortieren -----------------------------------------------------------

@@ -59,7 +59,7 @@
         <span class="verlauf-time">{{ e.zeitstempel[:16] }}</span>
         {% if darf_bearbeiten %}
         <button class="verlauf-edit-btn" type="button"
-                data-klick="toggleVerlaufEdit" data-args='[{{ e.id }}]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+                data-klick="toggleVerlaufEdit" data-args='[{{ e.id }}]' data-panel="verlauf-edit-{{ e.id }}" title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
         {% endif %}
       </div>
 

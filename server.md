@@ -1332,7 +1332,13 @@ teile/
                        Anfrage mehr durch; nur aufs Konto zu schauen
                        uebersieht ein aufgebrauchtes Monatslimit.
                        Betraege sind USD, nicht EUR (der Wunsch sagt Euro).
-  25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto
+  25_ausfall.py      – /a/ausfaelle/<token>/ Ausfallprotokoll fuers Auto;
+                       /druck (#250): Werkstatt-Ausdruck, Orte serverseitig
+                       auf 2 Nachkommastellen gerundet, ohne Namen
+  26_wunschzettel.py – /a/wunschzettel/<token>/ Geschenkwuensche (#251).
+                       Ueberraschungs-Regel: Reservierungen verlassen den
+                       Server fuer den Wuenschenden gar nicht. Auto-Grant an
+                       eltern+kind (nicht gast), Tabelle wunschzettel
                        (Wunsch #222). DREI Routen statt eines Formulars, und
                        das ist der Kern: `melden` legt den Eintrag SOFORT an
                        (nur Zeit + Nutzer), `position` haengt die Ortung
@@ -1906,6 +1912,36 @@ den niemand sieht.
 
 `tests/test_aria_labels.py` waechtert Vorhandensein, Gleichheit und dass der
 Name kein Platzhalter ist ("Knopf", "...").
+
+## Interaktions-Ebene (Wunsch #248)
+
+Vier Konventionen, alle zentral in `base.html`, gewaechtert in
+`tests/test_interaktion.py`:
+
+- **Overlays sind Dialoge.** Menue-Panel und ✨-Wunsch-Karte tragen
+  `role="dialog"` + `aria-modal="true"`; `dialogFuehrung()` liefert Fokus auf
+  das erste Bedienelement, Tab-Falle, Escape und Fokus-Rueckgabe an den
+  Ausloeser (Fallback ☰-Knopf). Ein neues Overlay laeuft ueber denselben
+  Helfer, nicht ueber nacktes `classList.toggle('open')`.
+- **Auf/Zu-Knoepfe tragen `data-panel="<id>"`.** `aufzuSync()` setzt daraus
+  nach jedem Klick `aria-expanded` - anhand der SICHTBARKEIT des Panels
+  (`getComputedStyle(...).display`), weil die Panels mal `.open`, mal
+  `hidden`, mal `style.display` nutzen. Wer ein Panel ohne Klick schaltet
+  (Escape), ruft `aufzuSync()` selbst.
+- **Wer ziehen kann, kann tippen.** `ziehSortierung()` ruft
+  `tastaturSortierung(opt)` selbst mit auf (Pfeiltasten am fokussierten
+  ⠿-Griff, beim Brett wechseln ←/→ die Spalte; Ansage ueber `#sr-live`,
+  gespeichert 600 ms nach dem letzten Druck ueber dieselbe
+  `opt.speichern`-Signatur wie das Ziehen). Vorlagen mit EIGENER
+  Zieh-Fassung (`initKatDrag` in den beiden Kategorien-Seiten) rufen den
+  Helfer einzeln. Bewusst ohne Tastatur: der Kacheln-Edit-Modus der
+  Startseite und das Essensplan-Ziehen (dort ist ✏️ je Slot die
+  gleichwertige Alternative).
+- **Emoji: Schmuck ist stumm, Inhalt spricht.** Nach `twemoji.parse()`
+  versteckt base.html jedes Emoji-Bild (`alt=""` + `aria-hidden`), ausser es
+  steht unter einem Element mit `data-emoji-alt` - das sind die App-Kacheln
+  der Startseite, Nutzertexte (Aufgaben, Eintraege, Wuensche, Namen) und der
+  Hilfe-Fliesstext, der die Emoji der Oberflaeche woertlich zitiert.
 
 ## Lange Vorgaenge anzeigen (Wunsch #176)
 
@@ -2560,6 +2596,35 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_tvb_essensplan_feinschliff.py` – Wuensche #254–#257. Statisch fuer
+  tvb.html (spieltag/ort nur mit Pruefung ausgeben - das war das
+  „NoneNone" aus #256; Drei-Spiele-Grenze samt data-panel; Gegenueber-
+  stellung mit Sieger/Verlierer-Regeln), funktional fuer #257 (Speichern
+  leitet mit #slot-Anker zurueck, kaputter tag bekommt keinen Anker).
+- `test_rezept_import_gzip.py` – Wunsch #252. Server, die ungefragt gzip
+  schicken (lecker.de seit 09/2026): `_entpacken()` fuer gzip/deflate,
+  unbekannte Kodierung ist ein klarer Fehler, und die Zip-Bomben-Abwehr
+  (Groessen-Check NACH dem Entpacken) wird mit einer echten Bombe belegt.
+- `test_wunschzettel.py` – Wunsch #251. Der Kern ist die
+  Ueberraschungs-Regel als ABWESENHEITs-Pruefung: Nach einer Reservierung
+  durch ein anderes Mitglied enthaelt die Seite des Wuenschenden weder ein
+  Reservierungs-Element noch den Namen des Reservierers. Dazu die
+  Berechtigungen (Wuenschender reserviert nie, fremde Reservierung
+  unantastbar, bearbeiten nur selbst, loeschen selbst/Admin) und der
+  Link-Filter (nur http/https, javascript: wird verworfen).
+- `test_ausfall_druck.py` – Wunsch #250. Werkstatt-Ausdruck der Ausfaelle:
+  Kernpruefung ist eine ABWESENHEIT (die vollen Koordinaten und die
+  Genauigkeit duerfen im Druck-HTML nirgends stehen), dazu Rundung auf
+  2 Nachkommastellen, Strich ohne Ortung, keine Namen auf dem Blatt,
+  und dass die App selbst weiter den vollen Ort zeigt.
+- `test_interaktion.py` – Wunsch #248. Die Interaktions-Ebene: beide
+  Overlays als Dialoge (role/aria-modal + dialogFuehrung), jeder
+  Auf/Zu-Knopf traegt `data-panel` (aria-expanded via aufzuSync),
+  eigene Zieh-Fassungen rufen `tastaturSortierung()`, und der
+  twemoji-Nachlauf versteckt Schmuck-Emoji (data-emoji-alt als Ausnahme).
+  Der Waechter fand beim Entstehen sofort einen vergessenen Knopf
+  (vokabeln `+ Vokabel eintragen`) - Gegenprobe mit absichtlichen Fehlern
+  gemacht, alle Teile schlagen an.
 - `test_grant.py` – Zugangsaufloesung, Rollen, Navigations-Token,
   Verschluesselung. Beschreibt den Ist-Zustand und muss nach jeder Umbaustufe
   wieder gruen sein.

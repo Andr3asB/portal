@@ -119,8 +119,9 @@
      gemerkte Ansicht („Brett") einen sofort wieder hierher, und man käme nie
      mehr in die Liste. #}
   <div class="top-aktionen">
-    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neue Aufgabe</button>
-    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn" data-panel="new-todo-card">+ Neue Aufgabe</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
     <a class="btn-zurueck" href="/a/todo{{ tp }}?ansicht=liste">☰ Liste</a>
   </div>
 
@@ -157,7 +158,9 @@
              data-nutzer="{{ t.erstellt_von }},{{ t.zugewiesen_an or '' }}">
           <div class="karte-kopf">
             {% if t.darf_bewegen %}
-            <button type="button" class="karte-griff" title="Verschieben" aria-label="Verschieben">⠿</button>
+            {#- Wunsch #248: Griff kann jetzt auch Tastatur (Pfeiltasten,
+                zentral in base.html) - links/rechts wechselt die Spalte. -#}
+            <button type="button" class="karte-griff" title="Verschieben (Ziehen oder Pfeiltasten)" aria-label="Verschieben (Ziehen oder Pfeiltasten)">⠿</button>
             {% else %}
             {# Wunsch #10/#214: Wer die Aufgabe nicht abhaken darf, darf sie auch
                nicht verschieben - der Statuswechsel ist dasselbe Recht. Ein
@@ -165,7 +168,8 @@
             <span class="karte-fest" title="Nur ansehen" aria-label="Nur ansehen">🔒</span>
             {% endif %}
             <div class="karte-text">
-              {{ t.inhalt }}
+              {#- Wunsch #248: Nutzertext behaelt sein Emoji-alt. -#}
+              <span data-emoji-alt>{{ t.inhalt }}</span>
               <div class="karte-meta">
                 {% if t.fuer_name %}
                 <span class="badge-person" style="background:{{ farbe_kontrast(t.fuer_farbe) }}; color:#fff">{{ t.fuer_name }}</span>
@@ -178,6 +182,7 @@
             </div>
             {% if t.darf_bewegen %}
             <button class="karte-knopf" type="button" data-klick="toggleTodoEdit" data-args='[{{ t.id }}]'
+                    data-panel="todo-edit-{{ t.id }}"
                     title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
             {% endif %}
             {% if darf_loeschen %}

@@ -26,6 +26,15 @@
 .zahl-wert  { font-size:24px; font-weight:700; color:var(--farbe-kontrast); font-variant-numeric:tabular-nums; }
 .zahl-label { font-size:12px; color:var(--text-2); margin-top:2px; }
 
+/* Wunsch #250: Weg zur Druckansicht fuer die Werkstatt - gleiche Bauart wie
+   die .top-aktionen-Knoepfe der anderen Apps (Rahmen, transparenter Grund). */
+.top-aktionen { display:flex; margin-bottom:14px; }
+.btn-druck {
+  flex:1; display:block; text-align:center; text-decoration:none;
+  background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe-kontrast); border-radius:12px; padding:12px 10px;
+  font-size:14px; font-weight:600;
+}
 .eintrag {
   background:var(--surface); border-radius:14px; padding:12px 16px;
   margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
@@ -99,6 +108,11 @@
       <div class="zahl-wert">{{ letzte_30 }}</div>
       <div class="zahl-label">letzte 30 Tage</div>
     </div>
+  </div>
+
+  {# Wunsch #250: Ausdruck fuer die Werkstatt - Orte dort gerundet. #}
+  <div class="top-aktionen">
+    <a class="btn-druck knopf" href="/a/ausfaelle{{ tp }}druck">🖨️ Für die Werkstatt drucken</a>
   </div>
 
   {% if eintraege %}

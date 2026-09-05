@@ -68,6 +68,25 @@ Geheimnisse in den Änderungen).
 Deren Priorität ändert ausschließlich ein Admin manuell – nie automatisiert,
 auch nicht im Rahmen eines Sammel-Auftrags.
 
+## Sitzungsstart: Stundenlauf (#157) prüfen und ggf. neu anlegen
+
+Der stündliche Wunsch-Durchlauf läuft als **session-gebundener** Cron-Job
+(CronCreate, stündlich um :23, max. 7 Tage) und stirbt mit jedem
+Sitzungsende bzw. Rechner-Neustart. Deshalb am Anfang jeder neuen Session
+**ohne Aufforderung**:
+
+1. Mit `CronList` prüfen, ob der Lauf existiert.
+2. Fehlt er: neu anlegen mit dem **wörtlichen Auftragstext** aus
+   `journal.md`, Eintrag vom 13.08.2026 („Stundenlauf wieder an") – nicht
+   aus der Beschreibung rekonstruieren.
+3. Danach sofort einen Testlauf von `scripts/wunsch_lauf_check.py` machen
+   (siehe „Prüfung gegen das laufende Portal"), ob Arbeit ansteht.
+
+Achtung: `CronList` sieht nur die **eigene** Session. Laufen absichtlich
+mehrere Claude-Sessions parallel, darf nur die Haupt-Session den Lauf
+halten – sonst arbeiten zwei Läufe dieselben Wünsche doppelt ab. Im
+Zweifel Andi fragen.
+
 ## Wichtige Kommandos
 
 ```bash
@@ -136,7 +155,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (1891 Tests, gut eine Minute)
+# Alles (2068 Tests, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien

@@ -197,8 +197,12 @@ body.packmodus .item-name { font-size:18px; }
          {% if item.gepackt %}checked{% endif %}>
   {# Wunsch #178: nur bei offenen Einträgen – gepackte stehen in einem eigenen
      Abschnitt nach Packzeitpunkt, dort wäre Sortieren sinnlos. #}
-  {% if not item.gepackt %}<button type="button" class="item-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>{% endif %}
-  <span class="item-name">{{ item.name }}</span>
+  {#- Wunsch #248: Der Griff kann jetzt auch Tastatur (Pfeiltasten, zentral
+      in base.html) - die Beschriftung sagt es dazu. -#}
+  {% if not item.gepackt %}<button type="button" class="item-drag-handle" title="Verschieben (Ziehen oder Pfeiltasten)" aria-label="Verschieben (Ziehen oder Pfeiltasten)">⠿</button>{% endif %}
+  {#- Wunsch #248: Nutzertext - ein getipptes Emoji ist hier Inhalt und
+      behaelt seinen Alt-Text (data-emoji-alt, siehe base.html). -#}
+  <span class="item-name" data-emoji-alt>{{ item.name }}</span>
 
   {% if item.person_id %}
     <span class="badge-person" style="background:{{ item.person_farbe }}22; color:{{ item.person_farbe }}">{{ item.person_name }}</span>
@@ -206,6 +210,7 @@ body.packmodus .item-name { font-size:18px; }
 
   <button class="item-edit-toggle" type="button"
           data-klick="toggleEditPanel" data-args='[{{ item.id }}]'
+          data-panel="edit-panel-{{ item.id }}"
           title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
 
   <div class="edit-panel" id="edit-panel-{{ item.id }}">
@@ -270,8 +275,9 @@ body.packmodus .item-name { font-size:18px; }
   </div>
 
   <div class="top-aktionen">
-    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neu</button>
-    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn" data-panel="add-form-card">+ Neu</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
     <button type="button" class="btn-packen-start" id="packen-start-btn">🧳 Packen starten</button>
   </div>
 

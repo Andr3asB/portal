@@ -44,11 +44,13 @@ Neuanlegen und Import-Vorschau, unterschieden nur über den bearbeiten-Parameter
 Speichern komplett ersetzt, kein Zeilen-Diffing.
 """
 import base64
+import gzip
 import http.client
 import ipaddress
 import json
 import re
 import socket
+import zlib
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
@@ -262,6 +264,33 @@ def _einmal_abrufen(url: str):
     return opener.open(req, timeout=_FETCH_TIMEOUT)
 
 
+def _entpacken(raw: bytes, encoding) -> bytes:
+    """Wunsch #252: Manche Server (lecker.de seit 09/2026) liefern gzip auch
+    dann, wenn der Client gar kein Accept-Encoding geschickt hat. urllib
+    entpackt nichts von selbst - ohne diesen Schritt landete Binaerbrei im
+    JSON-LD-Parser und beim Nutzer stand 'kein Rezept erkannt', obwohl die
+    Seite ein sauberes schema.org/Recipe traegt.
+
+    Nur gzip und deflate: mehr kann ein Server ohne Accept-Encoding nicht
+    ernsthaft erwarten. Alles andere (br, zstd) ist ein klarer Fehler mit
+    klarer Meldung statt stillem Brei."""
+    enc = (encoding or "").lower().strip()
+    if enc in ("", "identity"):
+        return raw
+    try:
+        if enc == "gzip":
+            return gzip.decompress(raw)
+        if enc == "deflate":
+            try:
+                return zlib.decompress(raw)
+            except zlib.error:
+                # "raw deflate" ohne zlib-Kopf, schicken manche Server so.
+                return zlib.decompress(raw, -zlib.MAX_WBITS)
+    except (OSError, zlib.error) as e:
+        raise ValueError(f"Antwort liess sich nicht entpacken ({enc})") from e
+    raise ValueError(f"Unbekannte Komprimierung ({enc})")
+
+
 def _seite_abrufen(url: str) -> str:
     """Laedt eine Rezeptseite und folgt dabei Weiterleitungen selbst, damit
     JEDE Station erneut geprueft wird (Wunsch #127). Setzt voraus, dass die
@@ -294,6 +323,12 @@ def _seite_abrufen(url: str) -> str:
                 raise ValueError(f"Seite nicht abrufbar (HTTP {resp.status})")
 
             raw = resp.read(_MAX_FETCH_BYTES + 1)
+            if len(raw) > _MAX_FETCH_BYTES:
+                raise ValueError("Seite zu groß")
+            raw = _entpacken(raw, resp.headers.get("Content-Encoding"))
+            # Nochmal pruefen: Das Limit oben zaehlte die KOMPRIMIERTEN
+            # Bytes - eine praeparierte Mini-Datei koennte sich sonst zu
+            # Hunderten MB aufblasen (Zip-Bombe).
             if len(raw) > _MAX_FETCH_BYTES:
                 raise ValueError("Seite zu groß")
             charset = resp.headers.get_content_charset() or "utf-8"

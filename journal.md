@@ -2,6 +2,215 @@
 
 ---
 
+## 2026-09-05 – portal-v240: #254–#257, Feinschliff an TVB und Essensplan
+
+Vier kleine Wuensche aus einer Runde, drei davon TVB, einer Essensplan.
+
+**#256 – das „nonenone".** Andis Frage „woher kommt das?" hat eine kurze
+Antwort: aus Python. `{{ s.spieltag }}{{ s.ort }}` in tvb.html - beide
+Felder koennen aus der Quelle als None kommen (Amateurligen fuehren sie
+oft nicht), und Jinja rendert None woertlich als „None". Jetzt erscheint
+jede Angabe nur, wenn sie da ist; fehlt alles, entfaellt die Zeile. Der
+Ort bleibt bewusst drin, wo er existiert - „wo spielen wir?" ist bei
+kommenden Spielen eine echte Information. Neuer Waechter prueft, dass
+jede Ausgabe der beiden Felder auf derselben Zeile auch ihre Pruefung
+traegt - und stolperte beim Entstehen prompt ueber den eigenen
+Jinja-Kommentar (die test_ziehgriff-Falle: Prosa statt Code geprueft;
+Kommentare werden jetzt vorab entfernt).
+
+**#254 – nur die naechsten drei Spiele.** Der Rest der Saison steckt in
+einem versteckten Block, „Alle N Spiele anzeigen" klappt ihn auf
+(data-panel nach #248-Konvention, der Knopf verschwindet danach).
+Kartenmarkup dafuer in ein Makro gezogen statt dupliziert.
+
+**#255 – Ergebnisse als Gegenueberstellung.** Grid 1fr/auto/1fr: Heim
+rechts­buendig links, Ergebnis mittig, Gast linksbuendig rechts. Sieger
+fett, Verlierer in --text-2 zurueckgenommen, Unentschieden neutral, die
+TVB-Mannschaft zusaetzlich in var(--farbe-kontrast) (wie die
+Tabellen-Zeile aus #253). Nicht gewertete Spiele zeigen weiter den
+Termin mittig.
+
+**#257 – Essensplan springt nicht mehr nach oben.** Das Speichern eines
+Tages leitete stumpf auf die Index-Seite - bei einem Eintrag in der
+naechsten Woche stand man danach am Seitenanfang. Jetzt traegt jeder
+Mahlzeit-Slot eine id und `eintrag_speichern()` leitet mit
+`#slot-<tag>_<mahlzeit>` zurueck (die #171-Konvention fuer Umschalter,
+die die Liste veraendern). Der Anker entsteht nur aus geprueften Werten:
+mahlzeit ist gegen MAHLZEITEN geprueft, tag muss ein ISO-Datum sein -
+ein beliebiger Formular-String gehoert nicht in eine Redirect-URL.
+`scroll-padding-top` aus #186 sorgt dafuer, dass der Slot nicht unter
+der stehenden Kopfzeile landet. Suite: **2068 Tests**.
+
+## 2026-09-05 – portal-v239: #252 (lecker.de-Import) und #253 (TVB-Zeile)
+
+**#252 (sehr_hoch) – „kein Rezept erkannt" bei lecker.de.** Die Diagnose
+von diesem Rechner aus war dreistufig: Seite laedt mit dem Import-UA
+einwandfrei (HTTP 200), die gespeicherte Datei beginnt aber mit `1f 8b` –
+**gzip, obwohl der Import gar kein Accept-Encoding schickt**. lecker.de
+(bzw. dessen CDN) komprimiert seit neuestem bedingungslos; urllib entpackt
+nichts von selbst, der JSON-LD-Parser bekam Binaerbrei. Entpackt ist die
+Seite voellig in Ordnung (Block 7: schema.org/Recipe, 20 Zutaten,
+HowToStep-Liste, „4 Personen").
+
+Fix: `_entpacken()` in `_seite_abrufen()` (11_rezepte.py) - gzip und
+deflate (beide Varianten), alles andere ist ein klarer Fehler statt
+stillem Brei. Dazu der zweite Groessen-Check NACH dem Entpacken: das
+Lese-Limit zaehlt nur die komprimierten Bytes, eine praeparierte
+Mini-Datei koennte sich sonst zu Hunderten MB aufblasen (Zip-Bombe, in
+`test_rezept_import_gzip.py` mit einer echten 3-MB-Bombe belegt). Der
+Import selbst wurde nach dem Deploy aus dem Container heraus nur LESEND
+gegen die gemeldete URL geprueft - das Rezept legt Andi selbst an, kein
+Testmuell in echten Daten.
+
+**#253 (mittel) – die TVB-Zeile fiel nicht auf.** `tr.hervorgehoben` war
+graues `--surface-2` plus fett - neben zehn weissen Zeilen praktisch
+unsichtbar. Jetzt: getoente Flaeche aus der Nutzerfarbe
+(`color-mix(... 16%, transparent)` - laeuft auf allen Familiengeraeten,
+gleiche Baseline wie `:has()`), kraeftiger 3px-Balken links, Schrift in
+`var(--farbe-kontrast)` (#237: nie die rohe Farbe als Text). Suite:
+**2063 Tests**.
+
+## 2026-09-04 – portal-v238: #251, der Wunschzettel
+
+Neue App `wunschzettel` (🎁, Modul `26_wunschzettel.py`): Geschenkwuensche
+fuer Weihnachten und Geburtstage. Der Wunsch verlangte „sehr einfach
+erfassen" und „andere sollen sehen" – das Eingabefeld steht deshalb ohne
++Neu-Toggle immer offen ganz oben, darunter der eigene Zettel, darunter
+die der anderen (gruppiert, Namens-Badge in Personenfarbe).
+
+**Die eine Regel, die die App traegt: die Ueberraschung.** Andere koennen
+einen fremden Wunsch mit „🎁 Ich besorge das" reservieren (verhindert
+Doppelkaeufe – der eigentliche Zweck vor Weihnachten), aber der
+WUENSCHENDE erfaehrt davon nichts. Durchgesetzt in der Route, nicht in der
+Vorlage: fuer die eigenen Wuensche kommen die Reservierungsfelder gar
+nicht erst ins Template-Dict. Der wichtigste Test prueft entsprechend die
+Abwesenheit im gerenderten HTML (und stolperte dabei zweimal lehrreich
+ueber CSS-Klassen und JS-Festtexte, die IMMER in der Seite stehen – die
+Pruefung haengt jetzt an `id="resv-`, nicht an Woertern).
+
+Berechtigungen: reservieren nie der Wuenschende selbst; freigeben nur der
+Reservierer (oder Admin); bearbeiten NUR der Wuenschende (auch kein Admin
+– auf fremden Zetteln formuliert niemand um); loeschen selbst/Admin.
+Links werden serverseitig auf http(s) gefiltert (`javascript:` waere
+trotz CSP ein vermeidbares Loch). Reservieren laeuft als
+#171-Umschalter (data-fetch + antwort_oder_weiter).
+
+Auto-Grant wie Geburtstage als Familiensache, aber ohne `gast` (#212-
+Lehre: Besuch hat auf Geschenklisten nichts verloren) – beim ersten
+Start nach dem Deploy bekamen alle Eltern/Kinder/Admins die Kachel von
+selbst. Hilfe-Kapitel 25, eine neue Twemoji-Grafik (🤫 1f92b). Suite:
+**2059 Tests**.
+
+## 2026-09-03 – portal-v237: #250, das Ausfallprotokoll fuer die Werkstatt
+
+Andi hat einen Werkstatttermin und will das Protokoll (#222) mitgeben –
+mit gekuerzten GPS-Koordinaten: Echtheit erkennbar, Route nicht.
+
+**Die Kuerzung (im Wunsch mir ueberlassen): zwei Nachkommastellen.** Das
+ist ein Raster von ~1,1 × 0,75 km – grob eine Ortslage. Man sieht, dass
+die Ausfaelle wirklich unterwegs an verschiedenen Orten passierten, aber
+weder Wohnadresse noch Fahrstrecke lassen sich ablesen. Eine Stelle mehr
+(~110 m) waere wieder ein Bewegungsprofil, eine weniger (~11 km) saehe
+aus wie ausgedacht. Die Genauigkeit (±x m) bleibt ganz weg (neben einem
+1-km-Raster nur Pseudo-Praezision), Melder-Namen ebenfalls – die
+Werkstatt braucht Zeitpunkte und Haeufigkeit, keine Familienmitglieder.
+
+**Gerundet wird in der Route, nicht in der Vorlage:** `druck()` in
+`25_ausfall.py` gibt der neuen `ausfaelle_druck.html` nur noch die
+fertigen Strings – die Seite KANN die vollen Werte nicht ausgeben. Der
+wichtigste Test in `test_ausfall_druck.py` prueft entsprechend eine
+Abwesenheit (`48.123` darf nirgends im HTML stehen). Export = Drucken:
+Der Druckdialog kann ueberall auch „Als PDF speichern", ein eigener
+Export-Endpunkt waere ein zweiter Weg fuer dasselbe.
+
+**Zweimal hatten die Waechter recht:** Die erste Fassung der Druckvorlage
+versteckte `.app-header` und `.ptr-anzeige` selbst – genau das verbieten
+`test_kopfzeile_bleibt` und `test_ziehen_neuladen` (beides gehoert
+base.html). Deshalb gibt es jetzt zentral in base.html eine
+`druckblatt`-Regel: traegt das `<main>` einer Vorlage diese Klasse,
+versteckt base.html im Druck das Portal-Chrome (`body:has(.druckblatt)`).
+Und 🖨️ brauchte seine lokale Twemoji-Grafik (1f5a8.svg) –
+`test_emoji.py`, wie immer.
+
+In der App selbst aendert sich nichts an der Anzeige: voller Ort samt
+Kartensprung bleibt (auch das gewaechtert). Neuer Knopf „🖨️ Fuer die
+Werkstatt drucken" unter den Zahlen, Hilfe-Kapitel Ausfaelle ergaenzt.
+Suite: **2026 Tests**.
+
+## 2026-09-02 – portal-v236: #249, der hereinragende Skip-Link
+
+Andis Fund (sehr_hoch): Der „Zum Inhalt springen"-Knopf aus #245 stand
+oben links dauerhaft im Bild, statt nur bei Tastaturfokus zu erscheinen.
+
+Die Ursache ist ein Rechenfehler im Versteck: `translateY(-200%)` rechnet
+in der **eigenen Hoehe** des Knopfs (~80 px Versatz), der Knopf sitzt aber
+bei `top: calc(var(--st) + 8px)`. Am Schreibtisch ist `--st` 0 und alles
+verschwindet – in der installierten PWA auf dem iPhone ist `--st` die
+Statusleiste (~50 px), und dann reichte der Versatz nicht mehr: der untere
+Rand ragte ins Bild. Ein Versteck, das von Element-Hoehe, Safe-Area und
+Schriftgroesse abhaengt, ist keins.
+
+Fix: seitlich aus dem Bild parken (`left: -999px`), bei `:focus-visible`
+an die Position (`left: 8px`) – das klassische Muster, unabhaengig von
+allem Dreien. `white-space: nowrap` dazu, damit der Text am Parkplatz
+nicht umbricht. Verhalten unveraendert: erster Tab-Stopp, sichtbar nur mit
+Tastatur. Suite 1997 Tests gruen (der #245-Waechter prueft die
+`:focus-visible`-Regel weiter).
+
+## 2026-09-01 – portal-v235: #248, die Interaktions-Ebene
+
+Der gebündelte Wunsch aus dem vierten Durchgang, alle vier Teile, alle
+zentral in `base.html` (Vollreferenz: server.md, „Interaktions-Ebene").
+
+**1. Overlays sind Dialoge.** `role="dialog"` + `aria-modal` an Menü-Panel
+und ✨-Karte; `dialogFuehrung()` liefert beiden dasselbe Verhalten: Fokus
+aufs erste Bedienelement, Tab-Falle, Escape schließt, Fokus kehrt zum
+Auslöser zurück (Fallback ☰ – der ✨-Eintrag im Menü ist nach dem Schließen
+selbst unsichtbar, `offsetParent === null` erkennt das).
+
+**2. aria-expanded ohne Handarbeit.** Ein Auf/Zu-Knopf trägt
+`data-panel="<id>"`; `aufzuSync()` meldet nach jedem Klick die SICHTBARKEIT
+des Panels (`getComputedStyle`, weil die Panels mal `.open`, mal `hidden`,
+mal `style.display` nutzen) an alle solchen Knöpfe zurück – auch „daneben
+tippen schließt" ist ein Klick, und exklusive Panels (Geburtstage klappen
+das jeweils andere zu) stimmen so ohne Sonderfall. ~25 Knöpfe in 16
+Vorlagen markiert: ☰, alle „+ Neu"/„Filtern", Einkaufsmodus, alle
+✏️-Panel-Toggles, 🔔, Verlauf.
+
+**3. Wer ziehen kann, kann tippen.** `tastaturSortierung(opt)` nimmt
+DIESELBEN Optionen wie `ziehSortierung()` – die ruft sie inzwischen selbst
+auf, Packliste und Brett bekamen die Pfeiltasten damit geschenkt; die zwei
+Kategorien-Seiten mit eigener Zieh-Fassung rufen sie einzeln. ↑/↓ sortiert
+in der eigenen Gruppe (gleiche Kandidatenwahl wie beim Ziehen: #181-Gruppen,
+Gepacktes zählt nie), ←/→ wechselt am Brett die Spalte, Ansage über eine
+`aria-live`-Zeile („Position 2 von 5"), gespeichert wird 600 ms nach dem
+letzten Druck über dieselbe `opt.speichern`-Signatur – fünfmal drücken ist
+EINE Speicherung. Bewusst ohne Tastatur: der Kachel-Edit-Modus der
+Startseite (nicht im Wunsch) und das Essensplan-Ziehen (✏️ je Slot ist die
+gleichwertige Alternative).
+
+**4. Emoji: Schmuck ist stumm, Inhalt spricht.** Nach `twemoji.parse()`
+versteckt ein Nachlauf jedes Emoji-Bild (`alt=""` + `aria-hidden`), außer
+unter einem Element mit `data-emoji-alt`: App-Kacheln (laut Wunsch
+ausdrücklich bedeutungstragend), Nutzertexte (Aufgaben, Einträge, Wünsche,
+Namen, Gerichte) und der Hilfe-Fließtext, der die Emoji der Oberfläche
+wörtlich zitiert („🔍 Filtern" ohne Emoji wäre „ Filtern").
+
+**Der Wächter (`test_interaktion.py`) fand beim Entstehen sofort etwas:**
+den „+ Vokabel eintragen"-Knopf, den der Hand-Durchgang übersehen hatte –
+dieselbe Lehre wie bei #246 („Wächter vor Fix" hätte hier von Anfang an
+gegolten). Gegenprobe mit drei absichtlichen Fehlern: alle Teile schlagen
+an. Stolperer des Abends: Der neue base.html-Kommentar enthielt als
+Beispiel „Haus mit Garten Startseite" – und `test_vokabel_verben` prüft,
+dass „Haus" NICHT auf der Verbtraining-Seite steht. Ein Kommentar im
+Inline-Skript ist eben auch Seiteninhalt. Vier Funktionstests, die exakte
+Markup-Strings wie `class="item-name">` griffen, wurden attribut-tolerant
+(`[^>]*>`) – ihr Prüfzweck blieb unverändert. ⌨️ brauchte eine neue lokale
+Twemoji-Grafik (2328.svg), `test_emoji.py` hatte recht.
+
+Suite: **1997 Tests**. Hilfe um den Tastatur-Tipp ergänzt (Kapitel 1,
+Packliste, Brett). Damit ist das Backlog wieder leer.
+
 ## 2026-09-01 – Vierter (Mini-)Durchgang: die Interaktions-Ebene → #248
 
 Andis Frage „noch ein Durchgang, oder ist jetzt alles sauber?" –

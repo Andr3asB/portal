@@ -69,9 +69,11 @@
   {% for k in kategorien %}
   <div class="kat-item {% if not k.aktiv %}inaktiv{% endif %}" data-kat-id="{{ k.id }}">
     <div class="kat-row">
-      <button type="button" class="kat-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>
-      <span class="kat-name">{{ k.name }}</span>
-      <button class="btn-edit-toggle" type="button" data-klick="toggleKat" data-args='[{{ k.id }}]' title="Umbenennen" aria-label="Umbenennen">✏️</button>
+      {#- Wunsch #248: Griff kann jetzt auch Tastatur (Pfeiltasten); der
+          Kategoriename ist Nutzertext und behaelt sein Emoji-alt. -#}
+      <button type="button" class="kat-drag-handle" title="Verschieben (Ziehen oder Pfeiltasten)" aria-label="Verschieben (Ziehen oder Pfeiltasten)">⠿</button>
+      <span class="kat-name" data-emoji-alt>{{ k.name }}</span>
+      <button class="btn-edit-toggle" type="button" data-klick="toggleKat" data-args='[{{ k.id }}]' data-panel="kat-edit-{{ k.id }}" title="Umbenennen" aria-label="Umbenennen">✏️</button>
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="id" value="{{ k.id }}">
@@ -225,5 +227,15 @@ async function saveKatOrder() {
 }
 
 document.querySelectorAll('.kat-drag-handle').forEach(initKatDrag);
+
+// Wunsch #248: Tastatur-Alternative zum Ziehen - zentraler Helfer aus
+// base.html, dieselben Bausteine wie oben. saveKatOrder liest die
+// Reihenfolge selbst aus dem DOM und ignoriert die uebergebene Liste.
+tastaturSortierung({
+  griff:     '.kat-drag-handle',
+  eintrag:   '.kat-item',
+  idAus:     el => parseInt(el.dataset.katId),
+  speichern: saveKatOrder,
+});
 </script>
 {% endblock %}

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% set app_slug = "wunschzettel" %}
+{% block title %}Wunschzettel{% endblock %}
+
+{% block extra_styles %}
+/* Wunsch #251: Erfassen soll SEHR einfach sein - das Eingabefeld steht
+   deshalb immer offen ganz oben, kein +Neu-Toggle davor. */
+.add-card {
+  background:var(--surface); border-radius:16px; padding:14px 16px;
+  margin-bottom:18px; box-shadow:0 1px 3px var(--shadow);
+}
+.add-input {
+  width:100%; border:1.5px solid var(--border); border-radius:10px;
+  padding:9px 12px; font-size:16px; font-family:inherit;
+  background:var(--surface); color:var(--text); margin-bottom:8px;
+}
+.add-input:focus { border-color:var(--farbe); }
+.btn-add {
+  width:100%; background:var(--farbe-band); color:#fff; border:none;
+  border-radius:10px; padding:11px 16px; font-size:15px; font-weight:600;
+  cursor:pointer;
+}
+.section-label {
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; font-weight:700; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.5px; margin:20px 0 8px;
+}
+.badge-person {
+  display:inline-flex; align-items:center;
+  border-radius:8px; padding:2px 8px; font-size:12px; font-weight:600;
+  text-transform:none; letter-spacing:normal; white-space:nowrap;
+}
+.wz-karte {
+  background:var(--surface); border-radius:14px; padding:12px 16px;
+  margin-bottom:8px; box-shadow:0 1px 3px var(--shadow);
+}
+.wz-zeile { display:flex; align-items:flex-start; gap:10px; }
+.wz-text  { flex:1; font-size:15px; min-width:0; overflow-wrap:anywhere; }
+.wz-datum { font-size:12px; color:var(--text-2); margin-top:4px; }
+.wz-knopf {
+  background:none; border:none; font-size:16px; cursor:pointer;
+  color:var(--text-2); flex-shrink:0; padding:2px 4px;
+}
+.wz-link {
+  display:inline-block; border:1px solid var(--border); border-radius:10px;
+  padding:7px 10px; margin-top:6px; font-size:13px; font-weight:600;
+  text-decoration:none; color:var(--farbe-kontrast);
+}
+.resv-zeile { display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap; }
+.resv-btn {
+  background:none; border:1.5px solid var(--farbe); color:var(--farbe-kontrast);
+  border-radius:10px; padding:8px 12px; font-size:13px; font-weight:600;
+  cursor:pointer;
+}
+.resv-status { font-size:13px; color:var(--gruen-text); font-weight:600; }
+.resv-fremd  { font-size:13px; color:var(--text-2); font-weight:600; }
+.wz-edit { display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.wz-edit.offen { display:block; }
+.btn-speichern {
+  background:var(--farbe-band); color:#fff; border:none;
+  border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer;
+}
+.hinweis { font-size:13px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
+.leer { font-size:14px; color:var(--text-2); padding:8px 2px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">🎁 Wunschzettel</h1>
+<div class="nav-sub">Für Weihnachten und Geburtstage</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+
+  <div class="add-card">
+    <form method="post" action="/a/wunschzettel{{ tp }}neu">
+      <input class="add-input" aria-label="Neuer Wunsch" type="text" name="text"
+             maxlength="300" required autocomplete="off"
+             placeholder="Was wünschst du dir? …">
+      <input class="add-input" aria-label="Link (optional)" type="url" name="link"
+             maxlength="500" autocomplete="off"
+             placeholder="Link zum Produkt (optional) – https://…">
+      <button class="btn-add" type="submit">+ Auf meinen Zettel</button>
+    </form>
+  </div>
+
+  <h2 class="section-label">🙋 Mein Wunschzettel</h2>
+  {% for w in meine %}
+  <div class="wz-karte" id="wz-{{ w.id }}">
+    <div class="wz-zeile">
+      {#- Nutzertext behaelt sein Emoji-alt (Wunsch #248). -#}
+      <span class="wz-text" data-emoji-alt>{{ w.text }}</span>
+      <button class="wz-knopf" type="button" data-klick="wzEdit" data-args='[{{ w.id }}]'
+              data-panel="wz-edit-{{ w.id }}"
+              title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+      <form method="post" action="/a/wunschzettel{{ tp }}{{ w.id }}/loeschen"
+            data-bestaetigen="{{ ('„' ~ w.text|truncate(40) ~ '“ vom Zettel nehmen?') }}">
+        <button class="wz-knopf" type="submit" title="Löschen" aria-label="Löschen">🗑️</button>
+      </form>
+    </div>
+    {% if w.link %}
+    <a class="wz-link knopf" href="{{ w.link }}" target="_blank" rel="noopener noreferrer">🔗 Link ansehen</a>
+    {% endif %}
+    <div class="wz-datum">gewünscht am {{ w.datum }}</div>
+    <div class="wz-edit" id="wz-edit-{{ w.id }}">
+      <form method="post" action="/a/wunschzettel{{ tp }}{{ w.id }}/bearbeiten">
+        <input class="add-input" aria-label="Wunsch" type="text" name="text"
+               maxlength="300" required value="{{ w.text }}">
+        <input class="add-input" aria-label="Link (optional)" type="url" name="link"
+               maxlength="500" value="{{ w.link or '' }}"
+               placeholder="Link zum Produkt (optional) – https://…">
+        <button class="btn-speichern" type="submit">Speichern</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="leer">Noch nichts gewünscht – trag oben deinen ersten Wunsch ein.</div>
+  {% endfor %}
+  <p class="hinweis">🤫 Ob jemand etwas von deinem Zettel besorgt, siehst du
+  hier absichtlich nicht – sonst wäre die Überraschung dahin.</p>
+
+  {% for g in fremde %}
+  <h2 class="section-label">🎁 Wunschzettel von
+    <span class="badge-person" style="background:{{ farbe_kontrast(g.farbe) }}; color:#fff">{{ g.name }}</span>
+  </h2>
+  {% for w in g.wuensche %}
+  <div class="wz-karte" id="wz-{{ w.id }}">
+    <div class="wz-zeile">
+      <span class="wz-text" data-emoji-alt>{{ w.text }}</span>
+      {% if w.darf_loeschen %}
+      <form method="post" action="/a/wunschzettel{{ tp }}{{ w.id }}/loeschen"
+            data-bestaetigen="{{ ('„' ~ w.text|truncate(40) ~ '“ von ' ~ g.name ~ 's Zettel nehmen?') }}">
+        <button class="wz-knopf" type="submit" title="Löschen" aria-label="Löschen">🗑️</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if w.link %}
+    <a class="wz-link knopf" href="{{ w.link }}" target="_blank" rel="noopener noreferrer">🔗 Link ansehen</a>
+    {% endif %}
+    <div class="resv-zeile">
+      {% if not w.reserviert %}
+      <form method="post" action="/a/wunschzettel{{ tp }}{{ w.id }}/reservieren"
+            data-fetch="reservierungAktualisiert">
+        <button class="resv-btn" type="submit" id="resv-btn-{{ w.id }}">🎁 Ich besorge das</button>
+      </form>
+      <span class="resv-status" id="resv-status-{{ w.id }}"></span>
+      {% elif w.von_mir_reserviert or user.is_admin %}
+      <form method="post" action="/a/wunschzettel{{ tp }}{{ w.id }}/reservieren"
+            data-fetch="reservierungAktualisiert">
+        <button class="resv-btn" type="submit" id="resv-btn-{{ w.id }}">↩️ Doch nicht</button>
+      </form>
+      <span class="resv-status" id="resv-status-{{ w.id }}">{% if w.von_mir_reserviert %}Von dir reserviert ✓{% else %}Reserviert: {{ w.reserviert_name }}{% endif %}</span>
+      {% else %}
+      <span class="resv-fremd">Wird schon besorgt ({{ w.reserviert_name }}) 🤝</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endfor %}
+  {% if not fremde %}
+  <h2 class="section-label">🎁 Die anderen</h2>
+  <div class="leer">Noch hat sonst niemand etwas auf dem Zettel.</div>
+  {% endif %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+function wzEdit(id) {
+  document.getElementById('wz-edit-' + id)?.classList.toggle('offen');
+}
+
+/* Wunsch #171-Muster: Der Reservieren-Umschalter aktualisiert nur seine
+ * eigene Zeile. textContent statt innerHTML (Konvention) - hier stehen
+ * ohnehin nur feste Texte. */
+function reservierungAktualisiert(d) {
+  if (!d || !d.ok) return;
+  const knopf  = document.getElementById('resv-btn-' + d.id);
+  const status = document.getElementById('resv-status-' + d.id);
+  if (knopf)  knopf.textContent  = d.reserviert ? '↩️ Doch nicht' : '🎁 Ich besorge das';
+  if (status) status.textContent = d.reserviert ? 'Von dir reserviert ✓' : '';
+}
+</script>
+{% endblock %}

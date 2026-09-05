@@ -191,7 +191,7 @@
     {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}
   </form>
   {% if historie.get(t.id) %}
-  <button type="button" class="todo-verlauf-toggle" data-klick="toggleVerlauf" data-args='[{{ t.id }}]'>🕘 Verlauf ({{ historie[t.id]|length }})</button>
+  <button type="button" class="todo-verlauf-toggle" data-klick="toggleVerlauf" data-args='[{{ t.id }}]' data-panel="todo-verlauf-{{ t.id }}">🕘 Verlauf ({{ historie[t.id]|length }})</button>
   <div class="todo-verlauf" id="todo-verlauf-{{ t.id }}">
     {% for h in historie[t.id] %}
     <div class="todo-verlauf-eintrag">

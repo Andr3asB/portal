@@ -132,15 +132,22 @@
     }
 
     /* Wunsch #245: Skip-Link - erster Tab-Stopp jeder Seite, sichtbar nur
-       mit Tastaturfokus. Ziel ist das <main id="main"> der Vorlagen. */
+       mit Tastaturfokus. Ziel ist das <main id="main"> der Vorlagen.
+       Wunsch #249: NICHT per translateY(-200%) nach oben verstecken - der
+       Versatz rechnet in der EIGENEN Hoehe (~80px), der Knopf sitzt aber
+       bei top: var(--st)+8px. In der installierten PWA ist --st ~50px
+       (Statusleiste), und dann ragte sein unterer Rand oben links ins
+       Bild. Deshalb seitlich aus dem Bild parken - das ist von Hoehe,
+       Inset und Schriftgroesse unabhaengig. */
     .skip-link {
-      position: absolute; left: 8px; top: calc(var(--st) + 8px);
-      z-index: 400; transform: translateY(-200%);
+      position: absolute; left: -999px; top: calc(var(--st) + 8px);
+      z-index: 400;
       background: var(--surface); color: var(--text);
       border: 2px solid var(--farbe-kontrast); border-radius: 10px;
       padding: 10px 16px; font-weight: 600; text-decoration: none;
+      white-space: nowrap;
     }
-    .skip-link:focus-visible { transform: none; }
+    .skip-link:focus-visible { left: 8px; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
@@ -429,6 +436,26 @@
       margin: 0 .05em 0 .1em;
       vertical-align: -0.1em;
     }
+    /* Wunsch #250: Eine Vorlage, deren <main> die Klasse `druckblatt`
+       traegt, ist zum Ausdrucken gedacht - im Druck verschwindet dann das
+       Portal-Chrome. Die Regel steht HIER, weil .app-header und die
+       Neulade-Geste base.html gehoeren (test_kopfzeile_bleibt.py bzw.
+       test_ziehen_neuladen.py lassen Vorlagen nicht daran). */
+    @media print {
+      body:has(.druckblatt) .app-header,
+      body:has(.druckblatt) .skip-link,
+      body:has(.druckblatt) .ptr-anzeige { display: none !important; }
+      body:has(.druckblatt) { background: #fff; color: #000; }
+    }
+
+    /* Wunsch #248: unsichtbare Ansage-Zeile fuer Screenreader - das
+       Tastatur-Sortieren meldet hier "Position 2 von 5". Klassisches
+       visually-hidden: aus dem Fluss, 1x1px, nie display:none (sonst
+       ignorieren Screenreader die aria-live-Aenderungen). */
+    .sr-live {
+      position: absolute; width: 1px; height: 1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
     {% block extra_styles %}{% endblock %}
   </style>
 </head>
@@ -441,6 +468,8 @@
 
 <!-- App-Header mit Navigation -->
 <div class="ptr-anzeige" id="ptr-anzeige" aria-hidden="true">Zum Neuladen ziehen</div>
+<!-- Wunsch #248: Ansagen des Tastatur-Sortierens, siehe tastaturSortierung() -->
+<div class="sr-live" id="sr-live" aria-live="polite"></div>
 
 <header class="app-header">
   <div class="nav-bar">
@@ -457,7 +486,8 @@
     </div>
 
     {% if user is defined and user %}
-    <button class="nav-btn" id="menu-btn" aria-label="Menü öffnen">☰</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, siehe aufzuSync(). -#}
+    <button class="nav-btn" id="menu-btn" aria-label="Menü öffnen" data-panel="menu-overlay">☰</button>
     {% else %}
     <span class="nav-ghost"></span>
     {% endif %}
@@ -474,8 +504,11 @@
 
 {% if user is defined and user %}
 <!-- Hamburger-Menü -->
+{# Wunsch #248: role=dialog + aria-modal am PANEL (nicht am Overlay - das ist
+   nur der abdunkelnde Hintergrund). Fokus-Fuehrung, Escape und die Fokus-
+   Rueckgabe macht dialogFuehrung() im Skript weiter unten. #}
 <div id="menu-overlay" class="menu-overlay">
-  <div id="menu-panel" class="menu-panel">
+  <div id="menu-panel" class="menu-panel" role="dialog" aria-modal="true" aria-label="Menü">
     <div class="menu-close-row">
       <button class="menu-close-btn" id="menu-close">✕ Schließen</button>
     </div>
@@ -578,8 +611,8 @@
 
 <!-- Wunsch-Overlay -->
 <div id="wunsch-overlay">
-  <div class="wunsch-modal-card">
-    <h3>✨ Verbesserungswunsch</h3>
+  <div class="wunsch-modal-card" role="dialog" aria-modal="true" aria-labelledby="wunsch-titel">
+    <h3 id="wunsch-titel">✨ Verbesserungswunsch</h3>
     <textarea aria-label="Verbesserungswunsch" id="wunsch-text" rows="4" placeholder="Was soll besser werden?"></textarea>
     {% if user is defined and user and user.is_admin %}
     {# Wunsch #152: nur fuer Admins. Voreinstellung "Zurueckgestellt" - ein
@@ -613,9 +646,10 @@
 //
 // Statt 59 einzelner `addEventListener`-Blöcke steht hier EIN delegierter
 // Verteiler je Ereignisart. Aus
-//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]'>
+//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]' data-panel="kat-edit-{{ '{{ k.id }}' }}">
 // wird
-//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]'>
+//     <button data-klick="toggleKat" data-args='[{{ '{{ k.id }}' }}]' data-panel="kat-edit-{{ '{{ k.id }}' }}">
+// (data-panel gehoert seit Wunsch #248 an jeden Auf/Zu-Knopf, siehe aufzuSync unten.)
 //
 // Die aufgerufenen Funktionen bleiben unverändert. Das geht auf, weil ein
 // Inline-Handler seinen Namen ohnehin nur im globalen Bereich auflösen kann –
@@ -815,6 +849,102 @@
 
     document.querySelectorAll(opt.griff).forEach(g =>
       g.addEventListener('pointerdown', beginn));
+
+    // Wunsch #248: dieselben Optionen taugen unveraendert fuer die
+    // Tastatur-Alternative - wer ziehen kann, kann ab hier auch tippen.
+    window.tastaturSortierung(opt);
+  };
+
+  /* Wunsch #248: Tastatur-Alternative zum Ziehen.
+   *
+   * Die Zieh-Griffe sind echte <button>s und damit fokussierbar - nur tat
+   * ein fokussierter Griff bisher NICHTS. Jetzt verschieben die Pfeiltasten
+   * den Eintrag: hoch/runter innerhalb seiner Gruppe, beim Brett zusaetzlich
+   * links/rechts in die Nachbarspalte (die Spalte ist dort der Status,
+   * genau wie beim Ziehen). Der Fokus bleibt auf dem Griff, jede Bewegung
+   * wird ueber #sr-live angesagt ("Position 2 von 5").
+   *
+   * Gespeichert wird erst 600 ms nach dem LETZTEN Tastendruck - fuenfmal
+   * druecken ist eine Speicherung, nicht fuenf. Der Speicher-Aufruf ist
+   * derselbe wie am Ende eines Zuges (gleiche opt.speichern-Signatur).
+   *
+   * ziehSortierung() ruft das hier selbst mit auf; die beiden
+   * Kategorien-Seiten mit eigener Zieh-Fassung (siehe #178-Kommentar oben)
+   * rufen es einzeln mit denselben Optionen. */
+  window.tastaturSortierung = function (opt) {
+    let timer = null;
+
+    function melde(text) {
+      const live = document.getElementById('sr-live');
+      if (live) live.textContent = text;
+    }
+
+    function spaltenName(s) {
+      // Brett-Spalten tragen ihren Namen im Kopf-Span, nicht in einem h2.
+      const h = s.querySelector('h2, .spalte-kopf span');
+      return h ? h.textContent.trim() : (s.dataset.status || 'Spalte');
+    }
+
+    // Rechnet Spalte/Reihenfolge erst beim Feuern aus - der Eintrag kann
+    // sich bis dahin weiterbewegt haben.
+    function sichern(eintrag) {
+      if (opt.spalten) {
+        const spalte = eintrag.closest(opt.spalten);
+        opt.speichern(
+          [...spalte.querySelectorAll(opt.eintrag)].map(opt.idAus),
+          spalte, eintrag);
+      } else {
+        opt.speichern([...document.querySelectorAll(opt.eintrag)]
+          .filter(el => !el.classList.contains('gepackt'))
+          .map(opt.idAus));
+      }
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      const griff = e.target.closest ? e.target.closest(opt.griff) : null;
+      if (!griff) return;
+      const eintrag = griff.closest(opt.eintrag);
+      if (!eintrag) return;
+      // Sonst blaettert die Seite bei jedem Verschieben mit.
+      e.preventDefault();
+
+      if (opt.spalten && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const spalten = [...document.querySelectorAll(opt.spalten)];
+        const von  = eintrag.closest(opt.spalten);
+        const ziel = spalten[spalten.indexOf(von) + (e.key === 'ArrowRight' ? 1 : -1)];
+        if (!ziel) return;                       // schon am Rand
+        (ziel.querySelector(opt.ablage) || ziel).appendChild(eintrag);
+        griff.focus();
+        const drin = [...ziel.querySelectorAll(opt.eintrag)];
+        melde(`${spaltenName(ziel)}, Position ${drin.indexOf(eintrag) + 1} von ${drin.length}`);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        // Dieselbe Kandidatenwahl wie beim Ziehen: beim Brett die eigene
+        // Spalte, sonst die eigene Gruppe (#181), Gepacktes zaehlt nie mit.
+        const schluessel = opt.gruppe ? opt.gruppe(eintrag) : null;
+        const liste = opt.spalten
+          ? [...eintrag.closest(opt.spalten).querySelectorAll(opt.eintrag)]
+          : [...document.querySelectorAll(opt.eintrag)].filter(el =>
+              !el.classList.contains('gepackt') &&
+              (schluessel === null || opt.gruppe(el) === schluessel));
+        const i = liste.indexOf(eintrag);
+        if (e.key === 'ArrowUp' && i > 0) {
+          liste[i - 1].parentNode.insertBefore(eintrag, liste[i - 1]);
+        } else if (e.key === 'ArrowDown' && i >= 0 && i < liste.length - 1) {
+          liste[i + 1].parentNode.insertBefore(eintrag, liste[i + 1].nextSibling);
+        } else {
+          return;                                // schon am Rand
+        }
+        griff.focus();
+        const neu = i + (e.key === 'ArrowUp' ? -1 : 1);
+        melde(`Position ${neu + 1} von ${liste.length}`);
+      } else {
+        return;
+      }
+
+      clearTimeout(timer);
+      timer = setTimeout(() => sichern(eintrag), 600);
+    });
   };
 
   function rufeAuf(el, name, ereignis) {
@@ -841,6 +971,28 @@
       if (rufeAuf(el, el.dataset[attribut], e) === false) e.preventDefault();
     });
   }
+
+  // Wunsch #248: aria-expanded ohne Handarbeit je Vorlage. Ein Auf/Zu-Knopf
+  // traegt data-panel="<id seines Panels>"; nach jedem Klick - irgendwo auf
+  // der Seite, denn auch "daneben tippen schliesst das Panel" ist ein Klick -
+  // wird der SICHTBARE Zustand jedes Panels an seine Knoepfe zurueckgemeldet.
+  // Sichtbarkeit statt Klassenname, weil die Panels mal .open, mal hidden,
+  // mal style.display nutzen - display:none ist der gemeinsame Nenner.
+  // Dieser Listener ist NACH dem data-klick-Verteiler registriert und sieht
+  // deshalb immer den Zustand nach dem Umschalten. Wer ein Panel ohne Klick
+  // umschaltet (Escape im Dialog), ruft aufzuSync() selbst.
+  window.aufzuSync = function () {
+    document.querySelectorAll('[data-panel]').forEach(function (k) {
+      const p = document.getElementById(k.dataset.panel);
+      if (p) k.setAttribute('aria-expanded',
+        getComputedStyle(p).display !== 'none' ? 'true' : 'false');
+    });
+  };
+  document.addEventListener('click', function () { window.aufzuSync(); });
+  // Anfangszustand erst bei DOMContentLoaded: Die App-Skripte in
+  // extra_scripts laufen NACH diesem Block und stellen dort z. B. den
+  // gemerkten Filter-Zustand wieder her - erst danach stimmt das Bild.
+  document.addEventListener('DOMContentLoaded', function () { window.aufzuSync(); });
 
   // Formulare: erst die Sicherheitsabfrage (Projektkonvention: jedes echte
   // Löschen fragt nach), dann eine etwaige eigene Prüffunktion.
@@ -1010,10 +1162,60 @@
   const menuPanel   = document.getElementById('menu-panel');
   const menuClose   = document.getElementById('menu-close');
 
-  menuBtn.addEventListener('click', () => menuOverlay.classList.add('open'));
-  menuClose.addEventListener('click', () => menuOverlay.classList.remove('open'));
+  // Wunsch #248: Overlay -> echter Dialog. Ein Overlay, das nur eine Klasse
+  // umschaltet, ist fuer die Tastatur unsichtbar: Escape tat nichts, Tab
+  // lief hinter dem abgedunkelten Hintergrund weiter durch die Seite, und
+  // nach dem Schliessen stand der Fokus im Nirgendwo. dialogFuehrung()
+  // liefert oeffnen/schliessen fuer beide Overlays:
+  //   - Fokus beim Oeffnen auf das erste Bedienelement im Panel,
+  //   - Tab/Shift+Tab bleiben im Panel (Fokus-Falle),
+  //   - Escape schliesst,
+  //   - der Fokus kehrt zum Ausloeser zurueck. Fallback ☰-Knopf: Wer das
+  //     ✨-Overlay aus dem Menue geoeffnet hat, dessen Ausloeser steckt nach
+  //     dem Schliessen selbst in einem unsichtbaren Panel.
+  function dialogFuehrung(overlay, panel) {
+    let ausloeser = null;
+    function fokussierbare() {
+      return [...panel.querySelectorAll('button, [href], input, select, textarea')]
+        .filter(el => !el.disabled && el.offsetParent !== null);
+    }
+    function tasten(e) {
+      if (e.key === 'Escape') { e.preventDefault(); schliessen(); return; }
+      if (e.key !== 'Tab') return;
+      const f = fokussierbare();
+      if (!f.length) return;
+      const erste = f[0], letzte = f[f.length - 1];
+      if (e.shiftKey && (document.activeElement === erste ||
+                         !panel.contains(document.activeElement))) {
+        e.preventDefault(); letzte.focus();
+      } else if (!e.shiftKey && document.activeElement === letzte) {
+        e.preventDefault(); erste.focus();
+      }
+    }
+    function oeffnen() {
+      ausloeser = document.activeElement;
+      overlay.classList.add('open');
+      document.addEventListener('keydown', tasten, true);
+      const f = fokussierbare();
+      if (f.length) f[0].focus();
+      window.aufzuSync();
+    }
+    function schliessen() {
+      overlay.classList.remove('open');
+      document.removeEventListener('keydown', tasten, true);
+      if (ausloeser && ausloeser.offsetParent !== null) ausloeser.focus();
+      else if (menuBtn) menuBtn.focus();
+      ausloeser = null;
+      window.aufzuSync();
+    }
+    return { oeffnen, schliessen };
+  }
+
+  const menueDialog = dialogFuehrung(menuOverlay, menuPanel);
+  menuBtn.addEventListener('click', menueDialog.oeffnen);
+  menuClose.addEventListener('click', menueDialog.schliessen);
   menuOverlay.addEventListener('click', e => {
-    if (!menuPanel.contains(e.target)) menuOverlay.classList.remove('open');
+    if (!menuPanel.contains(e.target)) menueDialog.schliessen();
   });
 
   // Dark Mode
@@ -1035,23 +1237,29 @@
         document.getElementById('dm-emoji').textContent = zeichen[d.modus];
         document.getElementById('dm-menu-btn').title =
           'Darstellung: ' + namen[d.modus] + ' (tippen zum Wechseln)';
-        menuOverlay.classList.remove('open');
+        menueDialog.schliessen();
       }
     } catch(e) { console.warn('darkmode toggle failed', e); }
   });
 
-  // Wunsch aus Menü
+  // Wunsch-Overlay - zweiter Dialog, gleiche Fuehrung (Wunsch #248). Das
+  // erste Bedienelement ist hier das Textfeld, genau da soll der Fokus hin.
+  const wunschOverlay = document.getElementById('wunsch-overlay');
+  const wunschDialog = dialogFuehrung(
+    wunschOverlay, wunschOverlay.querySelector('.wunsch-modal-card'));
+
+  // Wunsch aus Menü: Menue zu, Dialog auf. schliessen() setzt den Fokus auf
+  // den ☰-Knopf zurueck - der wird damit der Ausloeser des Wunsch-Dialogs
+  // und bekommt den Fokus am Ende wieder.
   document.getElementById('wunsch-menu-btn').addEventListener('click', () => {
-    menuOverlay.classList.remove('open');
-    document.getElementById('wunsch-overlay').classList.add('open');
+    menueDialog.schliessen();
+    wunschDialog.oeffnen();
   });
 
-  // Wunsch-Overlay
-  const wunschOverlay = document.getElementById('wunsch-overlay');
-  document.getElementById('wunsch-cancel').addEventListener('click', () =>
-    wunschOverlay.classList.remove('open'));
+  document.getElementById('wunsch-cancel').addEventListener('click',
+    wunschDialog.schliessen);
   wunschOverlay.addEventListener('click', e => {
-    if (e.target === wunschOverlay) wunschOverlay.classList.remove('open');
+    if (e.target === wunschOverlay) wunschDialog.schliessen();
   });
   document.getElementById('wunsch-send').addEventListener('click', async () => {
     const text = document.getElementById('wunsch-text').value.trim();
@@ -1071,7 +1279,7 @@
       const d = await resp.json();
       erfolgreich = !!d.ok;
     } catch(e) {}
-    wunschOverlay.classList.remove('open');
+    wunschDialog.schliessen();
     document.getElementById('wunsch-text').value = '';
     // Wunsch #152: Auswahl zuruecksetzen. Bliebe die letzte Wahl stehen,
     // bekaeme der naechste Wunsch unbemerkt dieselbe Priorität.
@@ -1106,6 +1314,23 @@ if (typeof twemoji !== 'undefined') {
   // Ordner zurueck. Deshalb "svg" als echter (nicht-leerer) Unterordner-
   // name, Dateien liegen entsprechend unter /static/twemoji/svg/.
   twemoji.parse(document.body, { base: '/static/twemoji/', folder: 'svg', ext: '.svg' });
+
+  // Wunsch #248: twemoji gibt JEDEM ersetzten Emoji ein alt mit dem
+  // Original-Zeichen - Screenreader lasen damit vor jedem Menuepunkt und
+  // jeder Kachel erst das Emoji vor ("Einkaufswagen Einkaufsliste").
+  // Schmuck-Emoji werden deshalb versteckt (alt leer + aria-hidden).
+  // Bedeutungstragende Stellen - die App-Kacheln der Startseite und alles,
+  // was NUTZERTEXT wiedergibt (dort ist ein getipptes Emoji Teil des
+  // Inhalts) - markieren ihr Element mit data-emoji-alt und behalten den
+  // Alt-Text. Standard ist Schmuck: Chrome-Emoji stehen praktisch immer
+  // neben einem Text oder in einem Knopf mit aria-label, der die Bedeutung
+  // laengst traegt.
+  document.querySelectorAll('img.emoji').forEach(function (img) {
+    if (!img.closest('[data-emoji-alt]')) {
+      img.setAttribute('alt', '');
+      img.setAttribute('aria-hidden', 'true');
+    }
+  });
 }
 </script>
 <script{{ csp_nonce }}>

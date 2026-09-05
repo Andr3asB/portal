@@ -101,7 +101,7 @@
     <span class="tag-datum">{{ tag.datum.strftime('%d.%m.') }}</span>
     {% if tag.gesperrt %}<span class="lock-badge">🔒 nur Eltern</span>{% endif %}
     {% if darf_editieren and not tag.gesperrt %}
-    <button class="tag-edit-toggle" type="button" data-klick="togglePlan" data-args='["{{ tag.iso }}"]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+    <button class="tag-edit-toggle" type="button" data-klick="togglePlan" data-args='["{{ tag.iso }}"]' data-panel="plan-edit-{{ tag.iso }}" title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
     {% endif %}
   </div>
 

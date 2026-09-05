@@ -26,13 +26,53 @@
   font-size:16px; font-weight:700; white-space:nowrap; text-align:right; flex-shrink:0;
 }
 .tvb-spiel-ergebnis.offen { font-size:13px; font-weight:600; color:var(--text-2); }
+/* Wunsch #254: Standard sind die naechsten drei Spiele, der Rest klappt auf. */
+.mehr-spiele-btn {
+  display:block; width:100%; text-align:center;
+  background:none; border:1.5px solid var(--farbe);
+  color:var(--farbe-kontrast); border-radius:12px; padding:11px 10px;
+  font-size:14px; font-weight:600; cursor:pointer; margin-top:10px;
+}
+/* Wunsch #255: Ergebnisse als Gegenueberstellung - links Heim, Mitte das
+   Ergebnis, rechts Gast. Der Sieger ist fett, der Verlierer zurueckgenommen,
+   die TVB-Mannschaft zusaetzlich in der Kontrastfarbe (wie die Tabelle,
+   #253). Bei Unentschieden bleiben beide normal. */
+.tvb-erg-karte { display:block; }
+.tvb-erg {
+  display:grid; grid-template-columns:1fr auto 1fr; gap:10px;
+  align-items:center;
+}
+.tvb-erg-team { font-size:14px; word-break:break-word; min-width:0; }
+.tvb-erg-team.heim { text-align:right; }
+.tvb-erg-team.gast { text-align:left; }
+.tvb-erg-team.sieger { font-weight:700; }
+.tvb-erg-team.verlierer { color:var(--text-2); }
+.tvb-erg-team.tvb { color:var(--farbe-kontrast); }
+.tvb-erg-score {
+  font-size:16px; font-weight:700; white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.tvb-erg-score.offen { font-size:13px; font-weight:600; color:var(--text-2); }
+.tvb-erg-meta { text-align:center; font-size:12px; color:var(--text-2); margin-top:4px; }
 .tvb-tabelle { width:100%; border-collapse:collapse; font-size:13px; }
 .tvb-tabelle th, .tvb-tabelle td {
   padding:7px 4px; text-align:center; border-bottom:1px solid var(--border-subtle);
 }
 .tvb-tabelle th { color:var(--text-2); font-weight:600; font-size:12px; }
 .tvb-tabelle td.tvb-team-name { text-align:left; white-space:normal; word-break:break-word; }
-.tvb-tabelle tr.hervorgehoben td { background:var(--surface-2); font-weight:700; }
+/* Wunsch #253: Die TVB-Zeile war mit grauem --surface-2 kaum vom Rest zu
+   unterscheiden - jetzt ein farbiger Anstrich aus der Nutzerfarbe: getoente
+   Flaeche (color-mix laeuft auf allen Familiengeraeten, siehe :has in
+   base.html), kraeftiger Balken links, Schrift in der Kontrast-Variante
+   (#237: Text nie in var(--farbe) selbst). */
+.tvb-tabelle tr.hervorgehoben td {
+  background: color-mix(in srgb, var(--farbe) 16%, transparent);
+  color: var(--farbe-kontrast);
+  font-weight: 700;
+}
+.tvb-tabelle tr.hervorgehoben td:first-child {
+  box-shadow: inset 3px 0 0 var(--farbe);
+}
 .tvb-tabelle tr:last-child td { border-bottom:none; }
 .empty { text-align:center; padding:32px 16px; color:var(--text-2); font-size:15px; }
 /* Wunsch #121: Knopf zur Kader-Unterseite, optisch wie die Zeitraum-Knoepfe
@@ -147,6 +187,29 @@
   <a class="kader-btn" href="/a/tvb{{ tp }}kader">👥 Kader &amp; Spielerwerte</a>
   {% endif %}
 
+  {# Wunsch #256: spieltag und ort koennen aus der Quelle als None kommen -
+     nacktes {{ s.ort }} schrieb dann woertlich "NoneNone" unter das Spiel.
+     Jede Angabe erscheint nur noch, wenn sie wirklich da ist; fehlt alles,
+     entfaellt die Zeile ganz. Der Ort bleibt bewusst drin, wo er existiert:
+     "wo spielen wir?" ist bei kommenden Spielen eine echte Information. #}
+  {% macro kommend_karte(s, gewaehlt, haupt_wettbewerb) %}
+  <div class="tvb-spiel">
+    <div class="tvb-spiel-teams">
+      <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
+      <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
+      {% if (s.wettbewerb and s.wettbewerb != haupt_wettbewerb) or s.spieltag or s.ort %}
+      <div class="tvb-spiel-meta">
+        {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
+        {%- if s.spieltag %}{{ s.spieltag }}{% endif %}{% if s.spieltag and s.ort %} · {% endif %}{% if s.ort %}{{ s.ort }}{% endif -%}
+      </div>
+      {% endif %}
+    </div>
+    <div class="tvb-spiel-ergebnis offen">
+      {{ s.anstoss[:16].replace('T', ' ') }}
+    </div>
+  </div>
+  {% endmacro %}
+
   <div class="tvb-section">
     <h2 class="tvb-section-title">📅 Nächste Spiele</h2>
     {% if fehler_spiele %}
@@ -154,21 +217,18 @@
     {% elif not kommende %}
       <div class="empty">Aktuell keine Spiele terminiert.</div>
     {% else %}
-      {% for s in kommende %}
-      <div class="tvb-spiel">
-        <div class="tvb-spiel-teams">
-          <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
-          <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
-          <div class="tvb-spiel-meta">
-            {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
-            {{ s.spieltag }}{% if s.spieltag and s.ort %} · {% endif %}{{ s.ort }}
-          </div>
-        </div>
-        <div class="tvb-spiel-ergebnis offen">
-          {{ s.anstoss[:16].replace('T', ' ') }}
-        </div>
+      {# Wunsch #254: Standard sind die naechsten drei - der Rest der Saison
+         steht aufklappbar dahinter, statt die Seite lang zu machen. #}
+      {% for s in kommende[:3] %}{{ kommend_karte(s, gewaehlt, haupt_wettbewerb) }}{% endfor %}
+      {% if kommende|length > 3 %}
+      <div id="mehr-spiele" hidden>
+        {% for s in kommende[3:] %}{{ kommend_karte(s, gewaehlt, haupt_wettbewerb) }}{% endfor %}
       </div>
-      {% endfor %}
+      <button type="button" class="mehr-spiele-btn" id="mehr-spiele-btn"
+              data-klick="mehrSpiele" data-panel="mehr-spiele">
+        Alle {{ kommende|length }} Spiele anzeigen
+      </button>
+      {% endif %}
     {% endif %}
   </div>
 
@@ -179,23 +239,24 @@
     {% elif not vergangene %}
       <div class="empty">Noch keine Ergebnisse.</div>
     {% else %}
+      {# Wunsch #255: Gegenueberstellung - Heim links, Ergebnis mittig, Gast
+         rechts; der Sieger fett, der Verlierer zurueckgenommen. #}
       {% for s in vergangene %}
-      <div class="tvb-spiel">
-        <div class="tvb-spiel-teams">
-          <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
-          <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
-          <div class="tvb-spiel-meta">
-            {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
-            {{ s.spieltag }}
+      {% set fertig = s.heim_tore is not none and s.gast_tore is not none %}
+      <div class="tvb-spiel tvb-erg-karte">
+        <div class="tvb-erg">
+          <div class="tvb-erg-team heim{% if s.heim == gewaehlt.name %} tvb{% endif %}{% if fertig and s.heim_tore > s.gast_tore %} sieger{% elif fertig and s.heim_tore < s.gast_tore %} verlierer{% endif %}">{{ s.heim }}</div>
+          <div class="tvb-erg-score{% if not fertig %} offen{% endif %}">
+            {% if fertig %}{{ s.heim_tore }}:{{ s.gast_tore }}{% else %}{{ s.anstoss[:16].replace('T', ' ') }}{% endif %}
           </div>
+          <div class="tvb-erg-team gast{% if s.gast == gewaehlt.name %} tvb{% endif %}{% if fertig and s.gast_tore > s.heim_tore %} sieger{% elif fertig and s.gast_tore < s.heim_tore %} verlierer{% endif %}">{{ s.gast }}</div>
         </div>
-        <div class="tvb-spiel-ergebnis{% if s.heim_tore is none %} offen{% endif %}">
-          {% if s.heim_tore is not none and s.gast_tore is not none %}
-            {{ s.heim_tore }}:{{ s.gast_tore }}
-          {% else %}
-            {{ s.anstoss[:16].replace('T', ' ') }}
-          {% endif %}
+        {% if (s.wettbewerb and s.wettbewerb != haupt_wettbewerb) or s.spieltag %}
+        <div class="tvb-erg-meta">
+          {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
+          {%- if s.spieltag %}{{ s.spieltag }}{% endif -%}
         </div>
+        {% endif %}
       </div>
       {% endfor %}
     {% endif %}
@@ -243,6 +304,15 @@
 
 {% block extra_scripts %}
 <script{{ csp_nonce }}>
+// Wunsch #254: Der Rest des Spielplans klappt auf - der Knopf verschwindet
+// danach, zuklappen braucht niemand (dann laedt man die Seite neu).
+function mehrSpiele() {
+  const rest  = document.getElementById('mehr-spiele');
+  const knopf = document.getElementById('mehr-spiele-btn');
+  if (rest)  rest.hidden  = false;
+  if (knopf) knopf.hidden = true;
+}
+
 // Wunsch #125: Scroll-Hinweise je nach Position ein-/ausblenden.
 (function () {
   var wrap = document.getElementById('team-wrap');

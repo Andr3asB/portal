@@ -66,7 +66,8 @@
 <div class="todo-item{% if t.erledigt %} done{% endif %}" id="todo-{{ t.id }}"
      data-status="{{ t.status }}" data-nutzer="{{ t.erstellt_von }},{{ t.zugewiesen_an or '' }}">
   <div class="todo-body">
-    <div class="todo-text">{{ t.inhalt }}</div>
+    {#- Wunsch #248: Nutzertext behaelt sein Emoji-alt (siehe base.html). -#}
+    <div class="todo-text" data-emoji-alt>{{ t.inhalt }}</div>
     <div class="todo-meta">
       {% if t.serie_id %}<span class="chip" style="background:#8e8e93" title="Wiederkehrende Aufgabe">🔁</span>{% endif %}
       {% if t.privat %}<span class="chip" style="background:#8e8e93">🔒</span>{% endif %}
@@ -94,7 +95,7 @@
   </div>
 
   {% if ich_darf_erledigen %}
-  <button class="todo-edit-toggle" type="button" data-klick="toggleTodoEdit" data-args='[{{ t.id }}]' title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
+  <button class="todo-edit-toggle" type="button" data-klick="toggleTodoEdit" data-args='[{{ t.id }}]' data-panel="todo-edit-{{ t.id }}" title="Bearbeiten" aria-label="Bearbeiten">✏️</button>
   {% endif %}
 
   {% if darf_loeschen %}
@@ -110,8 +111,9 @@
 
 <main class="main" id="main">
   <div class="top-aktionen">
-    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn">+ Neue Aufgabe</button>
-    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn">🔍 Filtern</button>
+    {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+    <button type="button" class="btn-neu-toggle" id="neu-toggle-btn" data-panel="new-todo-card">+ Neue Aufgabe</button>
+    <button type="button" class="btn-filter-toggle" id="filter-toggle-btn" data-panel="filter-card">🔍 Filtern</button>
     {# Wunsch #224 #}
     <a class="btn-neu-toggle" href="/a/todo{{ tp }}kanban?ansicht=brett" style="text-align:center; text-decoration:none">📋 Brett</a>
   </div>

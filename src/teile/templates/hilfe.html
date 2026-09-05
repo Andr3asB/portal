@@ -77,7 +77,10 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
 
 {% block body %}
 
-<main class="main" id="main">
+{#- Wunsch #248: Die Hilfe SPRICHT ueber die Emoji der Oberflaeche („🔍
+    Filtern" oeffnet …) - hier sind sie Inhalt, nicht Schmuck, und behalten
+    ihren Alt-Text (data-emoji-alt, siehe base.html). -#}
+<main class="main" id="main" data-emoji-alt>
 
   {% set kapitel = [
     ('kapitel-1', '🏠 Was ist das Portal?'),
@@ -104,6 +107,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     ('kapitel-22', '🎂 Geburtstage'),
     ('kapitel-23', '🚗 Ausfälle'),
     ('kapitel-24', '📋 Aufgaben als Brett'),
+    ('kapitel-25', '🎁 Wunschzettel'),
   ] %}
   <div class="section toc">
     <h2 class="section-title">📑 Inhalt</h2>
@@ -123,6 +127,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <div class="tip">📖 <strong>Diese Hilfe ist in Kapitel eingeklappt:</strong> Ein Tipp auf eine Überschrift (oder auf einen Eintrag im Inhaltsverzeichnis) klappt das Kapitel auf, ein zweiter wieder zu. So bleibt die Seite kurz, obwohl alles drinsteht.</div>
     <div class="tip">⚠️ Teile deinen Link nicht mit anderen – er gehört nur dir.</div>
     <div class="tip">🌗 <strong>Hell oder dunkel:</strong> Im Menü (☰) schaltet ein Knopf die Darstellung im Kreis: ☀️ <strong>Hell</strong> → 🌙 <strong>Dunkel</strong> → 🌗 <strong>Wie das Gerät</strong>. Der Knopf zeigt immer den Zustand, der gerade gilt. „Wie das Gerät“ heißt: Stellt dein iPhone abends auf Dunkelmodus um, wird auch das Portal dunkel – ganz ohne Zutun. Die Einstellung gilt nur für dich.</div>
+    <div class="tip">⌨️ <strong>Alles geht auch mit der Tastatur:</strong> Das ☰-Menü und der ✨-Wunsch-Dialog schließen mit <strong>Escape</strong>, und die Tab-Taste bleibt darin, bis du fertig bist. Überall, wo du am ⠿-Griff ziehen kannst (Packliste, Aufgaben-Brett, Kategorien), kannst du den Griff stattdessen mit Tab ansteuern und den Eintrag mit den <strong>Pfeiltasten</strong> verschieben – auf dem Brett wechseln ← und → die Spalte. Gespeichert wird automatisch, wie beim Ziehen.</div>
     <div class="tip">🗑️ <strong>Überall gleich:</strong> Wenn du etwas endgültig entfernen kannst, steht dort ein <strong>Mülleimer</strong> – in jeder App, an jeder Stelle. Vor dem Entfernen fragt das Portal immer nach. Ein <strong>Auge mit Strich</strong> oder „Für mich ausblenden“ ist etwas anderes: Da verschwindet der Eintrag nur bei dir und bleibt für alle anderen stehen. Und im Kassenbuch gibt es bewusst gar kein Löschen – dort wird <strong>storniert</strong>, der Eintrag bleibt sichtbar und zählt nur nicht mehr mit.</div>
   </details>
 
@@ -493,7 +498,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
       </li>
       <li>
         <span class="step-icon">⠿</span>
-        <div><strong>Reihenfolge selbst bestimmen:</strong> Am Griff links neben einem Eintrag ziehen – so lässt sich die Liste in die Reihenfolge bringen, in der du wirklich packst. Sie gilt für alle und bleibt gespeichert. Neue Einträge landen immer <strong>am Ende</strong>, damit sie deine Sortierung nicht durcheinanderbringen. Gepackte Sachen haben keinen Griff – sie stehen ohnehin in ihrem eigenen Abschnitt.</div>
+        <div><strong>Reihenfolge selbst bestimmen:</strong> Am Griff links neben einem Eintrag ziehen – oder den Griff mit Tab anwählen und mit ↑/↓ verschieben – so lässt sich die Liste in die Reihenfolge bringen, in der du wirklich packst. Sie gilt für alle und bleibt gespeichert. Neue Einträge landen immer <strong>am Ende</strong>, damit sie deine Sortierung nicht durcheinanderbringen. Gepackte Sachen haben keinen Griff – sie stehen ohnehin in ihrem eigenen Abschnitt.</div>
       </li>
       <li>
         <span class="step-icon">✏️</span>
@@ -511,6 +516,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
   <details class="section" id="kapitel-20">
     <summary class="section-title"><h2>🤾 TVB Stuttgart</h2></summary>
     <p>Zeigt die nächsten Spiele, die bisherigen Ergebnisse und die Tabelle – mit der eigenen Mannschaft farblich hervorgehoben. Alles zum Ansehen, nichts zum Eintragen.</p>
+    <p><strong>Übersichtlich gehalten:</strong> Bei den nächsten Spielen stehen zunächst nur die kommenden drei – „Alle … Spiele anzeigen" klappt den Rest der Saison auf. Ergebnisse stehen als Gegenüberstellung da: links Heim, rechts Gast, dazwischen das Ergebnis; der Sieger ist fett, in der Tabelle leuchtet die eigene Zeile in deiner Portalfarbe.</p>
     <ul class="steps">
       <li>
         <span class="step-icon">🔀</span>
@@ -634,6 +640,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     </ul>
     <div class="tip">📊 Oben stehen zwei Zahlen: alle Einträge und die der letzten 30 Tage. „Wie oft?" ist die erste Frage in der Werkstatt – die soll niemand abzählen müssen. Die Liste selbst zeigt die letzten 20 Einträge; ein Knopf darunter holt bei Bedarf alle. Der 📌-Knopf mit den Koordinaten springt zur Karte.</div>
     <div class="tip">📡 Die Meldung braucht in dem Moment Netz. Ohne Empfang lässt sich der Ausfall nicht speichern – dann lieber kurz danach nachtragen, sobald wieder Verbindung da ist, und die Uhrzeit in die Notiz schreiben.</div>
+    <div class="tip">🖨️ <strong>Für die Werkstatt drucken:</strong> Der Knopf unter den Zahlen öffnet das Protokoll als druckfertiges Blatt – alle Einträge mit Zeitpunkt und Notiz, dazu die beiden Zahlen. Über „Drucken“ lässt es sich auch als PDF sichern. Die Ortsangaben sind darauf bewusst auf zwei Nachkommastellen gerundet (≈ 1 km) und die Namen weggelassen: Die Werkstatt sieht, dass die Ausfälle unterwegs an echten Orten passiert sind, kann daraus aber weder Adressen noch Fahrstrecken ablesen. In der App selbst bleibt der genaue Ort samt Kartensprung erhalten.</div>
   </details>
 
   <details class="section" id="kapitel-24">
@@ -644,7 +651,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <ul class="steps">
       <li>
         <span class="step-icon">⠿</span>
-        <div><strong>Ziehen am Griff:</strong> Links an jeder Karte sitzt der Griff. <strong>Nach oben oder unten</strong> ändert die Reihenfolge innerhalb der Spalte – das ist die Priorität, und sie wird gespeichert. <strong>In eine andere Spalte</strong> ändert den Status. Beides wirkt sofort, ohne Speichern-Knopf.</div>
+        <div><strong>Ziehen am Griff:</strong> Links an jeder Karte sitzt der Griff. <strong>Nach oben oder unten</strong> ändert die Reihenfolge innerhalb der Spalte – das ist die Priorität, und sie wird gespeichert. <strong>In eine andere Spalte</strong> ändert den Status. Beides wirkt sofort, ohne Speichern-Knopf. Mit der Tastatur geht dasselbe: Griff mit Tab anwählen, ↑/↓ sortiert, ←/→ wechselt die Spalte.</div>
       </li>
       <li>
         <span class="step-icon">✅</span>
@@ -662,6 +669,29 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <div class="tip">📱 Auf dem Handy passen nicht alle vier Spalten nebeneinander – das Brett selbst lässt sich seitlich schieben und rastet dabei je Spalte ein. Am Rechner nutzt das Brett die volle Fensterbreite, damit die Aufgabentexte nicht mitten im Wort umbrechen; reicht auch die nicht für alle vier Spalten, lässt es sich wie am Handy seitlich schieben.</div>
     <div class="tip">🙈 Das Brett zeigt genau das, was du auch in der Liste siehst. Private Aufgaben anderer tauchen hier so wenig auf wie dort.</div>
     <div class="tip">🧹 <strong>Erledigtes räumt sich selbst auf:</strong> Was vor mehr als 7 Tagen abgehakt wurde, verschwindet aus Liste und Brett – gelöscht ist es nicht, ein Knopf („… ältere anzeigen“) holt es jederzeit zurück. Dieselbe Frist wie beim „Gepackt“-Abschnitt der Packliste.</div>
+  </details>
+
+  <details class="section" id="kapitel-25">
+    <summary class="section-title"><h2>🎁 Wunschzettel</h2></summary>
+    <p>Geschenkwünsche für Weihnachten und Geburtstage – jeder führt seinen eigenen Zettel, alle anderen können mitlesen.</p>
+    <ul class="steps">
+      <li>
+        <span class="step-icon">✍️</span>
+        <div><strong>Wünschen:</strong> Oben eintippen, was du dir wünschst – auf Wunsch mit einem Link zum Produkt – und auf „+ Auf meinen Zettel". Mehr ist es nicht. Mit ✏️ änderst du eigene Wünsche, mit 🗑️ nimmst du sie wieder herunter.</div>
+      </li>
+      <li>
+        <span class="step-icon">👀</span>
+        <div><strong>Mitlesen:</strong> Unter deinem Zettel stehen die der anderen. So weißt du vor dem Geburtstag, worüber sich jemand wirklich freut.</div>
+      </li>
+      <li>
+        <span class="step-icon">🎁</span>
+        <div><strong>„Ich besorge das":</strong> Bei einem fremden Wunsch reservierst du damit das Geschenk – alle anderen sehen dann „Wird schon besorgt", und niemand kauft es doppelt. Über „↩️ Doch nicht" gibst du es wieder frei; fremde Reservierungen kann niemand umwerfen (nur Admin darf notfalls aufräumen).</div>
+      </li>
+      <li>
+        <span class="step-icon">🤫</span>
+        <div><strong>Die Überraschung bleibt:</strong> Wer sich etwas wünscht, sieht <strong>nicht</strong>, ob oder von wem es reserviert ist – diese Information wird für den eigenen Zettel gar nicht erst ausgeliefert. Was du bekommst, erfährst du beim Auspacken.</div>
+      </li>
+    </ul>
   </details>
 
 </main>
