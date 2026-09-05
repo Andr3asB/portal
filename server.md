@@ -2596,6 +2596,11 @@ python -m venv .venv                                   # einmalig
   zweite wuerde test_kopfzeile_bleibt die falsche unterschieben),
   touch-action, Skip-Link vor der Kopfleiste, id="main" in jeder Vorlage,
   Hover nur hinter @media (hover:hover), aria-live am Offline-Banner.
+- `test_tvb_essensplan_feinschliff.py` – Wuensche #254–#257. Statisch fuer
+  tvb.html (spieltag/ort nur mit Pruefung ausgeben - das war das
+  „NoneNone" aus #256; Drei-Spiele-Grenze samt data-panel; Gegenueber-
+  stellung mit Sieger/Verlierer-Regeln), funktional fuer #257 (Speichern
+  leitet mit #slot-Anker zurueck, kaputter tag bekommt keinen Anker).
 - `test_rezept_import_gzip.py` – Wunsch #252. Server, die ungefragt gzip
   schicken (lecker.de seit 09/2026): `_entpacken()` fuer gzip/deflate,
   unbekannte Kodierung ist ein klarer Fehler, und die Zip-Bomben-Abwehr

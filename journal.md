@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-09-05 – portal-v240: #254–#257, Feinschliff an TVB und Essensplan
+
+Vier kleine Wuensche aus einer Runde, drei davon TVB, einer Essensplan.
+
+**#256 – das „nonenone".** Andis Frage „woher kommt das?" hat eine kurze
+Antwort: aus Python. `{{ s.spieltag }}{{ s.ort }}` in tvb.html - beide
+Felder koennen aus der Quelle als None kommen (Amateurligen fuehren sie
+oft nicht), und Jinja rendert None woertlich als „None". Jetzt erscheint
+jede Angabe nur, wenn sie da ist; fehlt alles, entfaellt die Zeile. Der
+Ort bleibt bewusst drin, wo er existiert - „wo spielen wir?" ist bei
+kommenden Spielen eine echte Information. Neuer Waechter prueft, dass
+jede Ausgabe der beiden Felder auf derselben Zeile auch ihre Pruefung
+traegt - und stolperte beim Entstehen prompt ueber den eigenen
+Jinja-Kommentar (die test_ziehgriff-Falle: Prosa statt Code geprueft;
+Kommentare werden jetzt vorab entfernt).
+
+**#254 – nur die naechsten drei Spiele.** Der Rest der Saison steckt in
+einem versteckten Block, „Alle N Spiele anzeigen" klappt ihn auf
+(data-panel nach #248-Konvention, der Knopf verschwindet danach).
+Kartenmarkup dafuer in ein Makro gezogen statt dupliziert.
+
+**#255 – Ergebnisse als Gegenueberstellung.** Grid 1fr/auto/1fr: Heim
+rechts­buendig links, Ergebnis mittig, Gast linksbuendig rechts. Sieger
+fett, Verlierer in --text-2 zurueckgenommen, Unentschieden neutral, die
+TVB-Mannschaft zusaetzlich in var(--farbe-kontrast) (wie die
+Tabellen-Zeile aus #253). Nicht gewertete Spiele zeigen weiter den
+Termin mittig.
+
+**#257 – Essensplan springt nicht mehr nach oben.** Das Speichern eines
+Tages leitete stumpf auf die Index-Seite - bei einem Eintrag in der
+naechsten Woche stand man danach am Seitenanfang. Jetzt traegt jeder
+Mahlzeit-Slot eine id und `eintrag_speichern()` leitet mit
+`#slot-<tag>_<mahlzeit>` zurueck (die #171-Konvention fuer Umschalter,
+die die Liste veraendern). Der Anker entsteht nur aus geprueften Werten:
+mahlzeit ist gegen MAHLZEITEN geprueft, tag muss ein ISO-Datum sein -
+ein beliebiger Formular-String gehoert nicht in eine Redirect-URL.
+`scroll-padding-top` aus #186 sorgt dafuer, dass der Slot nicht unter
+der stehenden Kopfzeile landet. Suite: **2068 Tests**.
+
 ## 2026-09-05 – portal-v239: #252 (lecker.de-Import) und #253 (TVB-Zeile)
 
 **#252 (sehr_hoch) – „kein Rezept erkannt" bei lecker.de.** Die Diagnose

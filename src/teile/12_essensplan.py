@@ -9,6 +9,7 @@ Tag, andere Mahlzeit oder beides (Wunsch #35, überarbeitet). Aktuelle und
 nächste Woche haben eigene Überschriften (Wunsch #40/#41), vergangene Tage
 sind zu einem Block einklappbar (Wunsch #42).
 """
+import re
 from datetime import date, timedelta
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
@@ -130,7 +131,15 @@ def eintrag_speichern(token):
                 erstellt_von=excluded.erstellt_von
         """, (tag, mahlzeit, rezept_id, text, user["id"]))
     db.commit()
-    return redirect(url_for("essensplan_app.index", token=token))
+    # Wunsch #257: zurueck an die bearbeitete Stelle statt an den
+    # Seitenanfang - Weiterleitung mit #anker auf den Slot (dieselbe
+    # Konvention wie bei den Umschaltern, die die Reihenfolge aendern).
+    # Der Anker entsteht nur aus geprueften Werten: mahlzeit ist oben
+    # gegen MAHLZEITEN geprueft, tag muss ein ISO-Datum sein.
+    ziel = url_for("essensplan_app.index", token=token)
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tag):
+        ziel += f"#slot-{tag}_{mahlzeit}"
+    return redirect(ziel)
 
 
 @bp.route("/a/essensplan/gekocht", defaults={"token": None}, methods=["POST"])

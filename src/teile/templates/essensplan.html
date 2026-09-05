@@ -96,7 +96,8 @@
       {% for mahlzeit in mahlzeiten %}
         {% set eintrag = tag.eintraege.get(mahlzeit) %}
         {% set slot_id = tag.iso ~ '_' ~ mahlzeit %}
-        <div class="mahlzeit-slot" data-tag="{{ tag.iso }}" data-mahlzeit="{{ mahlzeit }}">
+        {#- Wunsch #257: Sprungziel fuers Zurueckkommen nach dem Speichern. -#}
+        <div class="mahlzeit-slot" id="slot-{{ slot_id }}" data-tag="{{ tag.iso }}" data-mahlzeit="{{ mahlzeit }}">
           <div class="mahlzeit-kopf">
             <span class="mahlzeit-label">{{ mahlzeit_labels[mahlzeit] }}</span>
             {% if eintrag %}<button type="button" class="mahlzeit-drag-handle" title="Verschieben" aria-label="Verschieben">⠿</button>{% endif %}
