@@ -2,6 +2,89 @@
 
 ---
 
+## 2026-09-05 – portal-v241: #258 Aussprache üben (Mikrofon + Voxtral auf Mistrals EU-Endpunkt)
+
+Andis Antwort auf die Rückfrage: **Weg A** (KI-Schicht), aber „ein Modell,
+das in der EU gehostet wird, und keines, das in China entwickelt wurde".
+
+### Modellwahl – nachgemessen, nicht geraten
+
+OpenRouter listet 46 Modelle mit Audio-Eingabe (Stand heute): 26× Google
+Gemini, 5× Meta, 2× OpenAI, Nvidia, Xiaomi, Thinking Machines – und **ein**
+europäisches: `mistralai/voxtral-small-24b-2507` (Mistral, Paris). Voxtral
+hat drei Endpunkte, alle bei Mistral: `mistral`, `mistral/zdr` und
+`mistral/eu`. Der letzte ist Mistrals EU-Betrieb und 10 % teurer (0,11 statt
+0,10 USD je Mio. Prompt-Tokens).
+
+Ob OpenRouter eine Festlegung auf den Endpunkt überhaupt annimmt, stand
+nirgends verlässlich. Also ausprobiert, aus dem Container heraus mit dem
+echten Key, zwei Mini-Anfragen à 12 Tokens: mit `provider.only=["mistral/eu"]`
+kostete die Anfrage 1,76 µUSD, mit `only=["mistral"]` 1,60 µUSD – genau der
+10-%-Aufschlag des EU-Endpunkts. **Die Festlegung greift**, und das Preisfeld
+in der Antwort ist der Beweis, denn das `provider`-Feld sagt in beiden Fällen
+nur „Mistral". `allow_fallbacks=false` dazu: lieber ein Fehler als die
+Stimmaufnahme eines Kindes bei einem anderen Anbieter.
+
+### Was gebaut wurde
+
+- **`00_kern.py`:** `ki_anfrage()` nimmt `audio=(format, b64)` und hängt es
+  als `input_audio` ins content-Array (neben `bilder`). Neue Spalte
+  `ki_konfiguration.anbieter` (Migration vor dem Seed, der sie braucht),
+  `ki_anbieter_fuer(zweck)`, Seed `vokabeln_aussprache` = Voxtral +
+  `mistral/eu`. Steht ein Anbieter, geht `provider.only` + `allow_fallbacks=
+  false` mit. Die Text-Zwecke bleiben ohne Vorgabe – dort zählt der Ort nicht.
+- **`manage.py ki_modell <zweck> <modell> [anbieter|-]`** – drittes Argument
+  optional, `-` löscht, weglassen lässt stehen; `listki` zeigt den Anbieter.
+- **`16_vokabeln.py`:** `POST /wort/<vid>/aussprache` nimmt WAV im Body
+  (8 KB bis 1 MB, RIFF-Kopf – beides geprüft, BEVOR etwas Geld kostet),
+  `_aussprache_per_ki()` mit Kinder-Trainer-Prompt, Antwort JSON
+  `{note 1-5, verstanden, tipp}`, tolerant geparst (Codeblock, Vorrede),
+  Note begrenzt. Fehler immer als JSON mit `fehler`-Text: 400/404/413/
+  429/502. **Die Aufnahme wird nicht gespeichert** – ein Test läuft den
+  Datenordner vorher/nachher ab. Latein ausgenommen (`_OHNE_AUSSPRACHE`;
+  die zweite Frage aus der Rückfrage hat Andi offen gelassen, umgesetzt ist
+  die Empfehlung – eine Zeile, falls anders gewünscht). `lernen_start` gibt
+  `aussprache_moeglich` an die Vorlage.
+- **`vokabel_training.html`:** 🎤-Knopf neben „Anhören", erscheint nach der
+  Antwort. Aufnahme per **MediaRecorder** – ausdrücklich nicht die
+  Diktierfunktion (Andis Vorgabe; `SpeechRecognition` kommt in der Vorlage
+  nicht vor, ein Test wacht darüber). Derselbe Knopf wird zum ⏹-Stopp mit
+  rotem Rand, nach 8 s stoppt es von selbst. Der Browser dekodiert seine
+  eigene Aufnahme (webm/opus bei Chrome, mp4/aac bei Safari), rechnet über
+  einen `OfflineAudioContext` auf 16 kHz mono und schreibt den 44-Byte-
+  RIFF-Kopf selbst – so muss der Server weder webm noch mp4 verstehen.
+  Bewertung als Sterne + „Verstanden: …" + Tipp, per `textContent`,
+  `aria-live`. Wer während der Bewertung weiterklickt, bekommt kein
+  Ergebnis zum falschen Wort. Drei Twemoji-Grafiken nachgeholt (🎤 ⏹ 🔴 –
+  `test_emoji.py` hat die dritte gefunden).
+- **Caddyfile:** `microphone=(self)` statt `()`. `self` = nur diese
+  Herkunft, kein fremder Rahmen; der Browser fragt trotzdem jeden Nutzer
+  einmal. `test_permissions_policy_header.py` hält jetzt genau `(self)`
+  fest – leer wäre ein toter Knopf (nur „NotAllowedError" in der Konsole),
+  `*` zu viel.
+- **Hilfe** (Vokabeln-Kapitel): Bedienung, Mikrofon-Erlaubnis, „nicht
+  gespeichert, geht an Mistral in der EU", Kosten vom KI-Kontingent, Latein.
+- **`tests/test_aussprache.py`** (21 Tests): der eine, auf den es ankommt,
+  fängt die OpenRouter-Anfrage ab und prüft `provider.only` +
+  `allow_fallbacks`. Dazu Seed, manage.py, Sichtbarkeit, Größen, Latein
+  ohne KI-Aufruf, Kontingent, JSON-Toleranz, kein Speichern, Knopf nur mit
+  Training. Suite: **2088 grün**, ruff sauber (dabei 10 liegengebliebene
+  Funde aus den letzten Tagen mit `--fix` aufgeräumt – Importreihenfolge,
+  zwei ungenutzte Importe, `datetime.UTC`; keine Verhaltensänderung).
+
+### Ausgeliefert und geprüft
+
+v241, `--build`, Caddy `--force-recreate`, prune. Live:
+`Permissions-Policy` trägt `microphone=(self)`, `live_pruefung.py` alles
+grün, `listki` zeigt `vokabeln_aussprache … [Anbieter: mistral/eu]`, kein
+Fehler im Log. **Echte Hörprobe:** eine gecachte TTS-Aussprache („Yellow",
+WAV, 58 KB) direkt an Voxtral auf `mistral/eu` geschickt – Antwort
+`{"note": 4, "tipp": "Versuche, das 'e' am Ende … deutlicher …"}`, 132
+Tokens, **0,00014 USD** je Bewertung. Kein Nutzerkonto berührt (Key aus der
+Umgebung, kein Kontingent). Was nur ein Ohr prüfen kann – ob die Tipps zu
+echten Kinderstimmen taugen – steht bei Andi: Trainer öffnen, Englisch,
+antworten, 🎤.
+
 ## 2026-09-05 – `/init`: CLAUDE.md gegen den Code geprüft, sieben Lücken geschlossen
 
 Kein Portal-Code, keine Auslieferung. Zweiter `/init`-Durchgang des Tages,

@@ -15,7 +15,6 @@ import pathlib
 import re
 
 import pytest
-
 from teile.kern import farbe_kontrast, farbe_kontrast_hell
 
 TPL = pathlib.Path(__file__).resolve().parents[1] / "src" / "teile" / "templates"

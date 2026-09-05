@@ -360,8 +360,12 @@ reserviert**: `_kontingent_reservieren()` vor der Anfrage,
 echten Verbrauch danach (`tests/test_ki_kontingent_atomar.py`). Modell und
 Stimme kommen je Zweck aus der Datenbank (`ki_modell_fuer()`,
 `ki_stimme_fuer()`, gesetzt per `manage.py ki_modell` / `ki_stimme`), nicht aus
-dem Code. `24_ki_budget.py` sieht stündlich aufs OpenRouter-Guthaben und legt
-bei ≤ 1,00 USD **eine** Aufgabe samt Push für den Admin an (#183).
+dem Code. `ki_anfrage()` nimmt neben `bilder` auch `audio=(format, b64)`
+(#258); steht für den Zweck ein Anbieter in `ki_konfiguration.anbieter`, geht
+die Anfrage ohne Fallback nur dorthin (`ki_anbieter_fuer()`) – so ist die
+Aussprache-Bewertung auf Mistrals EU-Endpunkt festgenagelt. `24_ki_budget.py`
+sieht stündlich aufs OpenRouter-Guthaben und legt bei ≤ 1,00 USD **eine**
+Aufgabe samt Push für den Admin an (#183).
 
 **Umbauten laufen in Stufen, jede Stufe ist eine Zeile in der `.env`.**
 `SITZUNG_AUSSTELLEN`, `CSRF_MODUS`, `SITZUNG_KONSUMIEREN`, `TOKENFREIE_URLS`

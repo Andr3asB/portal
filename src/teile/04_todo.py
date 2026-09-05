@@ -55,7 +55,7 @@ Eine Serie, die an einem bestimmten Tag schon eine eigene Instanz hat,
 wird für GENAU diesen Tag nicht nochmal angeboten (unabhängig vom
 Intervall/Wochentag) - Doppel-Einträge am selben Tag bleiben ausgeschlossen.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
@@ -162,7 +162,7 @@ def _ohne_alte_erledigte(todos):
     verschwinden.
 
     Gibt (sichtbare, anzahl_versteckter) zurueck."""
-    grenze = (datetime.now(timezone.utc) - timedelta(days=7)) \
+    grenze = (datetime.now(UTC) - timedelta(days=7)) \
         .strftime("%Y-%m-%d %H:%M:%S")
     frisch = [t for t in todos
               if not (t["erledigt"] and t["erledigt_am"]

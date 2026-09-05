@@ -25,6 +25,14 @@ gleicher Fix dort fuer den analogen Rezept-Foto-Import aus Wunsch #97).
 Wunsch #81: Aussprache der Fremdsprache im Trainer per KI-TTS, Ergebnis
 wird als Datei im Datenordner gecacht (siehe _audio_pfad) statt bei jeder
 Wiedergabe neu erzeugt zu werden.
+
+Wunsch #258: Aussprache UEBEN - der Trainer nimmt nach der Antwort per
+Mikrofon auf (MediaRecorder, ausdruecklich NICHT die Diktierfunktion des
+Geraets), packt die Aufnahme im Browser zu WAV und schickt sie an
+/wort/<vid>/aussprache. Bewertet wird ueber ki_anfrage() mit Audio-Eingabe
+(Zweck "vokabeln_aussprache"): Voxtral von Mistral, festgenagelt auf den
+EU-Endpunkt (Andis Vorgabe: EU-Hosting, nicht in China entwickelt). Die
+Aufnahme wird nicht gespeichert. Latein ist ausgenommen (_OHNE_AUSSPRACHE).
 """
 import base64
 import hashlib
@@ -59,6 +67,27 @@ from teile.kern import (
 _FOTO_MAX_BYTES = 8 * 1024 * 1024  # 8 MB - Handyfotos passen bequem, schuetzt vor Ausreissern
 _FOTO_MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic"}
 _MAX_OCR_PAARE = 60
+
+# Wunsch #258: Aussprache ueben. Die Aufnahme kommt als WAV (16 kHz, mono,
+# 16 Bit - der Browser packt sie selbst so, siehe vokabel_training.html),
+# hoechstens 8 Sekunden = 256 KB. 1 MB laesst Luft, faengt aber jeden
+# Ausreisser ab, BEVOR er zum kostenpflichtigen KI-Aufruf wird. Unter
+# 8 KB (eine Viertelsekunde) ist es kein Wort, sondern ein Klick.
+_AUSSPRACHE_MAX_BYTES = 1_000_000
+_AUSSPRACHE_MIN_BYTES = 8_000
+_AUSSPRACHE_MAX_ZEICHEN_VERSTANDEN = 80
+_AUSSPRACHE_MAX_ZEICHEN_TIPP = 200
+# Sprachen ohne Aussprache-Training. Latein wird nicht gesprochen gelernt -
+# eine Bewertung waere dort geraten. Stand aus der Rueckfrage am Wunsch
+# (05.09.2026): Andi hat Weg A entschieden, die Latein-Frage offen gelassen;
+# umgesetzt ist die Empfehlung "Latein ausgenommen". Eine Zeile hier, wenn
+# das anders sein soll.
+_OHNE_AUSSPRACHE = {"Latein"}
+
+
+def aussprache_moeglich(sprache_name) -> bool:
+    """Gibt es fuer diese Sprache das Aussprache-Training (Wunsch #258)?"""
+    return (sprache_name or "").strip() not in _OHNE_AUSSPRACHE
 
 # Wunsch #194: Unregelmaessige Verben. Ein Eintrag IST ein unregelmaessiges
 # Verb, wenn `simple_past` UND `perfect` gefuellt sind - `fremd` traegt dann
@@ -755,18 +784,26 @@ def lernen_start(token):
         aufgaben = [{"id": v["id"], "fremd": v["fremd"], "deutsch": v["deutsch"]}
                     for v in vokabeln]
 
+    # Wunsch #258: Der Mikrofon-Knopf erscheint nur, wenn die Sprache ein
+    # Aussprache-Training hat - serverseitig entschieden, die Vorlage kennt
+    # die Sprachliste nicht.
+    sprache = db.execute(
+        "SELECT name FROM vokabel_sprachen WHERE id=?", (sprache_id,)).fetchone()
+    aussprache = aussprache_moeglich(sprache["name"] if sprache else "")
+
     if not aufgaben:
         db.execute("UPDATE vokabel_sessions SET beendet=datetime('now') WHERE id=?", (session_id,))
         db.commit()
         return render_template("vokabel_training.html",
             user=user, token=token, farbe=user["farbe"], session_id=session_id,
-            vokabeln=[], verbmodus=nur_verben)
+            vokabeln=[], verbmodus=nur_verben, aussprache_moeglich=aussprache)
 
     db.commit()
     random.shuffle(aufgaben)
     return render_template("vokabel_training.html",
         user=user, token=token, farbe=user["farbe"],
-        session_id=session_id, vokabeln=aufgaben, verbmodus=nur_verben)
+        session_id=session_id, vokabeln=aufgaben, verbmodus=nur_verben,
+        aussprache_moeglich=aussprache)
 
 
 @bp.route("/a/vokabeln/versuch", defaults={"token": None}, methods=["POST"])
@@ -1067,6 +1104,111 @@ def wort_audio(token, vid):
         pfad, mimetype=mimetype, conditional=True,
         download_name=f"aussprache.{endung}",
     )
+
+
+def _aussprache_per_ki(user_id, wort, sprache_name, wav_b64):
+    """Wunsch #258: Bewertet eine Stimmaufnahme gegen das Zielwort ueber die
+    KI-Schicht (Zweck "vokabeln_aussprache", Audio-Modell mit EU-Anbieter,
+    siehe AUSSPRACHE_STANDARD_* in 00_kern.py). Liefert
+    {"note": 1..5, "verstanden": str, "tipp": str}. Wirft KiLimitError/
+    KiFehler/ValueError - der Aufrufer macht daraus eine freundliche
+    Meldung. Die Aufnahme wird nirgends gespeichert; sie lebt nur in dieser
+    Anfrage."""
+    system = (
+        "Du bist ein freundlicher, geduldiger Aussprache-Trainer für Kinder, "
+        "die Vokabeln lernen. Du bekommst ein Zielwort und eine kurze "
+        "Tonaufnahme, in der das Kind versucht, dieses Wort auszusprechen. "
+        "Beurteile NUR die Aussprache des Zielworts. Antworte AUSSCHLIESSLICH "
+        'mit einem JSON-Objekt der Form {"verstanden": "...", "note": 1, '
+        '"tipp": "..."}. "verstanden" ist, was du in der Aufnahme gehört hast '
+        "(kurz, in der Fremdsprache). \"note\" ist eine Zahl von 1 bis 5: "
+        "5 = sehr gut verständlich und richtig betont, 4 = gut mit kleiner "
+        "Abweichung, 3 = verständlich, aber deutlich anders, 2 = schwer "
+        "verständlich, 1 = nicht erkennbar oder ein anderes Wort. \"tipp\" "
+        "ist EIN kurzer, konkreter, ermutigender Hinweis auf Deutsch (höchstens "
+        "zwei Sätze), z. B. welcher Laut anders klingen sollte. Bei Note 5 "
+        "genügt ein Lob. Keine Erklärung außerhalb des JSON, kein Markdown, "
+        "kein Codeblock."
+    )
+    prompt = (
+        f"Zielwort: „{wort}“ (Sprache: {sprache_name}). "
+        "Bewerte die Aussprache in der Aufnahme."
+    )
+    antwort = ki_anfrage(
+        user_id, "vokabeln_aussprache", system, prompt,
+        max_tokens=300, audio=("wav", wav_b64),
+    )
+    bereinigt = antwort.strip()
+    if bereinigt.startswith("```"):
+        bereinigt = bereinigt.strip("`")
+        if bereinigt.lower().startswith("json"):
+            bereinigt = bereinigt[4:]
+    # Manche Modelle stellen trotz Anweisung einen Satz voran - das JSON
+    # beginnt bei der ersten geschweiften Klammer.
+    anfang = bereinigt.find("{")
+    ende = bereinigt.rfind("}")
+    if anfang < 0 or ende < anfang:
+        raise ValueError("KI hat kein JSON-Objekt geliefert")
+    daten = json.loads(bereinigt[anfang:ende + 1])
+    if not isinstance(daten, dict):
+        raise ValueError("KI hat kein Objekt geliefert")
+    note = to_int(daten.get("note"))
+    if note is None:
+        raise ValueError("KI hat keine Note geliefert")
+    note = max(1, min(5, note))
+    verstanden = str(daten.get("verstanden") or "").strip()
+    tipp = str(daten.get("tipp") or "").strip()
+    return {
+        "note": note,
+        "verstanden": verstanden[:_AUSSPRACHE_MAX_ZEICHEN_VERSTANDEN],
+        "tipp": tipp[:_AUSSPRACHE_MAX_ZEICHEN_TIPP],
+    }
+
+
+@bp.route("/a/vokabeln/wort/<int:vid>/aussprache", defaults={"token": None}, methods=["POST"])
+@bp.route("/a/vokabeln/<token>/wort/<int:vid>/aussprache", methods=["POST"])
+def wort_aussprache(token, vid):
+    """Wunsch #258: Nimmt eine WAV-Aufnahme (Body, audio/wav) entgegen und
+    liefert die Bewertung als JSON. Antworten sind immer JSON mit `ok` und
+    im Fehlerfall `fehler` - der Trainer zeigt den Text direkt an, statt
+    einen Statuscode zu raten."""
+    user = _user(token)
+    db = get_db()
+    row = db.execute(f"""
+        SELECT v.fremd, s.name AS sprache
+        FROM   vokabeln v JOIN vokabel_sprachen s ON s.id = v.sprache_id
+        WHERE  v.id = :vid AND {_VOKABEL_SICHTBAR}
+    """, {"vid": vid, "uid": user["id"]}).fetchone()
+    if not row:
+        abort(404)
+    if not aussprache_moeglich(row["sprache"]):
+        return jsonify(ok=False, fehler="Für diese Sprache gibt es kein Aussprache-Training."), 400
+
+    # Groesse VOR dem Einlesen pruefen (Content-Length), und danach noch
+    # einmal am echten Inhalt - der Header ist eine Behauptung des Clients.
+    if (request.content_length or 0) > _AUSSPRACHE_MAX_BYTES:
+        return jsonify(ok=False, fehler="Die Aufnahme ist zu lang."), 413
+    daten = request.get_data(cache=False)
+    if len(daten) > _AUSSPRACHE_MAX_BYTES:
+        return jsonify(ok=False, fehler="Die Aufnahme ist zu lang."), 413
+    if len(daten) < _AUSSPRACHE_MIN_BYTES or not daten.startswith(b"RIFF"):
+        return jsonify(ok=False, fehler="Keine brauchbare Aufnahme - bitte noch einmal sprechen."), 400
+
+    try:
+        ergebnis = _aussprache_per_ki(
+            user["id"], row["fremd"], row["sprache"],
+            base64.b64encode(daten).decode("ascii"))
+    except KiLimitError:
+        return jsonify(
+            ok=False,
+            fehler="Monatliches KI-Kontingent aufgebraucht - bitte später erneut versuchen.",
+        ), 429
+    except (KiFehler, ValueError):
+        return jsonify(
+            ok=False,
+            fehler="Die Bewertung klappt gerade nicht - bitte später noch einmal.",
+        ), 502
+    return jsonify(ok=True, **ergebnis)
 
 
 def init_app(app):

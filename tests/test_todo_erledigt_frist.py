@@ -6,7 +6,6 @@ gleich verhaelt. Geloescht wird nichts: `?erledigt=alle` (und der Zaehl-Link)
 holt alles zurueck. Altbestand ohne erledigt_am bleibt bewusst sichtbar.
 """
 import pytest
-
 from teile.kern import new_token, token_lookup
 
 

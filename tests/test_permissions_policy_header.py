@@ -4,8 +4,15 @@ Die übrigen Sicherheits-Header (Referrer-Policy, X-Content-Type-Options,
 HSTS, CSP) stehen bereits sehr sorgfältig im `Caddyfile` bzw. in
 `21_csp.py`. `Permissions-Policy` fehlte noch – ohne ihn darf grundsätzlich
 jede eingebettete oder eingeschleuste Ressource Kamera, Mikrofon, Standort
-etc. anfragen. Das Portal selbst braucht keine dieser APIs: Fotos laufen über
-den normalen Datei-Upload-Dialog, nicht über `getUserMedia`.
+etc. anfragen. Das Portal selbst braucht fast keine dieser APIs: Fotos laufen
+über den normalen Datei-Upload-Dialog, nicht über `getUserMedia`.
+
+**Ausnahme seit Wunsch #258 (05.09.2026): das Mikrofon.** Das Aussprache-
+Training im Vokabeltrainer nimmt per `getUserMedia` auf. `microphone=(self)`
+erlaubt das nur Seiten dieser Herkunft – ein eingebetteter fremder Rahmen
+bekäme es weiterhin nicht. Ein eigener Test hält genau diesen Wert fest:
+`microphone=()` würde das Training lautlos abschalten (der Browser meldet nur
+„NotAllowedError“), `microphone=*` gäbe mehr frei als nötig.
 
 **Was diese Datei NICHT prüfen kann:** ob Caddy den Header tatsächlich
 ausliefert – dafür bräuchte es den echten, laufenden Container. Das ist
@@ -37,12 +44,15 @@ def test_permissions_policy_steht_im_caddyfile():
     assert _header_zeile("Permissions-Policy")
 
 
+GESPERRT = ("camera", "geolocation", "payment", "usb")
+
+
 def test_die_ungenutzten_apis_sind_gesperrt():
-    """Genau die APIs, die das Portal nachweislich nicht braucht - kein
-    getUserMedia (Fotos laufen über <input type=file>), keine Bezahl-API,
+    """Genau die APIs, die das Portal nachweislich nicht braucht - keine
+    Kamera (Fotos laufen über <input type=file>), keine Bezahl-API,
     kein USB, kein Standort."""
     wert = _header_zeile("Permissions-Policy")
-    for api in ("camera", "microphone", "geolocation", "payment", "usb"):
+    for api in GESPERRT:
         assert f"{api}=()" in wert, f"{api} ist nicht gesperrt"
 
 
@@ -50,12 +60,24 @@ def test_die_direktiven_sind_wirklich_leer():
     """`camera=(self)` sperrt NICHTS (self bleibt erlaubt) - hier zählt die
     leere Klammer, nicht nur das Vorkommen des Namens."""
     wert = _header_zeile("Permissions-Policy")
-    for api in ("camera", "microphone", "geolocation", "payment", "usb"):
+    for api in GESPERRT:
         treffer = re.search(rf"{api}=\(([^)]*)\)", wert)
         assert treffer, f"{api} kommt gar nicht vor"
         assert treffer.group(1).strip() == "", (
             f"{api}=({treffer.group(1)}) ist nicht leer - erlaubt also doch etwas"
         )
+
+
+def test_mikrofon_ist_genau_fuer_self_frei():
+    """Wunsch #258: Das Aussprache-Training braucht getUserMedia. `self` -
+    nicht leer (dann waere der Knopf im Trainer tot), nicht `*` (dann duerfte
+    auch ein eingebetteter fremder Rahmen mithoeren)."""
+    wert = _header_zeile("Permissions-Policy")
+    treffer = re.search(r"microphone=\(([^)]*)\)", wert)
+    assert treffer, "microphone kommt gar nicht vor"
+    assert treffer.group(1).strip() == "self", (
+        f"microphone=({treffer.group(1)}) - erwartet wird genau (self)"
+    )
 
 
 def test_bestehende_header_stehen_noch():

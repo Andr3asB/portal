@@ -7,7 +7,6 @@ ein echter Funktionstest gegen die Route.
 """
 import pathlib
 import re
-from datetime import date, timedelta
 
 import pytest
 

@@ -110,8 +110,18 @@ Caddy setzt folgende Headers auf alle Antworten:
 Referrer-Policy: no-referrer
 X-Content-Type-Options: nosniff
 Content-Security-Policy: frame-ancestors https://wir4.16schwaben.de
+Strict-Transport-Security: max-age=31536000            (Wunsch #134)
+Permissions-Policy: camera=(), microphone=(self), …    (Wunsch #208)
 -Server  (entfernt)
 ```
+
+**Permissions-Policy (Wunsch #208, Sicherheitsaudit 11.08.2026):** alle
+Geräte-APIs zu – mit **einer** Ausnahme seit Wunsch #258 (05.09.2026):
+`microphone=(self)`, weil das Aussprache-Training im Vokabeltrainer per
+`getUserMedia` aufnimmt. `self` gilt nur für Seiten dieser Herkunft, ein
+eingebetteter fremder Rahmen bekommt das Mikrofon weiterhin nicht.
+`tests/test_permissions_policy_header.py` hält genau diesen Wert fest.
+Änderungen am Caddyfile greifen erst mit `--force-recreate caddy`.
 
 **Wunsch #107 (2026-08-02): Einbettung in Home Assistant per iFrame.**
 Andi wollte das Portal als iFrame ins Home-Dashboard (Home Assistant unter
@@ -348,7 +358,9 @@ glogging_redact.py   – Gunicorn RedactingLogger: ersetzt Tokens in Logzeilen d
 manage.py            – CLI: createadmin, adduser, addapp, grant, listusers,
                        listwuensche, listtodos, wunsch_erledigt, backlog,
                        ki_modell/ki_stimme/listki (Wunsch #81: Modell/Stimme je
-                       KI-Zweck bzw. je Vokabeln-Sprache ohne Deploy ändern)
+                       KI-Zweck bzw. je Vokabeln-Sprache ohne Deploy ändern;
+                       ki_modell nimmt seit Wunsch #258 optional einen dritten
+                       Wert `anbieter` – "-" löscht ihn, ohne ihn bleibt er)
 teile/
   __init__.py        – registriert 00_kern als teile.kern, seit Wunsch #90
                        zusaetzlich 04_todo als teile.todo (erster Cross-Modul-
@@ -359,10 +371,15 @@ teile/
                        über OpenRouter, Token-Kontingent pro Nutzer/Monat über
                        users.ki_token_limit, protokolliert in ki_nutzung – von jedem
                        KI-Feature nutzbar, nicht nur Rezept-Import; optionaler
-                       `bilder`-Parameter für Vision-Eingabe, Wunsch #80),
+                       `bilder`-Parameter für Vision-Eingabe, Wunsch #80;
+                       optionaler `audio`-Parameter (format, base64) als
+                       `input_audio`, Wunsch #258 – steht für den Zweck ein
+                       Anbieter in ki_konfiguration.anbieter, geht die Anfrage
+                       mit provider.only + allow_fallbacks=false NUR dorthin),
                        ki_modell_fuer(zweck) (Wunsch #81 – Grundprinzip: Modell
                        je Verwendungszweck kommt aus ki_konfiguration statt fest
-                       im Code, Fallback KI_MODELL), ki_stimme_fuer(sprache_id) +
+                       im Code, Fallback KI_MODELL), ki_anbieter_fuer(zweck)
+                       (Wunsch #258, None = OpenRouter wählt), ki_stimme_fuer(sprache_id) +
                        ki_text_zu_sprache() (TTS über OpenRouter /audio/speech,
                        mp3→pcm-Fallback + WAV-Verpackung falls das Modell nur
                        PCM liefert, siehe Bekannte Issues), /health, _init_db(),
@@ -970,7 +987,22 @@ teile/
                        Nutzer sieht sonst nur seine eigenen Vokabeln/Kapitel/
                        Sessions. 🔊-Knopf fuer /wort/<vid>/audio auch direkt
                        in der Vokabelliste auf der Hauptseite, nicht nur im
-                       Trainer (Wunsch #84)
+                       Trainer (Wunsch #84). POST /wort/<vid>/aussprache
+                       (Wunsch #258): nimmt eine WAV-Aufnahme (Body
+                       audio/wav, 8 KB bis 1 MB, RIFF-Kopf) entgegen und
+                       laesst sie per ki_anfrage(audio=...) bewerten - Zweck
+                       "vokabeln_aussprache", Voxtral Small (Mistral) auf dem
+                       Endpunkt mistral/eu ohne Fallback; Antwort immer JSON
+                       {ok, note 1-5, verstanden, tipp} bzw. {ok:false,
+                       fehler} mit 400/404/413/429/502. Die Aufnahme wird
+                       NICHT gespeichert. Latein ist ausgenommen
+                       (_OHNE_AUSSPRACHE, aussprache_moeglich()); lernen_start
+                       gibt `aussprache_moeglich` an die Vorlage, der 🎤-Knopf
+                       existiert dann gar nicht. Der Browser nimmt per
+                       MediaRecorder auf (nicht die Diktierfunktion), rechnet
+                       ueber OfflineAudioContext auf 16 kHz mono um und
+                       schreibt den RIFF-Kopf selbst - der Server muss so
+                       weder webm noch mp4 dekodieren.
   17_packliste.py    – /a/packliste/<token>/ Packlisten fuer Reisen/Ausfluege
                        (Wunsch #111), bewusst sehr aehnlich zu 10_einkauf.py
                        aufgebaut, drei Unterschiede (vorab per Rueckfrage mit
@@ -1767,7 +1799,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `vokabel_kapitel_zuordnung` | vokabel_id (FK vokabeln, cascade), kapitel_id (FK vokabel_kapitel, cascade); UNIQUE(vokabel_id,kapitel_id) – m:n, eine Vokabel kann mehreren Kapiteln oder keinem angehören |
 | `vokabel_sessions` | id, user_id (FK users, cascade), sprache_id (FK vokabel_sprachen), gestartet, beendet (NULL = noch offen) – ein Trainer-Durchgang |
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
-| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97), modell – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell` änderbar |
+| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97, "vokabeln_aussprache" – Wunsch #258), modell, anbieter (NULL = OpenRouter wählt; "mistral/eu" beim Aussprache-Zweck, Wunsch #258) – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell <zweck> <modell> [anbieter\|-]` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 | `tvb_spiele` | id (PK, handball.net-Spiel-ID), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), wettbewerb (Wunsch #151 – Name des Wettbewerbs; NULL bei Altbestand, weil nachtraeglich nicht rekonstruierbar), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert |
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
@@ -2806,6 +2838,17 @@ python -m venv .venv                                   # einmalig
   Kontingent zaehlt nur das Wort, Cache-Schluessel ist versioniert, gleiches
   Wort teilt sich die Datei, verschiedene Sprachen nicht. Dazu die
   Audio-Kennzeichnung aus #148.
+- `test_aussprache.py` – Wunsch #258. Der eine Test, auf den es ankommt:
+  die Anfrage traegt `provider.only=["mistral/eu"]` + `allow_fallbacks=false`
+  - ohne das wiche OpenRouter bei einem Engpass mit der Stimmaufnahme eines
+  Kindes stillschweigend auf einen anderen Anbieter aus. Dazu: Seed und
+  `manage.py ki_modell` mit Anbieter, `input_audio` im content-Array,
+  Latein-Ausnahme ohne KI-Aufruf, Sichtbarkeit (#150), Groessen (400/413
+  VOR dem kostenpflichtigen Aufruf), 429/502, JSON in Codeblock/mit
+  Vorrede, Note auf 1-5 begrenzt, nichts landet im Datenordner, der
+  🎤-Knopf nur bei Sprachen mit Training, MediaRecorder statt
+  SpeechRecognition in der Vorlage. `test_permissions_policy_header.py`
+  haelt seitdem `microphone=(self)` fest (vorher leer).
 - `test_barcode.py` – Wunsch #143. Schwerpunkt ist die Ziffern-Pruefung (der
   Code geht in eine URL) - dieser Test hat den `$`/`\Z`-Fehler gefunden. Dazu
   die Produktabfrage mit vorgetaeuschten Antworten, die Pruefung der

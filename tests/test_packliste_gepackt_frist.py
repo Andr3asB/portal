@@ -5,7 +5,6 @@ noch Ballast. Ausgeblendet heisst: nicht gerendert - geloescht wird nichts,
 `?gepackt=alle` und der Zaehl-Link holen alles zurueck.
 """
 import pytest
-
 from teile.kern import new_token, token_lookup
 
 

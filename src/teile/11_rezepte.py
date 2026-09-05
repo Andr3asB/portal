@@ -50,9 +50,9 @@ import ipaddress
 import json
 import re
 import socket
-import zlib
 import urllib.error
 import urllib.request
+import zlib
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 

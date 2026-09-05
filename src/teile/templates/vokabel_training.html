@@ -32,6 +32,19 @@
   color:var(--text); border-radius:20px; padding:7px 16px; font-size:14px; cursor:pointer;
 }
 .btn-anhoeren.sichtbar { display:inline-block; }
+/* Wunsch #258: Aussprache ueben. Waehrend der Aufnahme wird der Knopf zum
+   Stopp-Knopf mit rotem Rand - derselbe Knopf, damit der Daumen nicht wandern
+   muss. Die Bewertung steht darunter in einer eigenen Karte. */
+.btn-anhoeren.aufnahme { border-color:var(--rot-text); color:var(--rot-text); }
+.aussprache-feedback {
+  display:none; margin-top:12px; padding:12px 14px; border-radius:12px;
+  background:var(--surface-2); text-align:left; font-size:14px; line-height:1.4;
+}
+.aussprache-feedback.sichtbar { display:block; }
+.aussprache-feedback .sterne { font-size:20px; letter-spacing:2px; margin-bottom:4px; }
+.aussprache-feedback .verstanden { color:var(--text-2); font-size:13px; }
+.aussprache-feedback .tipp { margin-top:6px; }
+.aussprache-feedback .hinweis { color:var(--text-2); }
 .btn-antworten {
   margin-top:16px; width:100%; background:var(--farbe-band); color:#fff; border:none;
   border-radius:10px; padding:12px 0; font-size:16px; font-weight:600; cursor:pointer;
@@ -68,6 +81,12 @@
     <div id="antwort-felder"></div>
     <div class="feedback" id="feedback"></div>
     <button class="btn-anhoeren" id="anhoeren-btn" type="button" data-klick="wortAnhoeren">🔊 Anhören</button>
+    {% if aussprache_moeglich %}
+    {# Wunsch #258: nur fuer Sprachen mit Aussprache-Training (nicht Latein),
+       das entscheidet lernen_start() serverseitig. #}
+    <button class="btn-anhoeren" id="aussprache-btn" type="button" data-klick="ausspracheUeben">🎤 Aussprache üben</button>
+    <div class="aussprache-feedback" id="aussprache-feedback" aria-live="polite"></div>
+    {% endif %}
     <button class="btn-antworten" id="antworten-btn">Antworten</button>
   </div>
   <button class="btn-beenden" id="beenden-btn">Training beenden</button>
@@ -164,6 +183,7 @@ function naechsteFrage() {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('anhoeren-btn').classList.remove('sichtbar');
+  ausspracheZuruecksetzen();
   document.getElementById('antworten-btn').textContent = 'Antworten';
   document.getElementById('antworten-btn').onclick = pruefen;
   aktualisiereFortschritt();
@@ -215,11 +235,191 @@ function pruefen() {
   }).catch(() => {});
 
   document.getElementById('anhoeren-btn').classList.add('sichtbar');
+  document.getElementById('aussprache-btn')?.classList.add('sichtbar');
 
   const btn = document.getElementById('antworten-btn');
   btn.textContent = 'Weiter';
   btn.onclick = naechsteFrage;
   aktualisiereFortschritt();
+}
+
+// ---- Wunsch #258: Aussprache ueben --------------------------------------
+// Eigene Aufnahme per MediaRecorder - ausdruecklich NICHT die Diktier-/
+// Spracherkennung des Geraets (die wuerde Text liefern, nicht Klang, und
+// laeuft bei Apple/Google ueber deren Server). Die Aufnahme wird im Browser
+// zu WAV (16 kHz, mono, 16 Bit) umgepackt: MediaRecorder liefert je nach
+// Browser webm/opus (Chrome, Firefox) oder mp4/aac (Safari) - der Server
+// muesste sonst beides dekodieren koennen. WAV versteht jedes Audio-Modell.
+const AUSSPRACHE_MAX_MS = 8000;
+let aufnahme = null;   // {recorder, timer} solange aufgenommen wird
+
+function ausspracheKnopf(text, aktiv) {
+  const btn = document.getElementById('aussprache-btn');
+  if (!btn) return;
+  btn.textContent = text;
+  btn.disabled = !aktiv;
+}
+
+function ausspracheMeldung(text, klasse) {
+  const box = document.getElementById('aussprache-feedback');
+  if (!box) return;
+  box.textContent = '';
+  if (!text) { box.classList.remove('sichtbar'); return; }
+  const zeile = document.createElement('div');
+  zeile.className = klasse || 'hinweis';
+  zeile.textContent = text;
+  box.appendChild(zeile);
+  box.classList.add('sichtbar');
+}
+
+function ausspracheZuruecksetzen() {
+  if (aufnahme) aufnahmeStoppen(true);
+  const btn = document.getElementById('aussprache-btn');
+  if (!btn) return;
+  btn.classList.remove('sichtbar', 'aufnahme');
+  ausspracheKnopf('🎤 Aussprache üben', true);
+  ausspracheMeldung('');
+}
+
+async function ausspracheUeben() {
+  if (!aktuelle) return;
+  if (aufnahme) { aufnahmeStoppen(false); return; }
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    ausspracheMeldung('Dieser Browser kann hier nicht aufnehmen.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio: true});
+  } catch (err) {
+    ausspracheMeldung('Kein Zugriff aufs Mikrofon - bitte im Browser erlauben.');
+    return;
+  }
+  const recorder = new MediaRecorder(stream);
+  const teile = [];
+  recorder.ondataavailable = e => { if (e.data && e.data.size) teile.push(e.data); };
+  recorder.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    if (recorder.abgebrochen) return;
+    bewerten(new Blob(teile, {type: recorder.mimeType || 'audio/webm'}));
+  };
+  recorder.start();
+  aufnahme = {recorder, timer: setTimeout(() => aufnahmeStoppen(false), AUSSPRACHE_MAX_MS)};
+  document.getElementById('aussprache-btn').classList.add('aufnahme');
+  ausspracheKnopf('⏹ Stopp', true);
+  ausspracheMeldung('🔴 Sprich das Wort …');
+}
+
+function aufnahmeStoppen(abbrechen) {
+  if (!aufnahme) return;
+  clearTimeout(aufnahme.timer);
+  const recorder = aufnahme.recorder;
+  aufnahme = null;
+  recorder.abgebrochen = !!abbrechen;
+  if (recorder.state !== 'inactive') recorder.stop();
+  document.getElementById('aussprache-btn')?.classList.remove('aufnahme');
+  ausspracheKnopf('🎤 Aussprache üben', true);
+}
+
+async function bewerten(blob) {
+  const vokabel = aktuelle;
+  ausspracheKnopf('Wird bewertet …', false);
+  ausspracheMeldung('Wird bewertet …');
+  try {
+    const wav = await alsWav(blob);
+    const antwort = await fetch(`/a/vokabeln${TP}wort/${vokabel.id}/aussprache`, {
+      method: 'POST',
+      headers: {'Content-Type': 'audio/wav'},
+      body: wav,
+    });
+    const daten = await antwort.json().catch(() => ({}));
+    // Inzwischen weitergeklickt? Dann gehoert die Bewertung zu einem
+    // anderen Wort und wuerde nur verwirren.
+    if (aktuelle !== vokabel) return;
+    if (!antwort.ok || !daten.ok) {
+      ausspracheMeldung(daten.fehler || 'Die Bewertung klappt gerade nicht.');
+      return;
+    }
+    zeigeBewertung(daten);
+  } catch (err) {
+    console.warn('Aussprache-Bewertung fehlgeschlagen:', err);
+    if (aktuelle === vokabel) ausspracheMeldung('Die Bewertung klappt gerade nicht.');
+  } finally {
+    if (aktuelle === vokabel) ausspracheKnopf('🎤 Aussprache üben', true);
+  }
+}
+
+function zeigeBewertung(daten) {
+  const box = document.getElementById('aussprache-feedback');
+  box.textContent = '';
+  const note = Math.max(1, Math.min(5, parseInt(daten.note, 10) || 1));
+  const sterne = document.createElement('div');
+  sterne.className = 'sterne';
+  sterne.setAttribute('aria-label', `${note} von 5 Sternen`);
+  sterne.textContent = '⭐'.repeat(note) + '☆'.repeat(5 - note);
+  box.appendChild(sterne);
+  if (daten.verstanden) {
+    const v = document.createElement('div');
+    v.className = 'verstanden';
+    v.textContent = `Verstanden: „${daten.verstanden}“`;
+    box.appendChild(v);
+  }
+  if (daten.tipp) {
+    const t = document.createElement('div');
+    t.className = 'tipp';
+    t.textContent = daten.tipp;
+    box.appendChild(t);
+  }
+  box.classList.add('sichtbar');
+  if (window.twemoji) twemoji.parse(box, {folder: 'svg', ext: '.svg', base: '/static/twemoji/'});
+}
+
+// Beliebiges Browser-Audioformat -> WAV 16 kHz mono 16 Bit. Erst dekodieren
+// (das kann der Browser fuer sein eigenes Aufnahmeformat immer), dann ueber
+// einen OfflineAudioContext auf 16 kHz herunterrechnen, dann den 44-Byte-
+// RIFF-Kopf davorsetzen.
+async function alsWav(blob) {
+  const roh = await blob.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  let dekodiert;
+  try {
+    dekodiert = await ctx.decodeAudioData(roh);
+  } finally {
+    if (ctx.close) ctx.close().catch(() => {});
+  }
+  const rate = 16000;
+  const laenge = Math.max(1, Math.ceil(dekodiert.duration * rate));
+  const OffCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const offline = new OffCtx(1, laenge, rate);
+  const quelle = offline.createBufferSource();
+  quelle.buffer = dekodiert;
+  quelle.connect(offline.destination);
+  quelle.start(0);
+  const mono = (await offline.startRendering()).getChannelData(0);
+
+  const puffer = new ArrayBuffer(44 + mono.length * 2);
+  const sicht = new DataView(puffer);
+  const schreibe = (pos, text) => { for (let i = 0; i < text.length; i++) sicht.setUint8(pos + i, text.charCodeAt(i)); };
+  schreibe(0, 'RIFF');
+  sicht.setUint32(4, 36 + mono.length * 2, true);
+  schreibe(8, 'WAVE');
+  schreibe(12, 'fmt ');
+  sicht.setUint32(16, 16, true);        // fmt-Block-Laenge
+  sicht.setUint16(20, 1, true);         // PCM
+  sicht.setUint16(22, 1, true);         // mono
+  sicht.setUint32(24, rate, true);
+  sicht.setUint32(28, rate * 2, true);  // Bytes je Sekunde
+  sicht.setUint16(32, 2, true);         // Bytes je Abtastwert
+  sicht.setUint16(34, 16, true);        // Bit je Abtastwert
+  schreibe(36, 'data');
+  sicht.setUint32(40, mono.length * 2, true);
+  let pos = 44;
+  for (let i = 0; i < mono.length; i++, pos += 2) {
+    const s = Math.max(-1, Math.min(1, mono[i]));
+    sicht.setInt16(pos, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return puffer;
 }
 
 let anhoerenAudio = null;
@@ -252,6 +452,7 @@ async function wortAnhoeren() {
 }
 
 function zeigeEnde() {
+  ausspracheZuruecksetzen();
   document.querySelector('.frage-card').style.display = 'none';
   document.getElementById('beenden-btn').style.display = 'none';
   document.getElementById('ende-card').style.display = 'block';

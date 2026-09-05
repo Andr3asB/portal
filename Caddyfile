@@ -73,18 +73,23 @@ portal.16schwaben.de {
 		# Kamera, Mikrofon, Standort etc. anfragen - selbst wenn eine
 		# erfolgreiche Einschleusung durch die bestehende CSP schon sehr
 		# unwahrscheinlich ist (Verteidigung in der Tiefe). Das Portal selbst
-		# braucht keine dieser APIs: Fotos (Rezepte, Vokabeln, Barcode) laufen
-		# ueber den normalen Datei-Upload-Dialog (<input type=file>), nicht
-		# ueber getUserMedia. `interest-cohort`/`browsing-topics` schaltet
-		# zusaetzlich Googles FLoC/Topics-Tracking ab - kostet nichts, nutzt
-		# aber auch nichts, ohne dass irgendjemand es verlangt hat.
+		# braucht fast keine dieser APIs: Fotos (Rezepte, Vokabeln, Barcode)
+		# laufen ueber den normalen Datei-Upload-Dialog (<input type=file>),
+		# nicht ueber getUserMedia. `interest-cohort`/`browsing-topics`
+		# schaltet zusaetzlich Googles FLoC/Topics-Tracking ab - kostet nichts,
+		# nutzt aber auch nichts, ohne dass irgendjemand es verlangt hat.
+		#
+		# Wunsch #258 (05.09.2026): `microphone=(self)` - das Aussprache-
+		# Training im Vokabeltrainer nimmt per getUserMedia auf. `self` heisst:
+		# nur Seiten dieser Herkunft, keine eingebetteten fremden Rahmen; der
+		# Browser fragt trotzdem bei jedem Nutzer einmal nach. Kamera bleibt zu.
 		#
 		# BEWUSST NICHT dabei: Cross-Origin-Opener-Policy/-Resource-Policy.
 		# Beide koennten das Einbetten im Home-Assistant-iFrame (Kiosk,
 		# frame-ancestors oben) stoeren, falls HA selbst Cross-Origin-
 		# Fensterzugriff braucht - das laesst sich nur an einem echten Geraet
 		# pruefen, nicht von hier aus. Siehe Wunsch #208 in der Werkstatt.
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), midi=(), interest-cohort=(), browsing-topics=()"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), midi=(), interest-cohort=(), browsing-topics=()"
 		-Server
 	}
 	# Wunsch #133: Anfragen mit übergroßem Body gar nicht erst durchreichen.

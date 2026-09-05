@@ -5,7 +5,6 @@ hohe Seite mit 1.214 interaktiven Elementen. Standard sind jetzt die letzten
 15, `?erledigt=alle` holt weiterhin bewusst alles (Browsersuche, Filter).
 """
 import pytest
-
 from teile.kern import new_token, token_lookup
 
 

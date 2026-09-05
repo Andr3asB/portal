@@ -329,17 +329,33 @@ def cmd_ki_modell(args):
     einmal gestartet ist (00_kern.py._init_db legt sie an) - dieses Skript
     hat absichtlich nur ein Mini-Schema fuer die Ersteinrichtung."""
     if len(args) < 2:
-        sys.exit("Verwendung: ki_modell <zweck> <modell>")
+        sys.exit("Verwendung: ki_modell <zweck> <modell> [anbieter|-]")
     zweck, modell = args[0], args[1]
+    # Wunsch #258: optional den OpenRouter-Anbieter festnageln (z. B.
+    # "mistral/eu" fuer die Aussprache-Bewertung). Ohne drittes Argument
+    # bleibt ein gesetzter Anbieter stehen; "-" loescht ihn ausdruecklich.
+    anbieter = args[2] if len(args) > 2 else None
     db = connect()
-    db.execute(
-        "INSERT INTO ki_konfiguration(zweck, modell) VALUES(?,?) "
-        "ON CONFLICT(zweck) DO UPDATE SET modell=excluded.modell",
-        (zweck, modell),
-    )
+    if anbieter is None:
+        db.execute(
+            "INSERT INTO ki_konfiguration(zweck, modell) VALUES(?,?) "
+            "ON CONFLICT(zweck) DO UPDATE SET modell=excluded.modell",
+            (zweck, modell),
+        )
+    else:
+        wert = None if anbieter == "-" else anbieter
+        db.execute(
+            "INSERT INTO ki_konfiguration(zweck, modell, anbieter) VALUES(?,?,?) "
+            "ON CONFLICT(zweck) DO UPDATE SET modell=excluded.modell, "
+            "anbieter=excluded.anbieter",
+            (zweck, modell, wert),
+        )
     db.commit()
+    zeile = db.execute(
+        "SELECT modell, anbieter FROM ki_konfiguration WHERE zweck=?", (zweck,)).fetchone()
     db.close()
-    print(f"KI-Modell fuer '{zweck}': {modell}")
+    zusatz = f" (Anbieter: {zeile['anbieter']})" if zeile["anbieter"] else ""
+    print(f"KI-Modell fuer '{zweck}': {zeile['modell']}{zusatz}")
 
 
 def cmd_ki_stimme(args):
@@ -363,8 +379,10 @@ def cmd_ki_stimme(args):
 def cmd_listki(_):
     db = connect()
     print("=== KI-Modelle je Zweck ===")
-    for r in db.execute("SELECT zweck, modell FROM ki_konfiguration ORDER BY zweck").fetchall():
-        print(f"  {r['zweck']}: {r['modell']}")
+    for r in db.execute(
+            "SELECT zweck, modell, anbieter FROM ki_konfiguration ORDER BY zweck").fetchall():
+        zusatz = f"  [Anbieter: {r['anbieter']}]" if r["anbieter"] else ""
+        print(f"  {r['zweck']}: {r['modell']}{zusatz}")
     print()
     print("=== TTS-Stimmen je Sprache ===")
     for r in db.execute("""

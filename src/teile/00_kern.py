@@ -1313,6 +1313,20 @@ KI_MODELL = "anthropic/claude-haiku-4.5"
 TTS_STANDARD_MODELL = "google/gemini-3.1-flash-tts-preview"
 TTS_STANDARD_STIMME = "Kore"
 
+# Wunsch #258: Aussprache-Bewertung braucht ein Modell, das Audio HOERT
+# (Chat-Completion mit `input_audio`, nicht der TTS-Endpunkt oben). Andis
+# Vorgabe: in der EU gehostet und nicht in China entwickelt. Von den 46
+# Audio-Modellen auf OpenRouter (Stand 05.09.2026) ist Voxtral (Mistral,
+# Paris) das einzige aus der EU; sein Endpunkt "mistral/eu" ist Mistrals
+# EU-Betrieb. Der Anbieter wird je Zweck in ki_konfiguration.anbieter
+# festgenagelt und mit allow_fallbacks=false angefragt - lieber ein Fehler
+# als die Aufnahme eines Kindes bei einem anderen Anbieter. Nachgemessen:
+# der EU-Endpunkt rechnet 10 % teurer ab (0,11 statt 0,10 USD je Mio.
+# Prompt-Tokens), genau daran laesst sich in der Antwort erkennen, dass die
+# Festlegung greift (journal.md, 05.09.2026).
+AUSSPRACHE_STANDARD_MODELL = "mistralai/voxtral-small-24b-2507"
+AUSSPRACHE_STANDARD_ANBIETER = "mistral/eu"
+
 
 class KiLimitError(Exception):
     """Monatliches Token-Kontingent des Nutzers ist aufgebraucht."""
@@ -1330,6 +1344,19 @@ def ki_modell_fuer(zweck: str) -> str:
     db = get_db()
     row = db.execute("SELECT modell FROM ki_konfiguration WHERE zweck=?", (zweck,)).fetchone()
     return row["modell"] if row else KI_MODELL
+
+
+def ki_anbieter_fuer(zweck: str):
+    """Wunsch #258: Fest vorgegebener OpenRouter-Anbieter je Zweck (Spalte
+    ki_konfiguration.anbieter, z. B. "mistral/eu"), oder None - dann waehlt
+    OpenRouter selbst. Gesetzt per `manage.py ki_modell <zweck> <modell>
+    <anbieter>`. Nur fuer Zwecke, bei denen der Ort der Verarbeitung
+    zaehlt (Stimmaufnahmen); die Text-Zwecke bleiben ohne Vorgabe."""
+    db = get_db()
+    row = db.execute(
+        "SELECT anbieter FROM ki_konfiguration WHERE zweck=?", (zweck,)).fetchone()
+    anbieter = (row["anbieter"] or "").strip() if row else ""
+    return anbieter or None
 
 
 def ki_stimme_fuer(sprache_id: int):
@@ -1451,7 +1478,7 @@ def _kontingent_korrigieren(tabelle: str, spalte: str, zeilen_id: int, wert: int
 
 
 def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens: int = 1500,
-               bilder=None) -> str:
+               bilder=None, audio=None) -> str:
     """Generischer KI-Aufruf über OpenRouter – von jedem KI-Feature verwendbar.
 
     Kontingent ist pro Nutzer und Kalendermonat gemeinsam über alle Features
@@ -1464,7 +1491,13 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
 
     `bilder` (Wunsch #80, OCR-Import): optionale Liste aus (mime_type,
     base64_daten)-Tupeln fuer Bildeingabe (Vision) – OpenRouter/OpenAI-
-    kompatibles content-Array statt reinem Text."""
+    kompatibles content-Array statt reinem Text.
+
+    `audio` (Wunsch #258, Aussprache): optionales (format, base64_daten)-Tupel,
+    z. B. ("wav", ...), als `input_audio`-Teil im selben content-Array. Steht
+    fuer den Zweck ein Anbieter in ki_konfiguration.anbieter, geht die Anfrage
+    mit `provider.only` + `allow_fallbacks=false` NUR dorthin - fuer
+    Stimmaufnahmen der Kinder ist der Ort der Verarbeitung Teil der Zusage."""
     import json
     import urllib.error
     import urllib.request
@@ -1479,26 +1512,37 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
         _kontingent_freigeben("ki_nutzung", platzhalter_id)
         raise KiFehler("Kein OPENROUTER_API_KEY konfiguriert.")
 
-    if bilder:
+    if bilder or audio:
         user_content = [{"type": "text", "text": prompt}]
-        for mime, b64 in bilder:
+        for mime, b64 in bilder or []:
             user_content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:{mime};base64,{b64}"},
             })
+        if audio:
+            audio_format, audio_b64 = audio
+            user_content.append({
+                "type": "input_audio",
+                "input_audio": {"data": audio_b64, "format": audio_format},
+            })
     else:
         user_content = prompt
 
+    body = {
+        "model": ki_modell_fuer(feature),
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+        "max_tokens": max_tokens,
+    }
+    anbieter = ki_anbieter_fuer(feature)
+    if anbieter:
+        body["provider"] = {"only": [anbieter], "allow_fallbacks": False}
+
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
-        data=json.dumps({
-            "model": ki_modell_fuer(feature),
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_content},
-            ],
-            "max_tokens": max_tokens,
-        }).encode(),
+        data=json.dumps(body).encode(),
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
     try:
@@ -1707,6 +1751,18 @@ def _init_db(app):
                 "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
                 (zweck, KI_MODELL),
             )
+        # Wunsch #258: Anbieter-Spalte (Migration vor dem Seed, der sie
+        # benutzt) und der Aussprache-Zweck mit EU-Anbieter. Auch hier
+        # INSERT OR IGNORE: was Andi per manage.py setzt, bleibt stehen.
+        try:
+            db.execute("ALTER TABLE ki_konfiguration ADD COLUMN anbieter TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        db.execute(
+            "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell, anbieter) VALUES(?,?,?)",
+            ("vokabeln_aussprache", AUSSPRACHE_STANDARD_MODELL, AUSSPRACHE_STANDARD_ANBIETER),
+        )
         for (sprache_id,) in db.execute("SELECT id FROM vokabel_sprachen").fetchall():
             db.execute(
                 "INSERT OR IGNORE INTO ki_stimmen(sprache_id, modell, stimme) VALUES(?,?,?)",
