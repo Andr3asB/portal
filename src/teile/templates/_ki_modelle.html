@@ -1,0 +1,34 @@
+{# Wunsch #259: Welche KI wofuer - und wo sie rechnet. Eingebunden in der
+   Hilfe (Kapitel "KI-Modelle") und auf der KI-Verbrauchsseite; die Daten
+   kommen aus ki_modell_uebersicht() in 00_kern.py, also LIVE aus
+   ki_konfiguration/ki_stimmen. Erwartet die Variable `ki`. #}
+<style>
+.kim-zeile { padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; line-height:1.45; }
+.kim-zeile:last-child { border-bottom:none; }
+.kim-zweck { font-weight:600; }
+.kim-was { color:var(--text-2); font-size:13px; }
+.kim-modell { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; word-break:break-all; margin-top:2px; }
+.kim-ort { font-size:13px; margin-top:2px; }
+.kim-ort.fest { color:var(--gruen-text); font-weight:600; }
+.kim-ort.offen { color:var(--text-2); }
+</style>
+<div class="kim-liste">
+  {% for z in ki.zwecke %}
+  <div class="kim-zeile">
+    <div class="kim-zweck">{{ z.label }}</div>
+    {% if z.beschreibung %}<div class="kim-was">{{ z.beschreibung }}</div>{% endif %}
+    <div class="kim-modell">{{ z.modell }}{% if z.standard %} (Standard, nicht eigens eingestellt){% endif %}</div>
+    <div class="kim-was">Entwickelt von {{ z.entwickler }} ({{ z.land }})</div>
+    <div class="kim-ort {{ 'fest' if z.festgelegt else 'offen' }}">Verarbeitung: {{ z.hosting }}</div>
+  </div>
+  {% endfor %}
+  {% for s in ki.stimmen %}
+  <div class="kim-zeile">
+    <div class="kim-zweck">Vorlesen – {{ s.sprache }}</div>
+    <div class="kim-was">liest das fremdsprachige Wort im Vokabeltrainer und in der Vokabelliste vor</div>
+    <div class="kim-modell">{{ s.modell }} · Stimme „{{ s.stimme }}“</div>
+    <div class="kim-was">Entwickelt von {{ s.entwickler }} ({{ s.land }})</div>
+    <div class="kim-ort {{ 'fest' if s.festgelegt else 'offen' }}">Verarbeitung: {{ s.hosting }}</div>
+  </div>
+  {% endfor %}
+</div>

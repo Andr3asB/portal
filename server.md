@@ -379,7 +379,14 @@ teile/
                        ki_modell_fuer(zweck) (Wunsch #81 – Grundprinzip: Modell
                        je Verwendungszweck kommt aus ki_konfiguration statt fest
                        im Code, Fallback KI_MODELL), ki_anbieter_fuer(zweck)
-                       (Wunsch #258, None = OpenRouter wählt), ki_stimme_fuer(sprache_id) +
+                       (Wunsch #258, None = OpenRouter wählt), KI_ZWECKE +
+                       ki_modell_beschreibung() + ki_modell_uebersicht()
+                       (Wunsch #259: Name/Beschreibung je Zweck, Entwickler
+                       und Land aus dem Modell-Präfix, Ort aus dem Anbieter –
+                       Live-Liste für Hilfe und KI-Verbrauchsseite; jeder
+                       neue ki_anfrage()-Zweck braucht eine Zeile in
+                       KI_ZWECKE und einen Seed, test_ki_modelle.py wacht),
+                       ki_stimme_fuer(sprache_id) +
                        ki_text_zu_sprache() (TTS über OpenRouter /audio/speech,
                        mp3→pcm-Fallback + WAV-Verpackung falls das Modell nur
                        PCM liefert, siehe Bekannte Issues), /health, _init_db(),
@@ -539,7 +546,11 @@ teile/
   07_push.py         – /push/vapid-public-key, /push/subscribe, /push/unsubscribe
   08_settings.py     – /einstellungen/<token> (Dark Mode), /manifest/<token>.json
                        (personalisiertes PWA-Manifest mit Nutzer-Token als start_url)
-  09_hilfe.py        – /a/hilfe/<token>/ Hilfe- und Erklärungsseite (alle Apps)
+  09_hilfe.py        – /a/hilfe/<token>/ Hilfe- und Erklärungsseite (alle Apps).
+                       Gibt seit Wunsch #259 `ki=ki_modell_uebersicht()` mit -
+                       Kapitel 26 "KI-Modelle" zeigt live, welches Modell
+                       wofür und wo rechnet (Include `_ki_modelle.html`,
+                       dieselbe Vorlage wie unten auf admin_ki.html)
   10_einkauf.py      – /a/einkauf/<token>/ Gemeinsame Einkaufsliste mit Kategorien
                        (aus einkauf_kategorien, editierbar), Läden, Angebot-
                        Markierung;
@@ -1355,7 +1366,10 @@ teile/
                        VERSANDTAG, eine Korrektur kann also keine kuenftige
                        Erinnerung unterdruecken.
   24_ki_budget.py    – /a/admin/<token>/ki  KI-Verbrauch je Nutzer und
-                       OpenRouter-Guthaben (Wunsch #183). Nur Admins.
+                       OpenRouter-Guthaben (Wunsch #183). Nur Admins. Unten
+                       seit Wunsch #259 "Welche Modelle, und wo sie rechnen"
+                       (Include `_ki_modelle.html`, Daten aus
+                       ki_modell_uebersicht()).
                        Zwei Guthaben-Begriffe, die nicht dasselbe sind:
                        `/api/v1/credits` = Konto (gekauft minus Gesamt-
                        verbrauch), `/api/v1/key` = Limit DIESES Schluessels
@@ -2605,6 +2619,13 @@ python -m venv .venv                                   # einmalig
 - `test_hilfe_kapitel.py` – Wunsch #242. Jedes Hilfe-Kapitel ist ein
   `<details>`, das Inhaltsverzeichnis kennt alle Anker, und das Skript
   oeffnet das Zielkapitel auch bei direkten `#kapitel-N`-Links.
+- `test_ki_modelle.py` – Wunsch #259. Waechter: jeder `ki_anfrage()`-Zweck
+  im Quelltext hat einen Namen in KI_ZWECKE und einen Seed in
+  ki_konfiguration (so fiel `einkauf_barcode` auf - nie geseedet, stumm auf
+  KI_MODELL). Dazu: Entwickler/Land aus dem Praefix, "nicht festgelegt"
+  ohne Anbieter, unbekannte Hersteller werden nicht geraten, Vorlesen je
+  aktiver Sprache, Hilfe und Verwaltung zeigen die Liste, eine Aenderung
+  per manage.py steht sofort in der Hilfe.
 - `test_werkstatt_erledigte_grenze.py` – Wunsch #240. Standard sind 15
   erledigte Wuensche, `?erledigt=alle` holt alle, die Kopfzeile nennt
   weiterhin die Gesamtzahl, unter der Grenze gibt es keinen Nachlade-Link.

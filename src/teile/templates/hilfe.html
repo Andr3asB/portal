@@ -108,6 +108,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     ('kapitel-23', '🚗 Ausfälle'),
     ('kapitel-24', '📋 Aufgaben als Brett'),
     ('kapitel-25', '🎁 Wunschzettel'),
+    ('kapitel-26', '🤖 KI-Modelle – welche, wofür, wo'),
   ] %}
   <div class="section toc">
     <h2 class="section-title">📑 Inhalt</h2>
@@ -227,7 +228,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
           <span>Nur für Admins. Hier werden Nutzer und App-Zugänge verwaltet.<br><br>
           <strong>📱 Geräte</strong> (oben im Kopf) zeigt jedes Gerät, das gerade angemeldet ist – wer, welches Gerät, seit wann und wann zuletzt benutzt. „Abmelden" trifft <em>nur dieses eine</em>: der Link des Mitglieds bleibt gültig, es kann sich damit jederzeit wieder anmelden. Das ist der Knopf für „ein altes Tablet ist weggegeben worden".<br><br>
           <strong>„Neuer Zugang + QR"</strong> bei einem Mitglied ist die größere Maßnahme: Sie erzeugt in einem Schritt für <em>alle</em> Apps dieses Mitglieds neue Adressen, macht sämtliche alten Links und QR-Codes sofort ungültig und meldet damit auch alle seine Geräte ab – der Notfallknopf, wenn ein Handy verloren geht oder ein Link versehentlich weitergegeben wurde. Danach braucht das Mitglied den neuen QR-Code. Der angezeigte Zugang ist <strong>nur in diesem Moment</strong> sichtbar; später lässt er sich nicht mehr nachschlagen, nur neu erzeugen.<br><br>
-          <strong>🤖 KI-Verbrauch</strong> (oben im Kopf) zeigt, wer wie viele Tokens seines Monatskontingents verbraucht hat, wofür sie draufgegangen sind (Rezept-Import, Foto-Import, Vokabeln …) und wie viele Zeichen vorgelesen wurden. Darüber steht das Guthaben bei OpenRouter – einmal das <em>Konto-Guthaben</em> und einmal das <em>Monatslimit des Schlüssels</em>; die große Zahl ist immer der kleinere von beiden, denn der bestimmt, wann nichts mehr geht. Fällt er auf <strong>1,00 USD oder darunter</strong>, legt das Portal Andi von selbst eine Aufgabe zum Aufladen an und schickt eine Push-Nachricht dazu – einmal, nicht jede Stunde neu. OpenRouter rechnet in US-Dollar, deshalb steht dort USD und nicht Euro. Ohne Guthaben fallen nur die KI-Funktionen aus, alles andere im Portal läuft weiter.</span>
+          <strong>🤖 KI-Verbrauch</strong> (oben im Kopf) zeigt, wer wie viele Tokens seines Monatskontingents verbraucht hat, wofür sie draufgegangen sind (Rezept-Import, Foto-Import, Vokabeln …) und wie viele Zeichen vorgelesen wurden. Darüber steht das Guthaben bei OpenRouter – einmal das <em>Konto-Guthaben</em> und einmal das <em>Monatslimit des Schlüssels</em>; die große Zahl ist immer der kleinere von beiden, denn der bestimmt, wann nichts mehr geht. Fällt er auf <strong>1,00 USD oder darunter</strong>, legt das Portal Andi von selbst eine Aufgabe zum Aufladen an und schickt eine Push-Nachricht dazu – einmal, nicht jede Stunde neu. OpenRouter rechnet in US-Dollar, deshalb steht dort USD und nicht Euro. Ohne Guthaben fallen nur die KI-Funktionen aus, alles andere im Portal läuft weiter. Ganz unten auf der Seite steht, <strong>welches Modell für welche Funktion</strong> eingestellt ist und wo es rechnet – dieselbe Liste wie im Kapitel <a href="#kapitel-26">KI-Modelle</a>.</span>
         </div>
       </li>
     </ul>
@@ -693,6 +694,15 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
         <div><strong>Die Überraschung bleibt:</strong> Wer sich etwas wünscht, sieht <strong>nicht</strong>, ob oder von wem es reserviert ist – diese Information wird für den eigenen Zettel gar nicht erst ausgeliefert. Was du bekommst, erfährst du beim Auspacken.</div>
       </li>
     </ul>
+  </details>
+
+  <details class="section" id="kapitel-26">
+    <summary class="section-title"><h2>🤖 KI-Modelle – welche, wofür, wo</h2></summary>
+    <p>Einige Funktionen im Portal fragen eine KI: Rezepte aus Links und Fotos, Vokabeln aus dem Schulheft, das Vorlesen, die Aussprache-Bewertung, die Überschriften in der Werkstatt und die Kategorie beim Barcode-Scan. Alles davon läuft über <strong>OpenRouter</strong>, einen Vermittler mit einem einzigen Schlüssel – OpenRouter reicht die Anfrage an den Betreiber des jeweiligen Modells weiter. Das heißt auch: <strong>Was du dabei eingibst oder fotografierst, verlässt das Haus</strong> und wird beim Betreiber verarbeitet.</p>
+    <p>Die Liste unten ist keine abgetippte Doku, sondern der <strong>Live-Stand</strong> aus der Datenbank. Tauscht Andi ein Modell aus, steht es sofort hier. Grün heißt: der Ort der Verarbeitung ist fest vorgegeben, und OpenRouter darf nicht ausweichen. „Nicht festgelegt“ heißt: OpenRouter wählt selbst, wer das Modell gerade bedient – bei den amerikanischen Modellen sind das amerikanische Rechenzentren.</p>
+    {% include "_ki_modelle.html" %}
+    <div class="tip">🎤 Die Aussprache-Bewertung ist bewusst anders eingestellt als der Rest: Stimmaufnahmen der Kinder gehen nur an ein europäisches Modell in einem EU-Rechenzentrum, und die Aufnahme wird nirgends gespeichert. Für die Text- und Foto-Funktionen gibt es diese Vorgabe nicht – dort zählt, welches Modell die Aufgabe am besten löst.</div>
+    <div class="tip">🤖 Dieselbe Liste steht für Andi auch in der Verwaltung unter „KI-Verbrauch“, direkt unter den Zahlen, wer wofür wie viele Tokens verbraucht hat.</div>
   </details>
 
 </main>

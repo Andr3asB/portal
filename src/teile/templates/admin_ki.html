@@ -164,5 +164,16 @@
     {% endfor %}
   </div>
 
+  {# Wunsch #259: Welche Modelle, und wo sie rechnen - live aus der DB. #}
+  <div class="kib-ueberschrift">Welche Modelle, und wo sie rechnen</div>
+  <div class="kib-karte">
+    <div class="kib-erklaerung" style="margin-bottom:6px">
+      Live-Stand aus <code>ki_konfiguration</code>/<code>ki_stimmen</code>.
+      Ändern ohne Deploy: <code>manage.py ki_modell &lt;zweck&gt; &lt;modell&gt; [anbieter|-]</code>
+      bzw. <code>ki_stimme</code>. Grün = Anbieter fest vorgegeben, kein Ausweichen.
+    </div>
+    {% include "_ki_modelle.html" %}
+  </div>
+
 </main>
 {% endblock %}

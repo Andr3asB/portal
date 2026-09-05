@@ -363,7 +363,12 @@ Stimme kommen je Zweck aus der Datenbank (`ki_modell_fuer()`,
 dem Code. `ki_anfrage()` nimmt neben `bilder` auch `audio=(format, b64)`
 (#258); steht für den Zweck ein Anbieter in `ki_konfiguration.anbieter`, geht
 die Anfrage ohne Fallback nur dorthin (`ki_anbieter_fuer()`) – so ist die
-Aussprache-Bewertung auf Mistrals EU-Endpunkt festgenagelt. `24_ki_budget.py`
+Aussprache-Bewertung auf Mistrals EU-Endpunkt festgenagelt. **Ein neuer
+KI-Zweck braucht eine Zeile in `KI_ZWECKE` (Name + Beschreibung) und einen
+Seed in `_init_db()`** – Hilfe-Kapitel „KI-Modelle" und die
+KI-Verbrauchsseite zeigen daraus live, welches Modell wofür und wo rechnet
+(#259); `tests/test_ki_modelle.py` liest die `ki_anfrage()`-Aufrufe aus dem
+Quelltext und schlägt sonst an. `24_ki_budget.py`
 sieht stündlich aufs OpenRouter-Guthaben und legt bei ≤ 1,00 USD **eine**
 Aufgabe samt Push für den Admin an (#183).
 

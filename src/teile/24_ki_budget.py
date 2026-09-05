@@ -39,7 +39,7 @@ import urllib.request
 
 from flask import Blueprint, abort, current_app, render_template
 
-from teile.kern import get_db, new_db, push_send
+from teile.kern import get_db, ki_modell_uebersicht, new_db, push_send
 from teile.kern import grant as check_grant
 
 bp  = Blueprint("ki_budget", __name__)
@@ -213,6 +213,7 @@ def uebersicht(token):
         nutzer=nutzer, tts=tts, je_feature=je_feature,
         guthaben=guthaben_lesen(current_app.config.get("OPENROUTER_API_KEY", "")),
         schwelle=SCHWELLE_USD,
+        ki=ki_modell_uebersicht(),   # Wunsch #259
     )
 
 

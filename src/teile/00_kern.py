@@ -1359,6 +1359,114 @@ def ki_anbieter_fuer(zweck: str):
     return anbieter or None
 
 
+# Wunsch #259: Welche KI wofuer - und wo sie rechnet. Die Wahrheit steht in
+# ki_konfiguration/ki_stimmen; Hilfe (Kapitel "KI-Modelle") und die
+# KI-Verbrauchsseite zeigen sie LIVE, damit ein per manage.py getauschtes
+# Modell nicht in einer veralteten Doku stehen bleibt. Jeder Zweck, den
+# ki_anfrage() im Code benutzt, braucht hier eine Zeile - ein Test liest die
+# Aufrufe aus dem Quelltext und schlaegt sonst an.
+KI_ZWECKE = (
+    ("rezepte_import", "Rezept aus Link",
+     "liest den Text einer Rezept-Webseite und macht daraus Zutaten und Schritte"),
+    ("rezepte_foto_import", "Rezept aus Foto",
+     "liest ein fotografiertes Rezept (Kochbuch, Zettel)"),
+    ("vokabeln_ocr", "Vokabeln aus Foto",
+     "liest Vokabellisten und Verbtabellen aus dem Schulheft"),
+    ("vokabeln_aussprache", "Aussprache bewerten",
+     "hört die Mikrofon-Aufnahme im Vokabeltrainer und gibt Sterne und einen Tipp"),
+    ("wunsch_titel", "Überschrift für Wünsche",
+     "macht aus einem Wunschtext in der Werkstatt eine kurze Überschrift"),
+    ("einkauf_barcode", "Kategorie nach Barcode",
+     "ordnet ein gescanntes Produkt einer Kategorie der Einkaufsliste zu"),
+)
+
+# Entwickler und Herkunftsland je Modell-Praefix (OpenRouter-Konvention
+# "hersteller/modell"). Unbekannte Praefixe werden als solche angezeigt,
+# nicht geraten.
+KI_ENTWICKLER = {
+    "anthropic":  ("Anthropic", "USA"),
+    "google":     ("Google", "USA"),
+    "openai":     ("OpenAI", "USA"),
+    "mistralai":  ("Mistral AI", "Frankreich"),
+    "meta-llama": ("Meta", "USA"),
+    "meta":       ("Meta", "USA"),
+    "microsoft":  ("Microsoft", "USA"),
+    "amazon":     ("Amazon", "USA"),
+    "nvidia":     ("Nvidia", "USA"),
+    "x-ai":       ("xAI", "USA"),
+    "cohere":     ("Cohere", "Kanada"),
+    "deepseek":   ("DeepSeek", "China"),
+    "qwen":       ("Alibaba", "China"),
+    "moonshotai": ("Moonshot AI", "China"),
+    "xiaomi":     ("Xiaomi", "China"),
+}
+
+# Ort der Verarbeitung je festgelegtem OpenRouter-Anbieter. Nur was hier
+# steht, laesst sich als Zusage anzeigen; alles andere ist "nicht festgelegt".
+KI_ANBIETER_ORTE = {
+    "mistral/eu":  "Mistral AI, Rechenzentrum in der EU",
+    "mistral/zdr": "Mistral AI, ohne Speicherung der Anfragen (Standort nicht festgelegt)",
+    "mistral":     "Mistral AI (Standort nicht festgelegt)",
+    "anthropic":   "Anthropic, USA",
+    "openai":      "OpenAI, USA",
+    "google-ai-studio": "Google, USA",
+}
+KI_ORT_OFFEN = "nicht festgelegt – OpenRouter wählt den Anbieter, in der Regel in den USA"
+
+
+def ki_modell_beschreibung(modell: str, anbieter=None) -> dict:
+    """Entwickler, Land und Ort der Verarbeitung zu einem Modell (Wunsch #259)."""
+    praefix = modell.split("/", 1)[0] if "/" in modell else ""
+    entwickler, land = KI_ENTWICKLER.get(praefix, (praefix or "unbekannt", "unbekannt"))
+    anbieter = (anbieter or "").strip() or None
+    return {
+        "modell": modell,
+        "entwickler": entwickler,
+        "land": land,
+        "anbieter": anbieter,
+        "hosting": KI_ANBIETER_ORTE.get(anbieter, anbieter) if anbieter else KI_ORT_OFFEN,
+        "festgelegt": bool(anbieter),
+    }
+
+
+def ki_modell_uebersicht() -> dict:
+    """Live-Uebersicht fuer Hilfe und KI-Verbrauchsseite (Wunsch #259):
+    {"zwecke": [...], "stimmen": [...]} - je Zweck aus KI_ZWECKE das Modell
+    aus ki_konfiguration (bzw. KI_MODELL, dann `standard`=True), dazu jeder
+    Zweck, der zwar in der DB steht, aber hier keinen Namen hat; je aktiver
+    Vokabel-Sprache das Vorlese-Modell aus ki_stimmen."""
+    db = get_db()
+    konf = {r["zweck"]: r for r in db.execute(
+        "SELECT zweck, modell, anbieter FROM ki_konfiguration")}
+    zwecke, bekannt = [], set()
+    for zweck, label, beschreibung in KI_ZWECKE:
+        row = konf.get(zweck)
+        zwecke.append({
+            "zweck": zweck, "label": label, "beschreibung": beschreibung,
+            "standard": row is None,
+            **ki_modell_beschreibung(row["modell"] if row else KI_MODELL,
+                                     row["anbieter"] if row else None),
+        })
+        bekannt.add(zweck)
+    for zweck in sorted(konf):
+        if zweck not in bekannt:
+            row = konf[zweck]
+            zwecke.append({
+                "zweck": zweck, "label": zweck, "beschreibung": "", "standard": False,
+                **ki_modell_beschreibung(row["modell"], row["anbieter"]),
+            })
+    stimmen = [
+        {"sprache": r["name"], "stimme": r["stimme"], **ki_modell_beschreibung(r["modell"])}
+        for r in db.execute("""
+            SELECT s.name, t.modell, t.stimme FROM ki_stimmen t
+            JOIN   vokabel_sprachen s ON s.id = t.sprache_id
+            WHERE  s.aktiv = 1
+            ORDER  BY s.name COLLATE NOCASE
+        """)
+    ]
+    return {"zwecke": zwecke, "stimmen": stimmen}
+
+
 def ki_stimme_fuer(sprache_id: int):
     """(modell, stimme) fuers TTS einer Vokabel-Sprache (Wunsch #81) - je
     Sprache in ki_stimmen hinterlegt, austauschbar ohne Code-Aenderung."""
@@ -1745,8 +1853,11 @@ def _init_db(app):
         # Anfang an etwas zum Aendern vorfinden, statt stumm auf KI_MODELL
         # zurueckzufallen. INSERT OR IGNORE - ein von Andi gesetzter Wert
         # wird bei folgenden Deploys nicht ueberschrieben.
+        # Wunsch #259: einkauf_barcode (#143) fehlte hier und fiel stumm auf
+        # KI_MODELL zurueck - seit die Hilfe die Modelle zeigt, faellt so
+        # etwas auf.
         for zweck in ("rezepte_import", "vokabeln_ocr", "rezepte_foto_import",
-                      "wunsch_titel"):
+                      "wunsch_titel", "einkauf_barcode"):
             db.execute(
                 "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
                 (zweck, KI_MODELL),

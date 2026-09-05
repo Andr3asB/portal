@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-09-05 – portal-v242: #259 KI-Modelle und Hosting-Orte sichtbar (Hilfe + Verwaltung)
+
+Stundenlauf, 14:23. Andis Wunsch, direkt nach #258: es soll in einem Kapitel
+dokumentiert sein, welche KI-Modelle (und wo gehostet) für die einzelnen
+Anfragen benutzt werden – und dasselbe in der KI-Token-Übersicht der
+Verwaltung.
+
+**Live statt abgetippt.** Die naheliegende Lösung – eine Tabelle in die
+Hilfe schreiben – wäre beim ersten `manage.py ki_modell` veraltet gewesen,
+und niemand hätte es gemerkt. Deshalb liest `ki_modell_uebersicht()` in
+`00_kern.py` die Wahrheit aus `ki_konfiguration` und `ki_stimmen` und beide
+Seiten binden dieselbe Vorlage `_ki_modelle.html` ein. Was die DB nicht
+weiß – Entwickler und Herkunftsland – kommt aus dem Modell-Präfix
+(`anthropic/…`, `google/…`, `mistralai/…`; unbekannte Präfixe werden als
+„unbekannt" gezeigt, nicht geraten). Der Ort der Verarbeitung kommt aus dem
+festgelegten Anbieter (`mistral/eu` → „Rechenzentrum in der EU", grün);
+ohne Festlegung steht da ehrlich „nicht festgelegt – OpenRouter wählt, in
+der Regel USA".
+
+**Nebenfund:** `einkauf_barcode` (#143) war nie in `ki_konfiguration`
+geseedet und fiel stumm auf `KI_MODELL` zurück – lief, stand aber nirgends.
+Jetzt geseedet, und ein Wächter (`test_ki_modelle.py`) liest alle
+`ki_anfrage()`-Aufrufe aus dem Quelltext: jeder Zweck braucht einen Namen in
+`KI_ZWECKE` und einen Seed. Der Wächter prüft sich selbst (findet er die
+fünf bekannten Zwecke nicht, ist sein Muster kaputt).
+
+Gebaut: Kapitel 26 „🤖 KI-Modelle – welche, wofür, wo" in der Hilfe (mit
+zwei Sätzen dazu, dass Eingaben und Fotos das Haus verlassen, und warum die
+Aussprache anders eingestellt ist als der Rest), Abschnitt „Welche Modelle,
+und wo sie rechnen" unten auf `admin_ki.html`, Querverweis im Admin-Kapitel.
+Ein Test setzt per manage.py ein Modell um und liest es sofort aus der
+Hilfe zurück. Suite 2122 grün, ruff sauber. v242 ohne Caddy-Änderung.
+
 ## 2026-09-05 – portal-v241: #258 Aussprache üben (Mikrofon + Voxtral auf Mistrals EU-Endpunkt)
 
 Andis Antwort auf die Rückfrage: **Weg A** (KI-Schicht), aber „ein Modell,
