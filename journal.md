@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-09-07 – portal-v247: Nachtrag zu #263 – die Ergebnisliste der Saison
+
+Andi: „Wann werden die Ergebnisse nachgeladen? Das erste Spiel der Saison
+fehlt noch immer." Berechtigt, und der Grund ist einfach: `fixture_detail`
+braucht eine **Kennung**, und die hatte das erste Spiel (28.08., TVB 30:29
+Bergischer HC) nie bekommen – `fixtures` führt keine gespielten Spiele, und
+im Ribbon-Fenster hatte niemand die Seite geöffnet. Das Nachladen konnte
+also nur Spiele reparieren, die schon einmal gesehen worden waren.
+
+Also noch einmal gesucht, diesmal beim Widget selbst. `widget.js` von
+`widget.eui.connect.sportradar.com` zerlegt den Reiter-Link `~w=fl~<…>` in
+Seitentyp (`fl` = fixtures) und Zustand – und **der Endpunkt nimmt den
+Zustand als `state`-Parameter**: `fixtures?locale=de-DE&state=<…>` mit dem
+Zustand des „Ergebnisse"-Reiters liefert 26 gespielte Spiele der Liga (Pokal:
+21), alle mit Endstand, Status `CONFIRMED` und Spieltag. Der Zustand steht
+in `data.subPageTabs` der normalen Antwort hinter `fl~`; zur Sicherheit baut
+`_sr_ergebnis_zustand()` ihn auch selbst (zlib + base64 von
+`{"l","s","z":"RESULTS"}` – geprüft: liefert dasselbe).
+
+`_profi_spiele()` fragt je Embed jetzt drei Listen: Spielplan, Ergebnisse,
+Ribbon. Ein bestätigter Endstand wird beim Zusammenführen nicht mehr von
+einem Live-Zwischenstand ersetzt, der Spieltag bleibt stehen, wenn die neuere
+Fassung keinen nennt (der UPSERT ebenso, `COALESCE`). `_sr_spiel()` liest
+„Spieltag: 3" als „3. Spieltag", damit die Ergebnisliste dieselbe Metazeile
+zeigt wie handball.net. Sechs Tests dazu.
+
+Zur Frage „wann": beim Öffnen der TVB-Seite, nicht im Hintergrund – wie
+alle TVB-Daten. Das steht jetzt auch so in der Hilfe.
+
 ## 2026-09-06 – portal-v246: #266 Mitgliederliste und App-Zugriff getrennt
 
 Andi: „in den letzten Wochen sind immer mehr Apps dazugekommen" – 20 Chips

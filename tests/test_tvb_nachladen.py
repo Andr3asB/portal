@@ -285,3 +285,122 @@ def test_seite_zeigt_laufendes_spiel_als_laufend(app, client, db, modul, monkeyp
     assert "33:31" in seite
     assert 'class="tvb-erg-score live"' in seite
     assert "sieger" not in seite.split("Handball Club Hamburg")[0][-200:], "kein Sieger beim Zwischenstand"
+
+
+# --- Nachtrag 07.09.2026: die Ergebnisliste der Saison --------------------------------
+#
+# Das erste Saisonspiel fehlte trotz #263: fixture_detail braucht eine
+# Kennung, und die hatte das Spiel nie bekommen - `fixtures` fuehrt keine
+# gespielten Spiele, und im Ribbon-Fenster hatte niemand die Seite geoeffnet.
+# Der "Ergebnisse"-Reiter des Widgets ist derselbe Endpunkt mit dem
+# Widget-Zustand als `state` und liefert ALLE gespielten Spiele der Saison.
+
+import base64
+import json
+import zlib
+
+TAB_STATE = "eJyrVspRslJQSknVdXFV0lFQKgbxkk0SjQ2NTNN0zS3TjHQNDdMMdS0TDS11TdPMky2SjVJTLMzNQYqrQIqDXINDfUKClWoBsksSlA"
+
+
+def _plan(mit_reiter=True, saison="c4a3125f-79f2-11f1-9a19-5f7c8c2ed877"):
+    daten = {"fixtures": [], "seasonId": saison}
+    if mit_reiter:
+        daten["subPageTabs"] = [
+            {"label": "Spielplan", "value": "FIXTURES", "link": "&~w=fl~AAAA"},
+            {"label": "Ergebnisse", "value": "RESULTS", "link": "&~w=fl~" + TAB_STATE},
+        ]
+    return {"data": daten}
+
+
+def _ergebnisliste():
+    return {"data": {"fixtures": [{
+        "competitors": [
+            {"name": "TVB Stuttgart", "isHome": True, "score": "30"},
+            {"name": "Bergischer HC", "isHome": False, "score": "29"},
+        ],
+        "fixtureId": "ddc1d0fb", "startTimeUTC": "2026-08-28T17:00:00",
+        "status": {"label": "Beendet", "value": "CONFIRMED"}, "round": "Spieltag: 1",
+    }]}}
+
+
+def test_zustand_kommt_aus_dem_reiter(modul):
+    assert modul._sr_ergebnis_zustand(_plan()) == TAB_STATE
+
+
+def test_zustand_wird_sonst_aus_der_saison_gebaut(modul):
+    zustand = modul._sr_ergebnis_zustand(_plan(mit_reiter=False))
+    roh = zlib.decompress(base64.urlsafe_b64decode(zustand + "=" * (-len(zustand) % 4)))
+    assert json.loads(roh) == {"l": "de-DE", "s": "c4a3125f-79f2-11f1-9a19-5f7c8c2ed877", "z": "RESULTS"}
+    assert "=" not in zustand
+    assert modul._sr_ergebnis_zustand(_plan(mit_reiter=False, saison=None)) is None
+    assert modul._sr_ergebnis_zustand(None) is None
+
+
+def test_das_erste_saisonspiel_kommt_aus_der_ergebnisliste(modul, monkeypatch):
+    aufrufe = []
+
+    def sr(pfad, embed=248):
+        aufrufe.append((embed, pfad))
+        if embed != 248:
+            return {"data": {"fixtures": []}}
+        if pfad == "fixtures?locale=de-DE":
+            return _plan()
+        if pfad == f"fixtures?locale=de-DE&state={TAB_STATE}":
+            return _ergebnisliste()
+        return {"data": {"fixtures": []}}
+
+    monkeypatch.setattr(modul, "_sr_get", sr)
+    spiele = modul._profi_spiele()
+    assert len(spiele) == 1
+    s = spiele[0]
+    assert s["id"] == "srddc1d0fb"
+    assert (s["heim_tore"], s["gast_tore"]) == (30, 29)
+    assert s["status"] == "Ended" and s["bestaetigt"] == 1
+    assert s["spieltag"] == "1. Spieltag"
+    assert s["anstoss"].startswith("2026-08-28T19:00")
+    assert (248, f"fixtures?locale=de-DE&state={TAB_STATE}") in aufrufe
+    # Reihenfolge: Spielplan, Ergebnisse, Ribbon - je Embed
+    assert [p for e, p in aufrufe if e == 248] == [
+        "fixtures?locale=de-DE", f"fixtures?locale=de-DE&state={TAB_STATE}", "fixtures_ribbon?locale=de-DE"]
+
+
+def test_ohne_reiter_wird_die_liste_nicht_angefragt(modul, monkeypatch):
+    aufrufe = []
+    monkeypatch.setattr(modul, "_sr_get", lambda pfad, embed=248: aufrufe.append(pfad) or {"data": {"fixtures": []}})
+    modul._profi_spiele()
+    assert not any("state=" in p for p in aufrufe)
+
+
+def test_ribbon_zwischenstand_ueberschreibt_keinen_bestaetigten_endstand(modul, monkeypatch):
+    """Dasselbe Spiel: bestaetigt in der Ergebnisliste, danach (verspaetet)
+    als Live im Ribbon - der Endstand bleibt, der Spieltag auch."""
+    def sr(pfad, embed=248):
+        if embed != 248:
+            return {"data": {"fixtures": []}}
+        if pfad == "fixtures?locale=de-DE":
+            return _plan()
+        if "state=" in pfad:
+            return _ergebnisliste()
+        return _ribbon_eintrag(heim="TVB Stuttgart", gast="Bergischer HC", tore=(28, 27),
+                               final=False, live=True, kennung="ddc1d0fb")
+
+    monkeypatch.setattr(modul, "_sr_get", sr)
+    s = modul._profi_spiele()[0]
+    assert (s["heim_tore"], s["gast_tore"], s["status"], s["bestaetigt"]) == (30, 29, "Ended", 1)
+    assert s["spieltag"] == "1. Spieltag"
+
+
+def test_upsert_behaelt_den_spieltag(app, modul, db):
+    _zeile(db, kennung="srddc1d0fb", tore=(30, 29), bestaetigt=1)
+    db["verbindung"].execute("UPDATE tvb_spiele SET spieltag='1. Spieltag' WHERE id='srddc1d0fb'")
+    db["verbindung"].commit()
+    with app.app_context():
+        from teile.kern import get_db
+        modul._tvb_spiele_aktualisieren(get_db(), [{
+            "id": "srddc1d0fb", "team_id": "profis", "spieltag": None, "heim": "TVB Stuttgart",
+            "gast": "Bergischer HC", "heim_tore": 30, "gast_tore": 29,
+            "anstoss": "2026-08-28T19:00:00+02:00", "ort": None, "status": "Ended",
+            "wettbewerb": "Opel HBL", "bestaetigt": 1,
+        }])
+    assert db["verbindung"].execute(
+        "SELECT spieltag FROM tvb_spiele WHERE id='srddc1d0fb'").fetchone()["spieltag"] == "1. Spieltag"

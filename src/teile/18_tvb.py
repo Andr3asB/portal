@@ -77,11 +77,13 @@ für sie wieder Spiele gibt - ohne Codeänderung.
 - #190: `tvb_quellen` hält fest, wann eine Quelle zuletzt wirklich lieferte;
   die Seite warnt nach 3 Tagen und bremst nach einem Fehlschlag 30 Minuten.
 """
+import base64
 import json
 import re
 import time
 import urllib.error
 import urllib.request
+import zlib
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -701,10 +703,17 @@ def _sr_spiel(eintrag, wettbewerb):
         status = "Live"
     else:
         status = "Ended" if hat_tore else "Pre"
+    # Die Ergebnisliste nennt den Spieltag als Text ("Spieltag: 3"), der
+    # Ribbon gar nicht. Gleiche Schreibweise wie bei handball.net.
+    runde = partie.get("round")
+    spieltag = None
+    if isinstance(runde, str) and runde.lower().startswith("spieltag"):
+        nummer = to_int(runde.split(":", 1)[1].strip()) if ":" in runde else None
+        spieltag = f"{nummer}. Spieltag" if nummer else None
     return {
         "id":         f"sr{kennung}",
         "team_id":    _PROFI_TEAM_ID,
-        "spieltag":   None,
+        "spieltag":   spieltag,
         "heim":       heim.get("name") or "?",
         "gast":       gast.get("name") or "?",
         "heim_tore":  tore_heim,
@@ -792,20 +801,58 @@ def _profi_spiele():
     Spiel in tvb_spiele stehen."""
     spiele = {}
     for embed, wettbewerb in _SR_EMBEDS.items():
-        for pfad in ("fixtures?locale=de-DE", "fixtures_ribbon?locale=de-DE"):
-            antwort = _sr_get(pfad, embed=embed)
+        plan = _sr_get("fixtures?locale=de-DE", embed=embed)
+        antworten = [plan]
+        # Wunsch #263, Nachtrag (07.09.2026): Der "Ergebnisse"-Reiter des
+        # Widgets ist derselbe Endpunkt mit dem Widget-Zustand als `state` -
+        # und liefert ALLE gespielten Spiele der Saison mit Endstand. Damit
+        # bekommt auch ein Spiel eine Kennung, das nie im Ribbon-Fenster
+        # gesehen wurde (das erste Saisonspiel fehlte genau deshalb).
+        zustand = _sr_ergebnis_zustand(plan)
+        if zustand:
+            antworten.append(_sr_get(f"fixtures?locale=de-DE&state={zustand}", embed=embed))
+        antworten.append(_sr_get("fixtures_ribbon?locale=de-DE", embed=embed))
+        for antwort in antworten:
             for eintrag in ((antwort or {}).get("data") or {}).get("fixtures") or []:
                 spiel = _sr_spiel(eintrag, wettbewerb)
                 if not spiel:
                     continue
-                # Dasselbe Spiel kommt aus beiden Endpunkten. Die Fassung MIT
+                # Dasselbe Spiel kommt aus mehreren Endpunkten. Die Fassung MIT
                 # Ergebnis gewinnt - sonst ueberschriebe der reine Spielplan
-                # ein gerade eingesammeltes Resultat wieder mit None.
+                # ein gerade eingesammeltes Resultat wieder mit None - und ein
+                # bestaetigter Endstand wird nicht von einem Zwischenstand
+                # ersetzt (#264). Der Spieltag bleibt stehen, wenn die neuere
+                # Fassung keinen kennt (der Ribbon nennt keinen).
                 vorher = spiele.get(spiel["id"])
-                if vorher and vorher["heim_tore"] is not None and spiel["heim_tore"] is None:
-                    continue
+                if vorher:
+                    if vorher["heim_tore"] is not None and spiel["heim_tore"] is None:
+                        continue
+                    if vorher["bestaetigt"] and not spiel["bestaetigt"]:
+                        continue
+                    if spiel["spieltag"] is None:
+                        spiel["spieltag"] = vorher["spieltag"]
                 spiele[spiel["id"]] = spiel
     return list(spiele.values())
+
+
+def _sr_ergebnis_zustand(plan):
+    """Wunsch #263, Nachtrag: Der Widget-Zustand fuer den Ergebnisse-Reiter.
+
+    Die `fixtures`-Antwort traegt in `subPageTabs` den Link des Reiters
+    (`&~w=fl~<zlib+base64>`); der Teil nach `fl~` ist genau der Wert, den
+    der Endpunkt als `state` versteht. Fehlt der Reiter, wird der Zustand
+    aus der Saison-Kennung selbst gebaut ({"l","s","z":"RESULTS"}, zlib,
+    base64 ohne Fuellzeichen) - so ist er entstanden, nachgeprueft am
+    07.09.2026. None, wenn beides fehlt."""
+    daten = (plan or {}).get("data") or {}
+    for reiter in daten.get("subPageTabs") or []:
+        if isinstance(reiter, dict) and reiter.get("value") == "RESULTS" and "fl~" in str(reiter.get("link") or ""):
+            return str(reiter["link"]).split("fl~", 1)[1]
+    saison = daten.get("seasonId")
+    if not saison:
+        return None
+    roh = json.dumps({"l": "de-DE", "s": saison, "z": "RESULTS"}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(zlib.compress(roh)).decode().rstrip("=")
 
 
 
@@ -828,7 +875,7 @@ def _tvb_spiele_aktualisieren(db, spiele):
             INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, wettbewerb, bestaetigt, aktualisiert_am)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
-                spieltag=excluded.spieltag,
+                spieltag=COALESCE(excluded.spieltag, tvb_spiele.spieltag),
                 heim_tore=CASE WHEN tvb_spiele.bestaetigt=1 AND excluded.bestaetigt=0
                                THEN tvb_spiele.heim_tore ELSE excluded.heim_tore END,
                 gast_tore=CASE WHEN tvb_spiele.bestaetigt=1 AND excluded.bestaetigt=0
