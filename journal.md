@@ -2,6 +2,59 @@
 
 ---
 
+## 2026-09-06 – portal-v244: #261 Aufgaben-Ziel als Chip-Band, #265 Spielerprofile
+
+### #261 – „User-Dropdown und Rollen-Auswahl sieht komisch aus"
+
+Die Karte hatte drei Bauarten übereinander: eine Radio-Zeile
+(Person/Rolle(n)/Alle), darunter je nach Wahl eine Auswahlliste oder
+Kästchen, daneben „Privat". Und Andis zweiter Punkt stimmt zur Hälfte: In
+der Auswahlliste stand „Für mich" **und** die eigene Person noch einmal mit
+Namen – als Andi konnte man „Für mich" oder „→ Andi" wählen, dasselbe Ziel
+zweimal. Das war der Unsinn. „Für mich" selbst bleibt sinnvoll (jeder legt
+sich die meisten Aufgaben selbst an, und es ist der Standard); nur die
+Dopplung ist weg.
+
+Jetzt ein einziges Band aus Chips, dieselben wie im Filter: **Ich**, die
+anderen Personen, die Rollen (in Mehrzahl: Eltern / Kinder / Gäste), Alle,
+Privat. Das Formularfeld sitzt unsichtbar im Label (Radio bzw. Checkbox),
+der Chip färbt sich über `:has(:checked)`, der Fokusring über
+`:has(:focus-visible)`. `ziel_typ` ist ein verstecktes Feld, das
+`zielGewaehlt()` aus dem Angehakten ableitet – Person oder Alle schließen
+die Rollen aus und umgekehrt, ohne Wahl fällt es auf „Ich" zurück. Die
+Feldnamen sind unverändert, `neu`/`bearbeiten` und alle ihre Tests ebenso;
+Liste und Brett teilen das Makro weiterhin (#225). 7 neue Tests.
+
+### #265 – Spielerprofile
+
+Kein JSON-Endpunkt weit und breit: der Sportradar-Embed hat keinen
+Spieler-Endpunkt (elf Namen durchprobiert), die HPI-API nur den Index. Die
+Spielerseite der Liga (`opel-hbl.de/de/player/<dc_id>`) ist eine Nuxt-Seite
+und liefert ihre Daten serverseitig als **devalue-Nutzlast** im
+`__NUXT_DATA__`-Skript mit – ein flaches Array, in dem Objekte ihre Kinder
+über Indizes referenzieren, Sonderformen wie `["Date", "…"]` wörtlich. Darin
+steckt alles: Steckbrief (Geburtstag, Alter, Position, Nation, Größe,
+Gewicht), Statistik je Wettbewerb (Spiele, Tore, 7m, Karten, Zeitstrafen;
+bei Torhütern Paraden/Gegentore) und die Laufbahn Verein für Verein, Saison
+für Saison. Die Seite ist ~1,5 MB – deshalb je Spieler 24 h Cache
+(`tvb_spieler_profile`) und nur auf Knopfdruck, nie im Rutsch für alle.
+
+Die HPI-API liefert die Sportradar-Kennung (`dc_id`) je Spieler mit;
+`tvb_kader` merkt sie sich, der Name im Kader wird zum Link. Die Kennung
+geht in den Pfad der Fremdanfrage und wird deshalb gegen das UUID-Muster
+geprüft (404 sonst, Test mit `..`, Bruchstück, Pfadanhang). Fotos kämen von
+`images.dc.connect.sportradar.com` – bewusst nicht eingebunden (#119, ein
+Test wacht darüber). Ist die Liga-Seite nicht erreichbar, steht der alte
+Stand mit Hinweis, ohne Cache eine freundliche Meldung. Der Kader-Cache
+wird mit der Migration einmalig geleert, damit die Links sofort da sind.
+15 Tests, darunter der Parser gegen eine nachgebaute devalue-Nutzlast –
+der Test hat den ersten Fehler gleich gefunden: `["Date", …]` steht
+wörtlich im Array, nicht als Index-Paar.
+
+Ein Wächter hat außerdem angeschlagen: `.sp-feld-label` galt
+`test_tippflaeche` als Formularfeld-Klasse („feld") mit 12 px. Umbenannt
+statt ausgenommen – der Wächter hatte recht, so heißen die Feld-Klassen.
+
 ## 2026-09-06 – portal-v243: #263/#264 – Bundesliga-Ergebnisse nachladen, Zwischenstand ist kein Endstand
 
 Andi: „Kann man da wirklich die alten Spiele nicht mehr laden? Das müsste

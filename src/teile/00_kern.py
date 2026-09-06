@@ -393,6 +393,14 @@ CREATE TABLE IF NOT EXISTS tvb_quellen (
   zuletzt_versuch TEXT,
   letzter_fehler  TEXT
 );
+-- Wunsch #265: Spielerprofil (Steckbrief, Laufbahn) von der Liga-Seite,
+-- je Spieler als JSON, hoechstens einen Tag alt. Schluessel ist die
+-- Sportradar-Kennung, die auch die HPI-API kennt (tvb_kader.dc_id).
+CREATE TABLE IF NOT EXISTS tvb_spieler_profile (
+  dc_id           TEXT PRIMARY KEY,
+  daten           TEXT NOT NULL,
+  aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
   vorname         TEXT    NOT NULL,
@@ -2174,6 +2182,20 @@ def _init_db(app):
         try:
             db.execute(
                 "ALTER TABLE tvb_spiele ADD COLUMN bestaetigt INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
+        # Wunsch #265: Spielerprofile. Die Liga-Seite kennt den Spieler unter
+        # seiner Sportradar-Kennung (dc_id), die HPI-API liefert sie mit -
+        # tvb_kader merkt sie sich, damit der Kader zum Profil verlinken
+        # kann. Der Kader ist ein 6-h-Cache und wird komplett neu gefuellt,
+        # die Spalte fuellt sich also von selbst.
+        try:
+            db.execute("ALTER TABLE tvb_kader ADD COLUMN dc_id TEXT")
+            # Der Cache haelt 6 h - einmalig leeren, damit die Links nicht
+            # erst am Abend erscheinen (gleiches Muster wie #124).
+            db.execute("DELETE FROM tvb_kader")
             db.commit()
         except sqlite3.OperationalError:
             pass

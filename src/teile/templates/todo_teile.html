@@ -55,20 +55,22 @@
   border-radius:10px; padding:10px 16px; font-size:20px; cursor:pointer;
   min-width:48px;
 }
-.todo-options { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.todo-select {
-  border:1.5px solid var(--border); border-radius:8px; padding:7px 10px;
-  font-size:16px; background:var(--surface); color:var(--text); flex:1; min-width:120px;
-}
-.ziel-typ-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
-.ziel-typ-radio { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--text-2); }
-.ziel-typ-radio input { width:16px; height:16px; }
-.ziel-detail { flex:1; min-width:120px; }
-.rollen-row { display:flex; gap:10px; flex-wrap:wrap; }
-.rolle-chip { display:flex; align-items:center; gap:5px; font-size:14px; color:var(--text-2); }
-.rolle-chip input { width:16px; height:16px; }
-.privat-row { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text-2); }
-.privat-row input { width:18px; height:18px; }
+/* Wunsch #261: EIN Chip-Band fuer das Ziel - Ich, die anderen Personen,
+   die Rollen, Alle - plus der Privat-Chip. Dieselben Chips wie im Filter,
+   damit die Karte nicht nach drei verschiedenen Formularen aussieht. Das
+   eigentliche Formularfeld sitzt unsichtbar IM Label (Radio bzw. Checkbox),
+   der Chip faerbt sich ueber :has(:checked); Fokusring ueber :has(:focus-
+   visible), weil das Feld selbst nicht sichtbar ist. */
+.ziel-label { font-size:12px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; margin:2px 0 6px; }
+.ziel-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ziel-chip { display:inline-flex; align-items:center; gap:6px; position:relative; }
+.ziel-chip input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
+.ziel-chip:has(input:checked) { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.ziel-chip:has(input:focus-visible) { outline:2px solid var(--farbe); outline-offset:2px; }
+.ziel-chip.rolle { border-style:dashed; }
+.ziel-chip.rolle:has(input:checked) { border-style:solid; }
+.ziel-trenner { width:1px; height:22px; background:var(--border); margin:0 2px; }
+.ziel-privat { margin-left:auto; }
 .todo-edit-panel {
   display:none; flex-direction:column; gap:8px; margin-top:10px;
   padding-top:10px; border-top:1px solid var(--border);
@@ -99,37 +101,33 @@
 {% endmacro %}
 
 
-{# --- Ziel: Person / Rolle(n) / Alle (Wunsch #39, #43) -------------------- #}
+{# --- Ziel: Ich / Person / Rolle(n) / Alle (Wunsch #39, #43, #261) ----------
+   Seit #261 ein einziges Chip-Band statt Radio-Zeile + Auswahlliste +
+   Kaestchen. Die Formularfelder heissen weiter ziel_typ / zugewiesen_an /
+   rollen / privat - die Routen `neu` und `bearbeiten` bleiben unveraendert.
+   "Ich" ist zugewiesen_an="" (wie bisher "Fuer mich"); die eigene Person
+   steht NICHT noch einmal als Chip - genau die Dopplung ("fuer mich" UND
+   "an Andi", wenn Andi eingeloggt ist) war der Anstoss. ziel_typ pflegt das
+   Skript (zielGewaehlt) aus dem, was angehakt ist. #}
 {% macro ziel_auswahl(users, rollen, rollen_labels, aktueller_user_id, vorbelegt_zugewiesen_an=None, vorbelegte_rollen=None, vorbelegt_privat=False) %}
 {% set ziel_typ_aktuell = 'alle' if vorbelegte_rollen == 'alle' else ('rollen' if vorbelegte_rollen else 'person') %}
 {% set gewaehlte_rollen = vorbelegte_rollen.split(',') if vorbelegte_rollen and vorbelegte_rollen != 'alle' else [] %}
+{% set mehrzahl = {'eltern': 'Eltern', 'kind': 'Kinder', 'gast': 'Gäste'} %}
+{% set ich_gewaehlt = ziel_typ_aktuell == 'person' and (not vorbelegt_zugewiesen_an or vorbelegt_zugewiesen_an == aktueller_user_id) %}
 <div class="ziel-wrap">
-  <div class="ziel-typ-row">
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="person" {% if ziel_typ_aktuell == 'person' %}checked{% endif %} data-aendern="updateZielTyp"> Person</label>
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="rollen" {% if ziel_typ_aktuell == 'rollen' %}checked{% endif %} data-aendern="updateZielTyp"> Rolle(n)</label>
-    <label class="ziel-typ-radio"><input type="radio" name="ziel_typ" value="alle" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %} data-aendern="updateZielTyp"> Alle</label>
-  </div>
-  <div class="todo-options">
-    <div class="ziel-person ziel-detail" {% if ziel_typ_aktuell != 'person' %}style="display:none"{% endif %}>
-      <select aria-label="Zuweisen an" class="todo-select" name="zugewiesen_an">
-        <option value="" {% if not vorbelegt_zugewiesen_an %}selected{% endif %}>Für mich</option>
-        {% for u in users %}
-        <option value="{{ u.id }}"
-          {% if u.id == vorbelegt_zugewiesen_an %}selected{% endif %}
-          {% if u.id == aktueller_user_id %}style="font-weight:600"{% endif %}>
-          → {{ u.name }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="ziel-rollen ziel-detail rollen-row" {% if ziel_typ_aktuell != 'rollen' %}style="display:none"{% endif %}>
-      {% for r in rollen %}
-      <label class="rolle-chip"><input type="checkbox" name="rollen" value="{{ r }}" {% if r in gewaehlte_rollen %}checked{% endif %}> {{ rollen_labels[r] }}</label>
-      {% endfor %}
-    </div>
-    <label class="privat-row">
-      <input type="checkbox" name="privat" {% if vorbelegt_privat %}checked{% endif %}> 🔒 Privat
-    </label>
+  <input type="hidden" name="ziel_typ" value="{{ ziel_typ_aktuell }}">
+  <div class="ziel-label">Für wen?</div>
+  <div class="ziel-row">
+    <label class="chip-btn ziel-chip"><input type="radio" name="zugewiesen_an" value="" data-ziel-typ="person" data-aendern="zielGewaehlt" {% if ich_gewaehlt %}checked{% endif %}>Ich</label>
+    {% for u in users if u.id != aktueller_user_id %}
+    <label class="chip-btn ziel-chip"><input type="radio" name="zugewiesen_an" value="{{ u.id }}" data-ziel-typ="person" data-aendern="zielGewaehlt" {% if ziel_typ_aktuell == 'person' and u.id == vorbelegt_zugewiesen_an %}checked{% endif %}>{{ u.name }}</label>
+    {% endfor %}
+    <span class="ziel-trenner" aria-hidden="true"></span>
+    {% for r in rollen %}
+    <label class="chip-btn ziel-chip rolle"><input type="checkbox" name="rollen" value="{{ r }}" data-ziel-typ="rolle" data-aendern="zielGewaehlt" {% if r in gewaehlte_rollen %}checked{% endif %}>{{ mehrzahl.get(r, rollen_labels[r]) }}</label>
+    {% endfor %}
+    <label class="chip-btn ziel-chip rolle"><input type="radio" name="ziel_alle" value="alle" data-ziel-typ="alle" data-aendern="zielGewaehlt" {% if ziel_typ_aktuell == 'alle' %}checked{% endif %}>Alle</label>
+    <label class="chip-btn ziel-chip ziel-privat"><input type="checkbox" name="privat" {% if vorbelegt_privat %}checked{% endif %}>🔒 Privat</label>
   </div>
 </div>
 {% endmacro %}
@@ -354,13 +352,32 @@ function toggleVerlauf(id) {
   if (v) v.style.display = v.style.display === 'flex' ? 'none' : 'flex';
 }
 
-// Wunsch #39: Ziel Person/Rolle(n)/Alle umschalten. Über closest('.ziel-wrap')
-// statt IDs skopiert, damit dieselbe Markup-Struktur im Neu-Formular UND in
-// jedem Bearbeiten-Panel unabhängig voneinander funktioniert (Wunsch #43).
-function updateZielTyp(radio) {
-  const wrap = radio.closest('.ziel-wrap');
-  const typ  = wrap.querySelector('input[name="ziel_typ"]:checked').value;
-  wrap.querySelector('.ziel-person').style.display = typ === 'person' ? '' : 'none';
-  wrap.querySelector('.ziel-rollen').style.display  = typ === 'rollen' ? 'flex' : 'none';
+// Wunsch #39/#261: Das Chip-Band pflegt das versteckte Feld ziel_typ.
+// Person oder Alle schliessen die Rollen aus (und umgekehrt) - eine Aufgabe
+// hat GENAU EIN Ziel. Ohne jede Wahl faellt es auf "Ich" zurueck. Ueber
+// closest('.ziel-wrap') statt IDs skopiert, damit dieselbe Markup-Struktur im
+// Neu-Formular UND in jedem Bearbeiten-Panel unabhaengig funktioniert (#43).
+function zielGewaehlt(feld) {
+  const wrap = feld.closest('.ziel-wrap');
+  const typFeld = wrap.querySelector('input[name="ziel_typ"]');
+  const typ = feld.dataset.zielTyp;
+  const rollen = [...wrap.querySelectorAll('input[name="rollen"]')];
+  const personen = [...wrap.querySelectorAll('input[name="zugewiesen_an"]')];
+  const alle = wrap.querySelector('input[name="ziel_alle"]');
+  if (typ === 'person') {
+    rollen.forEach(c => { c.checked = false; });
+    if (alle) alle.checked = false;
+    typFeld.value = 'person';
+  } else if (typ === 'alle') {
+    rollen.forEach(c => { c.checked = false; });
+    personen.forEach(r => { r.checked = false; });
+    typFeld.value = 'alle';
+  } else {
+    personen.forEach(r => { r.checked = false; });
+    if (alle) alle.checked = false;
+    const eine = rollen.some(c => c.checked);
+    typFeld.value = eine ? 'rollen' : 'person';
+    if (!eine) personen.find(r => r.value === '').checked = true;
+  }
 }
 {% endmacro %}

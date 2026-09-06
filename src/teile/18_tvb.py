@@ -1107,13 +1107,15 @@ def _kader_speichern(db, saison_name, spieler_roh):
         db.execute("""
             INSERT INTO tvb_kader(spieler_id, vorname, nachname, position,
                                   hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend,
-                                  spieltage, aktionen, saison_name, aktualisiert_am)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+                                  spieltage, aktionen, saison_name, dc_id, aktualisiert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
         """, (
             s.get("id"), s.get("firstname") or "", s.get("lastname") or "",
             s.get("position"),
             index.get("avg"), index.get("max"), index.get("last"), index.get("trend"),
             index.get("matchdays"), index.get("events"), saison_name,
+            # Wunsch #265: nur eine echte Sportradar-Kennung wird verlinkt.
+            s.get("dc_id") if _DC_ID.match(str(s.get("dc_id") or "")) else None,
         ))
     db.commit()
 
@@ -1167,6 +1169,195 @@ def kader(token):
         gruppen=gruppen,
         saison_name=saison_zeile["saison_name"] if saison_zeile else None,
         anzahl=sum(len(g["spieler"]) for g in gruppen),
+    )
+
+
+# --- Wunsch #265: Spielerprofile -------------------------------------------
+#
+# Die HPI-API kennt je Spieler nur den Index. Steckbrief und Laufbahn stehen
+# auf der Spielerseite der Liga (opel-hbl.de/de/player/<dc_id>) - eine
+# Nuxt-Seite, die ihre Daten serverseitig als "devalue"-Nutzlast in einem
+# <script id="__NUXT_DATA__"> mitliefert: ein flaches Array, in dem Objekte
+# ihre Kinder ueber Indizes referenzieren. Kein JSON-Endpunkt, den man
+# direkt fragen koennte (Sportradar-Embed: kein Spieler-Endpunkt, HPI: nur
+# der Index); die Seite ist ~1,5 MB gross, deshalb je Spieler ein Tag Cache
+# und nur auf Knopfdruck. Fotos kommen von images.dc.connect.sportradar.com
+# und werden bewusst NICHT eingebunden (kein fremder Host im Frontend, #119).
+_PROFIL_BASIS = "https://www.opel-hbl.de/de/player/"
+_PROFIL_MAX_ALTER_STUNDEN = 24
+_DC_ID = re.compile(r"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
+
+_PROFIL_POSITIONEN = {
+    "GK": "Tor", "LW": "Linksaußen", "LB": "Rückraum links", "CB": "Rückraum Mitte",
+    "RB": "Rückraum rechts", "RW": "Rechtsaußen", "P": "Kreisläufer",
+}
+_NATIONEN = {
+    "DEU": "Deutschland", "GER": "Deutschland", "AUT": "Österreich", "SUI": "Schweiz",
+    "CHE": "Schweiz", "DNK": "Dänemark", "DEN": "Dänemark", "SWE": "Schweden",
+    "NOR": "Norwegen", "ISL": "Island", "FIN": "Finnland", "ESP": "Spanien",
+    "FRA": "Frankreich", "PRT": "Portugal", "POR": "Portugal", "NLD": "Niederlande",
+    "NED": "Niederlande", "BEL": "Belgien", "POL": "Polen", "CZE": "Tschechien",
+    "SVK": "Slowakei", "HUN": "Ungarn", "HRV": "Kroatien", "CRO": "Kroatien",
+    "SVN": "Slowenien", "SLO": "Slowenien", "SRB": "Serbien", "BIH": "Bosnien-Herzegowina",
+    "MNE": "Montenegro", "MKD": "Nordmazedonien", "ROU": "Rumänien", "UKR": "Ukraine",
+    "LTU": "Litauen", "EGY": "Ägypten", "TUN": "Tunesien", "BRA": "Brasilien",
+    "ARG": "Argentinien", "JPN": "Japan", "KOR": "Südkorea", "QAT": "Katar",
+    "GRC": "Griechenland", "ITA": "Italien", "LUX": "Luxemburg",
+}
+
+
+def _profil_html_holen(dc_id):
+    """Die Spielerseite der Liga als Text - oder None."""
+    req = urllib.request.Request(
+        f"{_PROFIL_BASIS}{dc_id}",
+        headers={"User-Agent": _UA, "Accept": "text/html"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except Exception:
+        return None
+
+
+def _devalue(arr, index, tiefe=0, gesehen=frozenset()):
+    """Einen Knoten der devalue-Nutzlast aufloesen (Indizes -> Werte).
+    Sonderformen wie ["Date", i] werden auf ihren Inhalt reduziert."""
+    if not isinstance(index, int) or index < 0 or index >= len(arr):
+        return index
+    if index in gesehen or tiefe > 16:
+        return None
+    wert = arr[index]
+    weiter = gesehen | {index}
+    if isinstance(wert, list):
+        if wert and isinstance(wert[0], str) and wert[0] in (
+                "Date", "Set", "Map", "NaN", "undefined", "Infinity", "-Infinity", "BigInt"):
+            return _devalue(arr, wert[1], tiefe + 1, weiter) if len(wert) > 1 else None
+        return [_devalue(arr, x, tiefe + 1, weiter) for x in wert]
+    if isinstance(wert, dict):
+        return {k: _devalue(arr, v, tiefe + 1, weiter) for k, v in wert.items()}
+    return wert
+
+
+def _zahl(wert):
+    return to_int(wert) if wert is not None and wert != "" else None
+
+
+def _profil_statistik(roh):
+    """Die Zaehler einer Saison/Station/Liga in unsere Feldnamen."""
+    roh = roh or {}
+    return {
+        "spiele":     _zahl(roh.get("played")),
+        "tore":       _zahl(roh.get("goals")),
+        "siebenmeter": _zahl(roh.get("7mGoals")),
+        "gelb":       _zahl(roh.get("yellowCards")),
+        "zeitstrafen": _zahl(roh.get("sinBins")),
+        "rot":        _zahl(roh.get("redCards")),
+        "paraden":    _zahl(roh.get("goalKeeperShotsSaved")),
+        "gegentore":  _zahl(roh.get("goalKeeperGoalsAgainst")),
+    }
+
+
+def _spieler_profil_aus_html(html):
+    """Steckbrief und Laufbahn aus der Spielerseite der Liga - oder None."""
+    if not html:
+        return None
+    treffer = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+    if not treffer:
+        return None
+    try:
+        arr = json.loads(treffer.group(1))
+    except ValueError:
+        return None
+    if not isinstance(arr, list):
+        return None
+    for i, knoten in enumerate(arr):
+        if isinstance(knoten, dict) and {"header", "overview", "career"} <= set(knoten):
+            daten = _devalue(arr, i)
+            break
+    else:
+        return None
+    kopf = daten.get("header") or {}
+    info = (daten.get("overview") or {}).get("info") or {}
+    laufbahn = daten.get("career") or {}
+    kontext = daten.get("context") or {}
+    if not kopf.get("playerFamilyName") and not kopf.get("playerFullName"):
+        return None
+    geburtstag = str(info.get("birthday") or "")[:10] or None
+    position = info.get("position")
+    stationen = []
+    for eintrag in laufbahn.get("perTeam") or []:
+        verein = (eintrag or {}).get("team") or {}
+        stationen.append({
+            "verein":  verein.get("name") or "?",
+            "aktuell": bool(verein.get("teamId")) and verein.get("teamId") == kontext.get("currentTeamId"),
+            "gesamt":  _profil_statistik(eintrag.get("totals")),
+            "saisons": [{"name": s.get("seasonName") or "", **_profil_statistik(s)}
+                        for s in (eintrag.get("seasons") or [])],
+        })
+    ligen = [{"liga": t.get("leagueName") or "?", "saisons": _zahl(t.get("seasonCount")),
+              **_profil_statistik(t)} for t in (laufbahn.get("totals") or [])]
+    return {
+        "vorname":    kopf.get("playerGivenName") or "",
+        "nachname":   kopf.get("playerFamilyName") or "",
+        "name":       kopf.get("playerFullName") or f"{kopf.get('playerGivenName', '')} {kopf.get('playerFamilyName', '')}".strip(),
+        "nummer":     kopf.get("bib") or None,
+        "verein":     kopf.get("teamName") or None,
+        "position":   _PROFIL_POSITIONEN.get(position, position) if position else None,
+        "geburtstag": geburtstag,
+        "alter":      _zahl(info.get("age")),
+        "nation":     _NATIONEN.get(info.get("nationality"), info.get("nationality")) if info.get("nationality") else None,
+        "groesse":    _zahl(info.get("height")),
+        "gewicht":    _zahl(info.get("weight")),
+        "ligen":      ligen,
+        "stationen":  stationen,
+        "torwart":    position == "GK",
+    }
+
+
+def _spieler_profil(db, dc_id):
+    """Profil aus dem Cache oder frisch von der Liga-Seite. Gibt
+    (profil, veraltet) zurueck: veraltet=True, wenn nur ein alter Stand da
+    ist, weil die Seite gerade nicht erreichbar war."""
+    zeile = db.execute(
+        "SELECT daten, aktualisiert_am > datetime('now', ?) AS frisch "
+        "FROM tvb_spieler_profile WHERE dc_id=?",
+        (f"-{_PROFIL_MAX_ALTER_STUNDEN} hours", dc_id)).fetchone()
+    if zeile and zeile["frisch"]:
+        return json.loads(zeile["daten"]), False
+    profil = _spieler_profil_aus_html(_profil_html_holen(dc_id))
+    if profil:
+        db.execute("""
+            INSERT INTO tvb_spieler_profile(dc_id, daten, aktualisiert_am)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(dc_id) DO UPDATE SET daten=excluded.daten,
+                                             aktualisiert_am=excluded.aktualisiert_am
+        """, (dc_id, json.dumps(profil, ensure_ascii=False)))
+        db.commit()
+        return profil, False
+    if zeile:
+        return json.loads(zeile["daten"]), True
+    return None, False
+
+
+@bp.route("/a/tvb/kader/<dc_id>", defaults={"token": None})
+@bp.route("/a/tvb/<token>/kader/<dc_id>")
+def spieler(token, dc_id):
+    """Wunsch #265: Steckbrief, Statistik und Laufbahn eines Spielers."""
+    user = check_grant(token, APP)
+    if not user:
+        return render_template("denied.html", reason="invalid"), 403
+    # Die Kennung geht in den Pfad der Fremdanfrage - nur das UUID-Muster.
+    if not _DC_ID.match(dc_id or ""):
+        return render_template("denied.html", reason="invalid"), 404
+    db = get_db()
+    profil, veraltet = _spieler_profil(db, dc_id)
+    kader = db.execute(
+        "SELECT vorname, nachname, position, hpi_schnitt, hpi_letzter, hpi_trend, "
+        "spieltage, aktionen, saison_name FROM tvb_kader WHERE dc_id=?", (dc_id,)).fetchone()
+    return render_template("tvb_spieler.html",
+        user=user, token=token, farbe=user["farbe"],
+        profil=profil, veraltet=veraltet, kader=dict(kader) if kader else None,
+        positionen=dict(_POSITIONEN),
     )
 
 

@@ -19,6 +19,11 @@
 .kader-spieler:last-child { border-bottom:none; }
 .kader-name { flex:1; min-width:0; font-size:15px; word-break:break-word; }
 .kader-vorname { color:var(--text-2); font-weight:400; }
+/* Wunsch #265: der Name fuehrt zum Spielerprofil - als Link mit Pfeil,
+   damit man ihm ansieht, dass dahinter etwas ist. */
+.kader-link { color:inherit; text-decoration:none; display:inline-block; }
+.kader-link strong { color:var(--farbe-kontrast); }
+.kader-link::after { content:" ›"; color:var(--text-2); }
 .kader-werte { display:flex; gap:14px; flex-shrink:0; text-align:right; }
 .kader-wert-label { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
 .kader-wert { font-size:15px; font-weight:700; white-space:nowrap; }
@@ -61,7 +66,11 @@
       {% for s in gruppe.spieler %}
       <div class="kader-spieler">
         <div class="kader-name">
+          {% if s.dc_id %}
+          <a class="knopf kader-link" href="/a/tvb{{ tp }}kader/{{ s.dc_id }}"><span class="kader-vorname">{{ s.vorname }}</span> <strong>{{ s.nachname }}</strong></a>
+          {% else %}
           <span class="kader-vorname">{{ s.vorname }}</span> <strong>{{ s.nachname }}</strong>
+          {% endif %}
           <div class="kader-details">
             {{ s.spieltage }} Spieltage · {{ s.aktionen }} Aktionen
           </div>
@@ -95,6 +104,7 @@
       „HPI" ist der Saisonschnitt, „Zuletzt" der Wert vom letzten Spieltag mit
       Pfeil für den Trend. Werte verschiedener Positionen lassen sich nur
       bedingt vergleichen, deshalb die Gruppierung nach Position.
+      Ein Tipp auf den Namen öffnet Steckbrief, Statistik und Laufbahn.
     </div>
   {% endif %}
 

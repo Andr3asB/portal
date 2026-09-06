@@ -430,6 +430,13 @@ teile/
   todo_teile.html    – GETEILTE Bausteine von Liste und Brett (#225): CSS,
                        Neu-Formular, Filterkarte, Ziel-Auswahl,
                        Bearbeiten-Panel und das gemeinsame JavaScript.
+                       Ziel-Auswahl seit #261 EIN Chip-Band (Ich, andere
+                       Personen, Rollen in Mehrzahl, Alle, Privat): Radio/
+                       Checkbox unsichtbar IM Label, Chip faerbt sich ueber
+                       :has(:checked), ziel_typ ist ein verstecktes Feld,
+                       das zielGewaehlt() pflegt; die eigene Person steht
+                       nicht noch einmal mit Namen. Felder unveraendert
+                       (ziel_typ, zugewiesen_an, rollen, privat).
                        Einbinden IMMER mit `with context`, sonst kennen die
                        Makros `tp` nicht und die Formular-Adressen sind falsch.
                        Warum geteilt und nicht kopiert: Zwei Fassungen
@@ -1091,7 +1098,21 @@ teile/
                        in _tvb_spiele_aktualisieren() laesst einen
                        bestaetigten Stand nie durch einen unbestaetigten
                        ersetzen und uebernimmt den Anwurf immer (Verlegungen,
-                       Zeitkorrektur). Reiner Anzeige-Modus (keine
+                       Zeitkorrektur). Wunsch #265 (06.09.2026):
+                       /kader/<dc_id> zeigt das Spielerprofil - Steckbrief,
+                       HPI der Saison aus tvb_kader, Statistik je
+                       Wettbewerb, Laufbahn Verein fuer Verein. Quelle ist
+                       die Spielerseite der Liga (kein JSON-Endpunkt: der
+                       Sportradar-Embed hat keinen Spieler-Endpunkt, HPI nur
+                       den Index); _spieler_profil_aus_html() liest die
+                       devalue-Nutzlast (_devalue: flaches Array, Kinder als
+                       Indizes, Sonderformen wie ["Date", ...]), _spieler_
+                       profil() cached 24 h in tvb_spieler_profile. dc_id
+                       wird VOR dem Fremdabruf gegen das UUID-Muster
+                       geprueft (sie geht in den Pfad). Bewusst ohne
+                       Spielerfoto (fremder Host, #119); Positions- und
+                       Nationen-Codes werden uebersetzt, Unbekanntes bleibt
+                       als Code stehen. Reiner Anzeige-Modus (keine
                        Nutzereingaben). Daten kommen live per On-the-fly-
                        Abruf (urllib, kein neues pip-Paket, Timeout 8s,
                        "fehler"-Flag statt Crash - gleiches Muster wie
@@ -1832,7 +1853,8 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
 | `tvb_quellen` | quelle (PK, `mannschaften` oder `liga_id`), zuletzt_ok (letzter WIRKLICH geglückter Abruf – NULL heißt: seit Bestehen der Tabelle keiner), zuletzt_versuch, letzter_fehler (NULL = zuletzt hat es geklappt) – Wunsch #190: macht das stille Veralten der beiden HTML-Quellen sichtbar und bremst nach einem Fehlschlag 30 Min. „Erreichbar" zählt bewusst **nicht** als Erfolg: eine Seite, die 200 liefert, in der die Liga-ID aber fehlt, gilt als Fehler – genau so sieht ein Relaunch aus |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
-| `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
+| `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, dc_id (Wunsch #265 – Sportradar-Kennung des Spielers aus der HPI-Antwort, nur wenn sie dem UUID-Muster entspricht; Schlüssel fürs Profil), aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
+| `tvb_spieler_profile` | dc_id (PK), daten (JSON: name, nummer, verein, position, geburtstag, alter, nation, groesse, gewicht, ligen[], stationen[] mit saisons[], torwart), aktualisiert_am – Wunsch #265: Steckbrief und Laufbahn von der Spielerseite der Liga (opel-hbl.de/de/player/<dc_id>, devalue-Nutzlast im `__NUXT_DATA__`-Skript, ~1,5 MB je Seite), deshalb je Spieler 24 h Cache und nur auf Knopfdruck; ist die Seite nicht erreichbar, wird ein alter Stand mit Hinweis gezeigt |
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
@@ -2843,6 +2865,21 @@ python -m venv .venv                                   # einmalig
   "noch nie" auf der Seite, obwohl die Liste vom 14.08.2026 stammt), aber ohne
   jeden Bestand wird kein Datum erfunden. Gegenprobe gemacht: mit dem alten
   Verhalten fallen 4 der 11 Tests.
+- `test_tvb_spielerprofil.py` – Wunsch #265. Baut die devalue-Nutzlast der
+  Liga-Seite GENAU nach (flaches Array, Indizes, ["Date", ...]) statt
+  bequemes JSON zu fuettern - der Parser ist das Empfindliche. Steckbrief,
+  Ligen, Stationen mit aktuell-Markierung, Torwart-Erkennung, unbekannte
+  Codes werden nicht geraten, kaputte Seiten und Zyklen kippen nichts;
+  Route: Seite ohne fremden Bildhost, Cache (zweiter Aufruf ohne Abruf,
+  alter Cache wird erneuert, bei toter Quelle alter Stand mit Hinweis),
+  nur eine UUID geht in den Fremdpfad (404 sonst), Kader verlinkt nur
+  Spieler mit Kennung, `_kader_speichern` uebernimmt nur echte Kennungen.
+- `test_todo_ziel_chips.py` – Wunsch #261. Das Ziel-Band: die eigene Person
+  steht nur einmal ("Ich", nicht noch einmal mit Namen), keine
+  Auswahlliste mehr, Rollen als Chips mit echten Kaestchen in ihrem Label,
+  "Alle" und "Privat" als Chips, Bearbeiten-Panel zeigt Person/Rollen/Alle
+  vorbelegt, das Brett nutzt dasselbe Band, die Routen verstehen die
+  Felder unveraendert.
 - `test_tvb_nachladen.py` – Wunsch #263/#264. Der Hamburg-Fall als Test:
   ein Ribbon-Eintrag mit Toren, isLive=true, isFinal=false ergibt Status
   Live und bestaetigt=0 - nicht Ended; `date` allein ist Ortszeit. Dazu der

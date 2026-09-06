@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% set app_slug = "tvb" %}
+{% block title %}{{ profil.name if profil else 'Spieler' }} – TVB Stuttgart{% endblock %}
+
+{% block extra_styles %}
+{# Wunsch #265: Steckbrief, Statistik, Laufbahn eines Spielers. Daten von
+   der Spielerseite der Liga (siehe 18_tvb.py), bewusst ohne Foto. #}
+.sp-karte {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-bottom:12px;
+}
+.sp-kopf { text-align:center; padding:18px 16px; }
+.sp-nummer {
+  display:inline-block; min-width:44px; padding:6px 10px; border-radius:12px;
+  background:var(--farbe-band); color:#fff; font-size:22px; font-weight:800;
+  font-variant-numeric:tabular-nums; margin-bottom:8px;
+}
+.sp-name { font-size:22px; font-weight:700; }
+.sp-unter { font-size:14px; color:var(--text-2); margin-top:4px; }
+.sp-titel { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
+.sp-steckbrief { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+.sp-eintrag-label { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.sp-eintrag-wert { font-size:16px; font-weight:600; }
+.sp-hpi { display:flex; gap:18px; justify-content:space-around; text-align:center; }
+.sp-hpi-wert { font-size:22px; font-weight:700; }
+.sp-hpi-label { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.sp-trend-hoch { color:var(--gruen-text); }
+.sp-trend-runter { color:var(--rot-text); }
+.sp-scroll { overflow-x:auto; }
+.sp-tabelle { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+.sp-tabelle th, .sp-tabelle td { padding:6px 6px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--border-subtle); }
+.sp-tabelle th { font-weight:600; color:var(--text-2); font-size:12px; }
+.sp-tabelle th:first-child, .sp-tabelle td:first-child { text-align:left; white-space:normal; min-width:120px; }
+.sp-tabelle tr:last-child td { border-bottom:none; }
+.sp-tabelle tr.gesamt td { font-weight:700; border-top:2px solid var(--border); }
+.sp-station { margin-bottom:14px; }
+.sp-station:last-child { margin-bottom:0; }
+.sp-station-name { font-size:15px; font-weight:700; margin-bottom:4px; }
+.sp-station-name .aktuell {
+  font-size:12px; font-weight:600; color:var(--farbe-kontrast);
+  border:1px solid var(--farbe-kontrast); border-radius:10px; padding:1px 8px; margin-left:6px;
+}
+.sp-hinweis { font-size:12px; color:var(--text-2); line-height:1.5; }
+.empty { text-align:center; padding:40px 16px; color:var(--text-2); font-size:15px; line-height:1.5; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/tvb{{ tp }}kader" title="Zurück zum Kader">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">👤 Spieler</h1>
+<div class="nav-sub">TVB Stuttgart</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+
+  {% if not profil %}
+    <div class="empty">
+      <div style="font-size:48px;margin-bottom:12px">📡</div>
+      {% if kader %}<strong>{{ kader.vorname }} {{ kader.nachname }}</strong><br>{% endif %}
+      Das Spielerprofil ist gerade nicht abrufbar.<br>Versuch's später nochmal.
+    </div>
+  {% else %}
+
+  <div class="sp-karte sp-kopf">
+    {% if profil.nummer %}<div class="sp-nummer">{{ profil.nummer }}</div>{% endif %}
+    <div class="sp-name">{{ profil.name }}</div>
+    <div class="sp-unter">
+      {%- if profil.position %}{{ profil.position }}{% endif -%}
+      {%- if profil.position and profil.verein %} · {% endif -%}
+      {%- if profil.verein %}{{ profil.verein }}{% endif -%}
+    </div>
+  </div>
+
+  {% if veraltet %}
+  <div class="sp-karte sp-hinweis">📡 Die Liga-Seite ist gerade nicht erreichbar – das ist der zuletzt gespeicherte Stand.</div>
+  {% endif %}
+
+  <div class="sp-karte">
+    <h2 class="sp-titel">Steckbrief</h2>
+    <div class="sp-steckbrief">
+      <div><div class="sp-eintrag-label">Geboren</div><div class="sp-eintrag-wert">
+        {%- if profil.geburtstag %}{{ profil.geburtstag[8:10] }}.{{ profil.geburtstag[5:7] }}.{{ profil.geburtstag[0:4] }}{% if profil.alter %} ({{ profil.alter }}){% endif %}{% else %}–{% endif -%}
+      </div></div>
+      <div><div class="sp-eintrag-label">Nation</div><div class="sp-eintrag-wert">{{ profil.nation or '–' }}</div></div>
+      <div><div class="sp-eintrag-label">Größe</div><div class="sp-eintrag-wert">{% if profil.groesse %}{{ profil.groesse }} cm{% else %}–{% endif %}</div></div>
+      <div><div class="sp-eintrag-label">Gewicht</div><div class="sp-eintrag-wert">{% if profil.gewicht %}{{ profil.gewicht }} kg{% else %}–{% endif %}</div></div>
+    </div>
+  </div>
+
+  {% if kader %}
+  <div class="sp-karte">
+    <h2 class="sp-titel">HPI · Saison {{ kader.saison_name }}</h2>
+    <div class="sp-hpi">
+      <div>
+        <div class="sp-hpi-wert">{{ '%.1f'|format(kader.hpi_schnitt) if kader.hpi_schnitt is not none else '–' }}</div>
+        <div class="sp-hpi-label">Schnitt</div>
+      </div>
+      <div>
+        <div class="sp-hpi-wert">
+          {% if kader.hpi_letzter is not none %}{{ '%.0f'|format(kader.hpi_letzter) }}<span class="{% if kader.hpi_trend and kader.hpi_trend > 0 %}sp-trend-hoch{% elif kader.hpi_trend and kader.hpi_trend < 0 %}sp-trend-runter{% endif %}">{% if kader.hpi_trend and kader.hpi_trend > 0 %} ▲{% elif kader.hpi_trend and kader.hpi_trend < 0 %} ▼{% endif %}</span>{% else %}–{% endif %}
+        </div>
+        <div class="sp-hpi-label">Zuletzt</div>
+      </div>
+      <div><div class="sp-hpi-wert">{{ kader.spieltage or 0 }}</div><div class="sp-hpi-label">Spieltage</div></div>
+      <div><div class="sp-hpi-wert">{{ kader.aktionen or 0 }}</div><div class="sp-hpi-label">Aktionen</div></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if profil.ligen %}
+  <div class="sp-karte">
+    <h2 class="sp-titel">Statistik nach Wettbewerb</h2>
+    <div class="sp-scroll">
+      <table class="sp-tabelle">
+        <thead><tr>
+          <th>Wettbewerb</th><th>Saisons</th><th>Spiele</th>
+          {% if profil.torwart %}<th>Paraden</th><th>Gegentore</th>{% else %}<th>Tore</th><th>7m</th>{% endif %}
+          <th>Gelb</th><th>2 min</th><th>Rot</th>
+        </tr></thead>
+        <tbody>
+          {% for l in profil.ligen %}
+          <tr>
+            <td>{{ l.liga }}</td><td>{{ l.saisons if l.saisons is not none else '–' }}</td><td>{{ l.spiele if l.spiele is not none else '–' }}</td>
+            {% if profil.torwart %}<td>{{ l.paraden if l.paraden is not none else '–' }}</td><td>{{ l.gegentore if l.gegentore is not none else '–' }}</td>
+            {% else %}<td>{{ l.tore if l.tore is not none else '–' }}</td><td>{{ l.siebenmeter if l.siebenmeter is not none else '–' }}</td>{% endif %}
+            <td>{{ l.gelb if l.gelb is not none else '–' }}</td><td>{{ l.zeitstrafen if l.zeitstrafen is not none else '–' }}</td><td>{{ l.rot if l.rot is not none else '–' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if profil.stationen %}
+  <div class="sp-karte">
+    <h2 class="sp-titel">Laufbahn</h2>
+    {% for st in profil.stationen %}
+    <div class="sp-station">
+      <div class="sp-station-name">{{ st.verein }}{% if st.aktuell %}<span class="aktuell">aktuell</span>{% endif %}</div>
+      <div class="sp-scroll">
+        <table class="sp-tabelle">
+          <thead><tr>
+            <th>Saison</th><th>Spiele</th>
+            {% if profil.torwart %}<th>Paraden</th><th>Gegentore</th>{% else %}<th>Tore</th><th>7m</th>{% endif %}
+            <th>Gelb</th><th>2 min</th><th>Rot</th>
+          </tr></thead>
+          <tbody>
+            {% for s in st.saisons %}
+            <tr>
+              <td>{{ s.name }}</td><td>{{ s.spiele if s.spiele is not none else '–' }}</td>
+              {% if profil.torwart %}<td>{{ s.paraden if s.paraden is not none else '–' }}</td><td>{{ s.gegentore if s.gegentore is not none else '–' }}</td>
+              {% else %}<td>{{ s.tore if s.tore is not none else '–' }}</td><td>{{ s.siebenmeter if s.siebenmeter is not none else '–' }}</td>{% endif %}
+              <td>{{ s.gelb if s.gelb is not none else '–' }}</td><td>{{ s.zeitstrafen if s.zeitstrafen is not none else '–' }}</td><td>{{ s.rot if s.rot is not none else '–' }}</td>
+            </tr>
+            {% endfor %}
+            {% if st.saisons|length > 1 %}
+            <tr class="gesamt">
+              <td>Gesamt</td><td>{{ st.gesamt.spiele if st.gesamt.spiele is not none else '–' }}</td>
+              {% if profil.torwart %}<td>{{ st.gesamt.paraden if st.gesamt.paraden is not none else '–' }}</td><td>{{ st.gesamt.gegentore if st.gesamt.gegentore is not none else '–' }}</td>
+              {% else %}<td>{{ st.gesamt.tore if st.gesamt.tore is not none else '–' }}</td><td>{{ st.gesamt.siebenmeter if st.gesamt.siebenmeter is not none else '–' }}</td>{% endif %}
+              <td>{{ st.gesamt.gelb if st.gesamt.gelb is not none else '–' }}</td><td>{{ st.gesamt.zeitstrafen if st.gesamt.zeitstrafen is not none else '–' }}</td><td>{{ st.gesamt.rot if st.gesamt.rot is not none else '–' }}</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="sp-hinweis" style="padding:0 6px">
+    Quelle: Spielerseite der Handball-Bundesliga, höchstens einen Tag alt. Vereinsspiele
+    außerhalb der Bundesligen und des DHB-Pokals zählt die Liga nicht mit.
+  </div>
+
+  {% endif %}
+</main>
+{% endblock %}
