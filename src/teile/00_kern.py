@@ -1343,6 +1343,15 @@ TTS_STANDARD_STIMME = "Kore"
 AUSSPRACHE_STANDARD_MODELL = "mistralai/voxtral-small-24b-2507"
 AUSSPRACHE_STANDARD_ANBIETER = "mistral/eu"
 
+# Wunsch #269: Fotos (Rezepte, Vokabeln aus dem Schulheft) koennen
+# Handschriften enthalten - die sollen die EU nicht verlassen. Mistral Large 3
+# liest Handschrift zuverlaessig (Probe 07.09.2026: fuenf Paare sauber als
+# JSON, Ueberschrift und Seitenzahl ignoriert), auf demselben EU-Endpunkt wie
+# die Aussprache, rund 0,0006 USD je Foto. Gilt fuer beide Bild-Zwecke.
+VISION_STANDARD_MODELL = "mistralai/mistral-large-2512"
+VISION_STANDARD_ANBIETER = "mistral/eu"
+VISION_ZWECKE = ("vokabeln_ocr", "rezepte_foto_import")
+
 
 class KiLimitError(Exception):
     """Monatliches Token-Kontingent des Nutzers ist aufgebraucht."""
@@ -1872,8 +1881,7 @@ def _init_db(app):
         # Wunsch #259: einkauf_barcode (#143) fehlte hier und fiel stumm auf
         # KI_MODELL zurueck - seit die Hilfe die Modelle zeigt, faellt so
         # etwas auf.
-        for zweck in ("rezepte_import", "vokabeln_ocr", "rezepte_foto_import",
-                      "wunsch_titel", "einkauf_barcode"):
+        for zweck in ("rezepte_import", "wunsch_titel", "einkauf_barcode"):
             db.execute(
                 "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell) VALUES(?,?)",
                 (zweck, KI_MODELL),
@@ -1890,6 +1898,14 @@ def _init_db(app):
             "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell, anbieter) VALUES(?,?,?)",
             ("vokabeln_aussprache", AUSSPRACHE_STANDARD_MODELL, AUSSPRACHE_STANDARD_ANBIETER),
         )
+        # Wunsch #269: die beiden Bild-Zwecke mit EU-Anbieter. Auf dem
+        # laufenden Server wurden die bestehenden Zeilen per manage.py
+        # umgestellt (07.09.2026) - der Seed greift nur bei neuen Datenbanken.
+        for zweck in VISION_ZWECKE:
+            db.execute(
+                "INSERT OR IGNORE INTO ki_konfiguration(zweck, modell, anbieter) VALUES(?,?,?)",
+                (zweck, VISION_STANDARD_MODELL, VISION_STANDARD_ANBIETER),
+            )
         for (sprache_id,) in db.execute("SELECT id FROM vokabel_sprachen").fetchall():
             db.execute(
                 "INSERT OR IGNORE INTO ki_stimmen(sprache_id, modell, stimme) VALUES(?,?,?)",

@@ -362,8 +362,10 @@ Stimme kommen je Zweck aus der Datenbank (`ki_modell_fuer()`,
 `ki_stimme_fuer()`, gesetzt per `manage.py ki_modell` / `ki_stimme`), nicht aus
 dem Code. `ki_anfrage()` nimmt neben `bilder` auch `audio=(format, b64)`
 (#258); steht für den Zweck ein Anbieter in `ki_konfiguration.anbieter`, geht
-die Anfrage ohne Fallback nur dorthin (`ki_anbieter_fuer()`) – so ist die
-Aussprache-Bewertung auf Mistrals EU-Endpunkt festgenagelt. **Ein neuer
+die Anfrage ohne Fallback nur dorthin (`ki_anbieter_fuer()`) – so sind die
+Aussprache-Bewertung (#258) und beide Foto-Zwecke (`VISION_ZWECKE`, #269:
+Handschriften bleiben in der EU) auf Mistrals EU-Endpunkt festgenagelt; ein
+neuer Aufruf mit `bilder=` gehört in `VISION_ZWECKE`, ein Test prüft das. **Ein neuer
 KI-Zweck braucht eine Zeile in `KI_ZWECKE` (Name + Beschreibung) und einen
 Seed in `_init_db()`** – Hilfe-Kapitel „KI-Modelle" und die
 KI-Verbrauchsseite zeigen daraus live, welches Modell wofür und wo rechnet

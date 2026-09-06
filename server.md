@@ -379,7 +379,11 @@ teile/
                        ki_modell_fuer(zweck) (Wunsch #81 – Grundprinzip: Modell
                        je Verwendungszweck kommt aus ki_konfiguration statt fest
                        im Code, Fallback KI_MODELL), ki_anbieter_fuer(zweck)
-                       (Wunsch #258, None = OpenRouter wählt), KI_ZWECKE +
+                       (Wunsch #258, None = OpenRouter wählt; Wunsch #269:
+                       VISION_ZWECKE = vokabeln_ocr + rezepte_foto_import sind
+                       auf VISION_STANDARD_MODELL mistralai/mistral-large-2512
+                       @ mistral/eu geseedet, live per manage.py umgestellt -
+                       Handschriften bleiben in der EU), KI_ZWECKE +
                        ki_modell_beschreibung() + ki_modell_uebersicht()
                        (Wunsch #259: Name/Beschreibung je Zweck, Entwickler
                        und Land aus dem Modell-Präfix, Ort aus dem Anbieter –
@@ -1897,7 +1901,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `vokabel_kapitel_zuordnung` | vokabel_id (FK vokabeln, cascade), kapitel_id (FK vokabel_kapitel, cascade); UNIQUE(vokabel_id,kapitel_id) – m:n, eine Vokabel kann mehreren Kapiteln oder keinem angehören |
 | `vokabel_sessions` | id, user_id (FK users, cascade), sprache_id (FK vokabel_sprachen), gestartet, beendet (NULL = noch offen) – ein Trainer-Durchgang |
 | `vokabel_versuche` | id, session_id (FK vokabel_sessions, cascade), vokabel_id (FK vokabeln, cascade), richtig (0/1), beantwortet – ein protokollierter Abfrage-Versuch |
-| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97, "vokabeln_aussprache" – Wunsch #258), modell, anbieter (NULL = OpenRouter wählt; "mistral/eu" beim Aussprache-Zweck, Wunsch #258) – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell <zweck> <modell> [anbieter\|-]` änderbar |
+| `ki_konfiguration` | zweck (PK, z. B. "rezepte_import"/"vokabeln_ocr"/"rezepte_foto_import" – Wunsch #97, "vokabeln_aussprache" – Wunsch #258), modell, anbieter (NULL = OpenRouter wählt; "mistral/eu" beim Aussprache-Zweck, Wunsch #258, und bei beiden Foto-Zwecken, Wunsch #269) – Wunsch #81 (Grundprinzip): Modellwahl je KI-Zweck in der DB statt fest im Code, per `manage.py ki_modell <zweck> <modell> [anbieter\|-]` änderbar |
 | `ki_stimmen` | sprache_id (PK, FK vokabel_sprachen, cascade), modell, stimme – Wunsch #81: TTS-Modell/Stimme je Vokabeln-Sprache, per `manage.py ki_stimme` änderbar |
 | `tvb_spiele` | id (PK, mit Quellen-Präfix: `sr<uuid>` Sportradar, `n<nr>` handball.net), team_id (Wunsch #122 – ohne die würden sich die Spiele aller 18 Mannschaften vermischen; Altbestand einmalig auf die Profi-ID gesetzt), spieltag, heim, gast, heim_tore, gast_tore, anstoss (ISO, Europe/Berlin), ort, status ('Pre'/'Live'/'Ended'), wettbewerb (Wunsch #151 – Name des Wettbewerbs; NULL bei Altbestand, weil nachtraeglich nicht rekonstruierbar), bestaetigt (0/1, Wunsch #264 – 1 nur, wenn die Quelle den Stand als ENDSTAND bestätigt hat (isFinal/CONFIRMED/is_finished); ein bestätigter Stand wird vom UPSERT nie mehr durch einen unbestätigten ersetzt, `bestaetigt` kann nur steigen; Altbestand 0 und wird per fixture_detail einmalig nachgeprüft, #263), aktualisiert_am – Wunsch #120: Opportunistic-Cache, jedes bei einem Seitenaufruf gesehene TVB-Spiel wird per UPSERT gespeichert, da die Datenquelle selbst nur ein kleines Zeitfenster liefert; seit #263 dient aktualisiert_am zugleich als Bremse fürs Nachladen (höchstens ein fixture_detail-Versuch je Spiel und Stunde) |
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |

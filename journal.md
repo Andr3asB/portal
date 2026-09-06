@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-09-07 – portal-v250: #269 – Fotos bleiben in der EU
+
+Andi: Fotos (Rezepte, Vokabeln) können Handschriften enthalten, die sollen
+nicht in die USA. Der Mechanismus stand seit #258 (Anbieter je KI-Zweck);
+gebraucht wurde ein europäisches Bild-Modell mit EU-Endpunkt.
+
+OpenRouter listet 262 Modelle mit Bild-Eingabe, elf davon von Mistral, acht
+davon mit `mistral/eu`-Endpunkt. Probe aus dem Container mit einem
+synthetischen „Schulheft" (Segoe Script, fünf Paare, Überschrift und
+Seitenzahl als Störung), exakt der Prompt aus `_vokabeln_per_ki()`: Mistral
+Large 3 (`mistralai/mistral-large-2512`) und Mistral Small 2603 liefern
+beide fehlerfreies JSON mit genau den fünf Paaren, Störzeilen ignoriert.
+Genommen: **Mistral Large 3** – bei echter Handschrift zählt Lesequalität,
+und 0,0006 USD je Foto (930 Tokens Eingabe, EU-Aufschlag inklusive) ist
+kein Argument dagegen.
+
+Umgesetzt: `VISION_ZWECKE` (vokabeln_ocr, rezepte_foto_import) mit
+`VISION_STANDARD_MODELL`/`_ANBIETER` in `00_kern.py`, Seed für neue
+Datenbanken; auf dem Server die bestehenden Zeilen per
+`manage.py ki_modell <zweck> mistralai/mistral-large-2512 mistral/eu`
+umgestellt. Ein Test liest alle `ki_anfrage(..., bilder=...)`-Aufrufe aus dem
+Quelltext und verlangt, dass genau diese Zwecke in `VISION_ZWECKE` stehen
+und EU-geseedet sind – ein künftiger Foto-Zweck ohne EU-Anbieter fällt auf.
+Die Hilfe (Kapitel KI-Modelle) sagt es jetzt für Stimmen **und** Fotos; die
+Live-Liste dort und in der Verwaltung zeigt die Umstellung von selbst.
+
 ## 2026-09-07 – portal-v248: #267/#268 – Spieldetails mit Verlauf, Statistik und Aufstellung
 
 Zwei Wünsche, eine Seite: Jedes Spiel auf der TVB-Seite ist jetzt ein Link

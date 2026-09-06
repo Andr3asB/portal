@@ -49,6 +49,28 @@ def test_jeder_zweck_im_code_hat_namen_und_seed(kern, db):
     assert not fehlt_seed, f"ohne Seed in ki_konfiguration (_init_db): {sorted(fehlt_seed)}"
 
 
+def test_bild_zwecke_bleiben_in_der_eu(app, kern, db):
+    """Wunsch #269: Fotos koennen Handschriften enthalten. Beide Bild-Zwecke
+    sind auf ein europaeisches Modell mit EU-Anbieter geseedet - und die
+    Liste VISION_ZWECKE deckt genau die Aufrufe mit `bilder=` ab."""
+    import pathlib
+    import re
+    mit_bild = set()
+    for datei in TEILE.glob("[0-9][0-9]_*.py"):
+        text = datei.read_text(encoding="utf-8")
+        for m in re.finditer(r"ki_anfrage\(\s*[\w\[\]\"'.]+\s*,\s*\"([a-z_]+)\"[^)]*bilder=", text, re.DOTALL):
+            mit_bild.add(m.group(1))
+    assert mit_bild == set(kern.VISION_ZWECKE), mit_bild
+    for zweck in kern.VISION_ZWECKE:
+        zeile = db["verbindung"].execute(
+            "SELECT modell, anbieter FROM ki_konfiguration WHERE zweck=?", (zweck,)).fetchone()
+        assert zeile["modell"].startswith("mistralai/"), zweck
+        assert zeile["anbieter"] == "mistral/eu", zweck
+        with app.app_context():
+            assert kern.ki_anbieter_fuer(zweck) == "mistral/eu"
+    del pathlib
+
+
 def test_jede_zeile_hat_beschreibung_und_label(kern):
     for zweck, label, beschreibung in kern.KI_ZWECKE:
         assert label and label != zweck, zweck
