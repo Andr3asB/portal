@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% set app_slug = "admin" %}
+{% block title %}App-Zugriff{% endblock %}
+
+{% block extra_styles %}
+{# Wunsch #266: Wer darf welche App - als Tabelle Apps x Mitglieder. Jede
+   Zelle ist ein Knopf (Formular), der den Zugang schaltet; die Antwort
+   fuehrt hierher zurueck (Feld `zurueck`). Erste Spalte klebt, damit der
+   App-Name beim seitlichen Scrollen stehen bleibt. #}
+.az-erklaerung { font-size:13px; color:var(--text-2); line-height:1.5; margin-bottom:12px; }
+.az-scroll { overflow-x:auto; background:var(--surface); border-radius:14px; box-shadow:0 1px 3px var(--shadow); }
+.az-tabelle { border-collapse:collapse; width:100%; min-width:320px; }
+.az-tabelle th, .az-tabelle td { padding:4px 4px; text-align:center; border-bottom:1px solid var(--border-subtle); }
+.az-tabelle tr:last-child td { border-bottom:none; }
+.az-tabelle th.app, .az-tabelle td.app {
+  text-align:left; position:sticky; left:0; background:var(--surface); z-index:1;
+  padding-left:12px; min-width:140px; max-width:200px;
+}
+.az-app-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.az-app-anzahl { font-size:12px; color:var(--text-2); }
+.az-kopf { padding:10px 4px 8px; }
+.avatar {
+  width:36px; height:36px; border-radius:50%; margin:0 auto 2px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:700; color:#fff;
+}
+.az-nutzer-name { font-size:12px; color:var(--text-2); max-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0 auto; }
+.az-zelle form { margin:0; display:inline-block; }
+.az-schalter {
+  width:36px; height:36px; border-radius:50%; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--text-2); font-size:16px; cursor:pointer;
+  font-family:inherit;
+}
+.az-schalter.an { background:var(--gruen-text); border-color:var(--gruen-text); color:#fff; }
+.az-schalter.gesperrt { opacity:.45; cursor:default; }
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.top-aktion {
+  flex:1; display:block; text-align:center; text-decoration:none;
+  background:none; border:1.5px solid var(--farbe); color:var(--farbe-kontrast);
+  border-radius:12px; padding:12px 10px; font-size:14px; font-weight:600;
+  white-space:nowrap;
+}
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück zur Verwaltung">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">🧩 App-Zugriff</h1>
+<div class="nav-sub">{{ apps|length }} Apps · {{ all_users|length }} Mitglieder</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <div class="az-erklaerung">
+    Ein Tipp auf einen Kreis schaltet die App für dieses Mitglied frei oder
+    wieder ab – grün heißt freigeschaltet. Den eigenen Zugang zur Verwaltung
+    kannst du nicht abschalten.
+  </div>
+
+  <div class="az-scroll">
+    <table class="az-tabelle">
+      <thead>
+        <tr>
+          <th class="app az-kopf">App</th>
+          {% for u in all_users %}
+          <th class="az-kopf" scope="col">
+            <div class="avatar" style="background:{{ farbe_kontrast(u.farbe) }}" aria-hidden="true">{{ u.name[0] }}</div>
+            <div class="az-nutzer-name">{{ u.name }}</div>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in apps %}
+        {% set anzahl = anzahl_je_app.get(app.id, 0) %}
+        <tr>
+          <th class="app" scope="row">
+            <div class="az-app-name">{{ app.emoji }} {{ app.name }}</div>
+            <div class="az-app-anzahl">{{ anzahl }} von {{ all_users|length }}</div>
+          </th>
+          {% for u in all_users %}
+          {% set hat = app.id in grants.get(u.id, []) %}
+          {% set gesperrt = hat and app.slug == 'admin' and u.id == user.id %}
+          <td class="az-zelle">
+            {% if gesperrt %}
+            <button type="button" class="az-schalter an gesperrt" disabled aria-label="{{ app.name }} für {{ u.name }}: eigener Verwaltungszugang, nicht abschaltbar" title="{{ app.name }} für {{ u.name }}: eigener Verwaltungszugang, nicht abschaltbar">✓</button>
+            {% else %}
+            <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/{{ 'revoke' if hat else 'grant' }}/{{ app.slug }}">
+              <input type="hidden" name="zurueck" value="/a/admin{{ tp }}apps">
+              <button type="submit" class="az-schalter{% if hat %} an{% endif %}" aria-label="{{ app.name }} für {{ u.name }} {{ 'abschalten' if hat else 'freischalten' }}" title="{{ app.name }} für {{ u.name }} {{ 'abschalten' if hat else 'freischalten' }}">{{ '✓' if hat else '○' }}</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set app_slug = "admin" %}
+{% block title %}Apps für {{ mitglied.name }}{% endblock %}
+
+{% block extra_styles %}
+{# Wunsch #266: Die Apps EINES Mitglieds - freigeschaltete oben, die uebrigen
+   darunter, jede mit ihrer Beschreibung. Der Schalter ist ein Formular an
+   die bestehenden grant/revoke-Routen, die hierher zurueckleiten. #}
+.ua-kopf { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.avatar {
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; font-weight:700; color:#fff; flex-shrink:0;
+}
+.ua-name { font-size:17px; font-weight:600; }
+.ua-zahl { font-size:13px; color:var(--text-2); }
+.ua-gruppe { font-size:12px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 6px; }
+.ua-karte { background:var(--surface); border-radius:14px; box-shadow:0 1px 3px var(--shadow); }
+.ua-zeile { display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--border-subtle); }
+.ua-zeile:last-child { border-bottom:none; }
+.ua-emoji { font-size:22px; flex-shrink:0; width:32px; text-align:center; }
+.ua-text { flex:1; min-width:0; }
+.ua-app { font-size:15px; font-weight:600; }
+.ua-beschreibung { font-size:12px; color:var(--text-2); line-height:1.4; }
+.ua-zeile form { margin:0; flex-shrink:0; }
+.ua-schalter {
+  border:1.5px solid var(--border); border-radius:20px; padding:7px 12px;
+  background:var(--surface); color:var(--text); font-size:13px; font-weight:600;
+  cursor:pointer; font-family:inherit; white-space:nowrap;
+}
+.ua-schalter.an { background:var(--gruen-text); border-color:var(--gruen-text); color:#fff; }
+.ua-schalter:disabled { opacity:.45; cursor:default; }
+.ua-leer { padding:14px 12px; font-size:13px; color:var(--text-2); }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/admin{{ tp }}" title="Zurück zur Verwaltung">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">🧩 Apps</h1>
+<div class="nav-sub">{{ mitglied.name }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <div class="ua-kopf">
+    <div class="avatar" style="background:{{ farbe_kontrast(mitglied.farbe) }}" aria-hidden="true">{{ mitglied.name[0] }}</div>
+    <div>
+      <div class="ua-name">{{ mitglied.name }}</div>
+      <div class="ua-zahl">{{ frei|length }} von {{ frei|length + gesperrt|length }} Apps freigeschaltet</div>
+    </div>
+  </div>
+
+  {% macro zeile(app, hat) %}
+  {% set eigener_admin = hat and app.slug == 'admin' and mitglied.id == user.id %}
+  <div class="ua-zeile">
+    <div class="ua-emoji" aria-hidden="true">{{ app.emoji }}</div>
+    <div class="ua-text">
+      <div class="ua-app">{{ app.name }}</div>
+      {% if app.beschreibung %}<div class="ua-beschreibung">{{ app.beschreibung }}</div>{% endif %}
+    </div>
+    {% if eigener_admin %}
+    <button type="button" class="ua-schalter an" disabled title="Eigener Verwaltungszugang, nicht abschaltbar">✓ Frei</button>
+    {% else %}
+    <form method="post" action="/a/admin{{ tp }}user/{{ mitglied.id }}/{{ 'revoke' if hat else 'grant' }}/{{ app.slug }}">
+      <input type="hidden" name="zurueck" value="/a/admin{{ tp }}user/{{ mitglied.id }}/apps">
+      <button type="submit" class="ua-schalter{% if hat %} an{% endif %}" aria-label="{{ app.name }} {{ 'abschalten' if hat else 'freischalten' }}" title="{{ app.name }} {{ 'abschalten' if hat else 'freischalten' }}">{{ '✓ Frei' if hat else '+ Freischalten' }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  <h2 class="ua-gruppe">Freigeschaltet</h2>
+  <div class="ua-karte">
+    {% for app in frei %}{{ zeile(app, true) }}{% endfor %}
+    {% if not frei %}<div class="ua-leer">Noch keine App freigeschaltet.</div>{% endif %}
+  </div>
+
+  <h2 class="ua-gruppe">Nicht freigeschaltet</h2>
+  <div class="ua-karte">
+    {% for app in gesperrt %}{{ zeile(app, false) }}{% endfor %}
+    {% if not gesperrt %}<div class="ua-leer">Alle Apps sind freigeschaltet.</div>{% endif %}
+  </div>
+</main>
+{% endblock %}

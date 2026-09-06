@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-09-06 – portal-v246: #266 Mitgliederliste und App-Zugriff getrennt
+
+Andi: „in den letzten Wochen sind immer mehr Apps dazugekommen" – 20 Chips
+je Mitglied, fünf Mitglieder, die Verwaltung war keine Übersicht mehr.
+
+- **Übersicht** (`admin.html`): je Mitglied nur noch Name, Rolle, Push-Zahl
+  und „n von m Apps" (home zählt nicht mit). Knöpfe: ✏️ Bearbeiten,
+  🧩 Apps, 🔑 Neuer Zugang. Oben zusätzlich „🧩 App-Zugriff".
+- **Je Mitglied** (`/user/<uid>/apps`, `admin_user_apps.html`): zwei Gruppen,
+  freigeschaltet / nicht freigeschaltet, jede App mit Emoji, Name und ihrer
+  Beschreibung aus `apps.beschreibung`, ein Schalter je Zeile.
+- **Alles auf einmal** (`/apps`, `admin_apps.html`): Tabelle Apps × Mitglieder,
+  Kopf mit Avataren, erste Spalte klebt beim seitlichen Scrollen, je Zelle
+  ein runder Schalter (grün = frei) mit sprechendem `aria-label`; je App
+  steht „n von m". Der eigene Verwaltungszugang ist dort abgeblendet und
+  nicht schaltbar – die bestehende Sperre in `revoke_app` gilt weiter.
+- **grant/revoke** unverändert, leiten aber über das Formularfeld `zurueck`
+  dorthin, woher der Klick kam. `_zurueck()` nimmt nur Pfade unter
+  `/a/admin/` ohne `//` und `\\` – das Feld kommt vom Client, eine Adresse
+  mit Host wäre eine offene Weiterleitung. 8 Tests, Hilfe angepasst.
+
 ## 2026-09-06 – portal-v245: #260 Fälligkeit mit Uhrzeit, #262 Ziehen auf dem iPhone
 
 ### #260 – Fälligkeitsdatum mit Uhrzeit

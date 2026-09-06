@@ -113,6 +113,61 @@ def index(token):
     )
 
 
+# --- Wunsch #266: App-Zugriff getrennt von der Mitgliederliste ---------------
+#
+# Mit 20 Apps je Karte war die Verwaltung keine Uebersicht mehr. Die Chips
+# sind deshalb auf zwei eigene Seiten gezogen: je Mitglied (zwei Gruppen mit
+# Beschreibung) und alles auf einmal (Tabelle Apps x Mitglieder). Die
+# grant/revoke-Routen bleiben dieselben; sie leiten dorthin zurueck, woher
+# der Klick kam (`zurueck`, nur Pfade unter /a/admin/).
+
+def _zurueck(token):
+    """Ziel nach grant/revoke: das Formularfeld `zurueck`, wenn es ein
+    Admin-Pfad ist - sonst die Uebersicht. Nur ein Pfad, nie eine Adresse
+    mit Host, damit niemand ueber das Feld nach draussen umleiten kann."""
+    ziel = (request.form.get("zurueck") or "").strip()
+    if ziel.startswith("/a/admin/") and "//" not in ziel and "\\" not in ziel:
+        return redirect(ziel)
+    return redirect(url_for("admin_app.index", token=token))
+
+
+@bp.route("/a/admin/apps", defaults={"token": None})
+@bp.route("/a/admin/<token>/apps")
+def apps_uebersicht(token):
+    """Wer darf welche App - alle auf einmal."""
+    user = _admin(token)
+    db   = get_db()
+    users = db.execute("SELECT * FROM users ORDER BY id").fetchall()
+    apps  = db.execute("SELECT * FROM apps WHERE slug != 'home' ORDER BY id").fetchall()
+    grants = _grants_by_user(db)
+    anzahl_je_app = {}
+    for freigeschaltet in grants.values():
+        for app_id in freigeschaltet:
+            anzahl_je_app[app_id] = anzahl_je_app.get(app_id, 0) + 1
+    return render_template("admin_apps.html",
+        user=user, token=token, farbe=user["farbe"],
+        all_users=users, apps=apps, grants=grants, anzahl_je_app=anzahl_je_app,
+    )
+
+
+@bp.route("/a/admin/user/<int:uid>/apps", defaults={"token": None})
+@bp.route("/a/admin/<token>/user/<int:uid>/apps")
+def user_apps(token, uid):
+    """Die Apps EINES Mitglieds, freigeschaltete zuerst."""
+    user = _admin(token)
+    db   = get_db()
+    mitglied = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not mitglied:
+        abort(404)
+    apps = db.execute("SELECT * FROM apps WHERE slug != 'home' ORDER BY name COLLATE NOCASE").fetchall()
+    hat = _grants_by_user(db).get(uid, set())
+    return render_template("admin_user_apps.html",
+        user=user, token=token, farbe=user["farbe"], mitglied=mitglied,
+        frei=[a for a in apps if a["id"] in hat],
+        gesperrt=[a for a in apps if a["id"] not in hat],
+    )
+
+
 @bp.route("/a/admin/user/neu", defaults={"token": None}, methods=["GET", "POST"])
 @bp.route("/a/admin/<token>/user/neu", methods=["GET", "POST"])
 def user_neu(token):
@@ -189,7 +244,7 @@ def grant_app(token, uid, app_slug):
         # Home-Zugang bzw. das Sitzungs-Cookie in jede freigeschaltete App.
         grant_anlegen(db, uid, app["id"])
         db.commit()
-    return redirect(url_for("admin_app.index", token=token))
+    return _zurueck(token)   # Wunsch #266
 
 
 @bp.route("/a/admin/user/<int:uid>/revoke/<app_slug>", defaults={"token": None}, methods=["POST"])
@@ -198,14 +253,14 @@ def revoke_app(token, uid, app_slug):
     admin = _admin(token)
     # Nicht den eigenen admin-Grant entziehen
     if uid == admin["id"] and app_slug == "admin":
-        return redirect(url_for("admin_app.index", token=token))
+        return _zurueck(token)
     db = get_db()
     db.execute("""
         DELETE FROM grants
         WHERE user_id=? AND app_id=(SELECT id FROM apps WHERE slug=?)
     """, (uid, app_slug))
     db.commit()
-    return redirect(url_for("admin_app.index", token=token))
+    return _zurueck(token)   # Wunsch #266
 
 
 @bp.route("/a/admin/user/<int:uid>/neue_tokens", defaults={"token": None}, methods=["POST"])

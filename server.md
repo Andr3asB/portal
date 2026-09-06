@@ -418,6 +418,17 @@ teile/
                        die ein Sammelauftrag nie anfasst.
   03_admin.py        – /a/admin/<token>/ Admin-Bereich: Nutzer (mit Rolle), Grants,
                        QR-Codes, _clean_farbe() (Hex-Validierung).
+                       Wunsch #266 (06.09.2026): Mitgliederliste und
+                       App-Zugriff getrennt. Die Uebersicht zeigt je
+                       Mitglied nur "n von m Apps"; /user/<uid>/apps
+                       (admin_user_apps.html) zeigt die Apps EINES
+                       Mitglieds in zwei Gruppen mit Beschreibung, /apps
+                       (admin_apps.html) alles auf einmal als Tabelle Apps x
+                       Mitglieder (erste Spalte klebt, waagerecht scrollbar).
+                       grant/revoke unveraendert, leiten aber ueber das
+                       Formularfeld `zurueck` dorthin, woher der Klick kam -
+                       `_zurueck()` laesst nur Pfade unter /a/admin/ ohne
+                       "//" und "\\" zu, sonst die Uebersicht.
                        Wunsch #154: /geraete listet alle Sitzungen mit Person,
                        Geraet, Anmeldung und letzter Benutzung;
                        /geraete/<sid>/abmelden entfernt GENAU EINE Sitzung.
@@ -1481,6 +1492,9 @@ teile/
                               Edit-Mode (✎/✓), Gruppen anlegen/umbenennen/löschen
     denied.html             – Zugang verweigert / Landing ohne Token
     admin.html              – Nutzerverwaltung, Rollen-Badge, Grant-Chips, QR-Modal, Push-Abo-Badge
+    admin_apps.html         – Wunsch #266: Tabelle Apps x Mitglieder, jede Zelle ein
+                              Schalter (grant/revoke mit `zurueck`)
+    admin_user_apps.html    – Wunsch #266: die Apps eines Mitglieds, zwei Gruppen
     admin_user_form.html    – Nutzer anlegen/bearbeiten (Farbe, Rolle, Admin-Flag)
     admin_zugang.html       – Wunsch #140 Stufe 6: zeigt EINEN frisch erzeugten
                               Zugang (Link, QR als data:-URI, Kopierknopf) mit
@@ -2889,6 +2903,12 @@ python -m venv .venv                                   # einmalig
   "noch nie" auf der Seite, obwohl die Liste vom 14.08.2026 stammt), aber ohne
   jeden Bestand wird kein Datum erfunden. Gegenprobe gemacht: mit dem alten
   Verhalten fallen 4 der 11 Tests.
+- `test_admin_app_zugriff.py` – Wunsch #266. Die Uebersicht traegt keine
+  Chips mehr, nur die Zahl (home zaehlt nicht); die Seite eines Mitglieds
+  hat zwei Gruppen; grant/revoke leiten ueber `zurueck` zurueck, fremde
+  Ziele (Host, //, \\, andere App) landen auf der Uebersicht; die Tabelle
+  zeigt alle Apps und Mitglieder, der eigene Verwaltungszugang ist dort
+  gesperrt und bleibt auch per POST; nur Admins.
 - `test_todo_faellig.py` – Wunsch #260. Das Heikle ist die Zeitzone,
   deshalb Sommer- UND Winterdatum: Formular (Ortszeit) -> UTC, zurueck ins
   Feld, Anzeige mit Wochentag (Jahr nur wenn fremd), Status ueberfaellig/

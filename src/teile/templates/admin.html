@@ -30,7 +30,7 @@
   border-radius:20px; background:#e5f6ec; color:#217f39; font-weight:600;
   margin-left:4px; vertical-align:middle;
 }
-.user-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.user-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .btn-edit {
   font-size:13px; padding:6px 12px; border-radius:8px;
   background:var(--surface-2); color:var(--text); border:none; cursor:pointer; text-decoration:none;
@@ -42,18 +42,13 @@
   background:var(--surface-2); color:var(--rot-text); border:none; cursor:pointer;
   font-family:inherit;
 }
-.grants-label { font-size:12px; color:var(--text-2); margin-bottom:6px; font-weight:500; }
-.grants-row   { display:flex; flex-wrap:wrap; gap:6px; }
-.grant-chip {
-  display:inline-flex; align-items:center; gap:4px;
-  padding:6px 10px; border-radius:20px; font-size:13px; font-weight:500;
-  border:none; cursor:pointer;
-}
-.grant-chip.active   { background:#217f39; color:#fff; }
-.grant-chip.inactive { background:var(--chip-bg); color:var(--chip-text); }
-.grant-chip.inactive:hover { background:var(--surface-2); }
+/* Wunsch #266: Die App-Chips sind von hier auf eine eigene Seite gezogen
+   (admin_user_apps.html je Mitglied, admin_apps.html als Tabelle) - mit
+   inzwischen 20 Apps je Karte war die Uebersicht keine mehr. Hier steht nur
+   noch die Zahl. */
+.apps-zahl { font-size:13px; color:var(--text-2); }
 /* Wunsch #155: gleiche Bauart wie .top-aktionen in todo.html/rezepte.html */
-.top-aktionen { display:flex; gap:8px; margin-bottom:14px; }
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
 .top-aktion {
   flex:1; display:block; text-align:center; text-decoration:none;
   background:none; border:1.5px solid var(--farbe); color:var(--farbe-kontrast);
@@ -73,6 +68,7 @@
      (block header_extra). Überall sonst stehen Aktionen oben im Inhalt. #}
   <div class="top-aktionen">
     <a class="top-aktion" href="/a/admin{{ tp }}user/neu">+ Neues Mitglied</a>
+    <a class="top-aktion" href="/a/admin{{ tp }}apps">🧩 App-Zugriff</a>
     <a class="top-aktion" href="/a/admin{{ tp }}geraete">📱 Geräte</a>
     <a class="top-aktion" href="/a/admin{{ tp }}ki">🤖 KI-Verbrauch</a>
   </div>
@@ -91,11 +87,14 @@
             <span class="badge-push">🔔 {{ push_counts[u.id] }}</span>
           {% endif %}
         </div>
+        {# Wunsch #266: nur die Zahl - die Apps selbst stehen auf der eigenen Seite. #}
+        <div class="apps-zahl">{{ (u_grants|reject('eq', home_app_id)|list)|length }} von {{ apps|length }} Apps</div>
       </div>
     </div>
 
     <div class="user-actions">
       <a class="btn-edit knopf" href="/a/admin{{ tp }}user/{{ u.id }}/bearbeiten">✏️ Bearbeiten</a>
+      <a class="btn-edit knopf" href="/a/admin{{ tp }}user/{{ u.id }}/apps">🧩 Apps</a>
       {# Wunsch #131: Notfallknopf. Macht in einem Schritt ALLE Adressen dieses
          Nutzers ungültig - für "Handy weg" oder "Link aus Versehen
          weitergegeben". Sicherheitsabfrage, weil danach kein alter Link mehr
@@ -105,22 +104,6 @@
             data-bestaetigen="{{ ('Neuen Zugang für ' ~ u.name ~ ' erzeugen? Alle bisherigen Links und QR-Codes werden sofort ungültig. Der neue Link wird danach EINMAL angezeigt - danach nie wieder.') }}">
         <button type="submit" class="btn-neue-tokens">🔑 Neuer Zugang + QR</button>
       </form>
-    </div>
-
-    <div class="grants-label">App-Zugang</div>
-    <div class="grants-row">
-      {% for app in apps %}
-        {% set has_grant = app.id in u_grants %}
-        {% if has_grant %}
-          <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/revoke/{{ app.slug }}" style="margin:0">
-            <button type="submit" class="grant-chip active" title="Klicken zum Entziehen">{{ app.emoji }} {{ app.name }}</button>
-          </form>
-        {% else %}
-          <form method="post" action="/a/admin{{ tp }}user/{{ u.id }}/grant/{{ app.slug }}" style="margin:0">
-            <button type="submit" class="grant-chip inactive">{{ app.emoji }} {{ app.name }}</button>
-          </form>
-        {% endif %}
-      {% endfor %}
     </div>
   </div>
 {% endfor %}
