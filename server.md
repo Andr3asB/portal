@@ -1131,7 +1131,27 @@ teile/
                        geprueft (sie geht in den Pfad). Bewusst ohne
                        Spielerfoto (fremder Host, #119); Positions- und
                        Nationen-Codes werden uebersetzt, Unbekanntes bleibt
-                       als Code stehen. Reiner Anzeige-Modus (keine
+                       als Code stehen. Wunsch #267/#268 (07.09.2026):
+                       /spiel/<id> (id = tvb_spiele.id mit Praefix sr/n)
+                       zeigt Spieldetails in EINEM Format fuer beide Quellen
+                       (_sr_details: fixture_detail + &sub=pbp Ticker +
+                       &sub=preview Aufstellung/Offizielle; _neu_details:
+                       matches/<id>/events + /lineups, Kopf aus der eigenen
+                       Zeile): kopf (Wettbewerb, Spieltag, Anwurf, Halle,
+                       Zuschauer, Status, Teams mit Endstand, Halbzeit =
+                       Tore des 1. Abschnitts), ticker (Minute laeuft in der
+                       2. Halbzeit weiter, Art tor/strafe/karte/auszeit/
+                       fehlwurf/wechsel/abschnitt, Stand danach), statistik
+                       je Team (_SR_STAT_SPALTEN, Spielzeit PT27M44S ->
+                       27:44; handball.net nur Tore/7m/2min aus den
+                       Lineups), aufstellung + schiedsrichter. Cache
+                       tvb_spiel_details, Frist nach Zustand (_DETAILS_ALTER:
+                       beendet 24 h, kommend 6 h, laufend 2 min); Quelle weg
+                       -> alter Stand mit Hinweis, sonst nur der Kopf aus
+                       der eigenen Zeile. Kennung wird gegen _SPIEL_ID
+                       geprueft, bevor sie in einen Fremdpfad geht. Die
+                       Spielkarten der Uebersicht sind Links dorthin.
+                       Reiner Anzeige-Modus (keine
                        Nutzereingaben). Daten kommen live per On-the-fly-
                        Abruf (urllib, kein neues pip-Paket, Timeout 8s,
                        "fehler"-Flag statt Crash - gleiches Muster wie
@@ -1592,6 +1612,14 @@ teile/
                               disabled ("immer sichtbar"). Eigener
                               ←-Zurueck-Link, POST/Redirect/GET mit
                               ?gespeichert=1 als Bestaetigung
+    tvb_spiel.html          – Wunsch #267/#268: Spieldetails in einem Format fuer
+                              beide Quellen - Anzeigetafel (Stand, Halbzeit,
+                              Status, Zuschauer), Spielinfo bei kommenden
+                              Spielen, Ticker (Tore/Strafen/Karten/Abschnitte,
+                              Rest in <details>), Statistik und Aufstellung je
+                              Team (mobil untereinander, ab 700px nebeneinander,
+                              Tabellen in .sd-scroll mit klebender Namensspalte),
+                              Schiedsrichter, Legende; kein fremder Bildhost.
     tvb_kader.html          – Kader mit Spielerwerten (Wunsch #121): nach
                               Position gruppiert (Tor → Kreisläufer, deutsche
                               Labels aus _POSITIONEN), je Spieler HPI-Schnitt,
@@ -1877,6 +1905,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
 | `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, dc_id (Wunsch #265 – Sportradar-Kennung des Spielers aus der HPI-Antwort, nur wenn sie dem UUID-Muster entspricht; Schlüssel fürs Profil), aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 | `tvb_spieler_profile` | dc_id (PK), daten (JSON: name, nummer, verein, position, geburtstag, alter, nation, groesse, gewicht, ligen[], stationen[] mit saisons[], torwart), aktualisiert_am – Wunsch #265: Steckbrief und Laufbahn von der Spielerseite der Liga (opel-hbl.de/de/player/<dc_id>, devalue-Nutzlast im `__NUXT_DATA__`-Skript, ~1,5 MB je Seite), deshalb je Spieler 24 h Cache und nur auf Knopfdruck; ist die Seite nicht erreichbar, wird ein alter Stand mit Hinweis gezeigt |
+| `tvb_spiel_details` | id (PK = tvb_spiele.id), daten (JSON: quelle, kopf, ticker[], statistik{heim,gast}, aufstellung{heim,gast}, schiedsrichter[]), aktualisiert_am – Wunsch #267/#268: Spieldetails beider Quellen im einen Format (18_tvb.py `_sr_details`/`_neu_details`); Frist je Zustand des Spiels: beendet 24 h, kommend 6 h, laufend 2 min |
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
@@ -2920,6 +2949,17 @@ python -m venv .venv                                   # einmalig
   rollt am Rand mit und der Platzhalter wandert nach, Einrasten aus/an in
   ende UND abbruch, Spalte zaehlt ueber die ganze Hoehe, Brett scrollt
   weiterhin waagerecht, Listen ohne Spalten unberuehrt.
+- `test_tvb_spieldetails.py` – Wunsch #267/#268. Baut beide Rohformate nach:
+  Sportradar (fixture_detail mit periodData und statistics, pbp mit zwei
+  Abschnitten, preview mit Aufstellung/Offiziellen) und handball.net
+  (events, lineups). Prueft die Halbzeit als Tore des 1. Abschnitts, die
+  weiterlaufende Minute in der 2. Halbzeit, die Ereignisarten, dass nur
+  gespielt habende Spieler in der Statistik stehen, die lesbare Spielzeit,
+  Pokal zuerst im Pokal-Embed, kommend ohne Ticker-Abruf; die Seite mit
+  Tafel/Ticker/Statistik/Aufstellung ohne fremden Bildhost, Spielinfo bei
+  kommenden Spielen, Cache (ein Tag bei beendet), alter Stand mit Hinweis
+  bzw. nur der Kopf aus der eigenen Zeile, 404 fuer fremde Kennungen ohne
+  Fremdabruf, Zurueck zur richtigen Mannschaft, Links auf der Uebersicht.
 - `test_tvb_spielerprofil.py` – Wunsch #265. Baut die devalue-Nutzlast der
   Liga-Seite GENAU nach (flaches Array, Indizes, ["Date", ...]) statt
   bequemes JSON zu fuettern - der Parser ist das Empfindliche. Steckbrief,

@@ -1408,5 +1408,373 @@ def spieler(token, dc_id):
     )
 
 
+# --- Wunsch #267/#268: Spieldetails -------------------------------------------
+#
+# Ein Tipp auf ein Spiel (kommend oder gespielt) oeffnet /spiel/<id>. Die
+# Kennung ist tvb_spiele.id samt Quellen-Praefix: `sr<uuid>` (Sportradar,
+# Profis) oder `n<nr>` (handball.net, Amateur/Jugend). Beide Quellen werden
+# auf EIN Format gebracht (_spiel_details), damit die Vorlage nur eines
+# kennt:
+#   kopf        - Wettbewerb, Spieltag, Anwurf, Halle, Zuschauer, Status,
+#                 beide Teams mit Endstand und Halbzeitstand
+#   ticker      - Ereignisse in Reihenfolge, je mit Minute, Text, Spieler,
+#                 Seite (heim/gast), Spielstand danach, Art (tor/strafe/...)
+#   statistik   - je Team: Spielerzeilen mit Toren/Wuerfen, 7m, HPI, Assists,
+#                 Blocks, Steals, 2 min, Karten, Spielzeit
+#   aufstellung - je Team: Spieler (Nummer, Name, Position, Start/Bank),
+#                 Team-Offizielle; dazu die Schiedsrichter
+# Sportradar: fixture_detail (Kopf, Halbzeit, Statistik) + &sub=pbp (Ticker)
+# + &sub=preview (Aufstellung, Offizielle). handball.net:
+# matches/<id>/events + matches/<id>/lineups. Bilder beider Quellen werden
+# nicht eingebunden (#119).
+_SPIEL_ID = re.compile(r"\A(sr[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|n[0-9]{1,12})\Z")
+# Wie lange ein Stand gilt: beendet und bestaetigt einen Tag (Statistiken
+# werden gelegentlich nachkorrigiert), kommend sechs Stunden (Verlegung,
+# Halle), laufend zwei Minuten (der Ticker soll mitgehen).
+_DETAILS_ALTER = {"Ended": "-24 hours", "Pre": "-6 hours", "Live": "-2 minutes"}
+
+_SR_STAT_SPALTEN = [
+    # (Schluessel bei Sportradar, Ueberschrift, Kurzcode fuer die Legende)
+    ("goalsScored:shots",        "Tore/W.", "Tore und Wuerfe"),
+    ("shootingAccuracy",         "W%",     "Wurfquote"),
+    ("sevenMetreGoalsScored:sevenMetreShots", "7m", "Siebenmeter Tore/Wuerfe"),
+    ("handballPerformanceIndex", "HPI",    "Handball Performance Index"),
+    ("assists",                  "Ass.",   "Assists"),
+    ("blocks",                   "Bl.",    "Blocks"),
+    ("steals",                   "St.",    "Steals"),
+    ("twoMinuteSuspensions",     "2 min",  "Zeitstrafen"),
+    ("technicalFaults",          "TF",     "Technische Fehler"),
+    ("redCards",                 "Rot",    "Rote Karten"),
+    ("timeOnPlayingField",       "Min",    "Spielzeit"),
+]
+def _sr_ereignis_art(ev):
+    """Art eines Sportradar-Ereignisses. Nachgesehen an einem echten Spiel
+    (07.09.2026): ein Wurf ist IMMER eventType "goal", `success` sagt, ob er
+    drin war - der Fehlwurf ist kein eigener Typ. Zeitstrafen heissen
+    "suspension", Auszeiten "timeOut"."""
+    typ = ev.get("eventType")
+    if typ == "goal":
+        return "fehlwurf" if ev.get("success") is False else "tor"
+    if typ == "suspension":
+        return "strafe"
+    if typ in ("yellowCard", "redCard", "blueCard"):
+        return "karte"
+    if typ == "timeOut":
+        return "auszeit"
+    if typ == "goalKeeperChange":
+        return "wechsel"
+    return "sonst"
+
+
+def _dauer_lesbar(iso):
+    """'PT27M44S' -> '27:44'; None bleibt None."""
+    if not iso or not isinstance(iso, str):
+        return None
+    m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso)
+    if not m:
+        return None
+    h, mi, s = (int(x) if x else 0 for x in m.groups())
+    return f"{h * 60 + mi}:{s:02d}"
+
+
+def _spielminute(clock, periode, laenge=30):
+    """Sportradar-Uhr 'PT12M5S' im 2. Abschnitt -> '42:05'."""
+    m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", clock or "")
+    if not m:
+        return None
+    h, mi, s = (int(x) if x else 0 for x in m.groups())
+    return f"{(max(periode, 1) - 1) * laenge + h * 60 + mi}:{s:02d}"
+
+
+def _sr_details(zeile):
+    """Sportradar -> Detailformat, oder None wenn die Quelle nicht antwortet."""
+    kennung = zeile["id"][2:]
+    embeds = [255, 248] if zeile["wettbewerb"] == "DHB-Pokal" else [248, 255]
+    basis, embed = None, None
+    for e in embeds:
+        basis = _sr_get(f"fixture_detail?locale=de-DE&fixtureId={kennung}", embed=e)
+        if (basis or {}).get("data", {}).get("fixture"):
+            embed = e
+            break
+    if not embed:
+        return None
+    daten = basis["data"]
+    partie = daten["fixture"]
+    heim = next((c for c in partie.get("competitors") or [] if c.get("isHome")), None)
+    gast = next((c for c in partie.get("competitors") or [] if c is not heim), None)
+    if not heim or not gast:
+        return None
+    seiten = {heim.get("entityId"): "heim", gast.get("entityId"): "gast"}
+    zustand = partie.get("status")
+    zustand = zustand.get("value") if isinstance(zustand, dict) else zustand
+    status = "Ended" if zustand == "CONFIRMED" else ("Live" if zustand in ("LIVE", "IN_PROGRESS") else "Pre")
+
+    # Halbzeit: periodData.teamScores[entityId] = [{periodId:1, score}, ...]
+    # - Tore JE ABSCHNITT, nicht kumuliert.
+    abschnitte = {}
+    for eid, liste in ((daten.get("periodData") or {}).get("teamScores") or {}).items():
+        for a in liste or []:
+            abschnitte.setdefault(a.get("periodId"), {})[seiten.get(eid, eid)] = to_int(a.get("score"))
+    halbzeit = abschnitte.get(1)
+
+    def team(c):
+        return {"name": c.get("name") or "?", "kuerzel": c.get("code"),
+                "tore": to_int(c.get("score")), "sieger": c.get("resultPlace") == 1 and not c.get("draw")}
+
+    kopf = {
+        "wettbewerb": partie.get("competitionName") or zeile["wettbewerb"],
+        "spieltag": zeile["spieltag"],
+        "anstoss": zeile["anstoss"],
+        "halle": partie.get("venue") if isinstance(partie.get("venue"), str) else (partie.get("venue") or {}).get("name"),
+        "zuschauer": to_int(partie.get("attendance")),
+        "status": status,
+        "heim": team(heim), "gast": team(gast),
+        "halbzeit": (halbzeit.get("heim"), halbzeit.get("gast")) if halbzeit else None,
+    }
+
+    # Statistik: statistics.data.base.{home,away}.persons[0].rows
+    statistik = {}
+    basis_stat = ((daten.get("statistics") or {}).get("data") or {}).get("base") or {}
+    for seite, schluessel in (("heim", "home"), ("gast", "away")):
+        block = basis_stat.get(schluessel) or {}
+        tabellen = block.get("persons") or []
+        zeilen = []
+        for r in (tabellen[0].get("rows") if tabellen else []) or []:
+            st = r.get("statistics") or {}
+            if not r.get("participated", True):
+                continue
+            werte = {}
+            for key, _, _ in _SR_STAT_SPALTEN:
+                w = st.get(key)
+                if key == "timeOnPlayingField":
+                    w = _dauer_lesbar(w)
+                elif isinstance(w, float):
+                    w = round(w, 1)
+                werte[key] = w
+            zeilen.append({"nummer": r.get("bib"), "name": r.get("personName") or "?",
+                           "position": r.get("position"), "start": bool(r.get("starter")), **werte})
+        if zeilen:
+            statistik[seite] = zeilen
+
+    # Ticker: &sub=pbp -> pbp.{"1","2",...}.events. Die Quelle kennt keine
+    # Abschnittsmarken, deshalb je Block eine "n. Halbzeit"-Zeile davor und
+    # nach dem letzten beendeten Block "Spielende" mit dem Endstand.
+    ticker = []
+    if status != "Pre":
+        pbp = _sr_get(f"fixture_detail?locale=de-DE&fixtureId={kennung}&sub=pbp", embed=embed)
+        bloecke = sorted(((pbp or {}).get("data") or {}).get("pbp", {}).items(),
+                         key=lambda kv: to_int(kv[0]) or 0)
+        letzter_stand = None
+        for pid, block in bloecke:
+            periode = to_int(pid) or 1
+            dauer = (block or {}).get("durationMinutes") or 30
+            ticker.append({"periode": periode, "minute": f"{(periode - 1) * dauer}:00",
+                           "text": f"{periode}. Halbzeit", "spieler": None, "nummer": None,
+                           "seite": None, "stand": None, "art": "abschnitt"})
+            for ev in (block or {}).get("events") or []:
+                st = ev.get("scores") or {}
+                stand = (f"{to_int(st.get(heim.get('entityId')), 0)}:{to_int(st.get(gast.get('entityId')), 0)}"
+                         if st else None)
+                letzter_stand = stand or letzter_stand
+                ticker.append({
+                    "periode": periode,
+                    "minute": _spielminute(ev.get("clock"), periode, dauer),
+                    "text": ev.get("desc") or ev.get("eventType") or "",
+                    "spieler": ev.get("name"), "nummer": ev.get("bib"),
+                    "seite": seiten.get(ev.get("entityId")),
+                    "stand": stand,
+                    "art": _sr_ereignis_art(ev),
+                })
+        if bloecke and (bloecke[-1][1] or {}).get("ended"):
+            periode = to_int(bloecke[-1][0]) or 1
+            dauer = (bloecke[-1][1] or {}).get("durationMinutes") or 30
+            ticker.append({"periode": periode, "minute": f"{periode * dauer}:00", "text": "Spielende",
+                           "spieler": None, "nummer": None, "seite": None,
+                           "stand": letzter_stand, "art": "abschnitt"})
+
+    # Aufstellung + Offizielle: &sub=preview -> preview.persons
+    aufstellung, schiedsrichter = {}, []
+    vorschau = _sr_get(f"fixture_detail?locale=de-DE&fixtureId={kennung}&sub=preview", embed=embed)
+    personen = (((vorschau or {}).get("data") or {}).get("preview") or {}).get("persons") or {}
+    for eid, seite in seiten.items():
+        block = personen.get(eid) or {}
+        spieler = ([{"nummer": p.get("bib"), "name": p.get("name") or "?", "position": p.get("position"),
+                     "alter": to_int(p.get("age")), "start": True} for p in block.get("starters") or []]
+                   + [{"nummer": p.get("bib"), "name": p.get("name") or "?", "position": p.get("position"),
+                       "alter": to_int(p.get("age")), "start": False} for p in block.get("substitutes") or []])
+        stab = [{"name": p.get("name") or "?", "rolle": p.get("roleLabel") or p.get("role")}
+                for p in block.get("staff") or []]
+        if spieler or stab:
+            aufstellung[seite] = {"spieler": spieler, "stab": stab}
+    schiedsrichter = [{"name": p.get("name") or "?", "rolle": p.get("roleLabel") or p.get("role")}
+                      for p in personen.get("matchOfficials") or []]
+    return {"quelle": "Sportradar / Handball-Bundesliga", "kopf": kopf, "ticker": ticker,
+            "statistik": statistik, "aufstellung": aufstellung, "schiedsrichter": schiedsrichter}
+
+
+def _neu_details(zeile):
+    """handball.net -> Detailformat. Kopf aus der eigenen Zeile (die API hat
+    keinen Einzelspiel-Endpunkt), Ereignisse und Aufstellungen aus
+    matches/<id>/events und /lineups. None nur, wenn beides fehlt."""
+    nr = zeile["id"][1:]
+    ereignisse = _neu_api_get(f"matches/{nr}/events")
+    aufstellungen = _neu_api_get(f"matches/{nr}/lineups")
+    if ereignisse is None and aufstellungen is None:
+        return None
+    ereignisse = (ereignisse or {}).get("data", ereignisse) or []
+    aufstellungen = (aufstellungen or {}).get("data", aufstellungen) or {}
+
+    # Nachgesehen an einem echten Spiel (07.09.2026): die Liste kommt NICHT
+    # chronologisch (Halbzeitpause zuerst, dann absteigend), und das Feld
+    # `score` ist ausserhalb der beiden Halbzeit-Bloecke unbrauchbar (0:1 bei
+    # 9:15). Deshalb: nach Zeitstempel sortieren und den Spielstand selbst
+    # aus den Toren mitzaehlen. Die Halbzeit ist der Stand beim ersten
+    # Ereignis der 2. Halbzeit.
+    ticker, halbzeit = [], None
+    heim_tore = gast_tore = 0
+    roh = sorted((ereignisse if isinstance(ereignisse, list) else []),
+                 key=lambda e: (str(e.get("timestamp") or ""), to_int(e.get("id"), 0)))
+    for ev in roh:
+        typ = ev.get("event_type") or {}
+        name = typ.get("name") or ""
+        if "aufgestellt" in name:
+            continue                      # Aufstellungsmeldungen sind kein Spielverlauf
+        block = str(ev.get("block") or "")
+        periode = 2 if block.startswith("2") else 1
+        if periode == 2 and halbzeit is None:
+            halbzeit = (heim_tore, gast_tore)
+        if typ.get("is_goal"):
+            art = "tor"
+            if ev.get("is_home"):
+                heim_tore += 1
+            else:
+                gast_tore += 1
+        elif "Fehlwurf" in name:
+            art = "fehlwurf"
+        elif "Minuten" in name or "Disqualifikation" in name:
+            art = "strafe"
+        elif "Verwarnung" in name or "Karte" in name:
+            art = "karte"
+        elif "Auszeit" in name:
+            art = "auszeit"
+        elif "Spielende" in name or ("Teil" in name and "Start" in name):
+            art = "abschnitt"
+            name = "Spielende" if "Spielende" in name else f"{periode}. Halbzeit"
+        else:
+            art = "sonst"
+        roh_minute = str(ev.get("minute") or "0:00")
+        mm, _, ss = roh_minute.partition(":")
+        if block.startswith("Halbzeit"):
+            minute = "30:00"
+        else:
+            minute = f"{to_int(mm, 0) + (30 if periode == 2 else 0)}:{(ss or '00')[:2].rjust(2, '0')}"
+        sp = ev.get("player") or {}
+        ticker.append({
+            "periode": periode, "minute": minute, "text": name,
+            "spieler": f"{sp.get('first_name', '')} {sp.get('last_name', '')}".strip() or None,
+            "nummer": None,
+            "seite": "heim" if ev.get("is_home") else ("gast" if ev.get("team") else None),
+            "stand": f"{heim_tore}:{gast_tore}",
+            "art": art,
+        })
+    if halbzeit is None and ticker and zeile["heim_tore"] is not None:
+        halbzeit = None               # kein zweiter Abschnitt gesehen - lieber nichts behaupten
+
+    aufstellung, statistik = {}, {}
+    for seite, schluessel in (("heim", "local"), ("gast", "visitor")):
+        block = aufstellungen.get(schluessel) or {}
+        spieler, zeilen = [], []
+        for p in block.get("players") or []:
+            person = p.get("player") or {}
+            name = f"{person.get('first_name', '')} {person.get('last_name', '')}".strip() or "?"
+            spieler.append({"nummer": p.get("number"), "name": name,
+                            "position": "Tor" if p.get("is_goalkeeper") else None,
+                            "alter": None, "start": bool(p.get("is_starter"))})
+            zeilen.append({"nummer": p.get("number"), "name": name, "position": None,
+                           "start": bool(p.get("is_starter")),
+                           "goalsScored:shots": to_int(p.get("goals")),
+                           "sevenMetreGoalsScored:sevenMetreShots":
+                               f"{to_int(p.get('seven_meter_goals'), 0)}/{to_int(p.get('seven_meter_attempts'), 0)}"
+                               if p.get("seven_meter_attempts") else None,
+                           "twoMinuteSuspensions": to_int(p.get("two_minutes"))})
+        stab = [{"name": f"{(p.get('player') or {}).get('first_name', '')} {(p.get('player') or {}).get('last_name', '')}".strip() or "?",
+                 "rolle": (p.get("role") or {}).get("name")} for p in block.get("staff") or []]
+        if spieler or stab:
+            aufstellung[seite] = {"spieler": spieler, "stab": stab}
+        if zeilen and zeile["heim_tore"] is not None:
+            statistik[seite] = zeilen
+
+    kopf = {
+        "wettbewerb": zeile["wettbewerb"], "spieltag": zeile["spieltag"], "anstoss": zeile["anstoss"],
+        "halle": zeile["ort"], "zuschauer": None, "status": zeile["status"],
+        "heim": {"name": zeile["heim"], "kuerzel": None, "tore": zeile["heim_tore"],
+                 "sieger": zeile["heim_tore"] is not None and zeile["gast_tore"] is not None and zeile["heim_tore"] > zeile["gast_tore"]},
+        "gast": {"name": zeile["gast"], "kuerzel": None, "tore": zeile["gast_tore"],
+                 "sieger": zeile["heim_tore"] is not None and zeile["gast_tore"] is not None and zeile["gast_tore"] > zeile["heim_tore"]},
+        "halbzeit": halbzeit,
+    }
+    return {"quelle": "handball.net", "kopf": kopf, "ticker": ticker, "statistik": statistik,
+            "aufstellung": aufstellung, "schiedsrichter": []}
+
+
+def _spiel_details(db, zeile):
+    """Details aus dem Cache oder frisch. (details, veraltet) - veraltet=True
+    bedeutet: die Quelle war gerade nicht erreichbar, das ist ein alter Stand."""
+    frist = _DETAILS_ALTER.get(zeile["status"], "-6 hours")
+    cache = db.execute(
+        "SELECT daten, aktualisiert_am > datetime('now', ?) AS frisch "
+        "FROM tvb_spiel_details WHERE id=?", (frist, zeile["id"])).fetchone()
+    if cache and cache["frisch"]:
+        return json.loads(cache["daten"]), False
+    details = _sr_details(zeile) if zeile["id"].startswith("sr") else _neu_details(zeile)
+    if details:
+        db.execute("""
+            INSERT INTO tvb_spiel_details(id, daten, aktualisiert_am) VALUES (?, ?, datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET daten=excluded.daten, aktualisiert_am=excluded.aktualisiert_am
+        """, (zeile["id"], json.dumps(details, ensure_ascii=False)))
+        db.commit()
+        return details, False
+    if cache:
+        return json.loads(cache["daten"]), True
+    return None, False
+
+
+def _kopf_aus_zeile(zeile):
+    """Notnagel ohne Quelle: das, was die eigene Zeile hergibt."""
+    return {
+        "wettbewerb": zeile["wettbewerb"], "spieltag": zeile["spieltag"], "anstoss": zeile["anstoss"],
+        "halle": zeile["ort"], "zuschauer": None, "status": zeile["status"],
+        "heim": {"name": zeile["heim"], "kuerzel": None, "tore": zeile["heim_tore"], "sieger": False},
+        "gast": {"name": zeile["gast"], "kuerzel": None, "tore": zeile["gast_tore"], "sieger": False},
+        "halbzeit": None,
+    }
+
+
+@bp.route("/a/tvb/spiel/<sid>", defaults={"token": None})
+@bp.route("/a/tvb/<token>/spiel/<sid>")
+def spiel(token, sid):
+    """Wunsch #267/#268: Details zu einem Spiel - kommend oder gespielt."""
+    user = check_grant(token, APP)
+    if not user:
+        return render_template("denied.html", reason="invalid"), 403
+    if not _SPIEL_ID.match(sid or ""):
+        return render_template("denied.html", reason="invalid"), 404
+    db = get_db()
+    zeile = db.execute("SELECT * FROM tvb_spiele WHERE id=?", (sid,)).fetchone()
+    if not zeile:
+        return render_template("denied.html", reason="invalid"), 404
+    details, veraltet = _spiel_details(db, zeile)
+    mannschaft = db.execute(
+        "SELECT name FROM tvb_mannschaften WHERE team_id=?", (zeile["team_id"],)).fetchone()
+    tvb_name = mannschaft["name"] if mannschaft else _VEREIN_PROFIS
+    return render_template("tvb_spiel.html",
+        user=user, token=token, farbe=user["farbe"],
+        zeile=dict(zeile), details=details, veraltet=veraltet,
+        kopf=(details or {}).get("kopf") or _kopf_aus_zeile(zeile),
+        tvb_name=tvb_name, team_id=zeile["team_id"],
+        stat_spalten=_SR_STAT_SPALTEN,
+    )
+
+
 def init_app(app):
     app.register_blueprint(bp)

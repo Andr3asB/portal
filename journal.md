@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-09-07 – portal-v248: #267/#268 – Spieldetails mit Verlauf, Statistik und Aufstellung
+
+Zwei Wünsche, eine Seite: Jedes Spiel auf der TVB-Seite ist jetzt ein Link
+auf `/spiel/<id>`. Kommend zeigt sie Anwurf, Halle, Wettbewerb, Spieltag
+(#267); gespielt den ganzen Verlauf (#268).
+
+**Was die Quellen hergeben.** Beim Sondieren zeigte sich, dass Sportradars
+`fixture_detail` weit mehr trägt als den Endstand: `periodData` mit den
+Toren je Halbzeit, `statistics.data.base` mit einer Spielerstatistik je
+Team (Tore/Würfe, Quote, 7m, HPI, Assists, Blocks, Steals, Zeitstrafen,
+technische Fehler, Spielzeit als ISO-Dauer), und über `&sub=pbp` den
+kompletten Live-Ticker (Tor, Fehlwurf, Zeitstrafe, Karte, Auszeit,
+Torwartwechsel – je mit Uhr, Spieler und Spielstand danach), über
+`&sub=preview` Aufstellung, Team-Offizielle und Schiedsrichter. Die
+Reiter-Namen standen in `tabs` der Antwort (`pbp`, `preview`, `statistics`,
+`shot_chart`) – ich hatte vorher `play_by_play` und `lineups` geraten, beide
+404. Für die Amateurmannschaften hat handball.net `matches/<id>/events`
+(96 Ereignisse mit Minute, Block, Typ, Spieler, Stand) und `/lineups`
+(Spieler mit Toren, 7m, Zeitstrafen).
+
+**Ein Format für beide.** `_sr_details()` und `_neu_details()` liefern
+dasselbe Wörterbuch (kopf, ticker, statistik, aufstellung, schiedsrichter),
+die Vorlage kennt nur dieses. Fallen, die die Tests festhalten: Sportradars
+`teamScores` sind Tore **je Abschnitt**, nicht kumuliert (Halbzeit =
+Abschnitt 1, sonst stünde 12:14 als 34:34); die Uhr der 2. Halbzeit fängt
+bei 0 an und muss um 30 Minuten verschoben werden; Spieler ohne
+`participated` stehen nicht in der Statistik; handball.nets „Spieler
+aufgestellt"-Ereignisse sind kein Spielverlauf. Cache `tvb_spiel_details`
+mit Frist nach Zustand: beendet 24 h, kommend 6 h, laufend 2 min. Kennung
+gegen `_SPIEL_ID` geprüft, bevor sie in einen Fremdpfad geht.
+
+**Darstellung** (#268 verlangt sie ausdrücklich): Anzeigetafel mit großem
+Stand, Sieger fett, TVB in der Kontrastfarbe, Halbzeit darunter; Ticker als
+dreispaltiges Raster (Minute, Stand, Text) – standardmäßig Tore, Strafen,
+Karten und Abschnitte, der Rest aufklappbar in einem `<details>`;
+Statistik und Aufstellung je Team, mobil untereinander, ab 700 px
+nebeneinander, Tabellen scrollen im eigenen Rahmen mit klebender
+Namensspalte, Legende für die Kürzel. Keine Spielerfotos (#119). 14 Tests.
+
+**Die Live-Probe hat zwei Annahmen korrigiert** (v248 → v249, ausgeliefert
+als eine Version): Bei Sportradar ist ein Wurf **immer** `eventType: goal`,
+ob er drin war, sagt `success` – 69 Ereignisse lagen deshalb in „sonst";
+Zeitstrafen heißen `suspension`, Auszeiten `timeOut`. Bei handball.net
+kommt die Ereignisliste **nicht chronologisch** (Halbzeitpause zuerst, dann
+absteigend), und das `score`-Feld ist außerhalb der beiden Halbzeit-Blöcke
+Unsinn (0:1 bei wahrem 9:15). Jetzt: nach Zeitstempel sortiert, der
+Spielstand wird aus den Toren selbst mitgezählt, die Halbzeit ist der Stand
+beim ersten Ereignis der 2. Halbzeit. Die Testdaten spiegeln beide Marotten.
+
 ## 2026-09-07 – portal-v247: Nachtrag zu #263 – die Ergebnisliste der Saison
 
 Andi: „Wann werden die Ergebnisse nachgeladen? Das erste Spiel der Saison

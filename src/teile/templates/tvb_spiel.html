@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% set app_slug = "tvb" %}
+{% block title %}{{ kopf.heim.name }} – {{ kopf.gast.name }}{% endblock %}
+
+{% block extra_styles %}
+{# Wunsch #267/#268: Spieldetails. EIN Format fuer beide Quellen (siehe
+   18_tvb.py). Mobil untereinander, ab 700px Statistik und Aufstellung der
+   beiden Teams nebeneinander; Tabellen scrollen in ihrem eigenen Rahmen. #}
+.sd-karte { background:var(--surface); border-radius:14px; padding:14px 16px; box-shadow:0 1px 3px var(--shadow); margin-bottom:12px; }
+.sd-titel { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
+.sd-meta { text-align:center; font-size:13px; color:var(--text-2); line-height:1.5; }
+.sd-meta .tvb-wettbewerb { display:inline-block; padding:1px 6px; border-radius:8px; font-weight:600; background:var(--fg-3, rgba(127,127,127,.18)); color:var(--text-1); }
+.sd-tafel { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; margin:12px 0 6px; }
+.sd-team { font-size:16px; font-weight:600; word-break:break-word; min-width:0; }
+.sd-team.heim { text-align:right; }
+.sd-team.gast { text-align:left; }
+.sd-team.tvb { color:var(--farbe-kontrast); }
+.sd-team.sieger { font-weight:800; }
+.sd-team.verlierer { color:var(--text-2); }
+.sd-stand { font-size:34px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; line-height:1.1; }
+.sd-stand.live { color:var(--rot-text); }
+.sd-stand.offen { font-size:15px; font-weight:600; color:var(--text-2); }
+.sd-halbzeit { text-align:center; font-size:13px; color:var(--text-2); }
+.sd-status { display:inline-block; font-size:12px; font-weight:600; border-radius:10px; padding:2px 8px; border:1px solid var(--border); color:var(--text-2); }
+.sd-status.live { color:var(--rot-text); border-color:var(--rot-text); }
+.sd-status.ende { color:var(--gruen-text); border-color:var(--gruen-text); }
+.sd-info { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+.sd-info-label { font-size:12px; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+.sd-info-wert { font-size:15px; font-weight:600; }
+.sd-hinweis { font-size:12px; color:var(--text-2); line-height:1.5; }
+.sd-zwei { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:700px) { .sd-zwei { grid-template-columns:1fr 1fr; } }
+.sd-scroll { overflow-x:auto; }
+.sd-tabelle { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+.sd-tabelle th, .sd-tabelle td { padding:5px 5px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--border-subtle); }
+.sd-tabelle th { font-size:12px; font-weight:600; color:var(--text-2); }
+.sd-tabelle th.name, .sd-tabelle td.name { text-align:left; white-space:normal; min-width:130px; position:sticky; left:0; background:var(--surface); }
+.sd-tabelle tr:last-child td { border-bottom:none; }
+.sd-nummer { display:inline-block; min-width:22px; color:var(--text-2); font-size:12px; }
+.sd-start { color:var(--text-2); font-size:12px; }
+.sd-ticker { list-style:none; margin:0; padding:0; }
+.sd-ereignis { display:grid; grid-template-columns:44px 52px 1fr; gap:8px; align-items:baseline; padding:5px 0; border-bottom:1px solid var(--border-subtle); font-size:13px; }
+.sd-ereignis:last-child { border-bottom:none; }
+.sd-ereignis .minute { color:var(--text-2); font-variant-numeric:tabular-nums; }
+.sd-ereignis .stand { font-weight:700; font-variant-numeric:tabular-nums; }
+.sd-ereignis.tor .stand { color:var(--farbe-kontrast); }
+.sd-ereignis.strafe .text, .sd-ereignis.karte .text { color:var(--rot-text); }
+.sd-ereignis.abschnitt { background:var(--surface-2); border-radius:8px; padding:5px 8px; font-weight:600; }
+.sd-ereignis .text .wer { color:var(--text-2); }
+.sd-ereignis .text .seite { font-size:12px; color:var(--text-2); }
+.sd-details summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--farbe-kontrast); padding:6px 0; list-style:none; }
+.sd-details summary::-webkit-details-marker { display:none; }
+.sd-details summary::before { content:"▸ "; }
+.sd-details[open] summary::before { content:"▾ "; }
+.sd-liste { list-style:none; margin:0; padding:0; font-size:14px; }
+.sd-liste li { padding:5px 0; border-bottom:1px solid var(--border-subtle); display:flex; gap:8px; align-items:baseline; }
+.sd-liste li:last-child { border-bottom:none; }
+.sd-liste .rolle { margin-left:auto; font-size:12px; color:var(--text-2); white-space:nowrap; }
+.empty { text-align:center; padding:30px 16px; color:var(--text-2); font-size:15px; line-height:1.5; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="/a/tvb{{ tp }}{% if team_id != 'profis' %}?team={{ team_id }}{% endif %}" title="Zurück">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">🏐 Spiel</h1>
+<div class="nav-sub">{{ kopf.wettbewerb or 'TVB' }}{% if kopf.spieltag %} · {{ kopf.spieltag }}{% endif %}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  {% set fertig = kopf.heim.tore is not none and kopf.gast.tore is not none and kopf.status == 'Ended' %}
+  {% set laeuft = kopf.status == 'Live' %}
+
+  <div class="sd-karte">
+    <div class="sd-meta">
+      {%- if kopf.wettbewerb %}<span class="tvb-wettbewerb">{{ kopf.wettbewerb }}</span>{% endif -%}
+      {%- if kopf.spieltag %} {{ kopf.spieltag }}{% endif -%}
+      <br>{{ kopf.anstoss[8:10] }}.{{ kopf.anstoss[5:7] }}.{{ kopf.anstoss[0:4] }}, {{ kopf.anstoss[11:16] }} Uhr
+      {%- if kopf.halle %} · {{ kopf.halle }}{% endif %}
+    </div>
+    <div class="sd-tafel">
+      <div class="sd-team heim{% if kopf.heim.name == tvb_name %} tvb{% endif %}{% if fertig and kopf.heim.sieger %} sieger{% elif fertig and kopf.gast.sieger %} verlierer{% endif %}">{{ kopf.heim.name }}</div>
+      <div class="sd-stand{% if laeuft %} live{% elif not fertig %} offen{% endif %}">
+        {%- if kopf.heim.tore is not none and kopf.gast.tore is not none %}{{ kopf.heim.tore }}:{{ kopf.gast.tore }}{% else %}{{ kopf.anstoss[11:16] }}{% endif -%}
+      </div>
+      <div class="sd-team gast{% if kopf.gast.name == tvb_name %} tvb{% endif %}{% if fertig and kopf.gast.sieger %} sieger{% elif fertig and kopf.heim.sieger %} verlierer{% endif %}">{{ kopf.gast.name }}</div>
+    </div>
+    <div class="sd-halbzeit">
+      {% if kopf.halbzeit %}Halbzeit {{ kopf.halbzeit[0] }}:{{ kopf.halbzeit[1] }} · {% endif -%}
+      <span class="sd-status{% if laeuft %} live{% elif fertig %} ende{% endif %}">{% if laeuft %}🔴 läuft{% elif fertig %}Beendet{% else %}Terminiert{% endif %}</span>
+      {%- if kopf.zuschauer %} · {{ '{:,}'.format(kopf.zuschauer).replace(',', '.') }} Zuschauer{% endif %}
+    </div>
+  </div>
+
+  {% if veraltet %}
+  <div class="sd-karte sd-hinweis">📡 Die Quelle ist gerade nicht erreichbar – das ist der zuletzt gespeicherte Stand.</div>
+  {% elif not details %}
+  <div class="sd-karte sd-hinweis">📡 Mehr Details sind gerade nicht abrufbar – die Angaben oben stammen aus dem eigenen Spielplan.</div>
+  {% endif %}
+
+  {% if not fertig and not laeuft %}
+  <div class="sd-karte">
+    <h2 class="sd-titel">Spielinfo</h2>
+    <div class="sd-info">
+      <div><div class="sd-info-label">Anwurf</div><div class="sd-info-wert">{{ kopf.anstoss[8:10] }}.{{ kopf.anstoss[5:7] }}., {{ kopf.anstoss[11:16] }}</div></div>
+      <div><div class="sd-info-label">Halle</div><div class="sd-info-wert">{{ kopf.halle or '–' }}</div></div>
+      <div><div class="sd-info-label">Wettbewerb</div><div class="sd-info-wert">{{ kopf.wettbewerb or '–' }}</div></div>
+      <div><div class="sd-info-label">Spieltag</div><div class="sd-info-wert">{{ kopf.spieltag or '–' }}</div></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if details and details.ticker %}
+  <div class="sd-karte">
+    <h2 class="sd-titel">Spielverlauf</h2>
+    {% set tore = details.ticker|selectattr('art', 'eq', 'tor')|list %}
+    <ul class="sd-ticker" id="ticker-tore">
+      {% for e in details.ticker if e.art in ('tor', 'abschnitt', 'strafe', 'karte') %}
+      <li class="sd-ereignis {{ e.art }}">
+        <span class="minute">{{ e.minute or '' }}</span>
+        <span class="stand">{{ e.stand or '' }}</span>
+        <span class="text">{{ e.text }}{% if e.spieler %} <span class="wer">– {% if e.nummer %}#{{ e.nummer }} {% endif %}{{ e.spieler }}</span>{% endif %}{% if e.seite %} <span class="seite">({{ 'Heim' if e.seite == 'heim' else 'Gast' }})</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% set rest = details.ticker|rejectattr('art', 'in', ['tor', 'abschnitt', 'strafe', 'karte'])|list %}
+    {% if rest %}
+    <details class="sd-details">
+      <summary>Alle {{ details.ticker|length }} Ereignisse (auch Fehlwürfe, Auszeiten, Wechsel)</summary>
+      <ul class="sd-ticker">
+        {% for e in details.ticker %}
+        <li class="sd-ereignis {{ e.art }}">
+          <span class="minute">{{ e.minute or '' }}</span>
+          <span class="stand">{{ e.stand or '' }}</span>
+          <span class="text">{{ e.text }}{% if e.spieler %} <span class="wer">– {% if e.nummer %}#{{ e.nummer }} {% endif %}{{ e.spieler }}</span>{% endif %}{% if e.seite %} <span class="seite">({{ 'Heim' if e.seite == 'heim' else 'Gast' }})</span>{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if details and details.statistik %}
+  <div class="sd-karte">
+    <h2 class="sd-titel">Statistik</h2>
+    {% set hat_sr = details.quelle.startswith('Sportradar') %}
+    <div class="sd-zwei">
+      {% for seite in ('heim', 'gast') if details.statistik.get(seite) %}
+      <div>
+        <div class="sd-titel">{{ kopf[seite].name }}</div>
+        <div class="sd-scroll">
+          <table class="sd-tabelle">
+            <thead><tr>
+              <th class="name">Spieler</th>
+              {% if hat_sr %}
+                {% for key, kurz, _ in stat_spalten %}<th title="{{ _ }}">{{ kurz }}</th>{% endfor %}
+              {% else %}
+                <th>Tore</th><th>7m</th><th>2 min</th>
+              {% endif %}
+            </tr></thead>
+            <tbody>
+              {% for z in details.statistik[seite] %}
+              <tr>
+                <td class="name"><span class="sd-nummer">{{ z.nummer or '' }}</span> {{ z.name }}{% if z.position %} <span class="sd-start">{{ z.position }}</span>{% endif %}</td>
+                {% if hat_sr %}
+                  {% for key, _, _ in stat_spalten %}<td>{{ z[key] if z[key] is not none else '–' }}</td>{% endfor %}
+                {% else %}
+                  <td>{{ z['goalsScored:shots'] if z['goalsScored:shots'] is not none else '–' }}</td>
+                  <td>{{ z['sevenMetreGoalsScored:sevenMetreShots'] or '–' }}</td>
+                  <td>{{ z['twoMinuteSuspensions'] if z['twoMinuteSuspensions'] is not none else '–' }}</td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if hat_sr %}
+    <div class="sd-hinweis" style="margin-top:8px">
+      {% for _, kurz, lang in stat_spalten %}{{ kurz }} = {{ lang }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if details and details.aufstellung %}
+  <div class="sd-karte">
+    <h2 class="sd-titel">Aufstellung</h2>
+    <div class="sd-zwei">
+      {% for seite in ('heim', 'gast') if details.aufstellung.get(seite) %}
+      <div>
+        <div class="sd-titel">{{ kopf[seite].name }}</div>
+        <ul class="sd-liste">
+          {% for p in details.aufstellung[seite].spieler %}
+          <li><span class="sd-nummer">{{ p.nummer or '' }}</span> {{ p.name }}<span class="rolle">{{ p.position or '' }}{% if p.start %}{% if p.position %} · {% endif %}Start{% endif %}</span></li>
+          {% endfor %}
+          {% for p in details.aufstellung[seite].stab %}
+          <li>{{ p.name }}<span class="rolle">{{ p.rolle or 'Team' }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+    {% if details.schiedsrichter %}
+    <div class="sd-titel" style="margin-top:12px">Schiedsrichter</div>
+    <ul class="sd-liste">
+      {% for p in details.schiedsrichter %}
+      <li>{{ p.name }}<span class="rolle">{{ p.rolle or '' }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if details %}
+  <div class="sd-hinweis" style="padding:0 6px">Quelle: {{ details.quelle }}. Spielerfotos werden bewusst nicht geladen.</div>
+  {% endif %}
+</main>
+{% endblock %}

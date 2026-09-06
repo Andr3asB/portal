@@ -13,6 +13,10 @@
   border-bottom:1px solid var(--border-subtle); font-size:14px;
 }
 .tvb-spiel:last-child { border-bottom:none; }
+/* Wunsch #267/#268: jede Spielkarte ist ein Link zur Detailseite - ohne
+   Linkoptik, der Pfeil rechts sagt, dass dahinter etwas ist. */
+.tvb-spiel-link { color:inherit; text-decoration:none; }
+.tvb-pfeil { color:var(--text-2); font-weight:400; }
 .tvb-spiel-teams { flex:1; min-width:0; }
 .tvb-spiel-team { white-space:normal; word-break:break-word; }
 .tvb-spiel-team.tvb { font-weight:700; }
@@ -196,8 +200,9 @@
      Jede Angabe erscheint nur noch, wenn sie wirklich da ist; fehlt alles,
      entfaellt die Zeile ganz. Der Ort bleibt bewusst drin, wo er existiert:
      "wo spielen wir?" ist bei kommenden Spielen eine echte Information. #}
+  {# Wunsch #267: Die ganze Karte ist ein Link zur Detailseite. #}
   {% macro kommend_karte(s, gewaehlt, haupt_wettbewerb) %}
-  <div class="tvb-spiel">
+  <a class="tvb-spiel tvb-spiel-link knopf" href="/a/tvb{{ tp }}spiel/{{ s.id }}">
     <div class="tvb-spiel-teams">
       <div class="tvb-spiel-team{% if s.heim == gewaehlt.name %} tvb{% endif %}">{{ s.heim }}</div>
       <div class="tvb-spiel-team{% if s.gast == gewaehlt.name %} tvb{% endif %}">{{ s.gast }}</div>
@@ -209,9 +214,9 @@
       {% endif %}
     </div>
     <div class="tvb-spiel-ergebnis offen">
-      {{ s.anstoss[:16].replace('T', ' ') }}
+      {{ s.anstoss[:16].replace('T', ' ') }}<span class="tvb-pfeil" aria-hidden="true"> ›</span>
     </div>
-  </div>
+  </a>
   {% endmacro %}
 
   <div class="tvb-section">
@@ -250,7 +255,8 @@
       {# Wunsch #264: Sieger/Verlierer erst beim Endstand - ein Zwischenstand
          hat noch keinen. #}
       {% set fertig = s.heim_tore is not none and s.gast_tore is not none and not laeuft %}
-      <div class="tvb-spiel tvb-erg-karte">
+      {# Wunsch #268: ein Tipp aufs Ergebnis oeffnet Spielverlauf und Statistik. #}
+      <a class="tvb-spiel tvb-erg-karte tvb-spiel-link knopf" href="/a/tvb{{ tp }}spiel/{{ s.id }}">
         <div class="tvb-erg">
           <div class="tvb-erg-team heim{% if s.heim == gewaehlt.name %} tvb{% endif %}{% if fertig and s.heim_tore > s.gast_tore %} sieger{% elif fertig and s.heim_tore < s.gast_tore %} verlierer{% endif %}">{{ s.heim }}</div>
           <div class="tvb-erg-score{% if laeuft %} live{% elif not fertig %} offen{% endif %}">
@@ -265,7 +271,7 @@
           {%- if s.spieltag %}{{ s.spieltag }}{% endif -%}
         </div>
         {% endif %}
-      </div>
+      </a>
       {% endfor %}
     {% endif %}
   </div>

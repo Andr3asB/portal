@@ -401,6 +401,14 @@ CREATE TABLE IF NOT EXISTS tvb_spieler_profile (
   daten           TEXT NOT NULL,
   aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Wunsch #267/#268: Spieldetails (Halbzeit, Ticker, Statistik, Aufstellung)
+-- je Spiel als JSON; Schluessel ist tvb_spiele.id. Wie lange der Stand
+-- gilt, haengt vom Spielzustand ab (18_tvb.py, _spiel_details).
+CREATE TABLE IF NOT EXISTS tvb_spiel_details (
+  id              TEXT PRIMARY KEY,
+  daten           TEXT NOT NULL,
+  aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
   vorname         TEXT    NOT NULL,
