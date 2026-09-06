@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-09-06 – portal-v243: #263/#264 – Bundesliga-Ergebnisse nachladen, Zwischenstand ist kein Endstand
+
+Andi: „Kann man da wirklich die alten Spiele nicht mehr laden? Das müsste
+doch gehen." Es geht. Die Session vom 31.08. hatte an der *Liste* fünf
+`round`-Varianten probiert; ich habe den Widget-Zustand der Reiter
+entschlüsselt (`~w=fl~<zlib+base64>` → `{"l","s","z":"RESULTS"}`) und dann
+Endpunkt-Namen durchprobiert. Treffer: **`fixture_detail?locale=de-DE&
+fixtureId=<id>`** liefert zu jeder Kennung Status `CONFIRMED`, Endstand je
+Mannschaft (als Text!) und Halbzeitstände – geprüft mit den ältesten Spielen
+der Saison. Das Portal speichert jede gesehene Kennung, also lässt sich
+jedes Spiel nachtragen. HPI-API der Liga und handball.net-API kennen keine
+Bundesliga-Spiele, das bleibt Sportradar.
+
+**Beim Prüfen fiel das eigentliche Problem auf.** Hamburg – TVB vom 02.09.
+stand mit 33:31 in der Datenbank, Sportradar sagt 34:34 (Halbzeiten 12:14,
+22:20; Tabelle: je ein Unentschieden). `_sr_spiel()` hielt „beide Tore da"
+für „beendet" – der Ribbon trägt aber schon während des Spiels
+Zwischenstände (`isLive=true`, `isFinal=false`). Jemand hatte die Seite um
+20:52 in der Schlussphase geöffnet, der Zwischenstand wurde als `Ended`
+gespeichert, und bis das Spiel aus dem Ribbon rollte, hat niemand mehr die
+Seite geöffnet. Zweiter Fehler derselben Funktion: `date` wurde vor
+`startTimeUTC` bevorzugt und als UTC gelesen – `date` ist im Ribbon aber
+Ortszeit (20:00 für ein 18:00-UTC-Spiel). Jeder Anwurf aus dem Ribbon stand
+zwei Stunden zu spät in der Datenbank (Hamburg 21:00 statt 19:00).
+
+Umgesetzt:
+
+- **Drei Zustände** in `_sr_spiel()`: `Ended` nur bei `isFinal` oder Status
+  `CONFIRMED`, `Live` bei `isLive`, sonst `Pre`; Tore ohne jede Statusangabe
+  (Pokal-Spielplan, #231) gelten weiter als gespielt, aber unbestätigt.
+  `startTimeUTC` vor `date`; `date` allein wird als Ortszeit gelesen. Tore
+  über `to_int()`, weil fixture_detail sie als Text liefert.
+- **Neue Spalte `tvb_spiele.bestaetigt`** (0/1). Der UPSERT ersetzt einen
+  bestätigten Stand nie durch einen unbestätigten, `bestaetigt` kann nur
+  steigen, der Anwurf wird immer übernommen (Verlegungen, Zeitkorrektur),
+  NULL überschreibt keinen bekannten Wettbewerb. Altbestand startet mit 0.
+- **`_profi_nachladen()`**: bei jedem Seitenaufruf der Profis bis zu sechs
+  vergangene Spiele ohne bestätigten Endstand über fixture_detail nachziehen
+  (Pokal zuerst im Embed 255, sonst 248 dann 255), je Spiel höchstens ein
+  Versuch pro Stunde über `aktualisiert_am`. Damit korrigiert sich auch das
+  33:31 von selbst beim nächsten Aufruf.
+- **Vorlage**: laufendes Spiel zeigt den Zwischenstand rot mit „🔴 läuft",
+  ohne Sieger/Verlierer-Markierung.
+- Hilfe-Tipp und server.md korrigiert („nicht nachladbar" war falsch).
+- `test_tvb_nachladen.py` (16 Tests) plus zwei Anpassungen in
+  `test_tvb_datenschicht.py` (Ribbon-Fixture trägt jetzt beide Zeiten).
+
 ## 2026-09-05 – portal-v242: #259 KI-Modelle und Hosting-Orte sichtbar (Hilfe + Verwaltung)
 
 Stundenlauf, 14:23. Andis Wunsch, direkt nach #258: es soll in einem Kapitel

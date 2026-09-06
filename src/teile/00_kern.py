@@ -2166,6 +2166,18 @@ def _init_db(app):
         except sqlite3.OperationalError:
             pass
 
+        # Wunsch #263/#264: Ist der gespeicherte Stand ein von der Quelle
+        # bestaetigter ENDSTAND (1) oder nur ein Zwischenstand/ungeprueft (0)?
+        # Bestehende Zeilen starten mit 0 und werden einmalig ueber den
+        # Einzelspiel-Endpunkt nachgeprueft - genau so kam das falsche 33:31
+        # (Hamburg, 02.09.2026) wieder in Ordnung.
+        try:
+            db.execute(
+                "ALTER TABLE tvb_spiele ADD COLUMN bestaetigt INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+
         # Wunsch #124: Altersklasse je Mannschaft, damit sich Jugendklassen
         # pro Nutzer ausblenden lassen. tvb_mannschaften ist ein reiner Cache
         # der Vereinsseite - statt die Spalte muehsam nachzufuellen, wird der

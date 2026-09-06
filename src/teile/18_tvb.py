@@ -644,6 +644,9 @@ def _spiel_aus_neu(roh, team_id):
         "ort":        (roh.get("field") or {}).get("name"),
         "status":     "Ended" if zustand.get("is_finished") else "Pre",
         "wettbewerb": ((roh.get("phase") or {}).get("competition") or {}).get("name"),
+        # Wunsch #264: is_finished ist die Aussage der Quelle, dass es der
+        # Endstand ist - nicht bloss "es gibt Tore".
+        "bestaetigt": 1 if zustand.get("is_finished") else 0,
     }
 
 
@@ -663,19 +666,41 @@ def _sr_spiel(eintrag, wettbewerb):
 
     partie = eintrag.get("fixture") or eintrag
     kennung = partie.get("fixtureId")
-    zeit = partie.get("date") or partie.get("startTimeUTC")
-    if not kennung or not zeit:
+    zeit_utc, zeit_lokal = partie.get("startTimeUTC"), partie.get("date")
+    if not kennung or not (zeit_utc or zeit_lokal):
         return None
     try:
-        # Beide Endpunkte liefern UTC OHNE Zeitzonenangabe. Wird das als
-        # Ortszeit gelesen, liegt jeder Anwurf zwei Stunden daneben.
-        anstoss = datetime.fromisoformat(zeit).replace(
-            tzinfo=UTC).astimezone(_TZ).isoformat()
+        # Wunsch #264: `startTimeUTC` ist UTC ohne Zeitzonenangabe, `date`
+        # im Ribbon dagegen ORTSZEIT (20:00 fuer ein 18:00-UTC-Spiel). Bis
+        # #264 wurde `date` bevorzugt und als UTC gelesen - jeder Anwurf aus
+        # dem Ribbon stand damit zwei Stunden zu spaet in der Datenbank.
+        if zeit_utc:
+            anstoss = datetime.fromisoformat(zeit_utc).replace(
+                tzinfo=UTC).astimezone(_TZ).isoformat()
+        else:
+            anstoss = datetime.fromisoformat(zeit_lokal).replace(tzinfo=_TZ).isoformat()
     except Exception:
         return None
 
-    tore_heim, tore_gast = heim.get("score"), gast.get("score")
-    fertig = partie.get("isFinal") or (tore_heim is not None and tore_gast is not None)
+    # Tore kommen im Ribbon als Zahl, in fixture_detail als Zeichenkette.
+    tore_heim, tore_gast = to_int(heim.get("score")), to_int(gast.get("score"))
+    zustand = partie.get("status")
+    zustand_wert = (zustand.get("value") if isinstance(zustand, dict) else zustand) or ""
+    # Wunsch #264: Nur die Quelle sagt, ob es der ENDSTAND ist (isFinal bzw.
+    # Status CONFIRMED). Waehrend das Spiel laeuft, traegt der Ribbon schon
+    # Zwischenstaende mit isLive=true - die galten bisher als Endstand, und
+    # ein 33:31 aus der Schlussphase blieb als Ergebnis stehen (Hamburg,
+    # 02.09.2026, wirklich 34:34). Tore ohne beides (Pokal-Spielplan) zaehlen
+    # weiter als gespielt, aber unbestaetigt - fixture_detail prueft nach.
+    final = bool(partie.get("isFinal")) or zustand_wert == "CONFIRMED"
+    live = not final and (bool(partie.get("isLive")) or zustand_wert in ("LIVE", "IN_PROGRESS"))
+    hat_tore = tore_heim is not None and tore_gast is not None
+    if final:
+        status = "Ended"
+    elif live:
+        status = "Live"
+    else:
+        status = "Ended" if hat_tore else "Pre"
     return {
         "id":         f"sr{kennung}",
         "team_id":    _PROFI_TEAM_ID,
@@ -686,9 +711,66 @@ def _sr_spiel(eintrag, wettbewerb):
         "gast_tore":  tore_gast,
         "anstoss":    anstoss,
         "ort":        (partie.get("venue") or {}).get("name") if isinstance(partie.get("venue"), dict) else None,
-        "status":     "Ended" if fertig else "Pre",
+        "status":     status,
         "wettbewerb": wettbewerb,
+        "bestaetigt": 1 if final else 0,
     }
+
+
+def _sr_spiel_aus_detail(antwort, wettbewerb):
+    """Wunsch #263: Ein Spiel aus `fixture_detail?fixtureId=<id>` - der
+    Einzelspiel-Endpunkt, der zu JEDER Kennung Status und Endstand liefert,
+    egal wie lange das Spiel her ist. `data.fixture` traegt dort die
+    competitors selbst, der Status ist eine Zeichenkette ("CONFIRMED")."""
+    partie = ((antwort or {}).get("data") or {}).get("fixture")
+    if not isinstance(partie, dict):
+        return None
+    return _sr_spiel({"competitors": partie.get("competitors"), "fixture": partie},
+                     wettbewerb)
+
+
+# Wunsch #263: Wie viele vergangene Spiele ein Seitenaufruf hoechstens
+# nachprueft. Ein Aufruf je Spiel; mehr als das braucht es nur nach einer
+# langen Pause, und dann holt es der naechste Aufruf nach.
+_NACHLADEN_JE_AUFRUF = 6
+
+
+def _profi_nachladen(db, grenze=_NACHLADEN_JE_AUFRUF):
+    """Wunsch #263/#264: Vergangene Profi-Spiele ohne bestaetigten Endstand
+    ueber fixture_detail nachziehen - Spiele ohne Ergebnis (Ribbon-Fenster
+    verpasst) genauso wie Zwischenstaende, die vor #264 als Endstand
+    gespeichert wurden. Je Spiel hoechstens ein Versuch pro Stunde
+    (aktualisiert_am), damit ein Spiel, das die Quelle nicht kennt, nicht
+    bei jedem Seitenaufruf neu angefragt wird. Gibt die uebernommenen Spiele
+    zurueck."""
+    jetzt = datetime.now(_TZ).isoformat()
+    offen = db.execute("""
+        SELECT id, wettbewerb FROM tvb_spiele
+        WHERE  id LIKE 'sr%' AND bestaetigt = 0 AND anstoss < ?
+          AND  aktualisiert_am < datetime('now', '-1 hour')
+        ORDER  BY anstoss ASC LIMIT ?
+    """, (jetzt, grenze)).fetchall()
+    uebernommen = []
+    for zeile in offen:
+        kennung = zeile["id"][2:]
+        # Pokalspiele liegen im Pokal-Embed; ist der Wettbewerb unbekannt
+        # (Altbestand), erst die Liga, dann der Pokal.
+        embeds = [255, 248] if zeile["wettbewerb"] == "DHB-Pokal" else [248, 255]
+        spiel = None
+        for embed in embeds:
+            antwort = _sr_get(f"fixture_detail?locale=de-DE&fixtureId={kennung}", embed=embed)
+            spiel = _sr_spiel_aus_detail(antwort, _SR_EMBEDS.get(embed))
+            if spiel:
+                break
+        if spiel and spiel["status"] == "Ended" and spiel["bestaetigt"]:
+            uebernommen.append(spiel)
+        else:
+            db.execute("UPDATE tvb_spiele SET aktualisiert_am=datetime('now') WHERE id=?",
+                       (zeile["id"],))
+    if uebernommen:
+        _tvb_spiele_aktualisieren(db, uebernommen)
+    db.commit()
+    return uebernommen
 
 
 def _profi_spiele():
@@ -736,17 +818,30 @@ def _IST_TVB(name):
 
 def _tvb_spiele_aktualisieren(db, spiele):
     """UPSERT gesehener Spiele nach tvb_spiele - siehe Docstring oben."""
+    # Wunsch #264: Ein BESTAETIGTER Endstand wird von einem unbestaetigten
+    # Stand (Ribbon waehrend des Spiels, Spielplan ohne Tore) nie mehr
+    # ueberschrieben; `bestaetigt` kann nur steigen. Der Anwurf wird
+    # dagegen immer uebernommen - Verlegungen und die #264-Korrektur der
+    # Ribbon-Zeit sollen ankommen.
     for s in spiele:
         db.execute("""
-            INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, wettbewerb, aktualisiert_am)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+            INSERT INTO tvb_spiele(id, team_id, spieltag, heim, gast, heim_tore, gast_tore, anstoss, ort, status, wettbewerb, bestaetigt, aktualisiert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
-                spieltag=excluded.spieltag, heim_tore=excluded.heim_tore, gast_tore=excluded.gast_tore,
-                status=excluded.status, wettbewerb=excluded.wettbewerb,
+                spieltag=excluded.spieltag,
+                heim_tore=CASE WHEN tvb_spiele.bestaetigt=1 AND excluded.bestaetigt=0
+                               THEN tvb_spiele.heim_tore ELSE excluded.heim_tore END,
+                gast_tore=CASE WHEN tvb_spiele.bestaetigt=1 AND excluded.bestaetigt=0
+                               THEN tvb_spiele.gast_tore ELSE excluded.gast_tore END,
+                status=CASE WHEN tvb_spiele.bestaetigt=1 AND excluded.bestaetigt=0
+                            THEN tvb_spiele.status ELSE excluded.status END,
+                anstoss=excluded.anstoss,
+                wettbewerb=COALESCE(excluded.wettbewerb, tvb_spiele.wettbewerb),
+                bestaetigt=MAX(tvb_spiele.bestaetigt, excluded.bestaetigt),
                 aktualisiert_am=excluded.aktualisiert_am
         """, (s["id"], s["team_id"], s["spieltag"], s["heim"], s["gast"],
               s["heim_tore"], s["gast_tore"], s["anstoss"], s["ort"], s["status"],
-              s["wettbewerb"]))
+              s["wettbewerb"], 1 if s.get("bestaetigt") else 0))
     db.commit()
 
 
@@ -900,6 +995,11 @@ def index(token):
 
     if gesehene_spiele:
         _tvb_spiele_aktualisieren(db, gesehene_spiele)
+    if gewaehlt["ist_profi"]:
+        # Wunsch #263: verpasste Ergebnisse und unbestaetigte Staende ueber
+        # den Einzelspiel-Endpunkt nachziehen - nach dem Ribbon, damit ein
+        # frisch bestaetigtes Spiel nicht noch einmal angefragt wird.
+        _profi_nachladen(db)
 
     gespeicherte = db.execute(
         "SELECT * FROM tvb_spiele WHERE team_id=? ORDER BY anstoss ASC", (team_id,)
@@ -907,7 +1007,8 @@ def index(token):
     jetzt_iso = datetime.now(_TZ).isoformat()
     vergangene, kommende = [], []
     for s in gespeicherte:
-        (vergangene if s["status"] == "Ended" or s["anstoss"] < jetzt_iso else kommende).append(dict(s))
+        (vergangene if s["status"] in ("Ended", "Live") or s["anstoss"] < jetzt_iso
+         else kommende).append(dict(s))
     vergangene.reverse()  # neueste zuerst
 
     # Wunsch #123: Der Kopf nennt den Verein der GEWAEHLTEN Mannschaft -

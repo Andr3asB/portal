@@ -87,14 +87,17 @@ def test_id_traegt_ein_quellen_praefix(modul):
 # flach daneben. Beide muessen dasselbe Anzeigeformat ergeben.
 
 def _ribbon(heim="TVB Stuttgart", gast="THW Kiel", final=True, tore=(30, 28),
-            kennung="d803da2c"):
+            kennung="d803da2c", live=False):
+    # Wunsch #264: Der echte Ribbon traegt BEIDE Zeiten - `date` ist
+    # Ortszeit, `startTimeUTC` ist UTC. Dasselbe Spiel, zwei Schreibweisen.
     return {"data": {"fixtures": [{
         "competitors": [
             {"name": heim, "isHome": True, "score": tore[0]},
             {"name": gast, "isHome": False, "score": tore[1]},
         ],
-        "fixture": {"date": "2026-09-05T17:30:00", "isFinal": final,
-                    "fixtureId": kennung},
+        "fixture": {"date": "2026-09-05T19:30:00", "startTimeUTC": "2026-09-05T17:30:00",
+                    "isFinal": final, "isLive": live, "fixtureId": kennung,
+                    "status": {"value": "CONFIRMED" if final else "SCHEDULED"}},
     }]}}
 
 
@@ -186,9 +189,19 @@ def test_profispiel_auch_auswaerts(modul, monkeypatch):
 
 
 def test_sportradar_zeit_gilt_als_utc(modul, monkeypatch):
-    """Sportradar liefert die Zeit OHNE Zeitzone. Wird sie als Ortszeit
-    gelesen, verschiebt sich jeder Anwurf um zwei Stunden."""
+    """`startTimeUTC` ist UTC ohne Zeitzone. Wird sie als Ortszeit gelesen,
+    verschiebt sich jeder Anwurf um zwei Stunden. Der Ribbon traegt daneben
+    `date` in ORTSZEIT - bis #264 wurde das bevorzugt und als UTC gelesen,
+    Ergebnis: 21:00 statt 19:00 (Hamburg, 02.09.2026)."""
     monkeypatch.setattr(modul, "_sr_get", _nur(_ribbon()))
+    assert modul._profi_spiele()[0]["anstoss"].startswith("2026-09-05T19:30")
+
+
+def test_ribbon_date_allein_ist_ortszeit(modul, monkeypatch):
+    """Fehlt startTimeUTC, ist `date` die Ortszeit - und bleibt es."""
+    nur_date = _ribbon()
+    del nur_date["data"]["fixtures"][0]["fixture"]["startTimeUTC"]
+    monkeypatch.setattr(modul, "_sr_get", _nur(nur_date))
     assert modul._profi_spiele()[0]["anstoss"].startswith("2026-09-05T19:30")
 
 

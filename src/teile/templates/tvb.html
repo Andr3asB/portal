@@ -53,6 +53,10 @@
   font-variant-numeric:tabular-nums;
 }
 .tvb-erg-score.offen { font-size:13px; font-weight:600; color:var(--text-2); }
+/* Wunsch #264: Ein laufendes Spiel zeigt den Zwischenstand rot und sagt
+   "laeuft" - damit niemand einen Zwischenstand fuer das Ergebnis haelt. */
+.tvb-erg-score.live { color:var(--rot-text); }
+.tvb-live { color:var(--rot-text); font-weight:600; }
 .tvb-erg-meta { text-align:center; font-size:12px; color:var(--text-2); margin-top:4px; }
 .tvb-tabelle { width:100%; border-collapse:collapse; font-size:13px; }
 .tvb-tabelle th, .tvb-tabelle td {
@@ -242,17 +246,21 @@
       {# Wunsch #255: Gegenueberstellung - Heim links, Ergebnis mittig, Gast
          rechts; der Sieger fett, der Verlierer zurueckgenommen. #}
       {% for s in vergangene %}
-      {% set fertig = s.heim_tore is not none and s.gast_tore is not none %}
+      {% set laeuft = s.status == 'Live' %}
+      {# Wunsch #264: Sieger/Verlierer erst beim Endstand - ein Zwischenstand
+         hat noch keinen. #}
+      {% set fertig = s.heim_tore is not none and s.gast_tore is not none and not laeuft %}
       <div class="tvb-spiel tvb-erg-karte">
         <div class="tvb-erg">
           <div class="tvb-erg-team heim{% if s.heim == gewaehlt.name %} tvb{% endif %}{% if fertig and s.heim_tore > s.gast_tore %} sieger{% elif fertig and s.heim_tore < s.gast_tore %} verlierer{% endif %}">{{ s.heim }}</div>
-          <div class="tvb-erg-score{% if not fertig %} offen{% endif %}">
-            {% if fertig %}{{ s.heim_tore }}:{{ s.gast_tore }}{% else %}{{ s.anstoss[:16].replace('T', ' ') }}{% endif %}
+          <div class="tvb-erg-score{% if laeuft %} live{% elif not fertig %} offen{% endif %}">
+            {% if fertig or (laeuft and s.heim_tore is not none) %}{{ s.heim_tore }}:{{ s.gast_tore }}{% else %}{{ s.anstoss[:16].replace('T', ' ') }}{% endif %}
           </div>
           <div class="tvb-erg-team gast{% if s.gast == gewaehlt.name %} tvb{% endif %}{% if fertig and s.gast_tore > s.heim_tore %} sieger{% elif fertig and s.gast_tore < s.heim_tore %} verlierer{% endif %}">{{ s.gast }}</div>
         </div>
-        {% if (s.wettbewerb and s.wettbewerb != haupt_wettbewerb) or s.spieltag %}
+        {% if laeuft or (s.wettbewerb and s.wettbewerb != haupt_wettbewerb) or s.spieltag %}
         <div class="tvb-erg-meta">
+          {%- if laeuft %}<span class="tvb-live">🔴 läuft</span> {% endif -%}
           {%- if s.wettbewerb and s.wettbewerb != haupt_wettbewerb %}<span class="tvb-wettbewerb">{{ s.wettbewerb }}</span> {% endif -%}
           {%- if s.spieltag %}{{ s.spieltag }}{% endif -%}
         </div>
