@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-09-06 – portal-v245: #260 Fälligkeit mit Uhrzeit, #262 Ziehen auf dem iPhone
+
+### #260 – Fälligkeitsdatum mit Uhrzeit
+
+Neue Spalte `todos.faellig`, gespeichert als UTC im SQLite-Format wie jeder
+andere Zeitstempel (vergleichbar mit `datetime('now')`). Das Formular
+bekommt ein `datetime-local`-Feld „📅 Fällig" – der Browser zeichnet den
+Wähler selbst, auf iOS das Rad – in Ortszeit; `faellig_aus_formular()`
+rechnet nach UTC, `faellig_anzeige()` zurück („Di 08.09., 16:00", Jahr nur,
+wenn es nicht das laufende ist). Liste und Brett zeigen die Frist als Chip
+bzw. Zeile: am Tag selbst in der Akzentfarbe, nach Ablauf rot mit
+„überfällig", Erledigtes nie überfällig. Leer gelassen heißt keine Frist,
+beim Bearbeiten löscht Leeren sie. Sortierung bewusst unverändert – der
+Wunsch verlangt die Anzeige, und die Reihenfolge auf dem Brett ist Andis
+Priorisierung von Hand (#224).
+
+Der Test hat mich prompt selbst erwischt: „Mo 04.01.2027, 15:30" erwartet,
+16:30 bekommen – Januar ist Winterzeit. Genau der Fehler, den #264 gestern
+beim TVB gefunden hatte, deshalb prüfen die Tests Sommer- und Winterdatum.
+
+### #262 – Drag & Drop auf kleinen Bildschirmen
+
+„Funktioniert nicht sauber, wenn eine Spalte fast die ganze Breite
+einnimmt." Beim Lesen von `ziehSortierung()` in `base.html` fanden sich
+vier Ursachen in derselben Funktion:
+
+1. Ein Zug begann erst nach 8 px in der **Höhe**. Wer eine Karte seitlich in
+   die Nachbarspalte schob, ohne nach oben oder unten zu wandern, zog gar
+   nicht. Jetzt zählt der Abstand in beiden Richtungen (`Math.hypot`).
+2. Der Schatten folgte nur senkrecht und klebte in seiner Spalte, während
+   der Finger längst in der nächsten war. Jetzt folgt er auch seitlich.
+3. Das Brett scrollte während des Zuges nicht mit – die Nachbarspalte ist
+   auf dem Telefon nur ein schmaler Streifen, die übernächste unerreichbar.
+   Jetzt rollt das Brett, solange der Finger in der Randzone steht
+   (requestAnimationFrame, bis 24 px je Bild), und der Platzhalter wandert
+   mit. Das Einrasten (`scroll-snap`) ist während des Zuges aus und wird in
+   `ende()` **und** `abbruch()` zurückgesetzt, sonst spränge das Brett bei
+   jedem Schritt auf eine Spaltenkante zurück.
+4. Eine Spalte galt nur als Ziel, wenn der Finger auch in ihrer Höhe lag –
+   unterhalb einer kurzen Spalte war man „nirgends". Jetzt zählt nur die
+   Waagerechte.
+
+Alles nur mit `opt.spalten`; Packliste, Einkauf und Essensplan (#181:
+nicht quer ziehen) sind unberührt. `test_brett_ziehen_klein.py` wächtert
+jeden Punkt im Skript. Was nur ein Daumen prüfen kann – ob es sich auf dem
+iPhone jetzt „sauber" anfühlt – steht bei Andi.
+
 ## 2026-09-06 – portal-v244: #261 Aufgaben-Ziel als Chip-Band, #265 Spielerprofile
 
 ### #261 – „User-Dropdown und Rollen-Auswahl sieht komisch aus"

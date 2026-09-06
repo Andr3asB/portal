@@ -36,6 +36,11 @@
   display:inline-block; padding:2px 8px; border-radius:10px;
   font-size:12px; font-weight:600; color:#fff; margin-right:4px;
 }
+/* Wunsch #260: Faelligkeit als Chip - ueberfaellig rot, heute in der
+   Akzentfarbe, sonst neutral. Text in den Kontrast-Variablen (#237). */
+.todo-meta .chip.faellig { background:transparent; color:var(--text-2); border:1px solid var(--border); }
+.todo-meta .chip.faellig.heute { color:var(--farbe-kontrast); border-color:var(--farbe-kontrast); }
+.todo-meta .chip.faellig.ueberfaellig { color:var(--rot-text); border-color:var(--rot-text); }
 .todo-del {
   background:none; border:none; color:var(--text-2); cursor:pointer;
   font-size:20px; padding:0 4px; flex-shrink:0; align-self:center;
@@ -78,6 +83,7 @@
       {% elif t.zugewiesen_an == user.id and t.von_name %}
         <span class="chip" style="background:{{ farbe_kontrast(t.von_farbe) }}">von {{ t.von_name }}</span>
       {% endif %}
+      {% if t.faellig_anzeige %}<span class="chip faellig {{ t.faellig_status or '' }}">📅 {{ t.faellig_anzeige }}{% if t.faellig_status == 'ueberfaellig' %} · überfällig{% endif %}</span>{% endif %}
       Erstellt: {{ t.erstellt[:10] }}{% if t.erledigt and t.erledigt_am %} · Erledigt: {{ t.erledigt_am[:10] }}{% endif %}
     </div>
 

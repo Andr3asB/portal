@@ -2135,6 +2135,11 @@ def _init_db(app):
             # Zeitpunkt. Gilt je Status - beim Verschieben in eine andere
             # Spalte wird sie dort neu vergeben.
             ("position", "INTEGER NOT NULL DEFAULT 0"),
+            # Wunsch #260: Faelligkeit mit Uhrzeit, UTC im SQLite-Format
+            # ('YYYY-MM-DD HH:MM:SS') wie jeder andere Zeitstempel; NULL =
+            # keine Frist. Ortszeit nur im Formular und in der Anzeige
+            # (faellig_aus_formular/faellig_anzeige in 04_todo.py).
+            ("faellig", "TEXT"),
         ]:
             try:
                 db.execute(f"ALTER TABLE todos ADD COLUMN {col} {definition}")

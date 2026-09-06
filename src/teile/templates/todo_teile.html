@@ -71,6 +71,14 @@
 .ziel-chip.rolle:has(input:checked) { border-style:solid; }
 .ziel-trenner { width:1px; height:22px; background:var(--border); margin:0 2px; }
 .ziel-privat { margin-left:auto; }
+/* Wunsch #260: Faelligkeit mit Uhrzeit - ein datetime-local-Feld, das der
+   Browser selbst als Datums-/Uhrzeitwaehler zeichnet (iOS: das Rad). */
+.faellig-zeile { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--text-2); }
+.faellig-eingabe {
+  border:1.5px solid var(--border); border-radius:8px; padding:6px 8px;
+  font-size:16px; font-family:inherit; background:var(--surface); color:var(--text);
+}
+.faellig-eingabe:focus { border-color:var(--farbe); }
 .todo-edit-panel {
   display:none; flex-direction:column; gap:8px; margin-top:10px;
   padding-top:10px; border-top:1px solid var(--border);
@@ -133,6 +141,16 @@
 {% endmacro %}
 
 
+{# --- Faelligkeit (Wunsch #260) -------------------------------------------
+   Leer = keine Frist. `vorbelegt` kommt als 'YYYY-MM-DDTHH:MM' in Ortszeit
+   (faellig_fuer_formular in 04_todo.py), gespeichert wird UTC. #}
+{% macro faellig_feld(vorbelegt=None) %}
+<label class="faellig-zeile">📅 Fällig
+  <input class="faellig-eingabe" type="datetime-local" name="faellig" value="{{ vorbelegt or '' }}">
+</label>
+{% endmacro %}
+
+
 {# --- Neue Aufgabe -------------------------------------------------------- #}
 {% macro neu_karte(users, rollen, rollen_labels, aktueller_user_id) %}
 <div class="new-todo-card" id="new-todo-card">
@@ -143,6 +161,7 @@
       <button class="new-todo-submit" type="submit" title="Hinzufügen" aria-label="Hinzufügen">+</button>
     </div>
     {{ ziel_auswahl(users, rollen, rollen_labels, aktueller_user_id) }}
+    {{ faellig_feld() }}
   </form>
 </div>
 {% endmacro %}
@@ -187,6 +206,7 @@
       <button type="submit" class="todo-edit-save">Speichern</button>
     </div>
     {{ ziel_auswahl(users, rollen, rollen_labels, user.id, t.zugewiesen_an, t.zugewiesen_rollen, t.privat) }}
+    {{ faellig_feld(t.faellig_feld) }}
   </form>
   {% if historie.get(t.id) %}
   <button type="button" class="todo-verlauf-toggle" data-klick="toggleVerlauf" data-args='[{{ t.id }}]' data-panel="todo-verlauf-{{ t.id }}">🕘 Verlauf ({{ historie[t.id]|length }})</button>

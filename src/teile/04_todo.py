@@ -59,7 +59,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
-from teile.kern import get_db, push_send, to_int
+from teile.kern import LOKAL_TZ, get_db, push_send, to_int
 from teile.kern import grant as check_grant
 
 bp  = Blueprint("todo_app", __name__)
@@ -70,6 +70,88 @@ STATUS_LABELS = {"backlog": "Backlog", "offen": "Offen", "in_arbeit": "In Arbeit
 ROLLEN        = ["eltern", "kind", "gast"]
 ROLLEN_LABELS = {"eltern": "Eltern", "kind": "Kind", "gast": "Gast"}
 WOCHENTAGE    = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+WOCHENTAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+# --- Wunsch #260: Faelligkeit mit Uhrzeit -----------------------------------
+#
+# Gespeichert wird UTC im SQLite-Format ('YYYY-MM-DD HH:MM:SS'), wie jeder
+# andere Zeitstempel im Portal - so laesst sich in SQL gegen datetime('now')
+# vergleichen. Das Formular spricht Ortszeit (datetime-local, ohne Zeitzone):
+# hin und zurueck ueber LOKAL_TZ. Ein nacktes datetime.now() gibt es hier
+# nicht (siehe CLAUDE.md, Zeit).
+
+def faellig_aus_formular(text):
+    """'YYYY-MM-DDTHH:MM' (datetime-local, Ortszeit) -> UTC-Zeitstempel oder
+    None. Ein Datum ohne Uhrzeit gilt als 00:00 Ortszeit. Unlesbares wird
+    verworfen, nicht geraten."""
+    text = (text or "").strip().replace(" ", "T")
+    if not text:
+        return None
+    for muster, laenge in (("%Y-%m-%dT%H:%M", 16), ("%Y-%m-%d", 10)):
+        try:
+            wann = datetime.strptime(text[:laenge], muster)
+            break
+        except ValueError:
+            continue
+    else:
+        return None
+    return wann.replace(tzinfo=LOKAL_TZ).astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _faellig_lokal(text):
+    """UTC-Zeitstempel -> datetime in Ortszeit, oder None."""
+    if not text:
+        return None
+    try:
+        wann = datetime.strptime(str(text)[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return wann.replace(tzinfo=UTC).astimezone(LOKAL_TZ)
+
+
+def faellig_fuer_formular(text):
+    """UTC -> 'YYYY-MM-DDTHH:MM' fuer das datetime-local-Feld."""
+    lokal = _faellig_lokal(text)
+    return lokal.strftime("%Y-%m-%dT%H:%M") if lokal else ""
+
+
+def faellig_anzeige(text, heute=None):
+    """UTC -> 'Di 08.09., 16:00' (Jahr nur, wenn es nicht das laufende ist)."""
+    lokal = _faellig_lokal(text)
+    if not lokal:
+        return None
+    heute = heute or datetime.now(LOKAL_TZ).date()
+    jahr = "" if lokal.year == heute.year else f"{lokal.year}"
+    return f"{WOCHENTAGE_KURZ[lokal.weekday()]} {lokal:%d.%m.}{jahr}, {lokal:%H:%M}"
+
+
+def faellig_status(text, erledigt, jetzt=None):
+    """None (keine Frist oder erledigt), 'ueberfaellig', 'heute' oder 'offen'."""
+    lokal = _faellig_lokal(text)
+    if not lokal or erledigt:
+        return None
+    jetzt = jetzt or datetime.now(LOKAL_TZ)
+    if lokal < jetzt:
+        return "ueberfaellig"
+    if lokal.date() == jetzt.date():
+        return "heute"
+    return "offen"
+
+
+def _mit_faelligkeit(zeilen):
+    """Zeilen -> dicts mit faellig_anzeige/faellig_status/faellig_feld, damit
+    Liste und Brett dieselben drei Werte bekommen, ohne sie zweimal zu
+    berechnen."""
+    jetzt = datetime.now(LOKAL_TZ)
+    ergebnis = []
+    for z in zeilen:
+        t = dict(z)
+        t["faellig_anzeige"] = faellig_anzeige(t.get("faellig"), jetzt.date())
+        t["faellig_status"] = faellig_status(t.get("faellig"), t.get("erledigt"), jetzt)
+        t["faellig_feld"] = faellig_fuer_formular(t.get("faellig"))
+        ergebnis.append(t)
+    return ergebnis
 
 
 def _darf_loeschen(user) -> bool:
@@ -127,11 +209,13 @@ def _todo_url(db, user_id: int) -> str:
 
 
 def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int | None = None,
-              privat: bool = False, zugewiesen_rollen: str | None = None):
+              privat: bool = False, zugewiesen_rollen: str | None = None,
+              faellig: str | None = None):
     """Programmatische Schnittstelle für andere Apps (z. B. Geholfen, Scanner).
 
     Ohne konkrete Personen-Zuweisung, aber mit Rollen/Alle-Ziel (Wunsch #39)
-    landet die Aufgabe im Backlog statt in Offen."""
+    landet die Aufgabe im Backlog statt in Offen. `faellig` (Wunsch #260) ist
+    ein UTC-Zeitstempel oder None."""
     db = get_db()
     status = "backlog" if (zugewiesen_an is None and zugewiesen_rollen) else "offen"
     # Wunsch #224: ans ENDE der eigenen Spalte, nicht auf Position 0. Dieselbe
@@ -142,10 +226,10 @@ def todos_neu(inhalt: str, erstellt_von: int, zugewiesen_an: int | None = None,
         "SELECT COALESCE(MAX(position), -1) + 1 FROM todos WHERE status=?",
         (status,)).fetchone()[0]
     db.execute(
-        "INSERT INTO todos(inhalt,erstellt_von,zugewiesen_an,privat,zugewiesen_rollen,status,position) "
-        "VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO todos(inhalt,erstellt_von,zugewiesen_an,privat,zugewiesen_rollen,status,position,faellig) "
+        "VALUES(?,?,?,?,?,?,?,?)",
         (inhalt, erstellt_von, zugewiesen_an, 1 if privat else 0, zugewiesen_rollen,
-         status, naechste),
+         status, naechste, faellig),
     )
     db.commit()
     if zugewiesen_an and zugewiesen_an != erstellt_von:
@@ -292,7 +376,7 @@ def index(token):
         return redirect(url_for("todo_app.kanban", token=token,
                                 erledigt=request.args.get("erledigt")))
 
-    todos = _visible_todos(db, user)
+    todos = _mit_faelligkeit(_visible_todos(db, user))   # Wunsch #260
     erledigt_versteckt = 0
     if request.args.get("erledigt") != "alle":
         todos, erledigt_versteckt = _ohne_alte_erledigte(todos)
@@ -340,7 +424,8 @@ def neu(token):
             zugewiesen_an = None
 
     privat = 1 if request.form.get("privat") else 0
-    todos_neu(inhalt, user["id"], zugewiesen_an, bool(privat), zugewiesen_rollen)
+    todos_neu(inhalt, user["id"], zugewiesen_an, bool(privat), zugewiesen_rollen,
+              faellig=faellig_aus_formular(request.form.get("faellig")))
     return redirect(url_for("todo_app.index", token=token))
 
 
@@ -407,7 +492,7 @@ def kanban(token):
     if request.args.get("ansicht") == "brett":
         _ansicht_merken(db, user["id"], "brett")
 
-    todos = _visible_todos(db, user)
+    todos = _mit_faelligkeit(_visible_todos(db, user))   # Wunsch #260
     erledigt_versteckt = 0
     if request.args.get("erledigt") != "alle":
         todos, erledigt_versteckt = _ohne_alte_erledigte(todos)
@@ -539,9 +624,11 @@ def bearbeiten(token, tid):
             zugewiesen_an = None
     privat = 1 if request.form.get("privat") else 0
 
+    # Wunsch #260: leer gelassen heisst "keine Frist mehr".
     db.execute(
-        "UPDATE todos SET zugewiesen_an=?, zugewiesen_rollen=?, privat=? WHERE id=?",
-        (zugewiesen_an, zugewiesen_rollen, privat, tid),
+        "UPDATE todos SET zugewiesen_an=?, zugewiesen_rollen=?, privat=?, faellig=? WHERE id=?",
+        (zugewiesen_an, zugewiesen_rollen, privat,
+         faellig_aus_formular(request.form.get("faellig")), tid),
     )
     db.commit()
     return redirect(url_for("todo_app.index", token=token))

@@ -693,7 +693,7 @@
       const eintrag = griff.closest(opt.eintrag);
       if (!eintrag) return;
       griff.setPointerCapture(e.pointerId);
-      zustand = { eintrag, griff, startY: e.clientY, laeuft: false };
+      zustand = { eintrag, griff, startX: e.clientX, startY: e.clientY, laeuft: false };
       griff.addEventListener('pointermove', bewegung);
       griff.addEventListener('pointerup', ende);
       griff.addEventListener('pointercancel', abbruch);
@@ -702,11 +702,32 @@
     function bewegung(e) {
       if (!zustand || zustand.griff !== e.currentTarget) return;
       // Erst ab 8px als Ziehen werten - sonst verrutscht jeder Tipp.
-      if (!zustand.laeuft && Math.abs(e.clientY - zustand.startY) > 8) {
+      // Wunsch #262: Abstand in BEIDEN Richtungen. Vorher zaehlte nur die
+      // Hoehe - wer auf dem Brett eine Karte seitlich in die Nachbarspalte
+      // zog, ohne dabei 8px nach oben oder unten zu wandern, zog gar nicht.
+      if (!zustand.laeuft &&
+          Math.hypot(e.clientX - zustand.startX, e.clientY - zustand.startY) > 8) {
         zustand.laeuft = true;
         starte(e);
       }
       if (zustand.laeuft) folge(e);
+    }
+
+    // Wunsch #262: Der naechste scrollbare Vorfahre einer Spalte - auf dem
+    // Telefon das waagerecht scrollende Brett. null, wenn es keinen gibt.
+    function scrollElternteil(el) {
+      for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) {
+        const ox = getComputedStyle(p).overflowX;
+        if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth + 1) return p;
+      }
+      return null;
+    }
+
+    function ziehenAufraeumen() {
+      if (!zustand) return;
+      if (zustand.rollTimer) cancelAnimationFrame(zustand.rollTimer);
+      zustand.rollTimer = null;
+      if (zustand.brett) zustand.brett.style.scrollSnapType = zustand.snapVorher || '';
     }
 
     function loesen(griff) {
@@ -718,6 +739,7 @@
     function ende(e) {
       if (!zustand || zustand.griff !== e.currentTarget) return;
       loesen(zustand.griff);
+      ziehenAufraeumen();                           // Wunsch #262
       document.body.classList.remove('zieht');      // Wunsch #226
       if (zustand.laeuft) {
         const { eintrag, platzhalter, schatten } = zustand;
@@ -746,6 +768,7 @@
     function abbruch(e) {
       if (!zustand || zustand.griff !== e.currentTarget) return;
       loesen(zustand.griff);
+      ziehenAufraeumen();                           // Wunsch #262
       document.body.classList.remove('zieht');      // Wunsch #226
       if (zustand.laeuft) {
         const { eintrag, platzhalter, schatten } = zustand;
@@ -782,21 +805,80 @@
       zustand.schatten = schatten;
       zustand.platzhalter = ph;
       zustand.abstandY = e.clientY - r.top;
+      zustand.abstandX = e.clientX - r.left;
+
+      // Wunsch #262: Auf dem Telefon nimmt eine Spalte fast die ganze Breite
+      // ein, die Nachbarspalte ist nur ein schmaler Streifen - das Brett muss
+      // waehrend des Zuges MITSCROLLEN (siehe folge/rollen). Solange gezogen
+      // wird, ist das Einrasten (scroll-snap) aus, sonst springt das Brett
+      // beim Mitscrollen jedesmal auf eine Spaltenkante zurueck.
+      if (opt.spalten) {
+        const brett = scrollElternteil(eintrag.closest(opt.spalten));
+        if (brett) {
+          zustand.brett = brett;
+          zustand.snapVorher = brett.style.scrollSnapType;
+          brett.style.scrollSnapType = 'none';
+        }
+      }
+    }
+
+    // Wunsch #262: Waehrend der Finger am Rand des Bretts steht, rollt das
+    // Brett Bild fuer Bild weiter - und der Platzhalter wandert mit, sonst
+    // liegt er nach dem Scrollen in einer Spalte, die gar nicht mehr unter dem
+    // Finger ist.
+    function rollen() {
+      if (!zustand || !zustand.laeuft || !zustand.brett) return;
+      const { brett, rollDx, letztes } = zustand;
+      if (!rollDx) { zustand.rollTimer = null; return; }
+      const vorher = brett.scrollLeft;
+      brett.scrollLeft += rollDx;
+      // Ein synthetisches Ereignis mit den letzten Fingerkoordinaten: die
+      // Spalten sind unter dem Finger weitergewandert, der Platzhalter muss
+      // nach. `synthetisch` verhindert, dass daraus ein zweiter Roll-Takt wird.
+      if (brett.scrollLeft !== vorher && letztes) {
+        folge({ clientX: letztes.x, clientY: letztes.y, synthetisch: true });
+      }
+      zustand.rollTimer = requestAnimationFrame(rollen);
+    }
+
+    function randRollen(e) {
+      const { brett } = zustand;
+      if (!brett) return;
+      const r = brett.getBoundingClientRect();
+      const rand = Math.min(56, r.width / 5);
+      let dx = 0;
+      if (e.clientX < r.left + rand)       dx = -Math.ceil((r.left + rand - e.clientX) / 4);
+      else if (e.clientX > r.right - rand) dx =  Math.ceil((e.clientX - (r.right - rand)) / 4);
+      zustand.rollDx = Math.max(-24, Math.min(24, dx));
+      if (zustand.rollDx && !zustand.rollTimer) zustand.rollTimer = requestAnimationFrame(rollen);
     }
 
     function folge(e) {
-      const { eintrag, schatten, platzhalter, abstandY } = zustand;
+      const { eintrag, schatten, platzhalter, abstandY, abstandX } = zustand;
       schatten.style.top = `${e.clientY - abstandY}px`;
+      if (opt.spalten) {
+        // Wunsch #262: Auf dem Brett folgt der Schatten auch seitlich -
+        // vorher blieb er in seiner Spalte kleben, waehrend der Finger laengst
+        // in der naechsten war, und nichts zeigte an, wohin die Karte faellt.
+        schatten.style.left = `${e.clientX - abstandX}px`;
+        if (!e.synthetisch) {
+          zustand.letztes = { x: e.clientX, y: e.clientY };
+          randRollen(e);
+        }
+      }
 
       // Wunsch #224: Nur wenn `opt.spalten` gesetzt ist, darf ein Eintrag die
       // Gruppe WECHSELN. Ohne die Option bleibt unten alles wie gehabt - das
       // ist wichtig, weil Packliste (#181) und Einkauf sich ausdruecklich
       // darauf verlassen, dass NICHT quer gezogen werden kann.
       if (opt.spalten) {
+        // Wunsch #262: Die Spalte zaehlt, sobald der Finger WAAGERECHT ueber
+        // ihr steht - die Hoehe spielt keine Rolle mehr. Vorher galt ein
+        // Finger unterhalb einer kurzen Spalte als "nirgends", und die Karte
+        // blieb in der alten Spalte haengen.
         const spalte = [...document.querySelectorAll(opt.spalten)].find(s => {
           const r = s.getBoundingClientRect();
-          return e.clientX >= r.left && e.clientX <= r.right &&
-                 e.clientY >= r.top  && e.clientY <= r.bottom;
+          return e.clientX >= r.left && e.clientX <= r.right;
         });
         const ziel = spalte || platzhalter.closest(opt.spalten);
         if (!ziel) return;

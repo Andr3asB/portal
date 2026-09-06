@@ -446,6 +446,14 @@ teile/
                        `test_todo_ansicht.py::test_keine_zweite_fassung_der_formulare`
                        laesst kein zweites Markup zu.
   04_todo.py         – /a/todo/<token>/ Aufgabenliste + /kanban Brett (#224);
+                       Wunsch #260: Faelligkeit mit Uhrzeit - Formular
+                       (datetime-local, Ortszeit) -> faellig_aus_formular()
+                       -> UTC in todos.faellig; _mit_faelligkeit() haengt an
+                       jede Zeile faellig_anzeige ("Di 08.09., 16:00", Jahr
+                       nur wenn fremd), faellig_status (ueberfaellig/heute/
+                       offen, erledigt = None) und faellig_feld (Vorbelegung)
+                       - Liste und Brett zeigen dieselben Werte; todos_neu()
+                       nimmt faellig= entgegen. Keine Sortieraenderung.
                        ANSICHT MERKEN (#225): `todo_nutzer_ansicht` haelt je
                        NUTZER, ob zuletzt Liste oder Brett benutzt wurde -
                        serverseitig, weil der Wunsch "fuer einen Benutzer"
@@ -1820,7 +1828,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `sitzungen` | id, user_id (FK users, cascade), kennung_lookup (UNIQUE, HMAC des Cookie-Werts – der Klartext steht NIE in der DB), erstellt, gesehen, ablauf (NULL = läuft nie ab, z. B. Kiosk), quelle ('token'/'ha'), geraet (User-Agent, gekürzt) – Wunsch #140 Stufe 1: Sitzungs-Cookies. Eigene Tabelle statt signiertem Cookie, weil nur so ein Widerruf je Gerät möglich ist |
 | `push_abos` | id, user_id, endpoint, p256dh, auth, geraet |
 | `wuensche` | id, text, titel, prioritaet, user_id, app_slug, ansicht (app_slug/unterseite, token-frei – Wunsch #47), erstellt, erledigt, erledigt_am, umsetzung (Wunsch #101: was genau implementiert wurde, gesetzt über `manage.py wunsch_erledigt <id> "Text"`) |
-| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92) |
+| `todos` | id, inhalt, erstellt_von, zugewiesen_an, zugewiesen_rollen (TEXT, kommagetrennt, Sentinel "alle" – Wunsch #39, exklusiv zu zugewiesen_an), privat, erledigt, erledigt_am, erstellt, status ('backlog'/'offen'/'in_arbeit'/'erledigt', mit erledigt synchron gehalten), serie_id (FK todo_serien, NULL bei normalen Todos – Wunsch #90), wochentag (totes Altfeld – urspr. 0=Mo..6=So für Wunsch #90, nie mit Produktivdaten gefüllt, durch plan_tag ersetzt – Wunsch #92), plan_tag (ISO-Datum, nur bei serie_id gesetzt – Wunsch #92), position (Reihenfolge je Spalte – Wunsch #224), faellig (Wunsch #260 – Fälligkeit mit Uhrzeit als UTC 'YYYY-MM-DD HH:MM:SS', NULL = keine Frist; Ortszeit nur im datetime-local-Feld und in der Anzeige über faellig_aus_formular()/faellig_anzeige() in 04_todo.py) |
 | `todo_serien` | id, inhalt, wiederkehr_typ ('intervall'/'wochentag'), intervall_tage, fester_wochentag (totes Altfeld seit Wunsch #112, ersetzt durch feste_wochentage), feste_wochentage (kommagetrennt, z. B. "1,3,5", mehrere Wochentage gleichzeitig – Wunsch #112), aktiv, erstellt_von, erstellt – Wunsch #90, Pool-Vorlagen fuer wiederkehrende Aufgaben |
 | `todo_historie` | id, todo_id (FK todos, cascade), alter_inhalt, geaendert_von, geaendert_am |
 | `geholfen_aufgaben` | id, name, emoji, gewichtung, aktiv |
@@ -1923,6 +1931,22 @@ Text gekuerzt, ohne dass jemand den Grund sieht.
 `tests/test_werkstatt_ansicht.py` waechtert alles drei.
 
 ## Umsortieren per Ziehen (Wunsch #178)
+
+**Wunsch #262 (06.09.2026), nur mit `opt.spalten` (Brett):** Der Zug beginnt
+ab 8 px in BEIDEN Richtungen (`Math.hypot`), nicht nur in der Hoehe - sonst
+zog eine seitlich geschobene Karte gar nicht. Der Schatten folgt auch
+seitlich. Das Brett (der naechste scrollbare Vorfahre der Spalte,
+`scrollElternteil()`) rollt mit, solange der Finger in der Randzone steht
+(`randRollen`/`rollen` per requestAnimationFrame, bis 24 px je Bild), der
+Platzhalter wandert dabei mit (`folge()` mit einem synthetischen Ereignis aus
+den letzten Fingerkoordinaten, `synthetisch: true` verhindert einen zweiten
+Roll-Takt); das
+Einrasten (`scroll-snap-type`) ist waehrend des Zuges aus und wird in
+`ende()` UND `abbruch()` zurueckgesetzt (`ziehenAufraeumen()`). Eine Spalte
+zaehlt als Ziel, sobald der Finger waagerecht ueber ihr steht - die Hoehe
+spielt keine Rolle mehr. Listen ohne `opt.spalten` (Packliste, Einkauf,
+Essensplan) sind davon unberuehrt; `test_brett_ziehen_klein.py` waechtert
+jeden dieser Punkte.
 
 `window.ziehSortierung({griff, eintrag, platzhalter, idAus, speichern})` in
 `base.html` - der gemeinsame Helfer fuer alle neuen Sortierungen.
@@ -2865,6 +2889,17 @@ python -m venv .venv                                   # einmalig
   "noch nie" auf der Seite, obwohl die Liste vom 14.08.2026 stammt), aber ohne
   jeden Bestand wird kein Datum erfunden. Gegenprobe gemacht: mit dem alten
   Verhalten fallen 4 der 11 Tests.
+- `test_todo_faellig.py` – Wunsch #260. Das Heikle ist die Zeitzone,
+  deshalb Sommer- UND Winterdatum: Formular (Ortszeit) -> UTC, zurueck ins
+  Feld, Anzeige mit Wochentag (Jahr nur wenn fremd), Status ueberfaellig/
+  heute/offen (erledigt nie ueberfaellig), neu/bearbeiten speichern und
+  loeschen die Frist, Liste und Brett zeigen sie in Ortszeit, Panel ist
+  vorbelegt, todos_neu() nimmt sie entgegen.
+- `test_brett_ziehen_klein.py` – Wunsch #262. Liest das Zieh-Skript wie
+  #227/#228: Schwelle in beiden Richtungen, Schatten folgt seitlich, Brett
+  rollt am Rand mit und der Platzhalter wandert nach, Einrasten aus/an in
+  ende UND abbruch, Spalte zaehlt ueber die ganze Hoehe, Brett scrollt
+  weiterhin waagerecht, Listen ohne Spalten unberuehrt.
 - `test_tvb_spielerprofil.py` – Wunsch #265. Baut die devalue-Nutzlast der
   Liga-Seite GENAU nach (flaches Array, Indizes, ["Date", ...]) statt
   bequemes JSON zu fuettern - der Parser ist das Empfindliche. Steckbrief,
