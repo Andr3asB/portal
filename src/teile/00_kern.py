@@ -526,6 +526,17 @@ CREATE TABLE IF NOT EXISTS geburtstag_gesendet (
   datum         TEXT    NOT NULL,             -- YYYY-MM-DD des Versands
   PRIMARY KEY (user_id, geburtstag_id, art, datum)
 );
+-- Wunsch #272: Morning Briefing auf der Startseite. Eine Zeile je Nutzer und
+-- Tag (Familienzeit): wann bestaetigt, wann die Erinnerung rausging. Beides
+-- NULL = weder noch. Haengt per CASCADE am Nutzer, wird also in der
+-- Testdatenbank mitgeleert.
+CREATE TABLE IF NOT EXISTS briefing_status (
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tag           TEXT    NOT NULL,             -- YYYY-MM-DD in Familienzeit
+  bestaetigt_am TEXT,                         -- UTC
+  push_am       TEXT,                         -- UTC
+  PRIMARY KEY (user_id, tag)
+);
 CREATE TABLE IF NOT EXISTS kassenbuch_eintraege (
   id             INTEGER PRIMARY KEY,
   user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

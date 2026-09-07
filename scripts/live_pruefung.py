@@ -130,7 +130,8 @@ def main() -> int:
     print(f"Prüfe als {name} – {len(apps)} Apps, EINE Sitzung\n")
     fehler = []
     try:
-        for pfad, beschriftung in [("/health", "health"), ("/start", "Startseite")]:
+        for pfad, beschriftung in [("/health", "health"), ("/start", "Startseite"),
+                                   ("/p/briefing", "Startseite › Briefing")]:
             code, ms = hole(pfad, cookie)
             print(f"  {code}  {ms:5d} ms  {beschriftung}")
             if code != 200:

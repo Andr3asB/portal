@@ -229,6 +229,7 @@ CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
 KI_GUTHABEN_WACHT=1         # Wunsch #183: stuendlicher Blick aufs OpenRouter-Guthaben
 TVB_HINTERGRUND=1           # Wunsch #270: TVB-Daten im Hintergrund auffrischen (alle 5 min pruefen)
+BRIEFING_PUSH=1             # Wunsch #272: Erinnerung ans Morning Briefing (werktags 07:30, WE 09:00, bis 12:00)
 BACKUP_AGE_RECIPIENT=age1…  # Wunsch #130/#211: oeffentlicher age-Schluessel
 ```
 
@@ -247,8 +248,8 @@ Steht in der Variable etwas, das kein age-Schluessel ist, faellt das Backup
 `util` durchreichen – das fehlte bis 31.08.2026 und war der Grund, warum der
 erste Scharfschalt-Versuch wirkungslos blieb.
 
-`PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN`, `KI_GUTHABEN_WACHT` und
-`TVB_HINTERGRUND` stehen heute NICHT in der echten `.env` - sie greifen mit
+`PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN`, `KI_GUTHABEN_WACHT`,
+`TVB_HINTERGRUND` und `BRIEFING_PUSH` stehen heute NICHT in der echten `.env` - sie greifen mit
 ihrer Voreinstellung (leer bzw. 1). Sie sind hier aufgefuehrt, weil man sie dort eintragen kann und die
 Voreinstellung dann uebersteuert wird; `env_file: .env` reicht jede Zeile
 durch.
@@ -1502,6 +1503,34 @@ teile/
                        Sehen duerfen alle mit der App (der Wunsch verlangt
                        alle Eintraege inklusive Benutzer), aendern und
                        loeschen nur Urheber oder Admin.
+  27_briefing.py     – Morning Briefing auf der Startseite (#272). Karte
+                       oben im <main> von startseite.html mit Essensplan
+                       (heute, Mittag+Abend, Rezeptname oder Freitext) und
+                       Geburtstagen (heute+morgen, Ausblendungen des
+                       Nutzers aus geburtstag_einstellungen gelten), Inhalt
+                       in _briefing.html, Stile in _briefing_stile.html
+                       (beide auch in briefing.html = eigene Seite
+                       /p/briefing bzw. /p/<token>/briefing zum
+                       Wiederaufrufen). POST /p/briefing/bestaetigen
+                       schreibt briefing_status.bestaetigt_am (Tag in
+                       Familienzeit, jetzt_lokal()); per data-fetch ohne
+                       Seitensprung (#171), die Karte weicht dem Knopf
+                       „Briefing fuer heute". Daten per Alias aus
+                       teile.essensplan (Mahlzeiten), teile.geburtstage
+                       (_tage_bis/_alter_am_geburtstag, 29. Februar nur an
+                       einer Stelle), teile.start_token (_home_user); das
+                       Modul wird deshalb in teile/__init__.py NACH diesen
+                       dreien registriert, und 01_start_token importiert
+                       es lazy in der Route (sonst Kreis). Push-Erinnerung:
+                       _push_schleife (Schalter BRIEFING_PUSH, im Test 0,
+                       Minutentakt, new_db) schickt werktags ab 07:30 und
+                       am Wochenende ab 09:00 Familienzeit an Nutzer mit
+                       push_abos, deren Tag weder bestaetigt noch schon
+                       gepusht ist (briefing_status.push_am), und nach
+                       12:00 gar nicht mehr (Neustart am Nachmittag darf
+                       keinen „Guten Morgen" nachschicken). Gruss haengt an
+                       der Uhrzeit (Morgen/Hallo/Abend), die Karte bleibt
+                       ja bis zur Bestaetigung stehen.
                        `guthaben_pruefen()` laeuft stuendlich als Daemon-
                        Thread (Schalter `KI_GUTHABEN_WACHT`, im Test 0) und
                        legt bei <= 1,00 USD EINE Aufgabe fuer den ersten
@@ -1933,6 +1962,7 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
+| `briefing_status` | user_id (FK users, cascade), tag (YYYY-MM-DD in Familienzeit), bestaetigt_am (UTC, NULL = offen), push_am (UTC, NULL = noch nicht erinnert); PK (user_id, tag) – Wunsch #272: eine Zeile je Nutzer und Tag fürs Morning Briefing; Bestätigung ist idempotent (erste zählt), der Push-Vermerk verhindert die zweite Erinnerung nach einem Neustart |
 | `vokabel_kapitel_freigabe` | kapitel_id (FK vokabel_kapitel, cascade), user_id (FK users, cascade – WER es zusaetzlich sehen darf), erstellt; PK(kapitel_id, user_id) – Wunsch #150. Geteilt wird das KAPITEL, nicht die Vokabel: spaeter hinzugefuegte Vokabeln wandern automatisch mit. Eigentuemer bleibt `vokabel_kapitel.user_id` |
 | `rezept_gekocht` | id, rezept_id (FK rezepte, CASCADE), tag, mahlzeit, markiert_von (FK users, SET NULL), markiert_am; UNIQUE(rezept_id, tag, mahlzeit) – Wunsch #162. BEWUSST eine eigene Tabelle statt eines Haekchens auf essensplan_eintraege: ein Planeintrag wird ueberschrieben, verschoben (#35) und geloescht, die Historie muss das ueberleben. Haengt am REZEPT, nicht am Plan; Freitext-Eintraege koennen deshalb nicht abgehakt werden |
 | `wunsch_aktionen` | id, wunsch_id (FK wuensche, CASCADE), art ('frage'/'antwort'/'plan'/'umsetzung'/'notiz'), text, user_id (FK users, SET NULL), erstellt – Wunsch #161: Verlauf je Wunsch. `wuensche.umsetzung` BLEIBT daneben bestehen, sie traegt die Abschluesse von ~150 alten Wuenschen, die es als Aktion nie geben wird. `manage.py wunsch_erledigt` schreibt ab #161 beides |
@@ -2982,6 +3012,20 @@ python -m venv .venv                                   # einmalig
   respektiert die 30-Minuten-Pause nach einem Fehlschlag, und der Schalter
   steht in app.py, conftest und .env.example. Der Thread selbst laeuft im
   Test nie.
+- `test_briefing.py` – Wunsch #272. Inhalt (beide Mahlzeit-Slots immer da,
+  Rezeptname mit Kategorie-Symbol vs. Freitext, Geburtstage heute+morgen
+  aber nicht uebermorgen, „morgen" ueber den Jahreswechsel, Ausblendung
+  gilt nur dem, der sie gesetzt hat, Gruss je Tageszeit, Push-Kurztext),
+  Startseite (Karte bis zur Bestaetigung, danach versteckt und der
+  Wiederaufruf sichtbar; POST leitet zurueck bzw. antwortet JSON per
+  Accept-Header; Bestaetigung gilt nur fuer den Tag; eigene Seite mit
+  Zurueck-Link; 403 bei fremdem Token und ohne Sitzung) und die
+  Push-Auswahl mit fester Uhrzeit: werktags 07:29 nein / 07:30 ja / 11:59
+  ja / 12:00 nein, Samstag 08:59 nein / 09:00 ja, Sonntag 07:30 nein, ohne
+  Abo nichts, bestaetigt nichts, gestern bestaetigt zaehlt heute nicht,
+  ein Durchlauf pro Tag (Neustart am selben Morgen schickt nicht erneut),
+  Bestaetigung ueberschreibt den Push-Vermerk nicht. Thread-Schalter im
+  Test 0.
 - `test_tvb_bilder.py` – Wunsch #271. Allowlist auf genau einen Host (auch
   http, Subdomain-Trick und leerer Pfad fallen durch), `_kader_speichern`
   uebernimmt nur erlaubte Adressen, das Bild wird einmal geholt und danach

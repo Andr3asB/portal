@@ -2,6 +2,72 @@
 
 ---
 
+## 2026-09-07 – portal-v252: #272 Morning Briefing
+
+### #272 – „Morning Briefing mit Essensplan und Geburtstagen"
+
+Der Wunsch: morgens beim ersten Öffnen eine Karte auf der Startseite mit
+dem Essensplan von heute und den Geburtstagen von heute und morgen,
+bestätigbar, wieder aufrufbar, und eine Push-Erinnerung werktags um 7:30
+bzw. am Wochenende um 9:00, wenn noch nicht bestätigt.
+
+**Bau.** Neues Modul `27_briefing.py`, neue Tabelle `briefing_status`
+(user_id, tag, bestaetigt_am, push_am – hängt per CASCADE am Nutzer, wird
+in der Testdatenbank also mitgeleert, nichts in `BLEIBT`). Der Inhalt
+(`_briefing.html`) und die Stile (`_briefing_stile.html`) sind Includes und
+stehen an zwei Stellen: als Karte ganz oben in `startseite.html` und auf
+der eigenen Seite `/p/briefing` (mit Token: `/p/<token>/briefing`). Beides
+zeigt dadurch garantiert dasselbe.
+
+- **Karte bis zur Bestätigung.** Die Karte ist immer gerendert; ist der
+  Tag bestätigt, trägt sie `hidden`, und an ihrer Stelle steht ein kleiner
+  Knopf „☀️ Briefing für heute" (Link zur eigenen Seite). „✓ Gelesen" geht
+  per `data-fetch` (#171) – die Karte klappt ein, ohne dass die Seite neu
+  lädt und an den Anfang springt. Ohne JavaScript: normales POST mit
+  Weiterleitung zurück zur Startseite.
+- **Tag in Familienzeit.** `jetzt_lokal()` (Europe/Berlin), nicht
+  `date.today()` – der Container läuft in UTC, zwischen Mitternacht und
+  02:00 wäre der „Tag" sonst gestern, und eine 23:30-Bestätigung hätte das
+  Briefing des nächsten Morgens gleich mit abgehakt. Die Funktion ist
+  bewusst ersetzbar (Tests drehen nicht an der Rechner-Uhr).
+- **Gruß nach Uhrzeit.** „Guten Morgen" bis 11, „Hallo" bis 18, dann
+  „Guten Abend" – die Karte bleibt bis zur Bestätigung stehen, ein „Guten
+  Morgen" um 20 Uhr sähe aus wie eine stehengebliebene Uhr.
+- **Keine Kopien.** Mahlzeiten-Konstanten aus `12_essensplan`, Datumslogik
+  (`_tage_bis`, `_alter_am_geburtstag`, 29. Februar) aus `23_geburtstage`,
+  der Startseiten-Nutzer aus `01_start_token` – dafür drei neue Aliase in
+  `teile/__init__.py` (`teile.essensplan`, `teile.geburtstage`,
+  `teile.start_token`) plus `teile.briefing`. Reihenfolge dort ist
+  Pflicht: erst die Lieferanten, dann das Briefing; `01_start_token`
+  importiert das Briefing lazy in der Route, sonst wäre es ein Kreis.
+- **Ausblendungen gelten.** Wen jemand in der Geburtstags-App ausgeblendet
+  hat, sieht er auch morgens nicht – dieselbe Tabelle
+  `geburtstag_einstellungen`, derselbe Nutzer.
+- **Push.** Eigener Daemon-Thread (Schalter `BRIEFING_PUSH`, im Test 0, in
+  `.env.example` dokumentiert), Minutentakt, weil 07:30 auch 07:30 heißen
+  soll. Sendet an Nutzer mit `push_abos`, deren Tag weder bestätigt noch
+  schon gepusht ist, und **nur bis 12:00** – ein Container-Neustart am
+  Nachmittag soll keinen „Guten Morgen" nachschicken. Titel „☀️ Dein
+  Briefing für heute", Text die Kurzfassung („Mittag: … · 🎂 X hat morgen
+  Geburtstag"), Link auf `/start`. Der Vermerk `push_am` schützt wie
+  `geburtstag_gesendet` gegen die zweite Erinnerung nach einem Neustart.
+
+**Tests.** 17 neue in `test_briefing.py`, Suite 2398 grün. Ein Wächter
+schlug beim ersten Lauf an: `test_umschalter_ohne_sprung` verlangt für
+jedes `data-fetch` eine `function name(` in derselben Vorlage –
+`window.name = function` hatte ich zuerst geschrieben. Richtig so, der
+Wächter hat die Konvention durchgesetzt.
+
+**Auslieferung** v252, `live_pruefung.py` grün (Startseite 176 ms,
+Briefing-Seite 135 ms – die Seite steht jetzt in der Liste des Skripts).
+Heute steht drin: Mittag Ricotta-Gnocchi, Abend Vesper, morgen hat Ryan
+Storz Geburtstag – die erste Push-Erinnerung geht am 08.09. um 07:30 an
+alle, die bis dahin nicht hineingesehen haben (vier Nutzer haben ein
+Push-Abo). Hilfe: neues Kapitel 27 „Briefing für heute", Startseiten-Eintrag
+in Kapitel 3 verweist darauf.
+
+---
+
 ## 2026-09-07 – portal-v251: #270 Ladezeit, #271 Spielerbilder
 
 ### #270 – „Das erste Öffnen nach längerer Pause dauert lange"

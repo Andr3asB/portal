@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set app_slug = "home" %}
+{% block title %}Briefing – Familienportal{% endblock %}
+
+{% block extra_styles %}
+{# Wunsch #272: Das Briefing als eigene Seite - zum Wiederaufrufen, nachdem
+   die Karte auf der Startseite bestaetigt ist. Gleiche Stile, gleicher
+   Inhalt wie dort (_briefing.html). #}
+{% include "_briefing_stile.html" %}
+.briefing-karte { margin-top: 4px; }
+{% endblock %}
+
+{% block nav_left %}
+<a class="nav-btn" href="{{ start_pfad(token) }}" title="Zurück zur Startseite">←</a>
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">☀️ Briefing</h1>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <section class="briefing-karte" id="briefing">
+    {% include "_briefing.html" %}
+    {% if bestaetigt %}
+    <div class="briefing-fertig">✓ Heute schon gelesen</div>
+    {% else %}
+    <form method="post" action="/p{{ tp }}briefing/bestaetigen" class="briefing-form" data-fetch="briefingBestaetigt">
+      <button type="submit" class="btn-briefing">✓ Gelesen</button>
+    </form>
+    <div class="briefing-fertig" id="briefing-fertig" hidden>✓ Heute schon gelesen</div>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Wunsch #171/#272: Bestaetigen ohne Seitensprung - der Knopf weicht dem
+// Vermerk, die Seite bleibt stehen.
+function briefingBestaetigt(form) {
+  form.hidden = true;
+  var fertig = document.getElementById('briefing-fertig');
+  if (fertig) fertig.hidden = false;
+}
+</script>
+{% endblock %}

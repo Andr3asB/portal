@@ -9,6 +9,8 @@
 {% endblock %}
 
 {% block extra_styles %}
+{# Wunsch #272: Morning Briefing - Stile gemeinsam mit briefing.html. #}
+{% include "_briefing_stile.html" %}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -126,6 +128,19 @@
 
 {% block body %}
 <main class="main" id="main">
+  {# Wunsch #272: Morning Briefing - steht oben, bis es bestaetigt ist;
+     danach bleibt nur der kleine Wiederaufruf. Beides ist gerendert, das
+     Umschalten nach der Bestaetigung passiert ohne Seitensprung (#171). #}
+  <section class="briefing-karte" id="briefing"{% if briefing_bestaetigt %} hidden{% endif %}>
+    {% include "_briefing.html" %}
+    <form method="post" action="/p{{ tp }}briefing/bestaetigen" class="briefing-form" data-fetch="briefingBestaetigt">
+      <button type="submit" class="btn-briefing">✓ Gelesen</button>
+    </form>
+  </section>
+  <div class="briefing-wieder" id="briefing-wieder"{% if not briefing_bestaetigt %} hidden{% endif %}>
+    <a class="briefing-link knopf" href="/p{{ tp }}briefing">☀️ Briefing für heute</a>
+  </div>
+
   <!-- Push-Banner -->
   <div class="push-banner" id="push-banner" style="display:none">
     <span style="font-size:28px">🔔</span>
@@ -199,6 +214,15 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Wunsch #272: Nach "Gelesen" klappt die Karte ein, der Wiederaufruf
+// erscheint - ohne Neuladen (#171). Der Server hat die Bestaetigung
+// gespeichert, bevor diese Funktion laeuft.
+function briefingBestaetigt() {
+  document.getElementById('briefing').hidden = true;
+  document.getElementById('briefing-wieder').hidden = false;
+}
+</script>
 <script{{ csp_nonce }}>
 // Tageszeit-Gruß
 (function(){

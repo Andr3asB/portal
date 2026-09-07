@@ -133,11 +133,21 @@ def startseite(token):
             allgemein.append(app)
     gruppen_list = [gruppen_map[g["id"]] for g in gruppen_rows]
 
+    # Wunsch #272: Morning Briefing. Lazy importiert, weil teile/__init__.py
+    # dieses Modul VOR 27_briefing laedt (das Briefing braucht _home_user von
+    # hier) - ein Import auf Modulebene waere ein Kreis.
+    from teile.briefing import briefing_fuer, ist_bestaetigt, jetzt_lokal
+    jetzt = jetzt_lokal()
+    briefing = briefing_fuer(db, row["id"], jetzt)
+    briefing_bestaetigt = ist_bestaetigt(db, row["id"], jetzt.date())
+
     return render_template(
         "startseite.html",
         user=row,
         gruppen=gruppen_list,
         allgemein=allgemein,
+        briefing=briefing,
+        briefing_bestaetigt=briefing_bestaetigt,
         # Wunsch #140, Stufe 4: Hier stand bis Stufe 3 `token or
         # row["home_token"]` - eine Brücke, damit Menü und fetch-Aufrufe auf
         # `/start` nicht ohne Token dastehen. Die ist jetzt weg und muss weg

@@ -1,0 +1,36 @@
+{# Wunsch #272: Inhalt des Morning Briefings. Wird zweimal eingebunden -
+   als Karte auf der Startseite und auf der eigenen Seite /p/briefing -,
+   damit beide immer dasselbe zeigen. Erwartet `briefing` (27_briefing.py)
+   und `user`. Die Stile stehen in _briefing_stile.html. #}
+<div class="briefing-kopf">
+  <span class="briefing-sonne" data-emoji-alt>☀️</span>
+  <div>
+    <h2 class="briefing-titel">{{ briefing.gruss }}, {{ user.name }}!</h2>
+    <div class="briefing-datum">{{ briefing.datum_text }}</div>
+  </div>
+</div>
+
+<div class="briefing-block">
+  <div class="briefing-label">🍽️ Essen heute</div>
+  {% for m in briefing.mahlzeiten %}
+  <div class="briefing-zeile">
+    <span class="briefing-slot">{{ m.label }}</span>
+    {% if m.text %}<span>{% if m.symbol %}{{ m.symbol }} {% endif %}{{ m.text }}</span>
+    {% else %}<span class="briefing-leer">nichts geplant</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="briefing-block">
+  <div class="briefing-label">🎂 Geburtstage</div>
+  {% if briefing.geburtstage %}
+    {% for g in briefing.geburtstage %}
+    <div class="briefing-zeile">
+      <span class="briefing-slot">{{ '🎂 Heute' if g.wann == 'heute' else '🎁 Morgen' }}</span>
+      <span><strong>{{ g.name }}</strong>{% if g.wird_alt %} wird {{ g.wird_alt }}{% endif %}</span>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="briefing-zeile"><span class="briefing-leer">Heute und morgen hat niemand Geburtstag.</span></div>
+  {% endif %}
+</div>

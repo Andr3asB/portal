@@ -35,3 +35,18 @@ sys.modules.setdefault("teile.werkstatt_app", _werkstatt_app)
 # Aufgabenbau werden von den Tests direkt geprueft, ohne Umweg ueber HTTP.
 _vokabeln = importlib.import_module("teile.16_vokabeln")
 sys.modules.setdefault("teile.vokabeln", _vokabeln)
+
+# Wunsch #272: Das Morning Briefing (27_briefing.py) fasst Essensplan und
+# Geburtstage zusammen und haengt an der Startseite. Es braucht die
+# Mahlzeiten-Konstanten (12), die Datumslogik der Geburtstage (23) und den
+# Home-Nutzer (01) - alles per Alias statt als Kopie, damit z. B. der
+# 29. Februar nur an EINER Stelle behandelt wird. Reihenfolge: erst die
+# Lieferanten, dann das Briefing selbst.
+_essensplan = importlib.import_module("teile.12_essensplan")
+sys.modules.setdefault("teile.essensplan", _essensplan)
+_geburtstage = importlib.import_module("teile.23_geburtstage")
+sys.modules.setdefault("teile.geburtstage", _geburtstage)
+_start_token = importlib.import_module("teile.01_start_token")
+sys.modules.setdefault("teile.start_token", _start_token)
+_briefing = importlib.import_module("teile.27_briefing")
+sys.modules.setdefault("teile.briefing", _briefing)

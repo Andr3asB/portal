@@ -109,6 +109,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     ('kapitel-24', '📋 Aufgaben als Brett'),
     ('kapitel-25', '🎁 Wunschzettel'),
     ('kapitel-26', '🤖 KI-Modelle – welche, wofür, wo'),
+    ('kapitel-27', '☀️ Briefing für heute'),
   ] %}
   <div class="section toc">
     <h2 class="section-title">📑 Inhalt</h2>
@@ -155,7 +156,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
         <span class="app-emoji">🏠</span>
         <div class="app-desc">
           <strong>Startseite</strong>
-          <span>Dein persönlicher Einstieg. Von hier aus öffnest du alle Apps.</span>
+          <span>Dein persönlicher Einstieg. Von hier aus öffnest du alle Apps. Ganz oben steht morgens dein <a href="#kapitel-27">Briefing für heute</a> – Essen und Geburtstage auf einen Blick.</span>
         </div>
       </li>
       <li>
@@ -704,6 +705,14 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     {% include "_ki_modelle.html" %}
     <div class="tip">🎤📷 Zwei Dinge sind bewusst anders eingestellt als der Rest: <strong>Stimmaufnahmen</strong> (Aussprache-Bewertung) und <strong>Fotos</strong> (Rezept aus Foto, Vokabeln aus dem Schulheft) gehen nur an ein europäisches Modell in einem EU-Rechenzentrum, weil sie Stimmen und Handschriften der Familie enthalten. Die Aufnahmen und Fotos werden im Portal nicht gespeichert. Für die reinen Text-Funktionen gibt es diese Vorgabe nicht – dort zählt, welches Modell die Aufgabe am besten löst.</div>
     <div class="tip">🤖 Dieselbe Liste steht für Andi auch in der Verwaltung unter „KI-Verbrauch“, direkt unter den Zahlen, wer wofür wie viele Tokens verbraucht hat.</div>
+  </details>
+
+  <details class="section" id="kapitel-27">
+    <summary class="section-title"><h2>☀️ Briefing für heute</h2></summary>
+    <p>Öffnest du das Portal zum ersten Mal am Tag, steht ganz oben auf deiner Startseite eine Karte mit dem, was heute ansteht: <strong>was es mittags und abends zu essen gibt</strong> (aus dem Essensplan) und <strong>wer heute oder morgen Geburtstag hat</strong> (aus der Geburtstags-App, mit dem Alter, wenn das Geburtsjahr eingetragen ist). Wen du in der Geburtstags-App ausgeblendet hast, taucht auch hier nicht auf.</p>
+    <p>Ein Tipp auf <strong>„✓ Gelesen“</strong> bestätigt das Briefing – die Karte klappt ein und macht den Apps Platz. An ihrer Stelle bleibt ein kleiner Knopf <strong>„☀️ Briefing für heute“</strong>, mit dem du es jederzeit wieder aufrufen kannst. Am nächsten Tag ist die Karte wieder da.</p>
+    <p><strong>Erinnerung per Push:</strong> Hast du das Briefing bis <strong>7:30 Uhr</strong> (werktags) bzw. <strong>9:00 Uhr</strong> (Samstag und Sonntag) noch nicht bestätigt, schickt dir das Portal eine Push-Nachricht mit der Kurzfassung – einmal, nicht öfter, und nur an Geräte, auf denen du Benachrichtigungen aktiviert hast (Kapitel <a href="#kapitel-4">Benachrichtigungen</a>). Wer das Briefing schon vorher liest, bekommt keine.</p>
+    <div class="tip">📝 Steht auf der Karte „nichts geplant“, ist im Essensplan für heute nichts eingetragen – das Briefing zeigt nur, was da ist, es erfindet nichts.</div>
   </details>
 
 </main>

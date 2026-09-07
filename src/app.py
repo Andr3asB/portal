@@ -58,6 +58,10 @@ app.config["KI_GUTHABEN_WACHT"] = os.environ.get("KI_GUTHABEN_WACHT", "1")
 # Tabellen), damit das Oeffnen der App nicht auf sieben Fremdaufrufe wartet.
 # In der Testumgebung 0 - gleicher Grund wie bei den beiden oben.
 app.config["TVB_HINTERGRUND"] = os.environ.get("TVB_HINTERGRUND", "1")
+# Wunsch #272: Morning-Briefing-Erinnerung per Push (werktags 07:30, am
+# Wochenende 09:00, nur wenn das Briefing noch nicht bestaetigt ist). Im Test
+# 0 - derselbe Grund wie bei den drei oben.
+app.config["BRIEFING_PUSH"] = os.environ.get("BRIEFING_PUSH", "1")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

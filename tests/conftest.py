@@ -54,6 +54,8 @@ def app(tmp_path_factory, token_key):
     # Wunsch #270: die TVB-Auffrischung im Hintergrund - derselbe Grund, und
     # sie wuerde bei jedem Testlauf Sportradar und handball.net anrufen.
     os.environ["TVB_HINTERGRUND"] = "0"
+    # Wunsch #272: die Briefing-Erinnerung - Minutentakt, schreibt in die DB.
+    os.environ["BRIEFING_PUSH"] = "0"
     # Kein OpenRouter/VAPID/hae im Test – die Module müssen ohne auskommen.
     for leer in ("OPENROUTER_API_KEY", "VAPID_PRIVATE_KEY", "VAPID_PUBLIC_KEY",
                  "HAE_API_URL", "HAE_API_KEY"):
