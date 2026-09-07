@@ -221,7 +221,8 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
   weil die Tabelle nicht per `ON DELETE CASCADE` am Nutzer hängt.
 - **Neuer Hintergrund-Thread?** Er braucht einen eigenen Schalter in
   `app.py`, und `conftest.py` muss ihn auf `0` setzen – wie
-  `GEBURTSTAGS_ERINNERUNGEN` (#145) und `KI_GUTHABEN_WACHT` (#183). Ein Thread,
+  `GEBURTSTAGS_ERINNERUNGEN` (#145), `KI_GUTHABEN_WACHT` (#183) und
+  `TVB_HINTERGRUND` (#270). Ein Thread,
   der nebenher in dieselbe SQLite-Datei schreibt, lässt die Fixtures mit
   „database is locked" auflaufen. Dasselbe gilt für Modul-globalen Zustand:
   `rate_ueberschritten()` hält seine Treffer in einem Dict in `teile.kern`,

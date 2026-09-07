@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-09-07 – portal-v251: #270 Ladezeit, #271 Spielerbilder
+
+### #270 – „Das erste Öffnen nach längerer Pause dauert lange"
+
+Gemessen im Container, kalter Stand: Vereinsdaten 1,1 s, die sechs
+Sportradar-Listen **5,5 s** (nacheinander, je ~0,9 s), zwei Tabellen 0,8 s –
+rund acht Sekunden, und all das im Seitenaufruf, der Nutzer wartet. Drei
+Maßnahmen:
+
+1. **Parallel holen.** `_profi_spiele()` läuft in zwei Runden über einen
+   ThreadPool: erst die Spielpläne beider Embeds (aus ihnen kommt der
+   Zustand für den Ergebnisse-Reiter), dann Ergebnisse und Ribbon für beide
+   zugleich. Die Reihenfolge beim Zusammenführen bleibt (der Test in
+   `test_tvb_nachladen` prüft jetzt Mengen statt Reihenfolge der zweiten
+   Runde).
+2. **Tabellen zwischenspeichern.** Neue Tabelle `tvb_tabellen` mit der
+   Rohantwort je Mannschaft, 60 Minuten gültig; vorher holte jeder
+   Seitenaufruf sie live.
+3. **Hintergrund-Thread** (`_hintergrund_schleife`, alle 5 Minuten, Schalter
+   `TVB_HINTERGRUND` in `app.py`, in `conftest.py` auf 0 – dritte Zeile in
+   der Reihe #145/#183). Er frischt auf, was zu alt ist: Mannschaften und
+   Amateurspiele stündlich, die Profis stündlich – oder alle fünf Minuten,
+   wenn ein Profispiel im Fenster liegt (2 h vor bis 3 h nach Anwurf), damit
+   der Ribbon am Spieltag mitgeht –, fehlende Amateur-Tabellen. Der
+   Seitenaufruf liest dann nur; holt er doch selbst (Thread tot, Neustart),
+   ist das der Rückfall von vor #270, nicht die Regel.
+
+`_profis_auffrischen()` ist der EINE Weg für Seitenaufruf und Thread, damit
+beide dasselbe tun (Spiele, Tabelle, Quellen-Status, Nachladen). Der Thread
+nutzt `new_db()`, nie `g.db`. 11 Tests, Hilfe und `.env.example` ergänzt.
+
+### #271 – Spielerbilder
+
+Die HPI-Antwort nennt je Spieler eine Bild-Adresse auf Sportradars CDN
+(`images.dc.connect.sportradar.com`, Größe und Format als Parameter: 400 px
+webp sind ~30 KB statt 190 KB PNG). Regel #119 bleibt: der Browser lädt nichts
+von fremden Hosts. Also holt der **Server** das Bild einmal, legt es unter
+`DATA_DIR/tvb_bilder/<dc_id>.webp` ab und liefert es über
+`/a/tvb/<token>/bild/<dc_id>` mit Cache-Control aus; nach einer Woche wird es
+erneuert, bei totem CDN bleibt das alte Bild oder es kommen Initialen als
+SVG – ein Bild, das sicher da ist, statt eines kaputten Bildsymbols. Die
+Adresse geht in einen Fremdabruf, deshalb eine Allowlist auf genau diesen
+Host (`_bild_url_erlaubt`, geprüft gegen http, Subdomain-Trick, leeren
+Pfad). Kader (44 px, `loading="lazy"`) und Profil (112 px). 9 Tests, der
+Kader-Cache wird mit der Migration einmalig geleert, damit die Adressen
+sofort da sind.
+
 ## 2026-09-07 – portal-v250: #269 – Fotos bleiben in der EU
 
 Andi: Fotos (Rezepte, Vokabeln) können Handschriften enthalten, die sollen

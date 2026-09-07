@@ -359,9 +359,11 @@ def test_das_erste_saisonspiel_kommt_aus_der_ergebnisliste(modul, monkeypatch):
     assert s["spieltag"] == "1. Spieltag"
     assert s["anstoss"].startswith("2026-08-28T19:00")
     assert (248, f"fixtures?locale=de-DE&state={TAB_STATE}") in aufrufe
-    # Reihenfolge: Spielplan, Ergebnisse, Ribbon - je Embed
-    assert [p for e, p in aufrufe if e == 248] == [
-        "fixtures?locale=de-DE", f"fixtures?locale=de-DE&state={TAB_STATE}", "fixtures_ribbon?locale=de-DE"]
+    # Der Spielplan kommt zuerst (aus ihm stammt der Zustand), Ergebnisse und
+    # Ribbon danach - seit #270 parallel, also in beliebiger Reihenfolge.
+    pfade = [p for e, p in aufrufe if e == 248]
+    assert pfade[0] == "fixtures?locale=de-DE"
+    assert set(pfade[1:]) == {f"fixtures?locale=de-DE&state={TAB_STATE}", "fixtures_ribbon?locale=de-DE"}
 
 
 def test_ohne_reiter_wird_die_liste_nicht_angefragt(modul, monkeypatch):

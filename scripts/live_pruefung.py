@@ -31,6 +31,7 @@ import json
 import ssl
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -45,8 +46,12 @@ KENNUNG = "PRUEFUNG"
 # ein - sonst merkt niemand, wenn sie 500 wirft, bis jemand sie braucht.
 UNTERSEITEN = {
     "admin": [("/a/admin/geraete", "Verwaltung › Geräte"),
-              ("/a/admin/ki",      "Verwaltung › KI-Verbrauch")],
+              ("/a/admin/ki",      "Verwaltung › KI-Verbrauch"),
+              ("/a/admin/apps",    "Verwaltung › App-Zugriff")],
     "todo":  [("/a/todo/kanban",   "Aufgaben › Brett")],
+    # Der Kader fuellt seinen 6-h-Cache beim ersten Aufruf (HPI-API) - seit
+    # #271 samt Bild-Adressen; die Zeit dafuer steht dann in der Ausgabe.
+    "tvb":   [("/a/tvb/kader",     "TVB › Kader")],
 }
 
 
@@ -100,19 +105,23 @@ db.commit()
 """).splitlines()[-1])
 
 
-def hole(pfad: str, cookie: str) -> int:
+def hole(pfad: str, cookie: str) -> tuple[int, int]:
+    """(Statuscode, Dauer in ms). Die Dauer steht seit Wunsch #270 dabei -
+    "das erste Öffnen dauert lange" ist sonst nicht messbar, nur fühlbar."""
     anfrage = urllib.request.Request(BASIS + pfad, headers={
         "Cookie": f"portal_sitzung={cookie}",
         "User-Agent": "portal-live-pruefung",
     })
+    start = time.monotonic()
     try:
         with urllib.request.urlopen(anfrage, timeout=20,
                                     context=ssl.create_default_context()) as antwort:
-            return antwort.status
+            antwort.read()
+            return antwort.status, int((time.monotonic() - start) * 1000)
     except urllib.error.HTTPError as fehler:
-        return fehler.code
+        return fehler.code, int((time.monotonic() - start) * 1000)
     except Exception:
-        return 0
+        return 0, int((time.monotonic() - start) * 1000)
 
 
 def main() -> int:
@@ -122,20 +131,20 @@ def main() -> int:
     fehler = []
     try:
         for pfad, beschriftung in [("/health", "health"), ("/start", "Startseite")]:
-            code = hole(pfad, cookie)
-            print(f"  {code}  {beschriftung}")
+            code, ms = hole(pfad, cookie)
+            print(f"  {code}  {ms:5d} ms  {beschriftung}")
             if code != 200:
                 fehler.append((beschriftung, code))
         for app in apps:
             if app["slug"] == "home":
                 continue          # die Startseite hängt nicht unter /a/
-            code = hole(f"/a/{app['slug']}/", cookie)
-            print(f"  {code}  {app['name']}")
+            code, ms = hole(f"/a/{app['slug']}/", cookie)
+            print(f"  {code}  {ms:5d} ms  {app['name']}")
             if code != 200:
                 fehler.append((app["name"], code))
             for pfad, beschriftung in UNTERSEITEN.get(app["slug"], []):
-                code = hole(pfad, cookie)
-                print(f"  {code}  {beschriftung}")
+                code, ms = hole(pfad, cookie)
+                print(f"  {code}  {ms:5d} ms  {beschriftung}")
                 if code != 200:
                     fehler.append((beschriftung, code))
     finally:

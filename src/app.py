@@ -54,6 +54,10 @@ app.config["GEBURTSTAGS_ERINNERUNGEN"] = os.environ.get("GEBURTSTAGS_ERINNERUNGE
 # demselben Grund wie oben in der Testumgebung 0 - und der Thread wuerde dort
 # ausserdem bei jedem Testlauf OpenRouter anrufen.
 app.config["KI_GUTHABEN_WACHT"] = os.environ.get("KI_GUTHABEN_WACHT", "1")
+# Wunsch #270: Hintergrund-Auffrischung der TVB-Daten (Mannschaften, Spiele,
+# Tabellen), damit das Oeffnen der App nicht auf sieben Fremdaufrufe wartet.
+# In der Testumgebung 0 - gleicher Grund wie bei den beiden oben.
+app.config["TVB_HINTERGRUND"] = os.environ.get("TVB_HINTERGRUND", "1")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,

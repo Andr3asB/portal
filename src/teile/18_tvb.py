@@ -79,18 +79,32 @@ für sie wieder Spiele gibt - ohne Codeänderung.
 """
 import base64
 import json
+import logging
+import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
 import zlib
-from datetime import UTC, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, redirect, render_template, request
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    redirect,
+    render_template,
+    request,
+    send_file,
+)
 
-from teile.kern import get_db, to_int, utc_zu_lokal
+from teile.kern import get_db, new_db, to_int, utc_zu_lokal
 from teile.kern import grant as check_grant
+
+_log = logging.getLogger(__name__)
 
 bp  = Blueprint("tvb_app", __name__)
 APP = "tvb"
@@ -133,6 +147,33 @@ _SR_TABELLE_EMBED = 248          # eine Tabelle gibt es nur in der Liga
 # Abruf holt aber zugleich alle Spiele des Vereins, die sich sehr wohl
 # aendern. Deshalb kein Tageswert mehr, sondern stuendlich.
 _MANNSCHAFTEN_MAX_ALTER_STUNDEN = 1
+
+# Wunsch #270: Das erste Oeffnen nach laengerer Pause dauerte rund acht
+# Sekunden, weil der Seitenaufruf selbst sieben Fremdaufrufe nacheinander
+# machte (Vereinsdaten, sechs Sportradar-Listen, Tabellen). Jetzt:
+#   - die Sportradar-Listen laufen parallel (_profi_spiele),
+#   - Tabellen werden zwischengespeichert (tvb_tabellen),
+#   - ein Hintergrund-Thread frischt alles auf, bevor jemand die Seite oeffnet
+#     (_hintergrund_schleife, Schalter TVB_HINTERGRUND in app.py).
+# Der Seitenaufruf holt nur noch dann selbst, wenn der Stand aelter ist als
+# erlaubt - stuendlich, waehrend eines Profispiels alle fuenf Minuten (der
+# Ribbon soll mitgehen).
+_PROFI_MAX_ALTER_MINUTEN = 60
+_PROFI_MAX_ALTER_LIVE_MINUTEN = 5
+_TABELLE_MAX_ALTER_MINUTEN = 60
+_SPIELFENSTER_VOR_STUNDEN = 2
+_SPIELFENSTER_NACH_STUNDEN = 3
+_HINTERGRUND_TAKT_SEKUNDEN = 300
+_HINTERGRUND_STARTVERZUG_SEKUNDEN = 15
+
+# Wunsch #271: Spielerbilder. Die HPI-Antwort nennt je Spieler eine Adresse
+# auf Sportradars Bild-CDN; nur DIESER Host wird vom Server geholt (die
+# Adresse geht in einen Fremdabruf - ohne Allowlist waere das ein SSRF-Tor),
+# hoechstens 2 MB, als webp in 400 px, unter DATA_DIR/tvb_bilder abgelegt und
+# nach einer Woche erneuert. Der Browser bekommt das Bild von hier (#119).
+_BILD_HOST = "images.dc.connect.sportradar.com"
+_BILD_MAX_BYTES = 2 * 1024 * 1024
+_BILD_MAX_ALTER_TAGE = 7
 
 # Wunsch #190: Die Mannschaftsliste konnte still veralten - schlaegt der
 # Abruf fehl, bleibt der alte Stand stehen, und niemand erfaehrt davon.
@@ -574,17 +615,111 @@ def _mannschaften_aktualisieren(db):
 
 
 
-def _mannschaften_holen(db):
-    """Mannschaftsliste, bei Bedarf vorher aktualisiert."""
-    frisch = db.execute("""
+def _mannschaften_frisch(db):
+    return db.execute("""
         SELECT 1 FROM tvb_mannschaften
         WHERE aktualisiert_am > datetime('now', ?) LIMIT 1
-    """, (f"-{_MANNSCHAFTEN_MAX_ALTER_STUNDEN} hours",)).fetchone()
-    if not frisch and not _quelle_pausiert(db, _QUELLE_MANNSCHAFTEN):
+    """, (f"-{_MANNSCHAFTEN_MAX_ALTER_STUNDEN} hours",)).fetchone() is not None
+
+
+def _mannschaften_holen(db):
+    """Mannschaftsliste, bei Bedarf vorher aktualisiert."""
+    if not _mannschaften_frisch(db) and not _quelle_pausiert(db, _QUELLE_MANNSCHAFTEN):
         _mannschaften_aktualisieren(db)
     return [dict(z) for z in db.execute(
         "SELECT * FROM tvb_mannschaften ORDER BY position"
     ).fetchall()]
+
+
+# --- Wunsch #270: Zwischenspeicher fuer Tabellen, Frische der Profis -------------
+
+def _tabelle_speichern(db, team_id, antwort):
+    db.execute("""
+        INSERT INTO tvb_tabellen(team_id, daten, aktualisiert_am) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(team_id) DO UPDATE SET daten=excluded.daten, aktualisiert_am=excluded.aktualisiert_am
+    """, (team_id, json.dumps(antwort, ensure_ascii=False)))
+    db.commit()
+
+
+def _tabelle_laden(db, team_id, max_minuten=_TABELLE_MAX_ALTER_MINUTEN):
+    """Gespeicherte Rohantwort, oder None wenn sie fehlt oder zu alt ist."""
+    z = db.execute(
+        "SELECT daten FROM tvb_tabellen WHERE team_id=? AND aktualisiert_am > datetime('now', ?)",
+        (team_id, f"-{max_minuten} minutes")).fetchone()
+    return json.loads(z["daten"]) if z else None
+
+
+def _spiel_im_fenster(db):
+    """Laeuft gerade ein Profispiel (oder faengt es gleich an, oder ist es
+    eben zu Ende)? Dann darf der Stand nur Minuten alt sein."""
+    jetzt = datetime.now(_TZ)
+    von = (jetzt - timedelta(hours=_SPIELFENSTER_NACH_STUNDEN)).isoformat()
+    bis = (jetzt + timedelta(hours=_SPIELFENSTER_VOR_STUNDEN)).isoformat()
+    return db.execute(
+        "SELECT 1 FROM tvb_spiele WHERE team_id=? AND anstoss BETWEEN ? AND ? LIMIT 1",
+        (_PROFI_TEAM_ID, von, bis)).fetchone() is not None
+
+
+def _profis_frisch(db):
+    grenze = _PROFI_MAX_ALTER_LIVE_MINUTEN if _spiel_im_fenster(db) else _PROFI_MAX_ALTER_MINUTEN
+    return db.execute(
+        "SELECT 1 FROM tvb_quellen WHERE quelle=? AND zuletzt_ok > datetime('now', ?)",
+        (_QUELLE_PROFIS, f"-{grenze} minutes")).fetchone() is not None
+
+
+def _profis_auffrischen(db):
+    """Spiele, Tabelle und Nachladen der Profis - EIN Weg fuer Seitenaufruf
+    und Hintergrund. Gibt (gesehene_spiele, tabelle_antwort) zurueck."""
+    tabelle_antwort = _sr_get("standings?locale=de-DE", embed=_SR_TABELLE_EMBED)
+    gesehene = _profi_spiele()
+    if gesehene:
+        _tvb_spiele_aktualisieren(db, gesehene)
+    if tabelle_antwort is not None:
+        _tabelle_speichern(db, _PROFI_TEAM_ID, tabelle_antwort)
+    _quelle_melden(db, _QUELLE_PROFIS, tabelle_antwort is not None,
+                   None if tabelle_antwort is not None else "Sportradar nicht abrufbar")
+    # Wunsch #263: verpasste Ergebnisse und unbestaetigte Staende ueber den
+    # Einzelspiel-Endpunkt nachziehen - nach dem Ribbon, damit ein frisch
+    # bestaetigtes Spiel nicht noch einmal angefragt wird.
+    _profi_nachladen(db)
+    return gesehene, tabelle_antwort
+
+
+def _amateur_tabelle(db, team_id, phase_id):
+    """Tabelle einer Amateurmannschaft: gespeichert, sonst geholt und gespeichert."""
+    if not phase_id:
+        return None
+    antwort = _tabelle_laden(db, team_id)
+    if antwort is None:
+        antwort = _neu_api_get(f"standings?phase_id={phase_id}")
+        if antwort is not None:
+            _tabelle_speichern(db, team_id, antwort)
+    return antwort
+
+
+def _hintergrund_auffrischen(app):
+    """Ein Durchlauf: alles auffrischen, was zu alt ist. Laeuft im Thread mit
+    eigener Verbindung (new_db), nie mit g.db."""
+    with app.app_context(), new_db() as db:
+        if not _mannschaften_frisch(db) and not _quelle_pausiert(db, _QUELLE_MANNSCHAFTEN):
+            _mannschaften_aktualisieren(db)
+        if not _profis_frisch(db) and not _quelle_pausiert(db, _QUELLE_PROFIS):
+            _profis_auffrischen(db)
+        for m in db.execute("SELECT team_id, turnier_id FROM tvb_mannschaften WHERE ist_profi=0"):
+            if m["turnier_id"] and _tabelle_laden(db, m["team_id"]) is None:
+                _amateur_tabelle(db, m["team_id"], m["turnier_id"])
+
+
+def _hintergrund_schleife(app):
+    time.sleep(_HINTERGRUND_STARTVERZUG_SEKUNDEN)
+    while True:
+        try:
+            _hintergrund_auffrischen(app)
+        except Exception:
+            # Ein Fehler darf die Schleife nicht beenden - sonst holt ab da
+            # wieder jeder Seitenaufruf alles selbst, und niemand merkt es.
+            _log.exception("TVB-Auffrischung im Hintergrund fehlgeschlagen")
+        time.sleep(_HINTERGRUND_TAKT_SEKUNDEN)
 
 
 def _ausgeblendete_klassen(db, user_id):
@@ -799,19 +934,34 @@ def _profi_spiele():
     geoeffnet wird. Danach rollt es aus dem Ribbon heraus und ist von keiner
     erreichbaren Stelle mehr zu holen. Deshalb bleibt jedes einmal gesehene
     Spiel in tvb_spiele stehen."""
+    # Wunsch #270: Die sechs Listen liefen nacheinander (5,5 s gemessen) -
+    # jetzt in zwei parallelen Runden: erst die Spielplaene beider Embeds
+    # (aus ihnen kommt der Zustand fuer den Ergebnisse-Reiter), dann
+    # Ergebnisse und Ribbon fuer beide zugleich. Die Reihenfolge beim
+    # Zusammenfuehren bleibt Spielplan, Ergebnisse, Ribbon je Embed.
+    embeds = list(_SR_EMBEDS.items())
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        plaene = dict(zip([e for e, _ in embeds],
+                          pool.map(lambda e: _sr_get("fixtures?locale=de-DE", embed=e),
+                                   [e for e, _ in embeds])))
+        auftraege = []
+        for embed, _ in embeds:
+            # Wunsch #263, Nachtrag (07.09.2026): Der "Ergebnisse"-Reiter des
+            # Widgets ist derselbe Endpunkt mit dem Widget-Zustand als `state`
+            # - und liefert ALLE gespielten Spiele der Saison mit Endstand.
+            # Damit bekommt auch ein Spiel eine Kennung, das nie im
+            # Ribbon-Fenster gesehen wurde (das erste Saisonspiel fehlte genau
+            # deshalb).
+            zustand = _sr_ergebnis_zustand(plaene[embed])
+            if zustand:
+                auftraege.append((embed, f"fixtures?locale=de-DE&state={zustand}"))
+            auftraege.append((embed, "fixtures_ribbon?locale=de-DE"))
+        geholt = dict(zip(auftraege,
+                          pool.map(lambda a: _sr_get(a[1], embed=a[0]), auftraege)))
+
     spiele = {}
-    for embed, wettbewerb in _SR_EMBEDS.items():
-        plan = _sr_get("fixtures?locale=de-DE", embed=embed)
-        antworten = [plan]
-        # Wunsch #263, Nachtrag (07.09.2026): Der "Ergebnisse"-Reiter des
-        # Widgets ist derselbe Endpunkt mit dem Widget-Zustand als `state` -
-        # und liefert ALLE gespielten Spiele der Saison mit Endstand. Damit
-        # bekommt auch ein Spiel eine Kennung, das nie im Ribbon-Fenster
-        # gesehen wurde (das erste Saisonspiel fehlte genau deshalb).
-        zustand = _sr_ergebnis_zustand(plan)
-        if zustand:
-            antworten.append(_sr_get(f"fixtures?locale=de-DE&state={zustand}", embed=embed))
-        antworten.append(_sr_get("fixtures_ribbon?locale=de-DE", embed=embed))
+    for embed, wettbewerb in embeds:
+        antworten = [plaene[embed]] + [geholt[a] for a in auftraege if a[0] == embed]
         for antwort in antworten:
             for eintrag in ((antwort or {}).get("data") or {}).get("fixtures") or []:
                 spiel = _sr_spiel(eintrag, wettbewerb)
@@ -1020,13 +1170,16 @@ def index(token):
     # die NICHT im DHB-Spielbetrieb steckt, den die neue handball.net-API
     # abbildet. Deshalb hier die Weiche.
     if gewaehlt["ist_profi"]:
-        tabelle_antwort = _sr_get("standings?locale=de-DE", embed=_SR_TABELLE_EMBED)
-        gesehene_spiele = _profi_spiele()
+        # Wunsch #270: Frisch genug (Hintergrund-Thread) -> nur lesen. Sonst
+        # selbst holen, wie vor #270 - als Rueckfall, nicht als Regel.
+        if _profis_frisch(db):
+            gesehene_spiele, tabelle_antwort = [], _tabelle_laden(db, _PROFI_TEAM_ID, 24 * 60)
+            fehler_spiele = False
+        else:
+            gesehene_spiele, tabelle_antwort = _profis_auffrischen(db)
+            fehler_spiele = not gesehene_spiele and tabelle_antwort is None
         tabelle = _tabelle_aus_sr(tabelle_antwort)
-        fehler_spiele  = not gesehene_spiele and tabelle_antwort is None
         fehler_tabelle = tabelle_antwort is None
-        _quelle_melden(db, _QUELLE_PROFIS, tabelle_antwort is not None,
-                       None if tabelle_antwort is not None else "Sportradar nicht abrufbar")
     else:
         # Die Spiele der Amateur-/Jugendmannschaften kommen gesammelt beim
         # Aktualisieren der Mannschaftsliste herein (ein Aufruf fuer den
@@ -1034,19 +1187,10 @@ def index(token):
         # mehr zu holen; gezeigt wird der gespeicherte Bestand.
         gesehene_spiele = []
         phase_id = gewaehlt.get("turnier_id")
-        tabelle_antwort = (_neu_api_get(f"standings?phase_id={phase_id}")
-                           if phase_id else None)
+        tabelle_antwort = _amateur_tabelle(db, team_id, phase_id)
         tabelle = _tabelle_aus_neu(tabelle_antwort, gewaehlt["name"])
         fehler_spiele  = False
         fehler_tabelle = phase_id is not None and tabelle_antwort is None
-
-    if gesehene_spiele:
-        _tvb_spiele_aktualisieren(db, gesehene_spiele)
-    if gewaehlt["ist_profi"]:
-        # Wunsch #263: verpasste Ergebnisse und unbestaetigte Staende ueber
-        # den Einzelspiel-Endpunkt nachziehen - nach dem Ribbon, damit ein
-        # frisch bestaetigtes Spiel nicht noch einmal angefragt wird.
-        _profi_nachladen(db)
 
     gespeicherte = db.execute(
         "SELECT * FROM tvb_spiele WHERE team_id=? ORDER BY anstoss ASC", (team_id,)
@@ -1154,8 +1298,8 @@ def _kader_speichern(db, saison_name, spieler_roh):
         db.execute("""
             INSERT INTO tvb_kader(spieler_id, vorname, nachname, position,
                                   hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend,
-                                  spieltage, aktionen, saison_name, dc_id, aktualisiert_am)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+                                  spieltage, aktionen, saison_name, dc_id, bild_url, aktualisiert_am)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
         """, (
             s.get("id"), s.get("firstname") or "", s.get("lastname") or "",
             s.get("position"),
@@ -1163,8 +1307,23 @@ def _kader_speichern(db, saison_name, spieler_roh):
             index.get("matchdays"), index.get("events"), saison_name,
             # Wunsch #265: nur eine echte Sportradar-Kennung wird verlinkt.
             s.get("dc_id") if _DC_ID.match(str(s.get("dc_id") or "")) else None,
+            # Wunsch #271: nur eine Adresse auf dem erlaubten Bild-Host.
+            _bild_url_erlaubt(s.get("image")),
         ))
     db.commit()
+
+
+def _bild_url_erlaubt(url):
+    """Die Bild-Adresse, wenn sie auf dem erlaubten Host liegt - sonst None.
+    Sie wird spaeter vom Server abgerufen; alles andere als https auf genau
+    diesem Host waere ein Fremdabruf an beliebige Ziele."""
+    from urllib.parse import urlsplit
+    if not isinstance(url, str):
+        return None
+    teile = urlsplit(url.strip())
+    if teile.scheme != "https" or teile.netloc.lower() != _BILD_HOST or not teile.path:
+        return None
+    return url.strip()
 
 
 def _kader_ist_frisch(db):
@@ -1404,7 +1563,7 @@ def spieler(token, dc_id):
     return render_template("tvb_spieler.html",
         user=user, token=token, farbe=user["farbe"],
         profil=profil, veraltet=veraltet, kader=dict(kader) if kader else None,
-        positionen=dict(_POSITIONEN),
+        positionen=dict(_POSITIONEN), dc_id=dc_id,
     )
 
 
@@ -1776,5 +1935,78 @@ def spiel(token, sid):
     )
 
 
+# --- Wunsch #271: Spielerbilder ----------------------------------------------------
+
+def _bild_holen(url):
+    """Laedt das Bild vom erlaubten Host: (bytes, mimetype) oder None. Die
+    CDN-Adresse nimmt Groesse und Format als Parameter - 400 px webp sind
+    rund 30 KB statt 190 KB als PNG."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+    teile = urlsplit(url)
+    parameter = dict(parse_qsl(teile.query))
+    parameter.update({"size": "400", "format": "webp"})
+    ziel = urlunsplit((teile.scheme, teile.netloc, teile.path, urlencode(parameter), ""))
+    req = urllib.request.Request(ziel, headers={"User-Agent": _UA, "Accept": "image/*"})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            mime = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            daten = resp.read(_BILD_MAX_BYTES + 1)
+    except Exception:
+        return None
+    if not mime.startswith("image/") or len(daten) > _BILD_MAX_BYTES or not daten:
+        return None
+    return daten, mime
+
+
+def _bild_pfad(dc_id):
+    return os.path.join(current_app.config["DATA_DIR"], "tvb_bilder", f"{dc_id}.webp")
+
+
+def _bild_platzhalter(vorname, nachname):
+    """Ein SVG mit den Initialen - fuer Spieler ohne (erreichbares) Bild.
+    Ein Bild, das sicher kommt, statt eines kaputten Bildsymbols."""
+    initialen = "".join(t[:1] for t in (vorname or "", nachname or "") if t).upper() or "?"
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+           '<circle cx="50" cy="50" r="50" fill="#c7ccd6"/>'
+           '<text x="50" y="62" text-anchor="middle" font-family="sans-serif" '
+           f'font-size="38" font-weight="700" fill="#ffffff">{initialen}</text></svg>')
+    return Response(svg, mimetype="image/svg+xml", headers={"Cache-Control": "max-age=3600"})
+
+
+@bp.route("/a/tvb/bild/<dc_id>", defaults={"token": None})
+@bp.route("/a/tvb/<token>/bild/<dc_id>")
+def spieler_bild(token, dc_id):
+    """Wunsch #271: Das Spielerbild aus dem eigenen Zwischenspeicher - einmal
+    vom CDN geholt, eine Woche behalten, dann erneuert. Ohne Bild-Adresse
+    oder wenn das CDN nicht liefert: Initialen als SVG."""
+    user = check_grant(token, APP)
+    if not user:
+        return render_template("denied.html", reason="invalid"), 403
+    if not _DC_ID.match(dc_id or ""):
+        return render_template("denied.html", reason="invalid"), 404
+    db = get_db()
+    zeile = db.execute(
+        "SELECT vorname, nachname, bild_url FROM tvb_kader WHERE dc_id=?", (dc_id,)).fetchone()
+    if not zeile:
+        return render_template("denied.html", reason="invalid"), 404
+    pfad = _bild_pfad(dc_id)
+    frisch = (os.path.exists(pfad)
+              and time.time() - os.path.getmtime(pfad) < _BILD_MAX_ALTER_TAGE * 86400)
+    if not frisch and zeile["bild_url"]:
+        geholt = _bild_holen(zeile["bild_url"])
+        if geholt:
+            os.makedirs(os.path.dirname(pfad), exist_ok=True)
+            with open(pfad, "wb") as f:
+                f.write(geholt[0])
+            frisch = True
+    if not os.path.exists(pfad):
+        return _bild_platzhalter(zeile["vorname"], zeile["nachname"])
+    return send_file(pfad, mimetype="image/webp", max_age=86400, conditional=True)
+
+
 def init_app(app):
     app.register_blueprint(bp)
+    # Wunsch #270: Auffrischung im Hintergrund. Schalter wie bei #145/#183;
+    # in der Testumgebung aus (tests/conftest.py).
+    if str(app.config.get("TVB_HINTERGRUND", "1")).strip() in ("1", "true", "ja"):
+        threading.Thread(target=_hintergrund_schleife, args=(app,), daemon=True).start()

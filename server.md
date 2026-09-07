@@ -228,6 +228,7 @@ TOKENFREIE_URLS=1        # Wunsch #140, Stufe 4
 CSP_MODUS=scharf         # Wunsch #142, Stufe 5: aus | beobachten | scharf
 GEBURTSTAGS_ERINNERUNGEN=1  # Wunsch #145: taeglicher Erinnerungs-Lauf
 KI_GUTHABEN_WACHT=1         # Wunsch #183: stuendlicher Blick aufs OpenRouter-Guthaben
+TVB_HINTERGRUND=1           # Wunsch #270: TVB-Daten im Hintergrund auffrischen (alle 5 min pruefen)
 BACKUP_AGE_RECIPIENT=age1…  # Wunsch #130/#211: oeffentlicher age-Schluessel
 ```
 
@@ -246,9 +247,9 @@ Steht in der Variable etwas, das kein age-Schluessel ist, faellt das Backup
 `util` durchreichen – das fehlte bis 31.08.2026 und war der Grund, warum der
 erste Scharfschalt-Versuch wirkungslos blieb.
 
-`PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN` und `KI_GUTHABEN_WACHT` stehen
-heute NICHT in der echten `.env` - sie greifen mit ihrer Voreinstellung (leer
-bzw. 1). Sie sind hier aufgefuehrt, weil man sie dort eintragen kann und die
+`PORTAL_ORIGIN`, `GEBURTSTAGS_ERINNERUNGEN`, `KI_GUTHABEN_WACHT` und
+`TVB_HINTERGRUND` stehen heute NICHT in der echten `.env` - sie greifen mit
+ihrer Voreinstellung (leer bzw. 1). Sie sind hier aufgefuehrt, weil man sie dort eintragen kann und die
 Voreinstellung dann uebersteuert wird; `env_file: .env` reicht jede Zeile
 durch.
 
@@ -1155,7 +1156,25 @@ teile/
                        der eigenen Zeile. Kennung wird gegen _SPIEL_ID
                        geprueft, bevor sie in einen Fremdpfad geht. Die
                        Spielkarten der Uebersicht sind Links dorthin.
-                       Reiner Anzeige-Modus (keine
+                       Wunsch #270 (07.09.2026): Ladezeit - _profi_spiele()
+                       holt die sechs Sportradar-Listen parallel (ThreadPool,
+                       zwei Runden), Tabellen liegen in tvb_tabellen
+                       (_tabelle_speichern/_tabelle_laden, 60 min),
+                       _profis_auffrischen() ist der EINE Weg fuer Seite und
+                       Thread (Spiele, Tabelle, Quellen-Status, Nachladen),
+                       _profis_frisch() erlaubt 60 min bzw. 5 min im
+                       Spielfenster (_spiel_im_fenster: 2 h vor bis 3 h nach
+                       Anwurf). _hintergrund_schleife() (Schalter
+                       TVB_HINTERGRUND, im Test 0, new_db statt g.db) prueft
+                       alle 5 min und frischt auf, was zu alt ist - der
+                       Seitenaufruf liest dann nur; holt er selbst, ist das
+                       der Rueckfall. Wunsch #271: Spielerbilder -
+                       tvb_kader.bild_url (nur _BILD_HOST, _bild_url_erlaubt),
+                       /bild/<dc_id> holt einmal (400 px webp, max. 2 MB,
+                       _bild_holen) nach DATA_DIR/tvb_bilder, liefert von dort
+                       (max_age 1 Tag), erneuert nach 7 Tagen, sonst Initialen
+                       als SVG (_bild_platzhalter). Kader 44 px lazy, Profil
+                       112 px. Reiner Anzeige-Modus (keine
                        Nutzereingaben). Daten kommen live per On-the-fly-
                        Abruf (urllib, kein neues pip-Paket, Timeout 8s,
                        "fehler"-Flag statt Crash - gleiches Muster wie
@@ -1907,9 +1926,10 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `tvb_ausgeblendet` | user_id (FK users, cascade), altersklasse (Kürzel aus `_ALTERSKLASSEN`, z. B. „mC"/„gE"); PK(user_id, altersklasse) – Wunsch #124: welche Altersklassen DIESER Nutzer im Umschalter ausgeblendet hat. Gespeichert wird bewusst das Ausgeblendete, nicht das Sichtbare (neue Klassen sind dann automatisch sichtbar) |
 | `tvb_quellen` | quelle (PK, `mannschaften` oder `liga_id`), zuletzt_ok (letzter WIRKLICH geglückter Abruf – NULL heißt: seit Bestehen der Tabelle keiner), zuletzt_versuch, letzter_fehler (NULL = zuletzt hat es geklappt) – Wunsch #190: macht das stille Veralten der beiden HTML-Quellen sichtbar und bremst nach einem Fehlschlag 30 Min. „Erreichbar" zählt bewusst **nicht** als Erfolg: eine Seite, die 200 liefert, in der die Liga-ID aber fehlt, gilt als Fehler – genau so sieht ein Relaunch aus |
 | `tvb_mannschaften` | team_id (PK, handball.net-Team-ID), name, liga (volle Bezeichnung), kurz (Chip-Label, z. B. „mB BOL 2"), altersklasse (Kürzel für den Nutzerfilter, Wunsch #124 – bei den Profis „Profis"), turnier_id (Liga-ID für die Tabelle, anfangs NULL – wird bei der ersten Ansicht der Mannschaft nachgeholt), position (Reihenfolge im Umschalter, 0 = Profis), ist_profi, aktualisiert_am – Wunsch #122: Registry aller 18 Mannschaften, alle 24 h aus der Vereinsseite neu geparst |
-| `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, dc_id (Wunsch #265 – Sportradar-Kennung des Spielers aus der HPI-Antwort, nur wenn sie dem UUID-Muster entspricht; Schlüssel fürs Profil), aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
+| `tvb_kader` | spieler_id (PK, HPI-Spieler-ID), vorname, nachname, position (englisch wie von der API geliefert, Übersetzung erst im Template über `_POSITIONEN`), hpi_schnitt, hpi_bestwert, hpi_letzter, hpi_trend (1/-1), spieltage, aktionen, saison_name, dc_id (Wunsch #265 – Sportradar-Kennung des Spielers aus der HPI-Antwort, nur wenn sie dem UUID-Muster entspricht; Schlüssel fürs Profil), bild_url (Wunsch #271 – Bild-Adresse aus der HPI-Antwort, nur auf `images.dc.connect.sportradar.com`; das Bild selbst liegt unter DATA_DIR/tvb_bilder/<dc_id>.webp, eine Woche gültig, geliefert über /bild/<dc_id>), aktualisiert_am – Wunsch #121: Zeit-Cache (6 h) für die ~400 KB grosse HPI-Antwort; beim Neuladen wird die Tabelle geleert und neu gefüllt (Kader = Momentaufnahme, kein UPSERT – anders als `tvb_spiele`) |
 | `tvb_spieler_profile` | dc_id (PK), daten (JSON: name, nummer, verein, position, geburtstag, alter, nation, groesse, gewicht, ligen[], stationen[] mit saisons[], torwart), aktualisiert_am – Wunsch #265: Steckbrief und Laufbahn von der Spielerseite der Liga (opel-hbl.de/de/player/<dc_id>, devalue-Nutzlast im `__NUXT_DATA__`-Skript, ~1,5 MB je Seite), deshalb je Spieler 24 h Cache und nur auf Knopfdruck; ist die Seite nicht erreichbar, wird ein alter Stand mit Hinweis gezeigt |
 | `tvb_spiel_details` | id (PK = tvb_spiele.id), daten (JSON: quelle, kopf, ticker[], statistik{heim,gast}, aufstellung{heim,gast}, schiedsrichter[]), aktualisiert_am – Wunsch #267/#268: Spieldetails beider Quellen im einen Format (18_tvb.py `_sr_details`/`_neu_details`); Frist je Zustand des Spiels: beendet 24 h, kommend 6 h, laufend 2 min |
+| `tvb_tabellen` | team_id (PK = tvb_mannschaften.team_id), daten (Rohantwort der Quelle als JSON: Sportradar `standings` für die Profis, handball.net `standings?phase_id=` je Amateurmannschaft), aktualisiert_am – Wunsch #270: vorher holte jeder Seitenaufruf die Tabelle live; gilt 60 min, der Hintergrund-Thread füllt nach |
 | `geburtstage` | id, name, tag, monat, jahr (NULL = unbekannt), notiz, erstellt_von (FK users, **ON DELETE SET NULL** – der Geburtstag gehört der Familie, nicht dem Eintragenden), erstellt – Wunsch #145. tag/monat als ZAHLEN statt Datum: jährliche Wiederholung, Jahr oft unbekannt |
 | `geburtstag_einstellungen` | user_id, geburtstag_id, ausgeblendet, erinnerung (am Tag), vorlauf_tage (NULL = keine Vorab-Erinnerung); PK(user_id, geburtstag_id) – die Einstellungen sind PRO NUTZER, fehlende Zeile = Standard |
 | `geburtstag_gesendet` | user_id, geburtstag_id, art ('tag'/'vorlauf'), datum; PK über alle vier – ohne diese Tabelle schickte ein Container-Neustart am selben Tag dieselbe Erinnerung erneut |
@@ -2953,6 +2973,22 @@ python -m venv .venv                                   # einmalig
   rollt am Rand mit und der Platzhalter wandert nach, Einrasten aus/an in
   ende UND abbruch, Spalte zaehlt ueber die ganze Hoehe, Brett scrollt
   weiterhin waagerecht, Listen ohne Spalten unberuehrt.
+- `test_tvb_ladezeit.py` – Wunsch #270. Die Kernaussage: ist der Stand
+  frisch (Hintergrund-Thread), kostet der Seitenaufruf keinen einzigen
+  Fremdaufruf; ist er alt, holt die Seite selbst (Rueckfall) und speichert
+  die Tabelle. Spielfenster (2 h vor bis 3 h nach Anwurf) verkuerzt die
+  erlaubte Frische auf fuenf Minuten; Amateur-Tabelle beim zweiten Aufruf aus
+  tvb_tabellen; der Hintergrund-Durchlauf frischt nur auf, was zu alt ist,
+  respektiert die 30-Minuten-Pause nach einem Fehlschlag, und der Schalter
+  steht in app.py, conftest und .env.example. Der Thread selbst laeuft im
+  Test nie.
+- `test_tvb_bilder.py` – Wunsch #271. Allowlist auf genau einen Host (auch
+  http, Subdomain-Trick und leerer Pfad fallen durch), `_kader_speichern`
+  uebernimmt nur erlaubte Adressen, das Bild wird einmal geholt und danach
+  von hier geliefert (Cache-Control, Datei unter DATA_DIR), nach einer Woche
+  erneuert, bei totem CDN Initialen als SVG bzw. das alte Bild,
+  Typ-/Groessenpruefung beim Holen (400 px webp angefragt), 404/403,
+  Kader und Profil verweisen nur auf die eigene Bild-Route.
 - `test_tvb_spieldetails.py` – Wunsch #267/#268. Baut beide Rohformate nach:
   Sportradar (fixture_detail mit periodData und statistics, pbp mit zwei
   Abschnitten, preview mit Aufstellung/Offiziellen) und handball.net

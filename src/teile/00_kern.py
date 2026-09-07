@@ -409,6 +409,14 @@ CREATE TABLE IF NOT EXISTS tvb_spiel_details (
   daten           TEXT NOT NULL,
   aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Wunsch #270: Tabellen (Sportradar fuer die Profis, handball.net je
+-- Amateurmannschaft) als Rohantwort zwischengespeichert - vorher holte jeder
+-- Seitenaufruf sie live. Schluessel ist tvb_mannschaften.team_id.
+CREATE TABLE IF NOT EXISTS tvb_tabellen (
+  team_id         TEXT PRIMARY KEY,
+  daten           TEXT NOT NULL,
+  aktualisiert_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS tvb_kader (
   spieler_id      INTEGER PRIMARY KEY,
   vorname         TEXT    NOT NULL,
@@ -2224,6 +2232,15 @@ def _init_db(app):
             db.execute("ALTER TABLE tvb_kader ADD COLUMN dc_id TEXT")
             # Der Cache haelt 6 h - einmalig leeren, damit die Links nicht
             # erst am Abend erscheinen (gleiches Muster wie #124).
+            db.execute("DELETE FROM tvb_kader")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Wunsch #271: Bild-Adresse je Spieler aus der HPI-Antwort; das Bild
+        # selbst holt der Server einmal und legt es unter DATA_DIR/tvb_bilder
+        # ab - der Browser laedt nie vom fremden Host (#119).
+        try:
+            db.execute("ALTER TABLE tvb_kader ADD COLUMN bild_url TEXT")
             db.execute("DELETE FROM tvb_kader")
             db.commit()
         except sqlite3.OperationalError:

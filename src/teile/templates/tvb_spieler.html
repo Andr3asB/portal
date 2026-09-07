@@ -10,6 +10,12 @@
   box-shadow:0 1px 3px var(--shadow); margin-bottom:12px;
 }
 .sp-kopf { text-align:center; padding:18px 16px; }
+/* Wunsch #271: Spielerbild aus dem eigenen Zwischenspeicher. */
+.sp-bild {
+  width:112px; height:112px; border-radius:50%; object-fit:cover;
+  background:var(--surface-2); display:block; margin:0 auto 10px;
+  box-shadow:0 1px 3px var(--shadow);
+}
 .sp-nummer {
   display:inline-block; min-width:44px; padding:6px 10px; border-radius:12px;
   background:var(--farbe-band); color:#fff; font-size:22px; font-weight:800;
@@ -58,13 +64,14 @@
 
   {% if not profil %}
     <div class="empty">
-      <div style="font-size:48px;margin-bottom:12px">📡</div>
+      <img class="sp-bild" src="/a/tvb{{ tp }}bild/{{ dc_id }}" alt="" width="112" height="112">
       {% if kader %}<strong>{{ kader.vorname }} {{ kader.nachname }}</strong><br>{% endif %}
       Das Spielerprofil ist gerade nicht abrufbar.<br>Versuch's später nochmal.
     </div>
   {% else %}
 
   <div class="sp-karte sp-kopf">
+    <img class="sp-bild" src="/a/tvb{{ tp }}bild/{{ dc_id }}" alt="" width="112" height="112">
     {% if profil.nummer %}<div class="sp-nummer">{{ profil.nummer }}</div>{% endif %}
     <div class="sp-name">{{ profil.name }}</div>
     <div class="sp-unter">
