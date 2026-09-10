@@ -409,7 +409,10 @@ teile/
                        _auto_grant_all() (hilfe + einkauf an alle Nutzer),
                        @app.after_request setzt Service-Worker-Allowed: / nur
                        fuer /static/sw.js (siehe sw.js weiter unten)
-  01_start_token.py  – / (Landing), /p/<token> (Startseite mit Gruppen),
+  01_start_token.py  – / (Landing), /p/<token> (Startseite mit Gruppen;
+                       Wunsch #279: fuer Admins `werkstatt_offen` = offene
+                       Wuensche ohne Prioritaet, als Badge `.tile-badge` auf
+                       der Werkstatt-Kachel, 1-9 oder „9+"),
                        POST /p/<token>/reorder (Apps), /gruppe/reorder (Gruppen selbst),
                        /gruppe/neu, /gruppe/<id>/umbenennen, /gruppe/<id>/loeschen.
                        `.tile` in startseite.html: `touch-action:none` gilt seit
@@ -1052,7 +1055,14 @@ teile/
                        doppelten SVG-IDs erzeugen - koerper_vorne(typ, suffix='')
                        muss diesen Suffix mit an seine Element-IDs weitergeben,
                        sonst laeuft der Clip-Pfad der Galerie ins Leere und das
-                       Muster verschwindet (Wunsch #83, siehe Bekannte Issues)
+                       Muster verschwindet (Wunsch #83, siehe Bekannte Issues).
+                       Wunsch #273: `_mensch_svg_rendern(optionen, seed)` -
+                       Galerie `figur-<id>`, Vorschau `vorschau`, weil
+                       DiceBear die SVG-IDs aus dem Seed hasht und ohne Seed
+                       alle Figuren dieselben IDs tragen (zweite Figur zeigt
+                       dann die Kleidung der ersten); `hatColor` =
+                       Kleidungsfarbe, damit die Muetze nicht am Seed-Zufall
+                       haengt (siehe Bekannte Issues)
   16_vokabeln.py     – /a/vokabeln/<token>/ Vokabeln lernen (Wunsch #73,
                        kompletter Neubau – Wunsch #67 war ein Fehlversuch):
                        Sprachen global (Standard Englisch/Latein, neue per
@@ -2638,6 +2648,17 @@ Der Datenstrom geht seit dem 31.08.2026 **verschlüsselt** aufs NAS (`age`, asym
   (`_hae_steps`) hat dieses Problem nicht, da sie von vornherein exakte
   Unix-Millisekunden statt eines Datums verwendet.
 
+- **DiceBear/Avataaars vergibt ohne `seed` in JEDER Figur dieselben
+  SVG-IDs** (`<g id="clothes-overall-811c9dc5">` in `<defs>`, gezeichnet
+  per `<use href>`; 811c9dc5 ist der FNV-Startwert, also der Hash des
+  leeren Seeds). Zwei Figuren mit demselben Kleidungsstueck auf einer
+  Seite: `<use>` zeigt bei beiden auf die ERSTE Definition, die zweite
+  traegt Kleidung, Frisur und Mund der ersten - Andis Wunsch #273 „manche
+  Figuren haben die falsche Kleidungsfarbe" (v256). Seit v256 bekommt jede
+  Galerie-Figur `seed="figur-<id>"`, die Vorschau `"vorschau"`; die
+  Muetzenfarbe (`hatColor`, das einzige, was DiceBear sonst aus dem Seed
+  wuerfelt) folgt fest der Kleidungsfarbe. `test_tierbaukasten_ids.py`
+  wacht darueber. Dasselbe Muster wie der Eintrag darunter (Wunsch #83).
 - **SVG `<use href="#id">`/`clipPath` gegen eine nicht existierende ID
   resolved zu einem leeren Clip-Bereich, ohne Fehler.** Betraf Wunsch #83
   (v70-Fix, Tierbaukasten-Galerie): `figur_vorschau()` (`tierbaukasten.html`)
@@ -2974,6 +2995,15 @@ python -m venv .venv                                   # einmalig
   anfasst; laedt `db_snapshot.py` per `importlib.util.spec_from_file_location`
   und biegt `DB`/`SNAP_DIR` auf ein tmp_path um. Ein Test haelt die Reihenfolge
   in `_prune()` fest (erst alte `.db`, dann Verwaiste).
+- `test_tierbaukasten_ids.py` – Wunsch #273. Zwei Mensch-Figuren mit
+  gleichen Optionen und verschiedenem Seed teilen keine SVG-ID, jede
+  `<use href>` zeigt auf eine eigene Definition, die Vorschau kollidiert
+  nicht mit der Galerie, die Muetzenfarbe haengt nicht am Seed sondern an
+  der Kleidungsfarbe; Galerieseite mit zwei gleich gebauten Figuren ohne
+  doppelte IDs und mit beiden Kleidungsfarben.
+- `test_werkstatt_badge.py` – Wunsch #279. Kein Badge ohne unpriorisierte
+  offene Wuensche, Zaehlung nur NULL/leer und erledigt=0, „9+" ab zehn,
+  Kinder sehen die Kachel ohne Badge.
 - `test_tierbaukasten_bearbeiten.py` – Wunsch #201. Derselbe Aufbau wie bei den
   Geburtstagen, plus der Fall, den nur diese App hat: der Kategoriewechsel muss
   die Spalten der alten Kategorie raeumen. Beim Gegenprobieren (Spalte

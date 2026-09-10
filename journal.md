@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-09-11 – portal-v256: #273 Kleidungsfarben im Tierbaukasten, #279 Werkstatt-Badge
+
+### #273 – „Manche Figuren haben die falsche Kleidungsfarbe" [sehr_hoch]
+
+Erst vermutet: Rendering oder Formular. Beides sauber – `dicebear-core`
+setzt `clothesColor` bei allen acht Kleidungsstücken korrekt, die
+Schwatches führen den versteckten Wert richtig. Der Blick in die
+Datenbank brachte die Spur: Friederikes sechs Figuren tragen alle
+`shirtVNeck` – und genau dann fällt es auf.
+
+**Ursache:** DiceBear legt jedes Teil als `<g id="clothes-shirtVNeck-<hash>">`
+in `<defs>` ab und zeichnet es per `<use href="#…">`. Der Hash kommt aus
+dem `seed`; ohne Seed ist er in jeder Figur derselbe (`811c9dc5`, der
+FNV-Startwert). Stehen zwei Figuren mit demselben Kleidungsstück auf der
+Galerieseite, löst der Browser `<use>` bei beiden auf die **erste**
+Definition im Dokument auf – die zweite Figur trägt die Kleidung (und
+Frisur, Mund) der ersten. Dieselbe Falle wie Wunsch #83 bei den
+Tier-Clip-Pfaden, nur diesmal in der Bibliothek statt im eigenen Macro.
+
+**Fix:** `_mensch_svg_rendern(optionen, seed)` – Galerie `figur-<id>`,
+Vorschau `vorschau`. Der Seed steuert bei DiceBear auch, was sonst
+gewürfelt wird; hier ist das nur die Mützenfarbe (`hatColor`). Damit die
+nicht mit dem Seed wechselt, folgt sie fest der Kleidungsfarbe – Hilfe
+sagt das. Keine Datenmigration nötig, die gespeicherten Optionen waren
+immer richtig. Vier Tests, darunter die Galerieseite mit zwei gleich
+gebauten Figuren ohne doppelte IDs.
+
+### #279 – „Werkstatt-Badge für unpriorisierte Wünsche" [mittel]
+
+Die Werkstatt-Kachel auf der Startseite trägt für Admins eine Zahl
+(1–9, ab zehn „9+") mit den offenen Wünschen ohne Priorität – die warten
+auf Andi, denn Prioritäten vergibt nur ein Mensch (#152). Kinder sehen
+die Kachel ohne Badge. Badge in der Bandfarbe mit weißer Schrift
+(Kontrast garantiert, #237), `role="status"` mit Aria-Text. Vier Tests.
+
+v256 ausgeliefert, `live_pruefung.py` grün, Suite 2427 grün.
+
+---
+
 ## 2026-09-11 – portal-v254/v255: #278 Mobile-Layout der Punktmatrix, #277 Abstand
 
 ### #278 – „Mobile-Layout für Punktmatrix" [hoch]

@@ -164,13 +164,30 @@ def _mensch_optionen_lesen(form):
     return optionen
 
 
-def _mensch_svg_rendern(optionen):
+def _mensch_svg_rendern(optionen, seed="vorschau"):
     """Baut aus den gespeicherten/übermittelten Auswahlwerten ein Avataaars-SVG.
-    Läuft komplett lokal (dicebear-core + dicebear-styles), keine Netzwerkanfrage."""
+    Läuft komplett lokal (dicebear-core + dicebear-styles), keine Netzwerkanfrage.
+
+    Wunsch #273 („manche Figuren haben die falsche Kleidungsfarbe"): DiceBear
+    legt jedes Teil als `<g id="clothes-overall-<hash>">` in `<defs>` ab und
+    zeichnet es per `<use href="#…">`. Der Hash kommt aus dem `seed` - ohne
+    Seed ist er fuer JEDE Figur derselbe (811c9dc5, der FNV-Startwert). Stehen
+    dann zwei Figuren mit demselben Kleidungsstueck auf einer Seite, zeigt
+    `<use>` bei beiden auf die ERSTE Definition im Dokument: die zweite Figur
+    traegt die Kleidung (und Frisur, Mund …) der ersten. Genau der Fehler,
+    den Wunsch #83 schon einmal bei den Tier-Clip-Pfaden hatte. Deshalb
+    bekommt jede Figur ihren eigenen Seed (Galerie: „figur-<id>", Vorschau:
+    „vorschau") und damit eigene IDs.
+
+    Der Seed steuert auch, was DiceBear sonst zufaellig waehlt - hier nur die
+    Muetzenfarbe. Damit sie nicht mit dem Seed wechselt, folgt sie fest der
+    Kleidungsfarbe (`hatColor`)."""
     dicebear_optionen = {
+        "seed": seed,
         "skinColor": [optionen["haut"]],
         "topVariant": [optionen["frisur"]],
         "hairColor": [optionen["haarfarbe"]],
+        "hatColor": [optionen["kleidungsfarbe"]],
         "eyesVariant": [optionen["augen"]],
         "eyebrowsVariant": [optionen["augenbrauen"]],
         "mouthVariant": [optionen["mund"]],
@@ -282,7 +299,8 @@ def index(token):
     mensch_svgs = {}
     for k in eigene:
         if k["tier_typ"] == "mensch" and k["dicebear_optionen"]:
-            mensch_svgs[k["id"]] = _mensch_svg_rendern(json.loads(k["dicebear_optionen"]))
+            mensch_svgs[k["id"]] = _mensch_svg_rendern(json.loads(k["dicebear_optionen"]),
+                                                       seed=f"figur-{k['id']}")
     return render_template("tierbaukasten.html",
         user=user, token=token, farbe=user["farbe"],
         kategorien=KATEGORIEN, tiere=TIERE, muster=MUSTER, accessoires=ACCESSOIRES,

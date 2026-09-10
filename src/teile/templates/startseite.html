@@ -39,6 +39,16 @@
 .edit-mode .tile { touch-action: none; }
 .tile:not(.edit-mode *):active { transform: scale(.96); }
 .tile-emoji { font-size: 40px; line-height: 1; pointer-events: none; }
+/* Wunsch #279: Zahl der Wuensche ohne Prioritaet auf der Werkstatt-Kachel
+   (nur Admins). In der Bandfarbe des Nutzers - weisser Text darauf hat
+   garantiert Kontrast (Wunsch #237). */
+.tile { position: relative; }
+.tile-badge {
+  position: absolute; top: 8px; right: 8px; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 11px; box-sizing: border-box;
+  background: var(--farbe-band); color: #fff; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
 .tile-name  { font-size: 14px; font-weight: 500; color: var(--text-3); pointer-events: none; }
 .tile.tile-gesperrt { opacity: .35; filter: grayscale(1); cursor: default; }
 .empty {
@@ -175,6 +185,7 @@
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji" data-emoji-alt>{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
+          {% if app.slug == 'werkstatt' and werkstatt_offen %}<span class="tile-badge" role="status" aria-label="{{ werkstatt_offen }} Wünsche ohne Priorität">{{ '9+' if werkstatt_offen > 9 else werkstatt_offen }}</span>{% endif %}
         </a>
         {% endfor %}
       </div>
@@ -194,6 +205,7 @@
            data-grant-id="{{ app.grant_id }}" data-offline="{{ 1 if app.offline_faehig else 0 }}">
           <span class="tile-emoji" data-emoji-alt>{{ app.emoji }}</span>
           <span class="tile-name">{{ app.name }}</span>
+          {% if app.slug == 'werkstatt' and werkstatt_offen %}<span class="tile-badge" role="status" aria-label="{{ werkstatt_offen }} Wünsche ohne Priorität">{{ '9+' if werkstatt_offen > 9 else werkstatt_offen }}</span>{% endif %}
         </a>
         {% endfor %}
       </div>

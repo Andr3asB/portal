@@ -141,6 +141,16 @@ def startseite(token):
     briefing = briefing_fuer(db, row["id"], jetzt)
     briefing_bestaetigt = ist_bestaetigt(db, row["id"], jetzt.date())
 
+    # Wunsch #279: Badge auf der Werkstatt-Kachel mit der Zahl der offenen
+    # Wuensche OHNE Prioritaet - die wartet auf einen Admin, denn nur ein
+    # Mensch vergibt Prioritaeten (#152). Deshalb nur fuer Admins.
+    werkstatt_offen = 0
+    if row["is_admin"]:
+        werkstatt_offen = db.execute("""
+            SELECT COUNT(*) FROM wuensche
+            WHERE erledigt = 0 AND (prioritaet IS NULL OR prioritaet = '')
+        """).fetchone()[0]
+
     return render_template(
         "startseite.html",
         user=row,
@@ -148,6 +158,7 @@ def startseite(token):
         allgemein=allgemein,
         briefing=briefing,
         briefing_bestaetigt=briefing_bestaetigt,
+        werkstatt_offen=werkstatt_offen,
         # Wunsch #140, Stufe 4: Hier stand bis Stufe 3 `token or
         # row["home_token"]` - eine Brücke, damit Menü und fetch-Aufrufe auf
         # `/start` nicht ohne Token dastehen. Die ist jetzt weg und muss weg
