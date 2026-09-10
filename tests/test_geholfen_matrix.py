@@ -49,6 +49,8 @@ def test_spalten_wochentag_plus_tag_und_wochenende(modul):
     d = modul.matrix_daten([], TAGE, AUFGABEN, PERSONEN)
     labels = [s["label"] for s in d["spalten"]]
     assert labels == ["Sa 29.", "So 30.", "Mo 31.", "Di 1.", "Mi 2.", "Do 3.", "Fr 4.", "Sa 5.", "So 6.", "Mo 7."]
+    assert (d["spalten"][3]["wt"], d["spalten"][3]["tz"]) == ("Di", "1.")
+    assert d["spalten"][9]["datum_lang"] == "Montag, 7. September"
     assert [s["wochenende"] for s in d["spalten"]] == [True, True, False, False, False, False, False, True, True, False]
     assert [s["heute"] for s in d["spalten"]].index(True) == 9
 
@@ -73,6 +75,7 @@ def test_ab_fuenf_vier_punkte_plus_zaehler(modul):
     assert zelle["anzahl"] == 6 and len(zelle["punkte"]) == 4 and zelle["mehr"] == 2
     assert [p["uid"] for p in zelle["punkte"]] == [10, 10, 10, 10]
     assert zelle["tooltip"] == "Spülmaschine, Mo 7. – Anna 4x, Ben 2x"
+    assert zelle["anteile"] == ["Anna 4x", "Ben 2x"] and zelle["datum_lang"] == "Montag, 7. September"
     assert zelle["punkte"][0]["dunkel"] and zelle["punkte"][0]["hell"], "beide Kontrastfarben"
     leer = d["zeilen"][0]["zellen"][0]
     assert leer["anzahl"] == 0 and leer["punkte"] == [] and leer["mehr"] == 0 and leer["tooltip"] == ""
@@ -82,7 +85,8 @@ def test_personenstreifen_stufen(modul):
     e = [("2026-09-07", 10, 2)] * 5 + [("2026-09-06", 10, 1)] * 3 + [("2026-09-05", 10, 1)] * 2 + [("2026-09-04", 10, 4)]
     d = modul.matrix_daten(e, TAGE, AUFGABEN, PERSONEN)
     anna = d["personen"][0]
-    assert anna["name"] == "Anna"
+    assert anna["name"] == "Anna" and anna["vorname"] == "Anna"
+    assert modul.matrix_daten([], TAGE, AUFGABEN, [{"id": 1, "name": "Max Muster", "farbe": "#000000"}])["personen"][0]["vorname"] == "Max"
     assert [z["stufe"] for z in anna["zellen"]] == [0, 0, 0, 0, 0, 0, 1, 2, 3, 4]
     assert anna["zellen"][9]["anzahl"] == 5, "Deckel nur bei der Stufe, die Zahl bleibt"
     assert anna["zellen"][6]["tooltip"] == "Anna, Fr 4.: 1 Aufgabe"
@@ -116,16 +120,23 @@ def test_seite_zeigt_matrix_und_streifen(client, db, geholfen, admin, kind):
     v.commit()
     seite = client.get(f"/a/geholfen/{geholfen['TestAdmin']}/").get_data(as_text=True)
     assert seite.count('class="mx-zelle mx-kopfzelle') == 10
-    assert 'class="matrix-scroll"' in seite
+    assert '<span class="wt">' in seite and '<span class="tz">' in seite, "zweizeiliger Kopf (#278)"
     assert seite.count('aria-pressed="true"') >= 3, "Chip 'alle' plus je Person"
     assert 'data-klick="matrixFilter" data-args=\'["alle"]\'' in seite
     assert seite.count('class="punkt farbflaeche"') == 4 and '<span class="mx-mehr">+1</span>' in seite
     assert 'class="quadrat farbflaeche g4"' in seite
     assert "Kantenlänge = Anzahl erledigter Aufgaben" in seite
     assert 'id="matrix-erklaerung"' in seite
-    # Die Punkte tragen Person und Aufgabe als Text - Farbe ist nie die
-    # einzige Information.
-    assert 'aria-label="TestKind – ' in seite
+    # Wunsch #278: Tap statt Hover - volle Zellen sind Knoepfe mit den
+    # Einzelheiten in data-args, leere Zellen keine; kein title-Tooltip mehr.
+    assert seite.count('data-klick="zelleDetails"') == 1
+    assert '["TestKind 5x"]]\'' in seite, "Einzelheiten in data-args (tojson, einfach gequotet)"
+    assert '– TestKind 5x"' in seite, "aria-label der Zelle nennt Person und Anzahl"
+    assert 'title="' not in seite.split('class="matrix-section"')[1].split('mx-overlay')[0]
+    assert 'role="dialog"' in seite and 'aria-modal="true"' in seite
+    # Wunsch #277: eigener Titel mit Abstand vor dem Personenstreifen.
+    assert 'class="heatmap-title ps-titel"' in seite
+    assert 'class="name-kurz">TestKind<' in seite
 
 
 def test_tippen_meldet_den_familientag(client, db, geholfen, admin, modul, monkeypatch):

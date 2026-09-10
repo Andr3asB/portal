@@ -47,6 +47,10 @@ APP = "geholfen"
 
 MATRIX_TAGE = 10
 WOCHENTAG_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+WOCHENTAG_LANG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag",
+                  "Samstag", "Sonntag"]
+MONAT_LANG = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+              "August", "September", "Oktober", "November", "Dezember"]
 # Wunsch #276: hoechstens vier Punkte je Zelle, der Rest als "+n".
 PUNKTE_MAX = 4
 # Kantenlaenge des Quadrats im Personenstreifen je Anzahl (Stufe 4 = Deckel).
@@ -58,11 +62,16 @@ def _kann_fuer_andere(user):
 
 
 def _spalten(tage):
-    """Spaltenkoepfe: Wochentag plus Tageszahl ("Mo 1."), Wochenende markiert."""
+    """Spaltenkoepfe: Wochentag plus Tageszahl ("Mo 1."), Wochenende markiert.
+    Wunsch #278: `wt`/`tz` getrennt, damit der Kopf auf dem Handy zweizeilig
+    passt; `datum_lang` fuer das Detail-Blatt."""
     heute = tage[-1]
     return [{
         "iso": t.isoformat(),
         "label": f"{WOCHENTAG_KURZ[t.weekday()]} {t.day}.",
+        "wt": WOCHENTAG_KURZ[t.weekday()],
+        "tz": f"{t.day}.",
+        "datum_lang": f"{WOCHENTAG_LANG[t.weekday()]}, {t.day}. {MONAT_LANG[t.month - 1]}",
         "wochenende": t.weekday() >= 5,
         "heute": t == heute,
     } for t in tage]
@@ -117,13 +126,14 @@ def matrix_daten(ereignisse, tage, aufgaben, personen):
             punkte = [{"uid": uid, "name": je_person[uid]["name"], **_farben(je_person[uid])}
                       for uid in uids[:PUNKTE_MAX]]
             tooltip = ""
+            anteile = [f"{je_person[uid]['name']} {n}x" for uid, n in je_uid.items()]
             if uids:
-                anteile = ", ".join(f"{je_person[uid]['name']} {n}x" for uid, n in je_uid.items())
-                tooltip = f"{a['name']}, {s['label']} – {anteile}"
+                tooltip = f"{a['name']}, {s['label']} – {', '.join(anteile)}"
             z_zellen.append({
                 "iso": s["iso"], "wochenende": s["wochenende"],
+                "datum_lang": s["datum_lang"],
                 "punkte": punkte, "mehr": max(0, len(uids) - PUNKTE_MAX),
-                "anzahl": len(uids), "tooltip": tooltip,
+                "anzahl": len(uids), "tooltip": tooltip, "anteile": anteile,
             })
         zeilen.append({"id": a["id"], "name": a["name"], "emoji": a["emoji"],
                        "gesamt": gesamt.get(a["id"], 0), "zellen": z_zellen})
@@ -142,7 +152,9 @@ def matrix_daten(ereignisse, tage, aufgaben, personen):
                 "tooltip": (f"{p['name']}, {s['label']}: {n} "
                             f"{'Aufgabe' if n == 1 else 'Aufgaben'}") if n else "",
             })
-        personen_zeilen.append({"id": p["id"], "name": p["name"], **_farben(p), "zellen": p_zellen})
+        personen_zeilen.append({"id": p["id"], "name": p["name"],
+                                "vorname": p["name"].split()[0] if p["name"].split() else p["name"],
+                                **_farben(p), "zellen": p_zellen})
 
     return {"spalten": spalten, "zeilen": zeilen, "personen": personen_zeilen}
 

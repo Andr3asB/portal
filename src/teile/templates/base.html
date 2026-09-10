@@ -1300,6 +1300,10 @@
     }
     return { oeffnen, schliessen };
   }
+  // Wunsch #278: Vorlagen bauen eigene Overlays (Detail-Blatt der
+  // Geholfen-Matrix) ueber DIESE Fuehrung - nie ueber nacktes
+  // classList.toggle (Wunsch #248). Deshalb global erreichbar.
+  window.dialogFuehrung = dialogFuehrung;
 
   const menueDialog = dialogFuehrung(menuOverlay, menuPanel);
   menuBtn.addEventListener('click', menueDialog.oeffnen);

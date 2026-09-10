@@ -2,6 +2,67 @@
 
 ---
 
+## 2026-09-11 – portal-v254/v255: #278 Mobile-Layout der Punktmatrix, #277 Abstand
+
+### #278 – „Mobile-Layout für Punktmatrix" [hoch]
+
+Andis Korrektur zur Spezifikation: Das waagerechte Scrollen aus v253 war
+auf dem iPhone unbrauchbar – fünf von zehn Tagen sichtbar, Namen
+abgeschnitten. „Was gescrollt werden muss, wird nicht verglichen."
+
+Umgesetzt mit **einem** DOM für beide Layouts, nur die Grid-Definition
+wechselt per Media Query (unter 600 px):
+
+- Kein `min-width` mehr, nirgends: die Tagesspalten sind `minmax(0, 1fr)`,
+  auf dem Desktop mit 150 px Label-Spalte davor. Damit gibt es auch auf
+  dem Desktop keinen Scroll-Container mehr – und der Spaltenkopf kann
+  jetzt überall am oberen Rand kleben (`position: sticky`, das in v253
+  wegen des overflow-x-Containers nicht ging).
+- Handy: das Aufgabenlabel wird zur eigenen Zeile über dem Raster
+  (`grid-column: 1 / -1`, bis zu zwei Zeilen, keine Ellipse), der Kopf
+  steht einmal, zweizeilig („Mo" / „1."), Zeilenhöhe 28 px, Punkte 7 px,
+  Abstand 2 px, zwischen zwei Aufgaben 12 px plus Haarlinie. Wochenende
+  weiter je Zelle – ergibt über alle Zeilen dieselbe senkrechte Spur.
+- Personenstreifen bleibt nebeneinander: Label 56 px (Vorname), Quadrate
+  12/18/24/24 px. Auf 320 px bleiben je Spalte nur ~20 px (16 px Seitenrand
+  + 16 px Kartenrand + 56 px Label), deshalb deckeln die Quadrate zusätzlich
+  auf Spaltenbreite minus 2 px (`min(24px, calc(100% - 2px))`, quadratisch
+  über `aspect-ratio`) – das war der Nachschlag v255 nach der Messung.
+- **Tap statt Hover:** Zellen mit Einträgen sind `<button>`s (bekommen
+  damit die globale 44-px-Trefferfläche aus base.html), `data-args` trägt
+  Aufgabe, Datum und die Liste „Person nx"; ein Tipp öffnet ein Blatt unten
+  (Desktop: mittig), Tipp daneben oder Escape schließt. Geführt über
+  `dialogFuehrung()` aus base.html, das dafür als `window.dialogFuehrung`
+  freigegeben wurde (Wunsch #248: kein nacktes classList.toggle). Alle
+  `title`-Tooltips in der Matrix entfernt; die `aria-label`s bleiben.
+  Nach dem Antippen einer Kachel wird eine leere Zelle zur Laufzeit zum
+  Knopf, inklusive `data-args`.
+- Chips mindestens 32 px hoch, ab sechs Personen eine schiebbare Zeile mit
+  angeschnittenem nächsten Chip (`.schieben`); Safe-Area-Ränder auf der
+  Karte; `box-sizing: border-box` am Raster.
+- **Eine bewusste Abweichung:** Kopfschrift 12 px statt der geforderten
+  11 px – Wunsch #238 („nie unter 12 px") ist Projektregel, der Wächter
+  `test_farbkontrast.py` lässt 11 px nicht durch. 12 px passt, gemessen.
+
+**Messung** (Chrome, Handy-Regeln eingespielt, `.main` auf 320 bzw. 375 px;
+ein echtes Fenster-Resize ging nicht, die Seite ist maximiert, und ein
+iframe verbietet der Frame-Header): bei 320 px alle zehn Köpfe und Zellen
+deckungsgleich (letzte Spalte 918,9–944,5 px in beiden), kein Überlauf
+(scrollWidth = clientWidth), Labels einzeilig ohne Clip, Kopf zweizeilig,
+Zellen 28 px, Punkte 7 px; Tap öffnet das Blatt mit „Spülmaschine
+ausräumen / Samstag, 5. September / Johannes 1x", Fokus auf „Schließen",
+Klick daneben schließt.
+
+### #277 – „Mehr Abstand zwischen den Grafiken" [mittel]
+
+Der Personenstreifen hat jetzt eine eigene Überschrift „👤 Je Person" mit
+22 px Abstand und Trennlinie über der Matrix – gemessen 22 px Luft zwischen
+letzter Aufgabenzeile und Titel.
+
+Suite 2419 grün. Hilfe-Kapitel 5 beschreibt Tap-Blatt und Handy-Layout.
+
+---
+
 ## 2026-09-10 – portal-v253: #275 Staubwischen-Icon, #274 Gewicht & BMI, #276 Punktmatrix
 
 ### #275 – „Icon für Staubwischen ist am PC nicht sichtbar" [hoch]

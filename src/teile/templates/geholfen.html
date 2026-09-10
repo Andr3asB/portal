@@ -28,65 +28,127 @@
 @media(min-width:500px) { .aufgaben-grid { grid-template-columns:repeat(4,1fr); } }
 @media(min-width:700px) { .aufgaben-grid { grid-template-columns:repeat(5,1fr); } }
 
-/* Wunsch #276: Punktmatrix (A) und Personenstreifen (B) - beide CSS Grid mit
-   DERSELBEN Spaltendefinition (.mx-zeile), damit sie untereinander fluchten.
-   Jede Zeile ist ein eigenes Grid, damit Zeilenhintergrund und die links
-   festgepinnte Label-Spalte funktionieren; die Spaltenbreiten sind fest,
-   auf schmalen Bildschirmen scrollt der Block waagerecht (nie weniger als
-   zehn Tage - sonst stimmt "letzte 10 Tage" nicht mehr). */
+/* Wunsch #276/#278: Punktmatrix (A) und Personenstreifen (B). Beide sind
+   CSS Grid mit DERSELBEN Spaltendefinition (.mx-raster), damit sie
+   untereinander fluchten; jede Zeile ist ein eigenes Grid (Zeilenhintergrund,
+   Trennlinien). Die Tagesspalten sind 1fr OHNE min-width - so passen alle
+   zehn Tage immer nebeneinander, es gibt nirgends waagerechtes Scrollen
+   (#278: "was gescrollt werden muss, wird nicht verglichen"). Unter 600 px
+   wandert das Aufgabenlabel als eigene Zeile UEBER das Raster (grid-column
+   1/-1), der Kopf steht einmal, zweizeilig und klebt oben. */
 .matrix-section {
-  background:var(--surface); border-radius:14px; padding:14px 0 12px;
-  box-shadow:0 1px 3px var(--shadow); margin-top:4px;
+  background:var(--surface); border-radius:14px; padding:14px 16px 12px;
+  box-shadow:0 1px 3px var(--shadow); margin-top:4px; box-sizing:border-box;
 }
-.matrix-section .heatmap-title { padding:0 16px; }
 .heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin:0 0 10px; }
 .mx-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.mx-chips { display:flex; gap:6px; flex-wrap:wrap; padding:0 16px; margin-bottom:10px; }
+.mx-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+/* Mehr als fuenf Personen: eine Zeile, seitlich schiebbar, der naechste Chip
+   ist angeschnitten sichtbar. */
+.mx-chips.schieben { flex-wrap:nowrap; overflow-x:auto; padding-right:28px; scrollbar-width:none; }
 .mx-chip {
   display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--border);
-  border-radius:20px; padding:5px 11px; font-size:13px; font-weight:600; font-family:inherit;
-  background:var(--chip-bg); color:var(--chip-text); cursor:pointer;
+  border-radius:20px; padding:5px 11px; min-height:32px; font-size:13px; font-weight:600; font-family:inherit;
+  background:var(--chip-bg); color:var(--chip-text); cursor:pointer; white-space:nowrap;
   -webkit-tap-highlight-color:transparent;
 }
 .mx-chip[aria-pressed="false"] { opacity:.45; }
 .mx-chip-punkt { width:10px; height:10px; border-radius:50%; display:inline-block; }
-.matrix-scroll { overflow-x:auto; padding:0 0 4px; }
-.mx-zeile {
-  display:grid; grid-template-columns:118px repeat(10, 52px); align-items:center;
-  min-width:max-content;
+.mx-raster {
+  display:grid; grid-template-columns:150px repeat(10, minmax(0, 1fr));
+  align-items:center; box-sizing:border-box;
 }
-.mx-zeile.alt { background:var(--surface-2); }
-.mx-kopf { border-bottom:1px solid var(--border-subtle); }
+.mx-kopf {
+  position:sticky; top:calc(var(--st) + 62px); z-index:2;
+  background:var(--surface); border-bottom:1px solid var(--border-subtle);
+}
+.mx-aufgabe.alt { background:var(--surface-2); border-radius:6px; }
 .mx-label {
-  position:sticky; left:0; z-index:1; background:var(--surface);
-  font-size:13px; font-weight:600; padding:0 8px 0 16px; height:44px; line-height:44px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:13px; font-weight:600; min-width:0; padding:0 8px 0 4px;
+  overflow-wrap:anywhere;
 }
-.mx-zeile.alt .mx-label { background:var(--surface-2); }
 .mx-zelle {
-  height:44px; display:flex; align-items:center; justify-content:center; gap:3px;
-  position:relative;
+  height:44px; min-width:0; display:flex; align-items:center; justify-content:center; gap:3px;
+  border:none; background:none; padding:0; margin:0; font:inherit; color:inherit;
+  border-radius:8px;
 }
-.mx-kopfzelle { font-size:12px; color:var(--text-2); font-weight:600; }
+button.mx-zelle { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+button.mx-zelle:active { background:var(--chip-bg); }
+.mx-kopfzelle { font-size:12px; color:var(--text-2); font-weight:600; height:auto; padding:4px 0; }
 .mx-kopfzelle.heute { color:var(--farbe-kontrast); }
-/* Wochenende: leicht abgesetzt ueber die volle Hoehe - subtil, kein Farbblock. */
-.mx-zelle.we { background:rgba(127,127,127,.09); }
-.punkt {
-  width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0;
-  transition:opacity .15s;
-}
+/* Wochenende je Zelle - ueber alle Zeilen ergibt das dieselbe senkrechte Spur. */
+.mx-zelle.we { background:rgba(127,127,127,.09); border-radius:0; }
+.punkt { width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; transition:opacity .15s; }
 .punkt.gedimmt { opacity:.15; }
 .mx-mehr { font-size:12px; color:var(--text-2); font-weight:600; margin-left:1px; }
-.ps-zeile .mx-label { height:48px; line-height:48px; }
+/* Wunsch #277: sichtbarer Abstand zwischen den beiden Grafiken. */
+.ps-titel { margin-top:22px; padding-top:14px; border-top:1px solid var(--border-subtle); }
 .ps-zeile .mx-zelle { height:48px; }
+.name-kurz { display:none; }
 .quadrat { display:inline-block; border-radius:5px; }
 .quadrat.g0 { display:none; }
 .quadrat.g1 { width:18px; height:18px; }
 .quadrat.g2 { width:26px; height:26px; }
 .quadrat.g3 { width:34px; height:34px; }
 .quadrat.g4 { width:40px; height:40px; }
-.mx-trenner { height:10px; }
-.ps-legende { font-size:12px; color:var(--text-2); padding:8px 16px 0; line-height:1.4; }
+.ps-legende { font-size:12px; color:var(--text-2); padding:8px 0 0; line-height:1.4; }
+
+@media (max-width:599px) {
+  .matrix-section {
+    padding-left:calc(16px + env(safe-area-inset-left, 0px));
+    padding-right:calc(16px + env(safe-area-inset-right, 0px));
+  }
+  .mx-raster { grid-template-columns:repeat(10, minmax(0, 1fr)); }
+  /* Label als eigene Zeile ueber dem Raster, bis zu zwei Zeilen, keine Ellipse. */
+  .mx-aufgabe .mx-label {
+    grid-column:1 / -1; padding:0 0 4px; white-space:normal;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .mx-kopf .mx-label { display:none; }
+  .mx-kopfzelle { flex-direction:column; gap:0; line-height:1.15; padding:4px 0; }
+  .mx-aufgabe.alt { background:none; }
+  .mx-aufgabe + .mx-aufgabe { border-top:0.5px solid var(--border-subtle); margin-top:12px; padding-top:12px; }
+  .mx-aufgabe .mx-zelle { height:28px; gap:2px; }
+  .punkt { width:7px; height:7px; }
+  .ps-raster { grid-template-columns:56px repeat(10, minmax(0, 1fr)); }
+  .ps-raster .mx-label { padding:0 4px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .name-voll { display:none; }
+  .name-kurz { display:inline; }
+  .ps-zeile .mx-zelle { height:28px; }
+  /* Auf 320 px bleiben je Tagesspalte nur ~20 px (16 px Seitenrand, 16 px
+     Kartenrand, 56 px Label) - die Quadrate deckeln deshalb zusaetzlich
+     auf Spaltenbreite minus 2 px und bleiben quadratisch. */
+  .quadrat.g1 { width:min(12px, calc(100% - 2px)); height:auto; aspect-ratio:1; }
+  .quadrat.g2 { width:min(18px, calc(100% - 2px)); height:auto; aspect-ratio:1; }
+  .quadrat.g3, .quadrat.g4 { width:min(24px, calc(100% - 2px)); height:auto; aspect-ratio:1; }
+}
+
+/* Wunsch #278: Tap statt Hover - Detail-Blatt unten (Handy) bzw. mittig
+   (Desktop), gefuehrt ueber dialogFuehrung() aus base.html. */
+.mx-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.35); display:none;
+  align-items:flex-end; justify-content:center; z-index:250;
+}
+.mx-overlay.open { display:flex; }
+.mx-sheet {
+  background:var(--surface); color:var(--text); width:100%; max-width:720px; box-sizing:border-box;
+  border-radius:16px 16px 0 0; padding:16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-shadow:0 -4px 20px rgba(0,0,0,.2);
+}
+.mx-sheet-kopf { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.mx-sheet-titel { font-size:17px; font-weight:700; margin:0; }
+.mx-sheet-zu {
+  background:var(--chip-bg); color:var(--chip-text); border:none; border-radius:10px;
+  padding:8px 14px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;
+}
+.mx-sheet-datum { font-size:13px; color:var(--text-2); margin:2px 0 10px; }
+.mx-sheet-liste { list-style:none; margin:0; padding:0; }
+.mx-sheet-liste li { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:15px; border-top:1px solid var(--border-subtle); }
+.mx-sheet-liste li:first-child { border-top:none; }
+@media (min-width:600px) {
+  .mx-overlay { align-items:center; }
+  .mx-sheet { max-width:380px; border-radius:16px; padding-bottom:16px; }
+}
 /* Nutzer-Picker */
 .nutzer-picker { margin-bottom:12px; }
 .nutzer-picker-label { font-size:12px; color:var(--text-2); font-weight:600;
@@ -138,9 +200,9 @@
   {% if matrix.personen %}
   <section class="matrix-section" aria-describedby="matrix-erklaerung">
     <h2 class="heatmap-title">📊 Letzte 10 Tage</h2>
-    <p id="matrix-erklaerung" class="mx-sr">Punktmatrix: eine Zeile je Aufgabe, eine Spalte je Tag der letzten zehn Tage, älteste links. Jeder Punkt ist eine Erledigung in der Farbe der Person. Darunter je Person und Tag ein Quadrat, dessen Größe die Anzahl erledigter Aufgaben zeigt.</p>
+    <p id="matrix-erklaerung" class="mx-sr">Punktmatrix: eine Zeile je Aufgabe, eine Spalte je Tag der letzten zehn Tage, älteste links. Jeder Punkt ist eine Erledigung in der Farbe der Person; ein Tipp auf eine Zelle zeigt die Einzelheiten. Darunter je Person und Tag ein Quadrat, dessen Größe die Anzahl erledigter Aufgaben zeigt.</p>
 
-    <div class="mx-chips" role="group" aria-label="Personen filtern">
+    <div class="mx-chips{% if matrix.personen|length > 5 %} schieben{% endif %}" role="group" aria-label="Personen filtern">
       <button type="button" class="mx-chip" id="mx-chip-alle" aria-pressed="true" data-klick="matrixFilter" data-args='["alle"]'>alle</button>
       {% for p in matrix.personen %}
       <button type="button" class="mx-chip" aria-pressed="true" data-uid="{{ p.id }}" data-klick="matrixFilter" data-args='["{{ p.id }}"]'>
@@ -149,42 +211,56 @@
       {% endfor %}
     </div>
 
-    <div class="matrix-scroll">
-      <div class="mx-zeile mx-kopf">
-        <div class="mx-label"></div>
-        {% for s in matrix.spalten %}
-        <div class="mx-zelle mx-kopfzelle{% if s.wochenende %} we{% endif %}{% if s.heute %} heute{% endif %}">{{ s.label }}</div>
-        {% endfor %}
-      </div>
-      {% for z in matrix.zeilen %}
-      <div class="mx-zeile{{ ' alt' if loop.index is even else '' }}" data-aufgabe="{{ z.id }}">
-        <div class="mx-label" title="{{ z.name }}">{{ z.emoji }} {{ z.name }}</div>
-        {% for c in z.zellen %}
-        <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="mx-{{ z.id }}-{{ c.iso }}"{% if c.tooltip %} title="{{ c.tooltip }}"{% endif %}>
-          {%- for p in c.punkte -%}
-          <span class="punkt farbflaeche" data-uid="{{ p.uid }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}" role="img" title="{{ p.name }} – {{ z.name }}" aria-label="{{ p.name }} – {{ z.name }}"></span>
-          {%- endfor -%}
-          {%- if c.mehr %}<span class="mx-mehr">+{{ c.mehr }}</span>{% endif -%}
-        </div>
-        {% endfor %}
-      </div>
+    <div class="mx-raster mx-kopf">
+      <div class="mx-label"></div>
+      {% for s in matrix.spalten %}
+      <div class="mx-zelle mx-kopfzelle{% if s.wochenende %} we{% endif %}{% if s.heute %} heute{% endif %}"><span class="wt">{{ s.wt }}</span><span class="tz">{{ s.tz }}</span></div>
       {% endfor %}
+    </div>
+    {% for z in matrix.zeilen %}
+    <div class="mx-raster mx-aufgabe{{ ' alt' if loop.index is even else '' }}" data-aufgabe="{{ z.id }}">
+      <div class="mx-label">{{ z.emoji }} {{ z.name }}</div>
+      {% for c in z.zellen %}
+      {% if c.anzahl %}
+      <button type="button" class="mx-zelle{% if c.wochenende %} we{% endif %}" id="mx-{{ z.id }}-{{ c.iso }}"
+              data-klick="zelleDetails" data-args='{{ [z.name, c.datum_lang, c.anteile]|tojson }}'
+              aria-label="{{ c.tooltip }}">
+        {%- for p in c.punkte -%}
+        <span class="punkt farbflaeche" data-uid="{{ p.uid }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"></span>
+        {%- endfor -%}
+        {%- if c.mehr %}<span class="mx-mehr">+{{ c.mehr }}</span>{% endif -%}
+      </button>
+      {% else %}
+      <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="mx-{{ z.id }}-{{ c.iso }}" data-datum="{{ c.datum_lang }}"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
 
-      <div class="mx-trenner"></div>
-
-      {% for p in matrix.personen %}
-      <div class="mx-zeile ps-zeile{{ ' alt' if loop.index is even else '' }}">
-        <div class="mx-label farbtext" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}">{{ p.name }}</div>
-        {% for c in p.zellen %}
-        <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="ps-{{ p.id }}-{{ c.iso }}" data-anzahl="{{ c.anzahl }}">
-          <span class="quadrat farbflaeche g{{ c.stufe }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"{% if c.anzahl %} role="img" title="{{ c.tooltip }}" aria-label="{{ c.tooltip }}"{% endif %}></span>
-        </div>
-        {% endfor %}
+    <h2 class="heatmap-title ps-titel">👤 Je Person</h2>
+    {% for p in matrix.personen %}
+    <div class="mx-raster ps-raster ps-zeile">
+      <div class="mx-label farbtext" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"><span class="name-voll">{{ p.name }}</span><span class="name-kurz">{{ p.vorname }}</span></div>
+      {% for c in p.zellen %}
+      <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="ps-{{ p.id }}-{{ c.iso }}" data-anzahl="{{ c.anzahl }}">
+        <span class="quadrat farbflaeche g{{ c.stufe }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"{% if c.anzahl %} role="img" aria-label="{{ c.tooltip }}"{% endif %}></span>
       </div>
       {% endfor %}
     </div>
+    {% endfor %}
     <div class="ps-legende">Kantenlänge = Anzahl erledigter Aufgaben an diesem Tag, leer = nichts erledigt</div>
   </section>
+
+  <div class="mx-overlay" id="mx-overlay">
+    <div class="mx-sheet" id="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mx-sheet-titel">
+      <div class="mx-sheet-kopf">
+        <h3 class="mx-sheet-titel" id="mx-sheet-titel"></h3>
+        <button type="button" class="mx-sheet-zu" data-klick="zelleSchliessen">Schließen</button>
+      </div>
+      <div class="mx-sheet-datum" id="mx-sheet-datum"></div>
+      <ul class="mx-sheet-liste" id="mx-sheet-liste"></ul>
+    </div>
+  </div>
   {% endif %}
 </main>
 
@@ -243,12 +319,72 @@
     document.getElementById('mx-chip-alle').setAttribute('aria-pressed', aus.size === 0 ? 'true' : 'false');
   };
 
+  // Wunsch #278: Tap auf eine Zelle oeffnet das Detail-Blatt (Aufgabe, Datum,
+  // Person plus Anzahl). Tap daneben oder Escape schliesst; Fokus-Falle und
+  // Fokus-Rueckgabe kommen aus dialogFuehrung() (Wunsch #248).
+  const overlay = document.getElementById('mx-overlay');
+  const sheet = document.getElementById('mx-sheet');
+  const dialog = (overlay && window.dialogFuehrung) ? window.dialogFuehrung(overlay, sheet) : null;
+  if (overlay) {
+    overlay.addEventListener('click', function(e) { if (e.target === overlay && dialog) dialog.schliessen(); });
+  }
+  window.zelleDetails = function(aufgabe, datum, anteile) {
+    if (!dialog) return;
+    document.getElementById('mx-sheet-titel').textContent = aufgabe;
+    document.getElementById('mx-sheet-datum').textContent = datum;
+    const liste = document.getElementById('mx-sheet-liste');
+    liste.textContent = '';
+    (anteile || []).forEach(function(text) {
+      const li = document.createElement('li');
+      const name = text.replace(/ \d+x$/, '');
+      const person = Object.values(PERSONEN).find(p => p.name === name);
+      if (person) {
+        const punkt = document.createElement('span');
+        punkt.className = 'punkt farbflaeche';
+        punkt.style.setProperty('--ft-dunkel', person.dunkel);
+        punkt.style.setProperty('--ft-hell', person.hell);
+        li.appendChild(punkt);
+      }
+      li.appendChild(document.createTextNode(text));
+      liste.appendChild(li);
+    });
+    dialog.oeffnen();
+  };
+  window.zelleSchliessen = function() { if (dialog) dialog.schliessen(); };
+
   // Nach dem Antippen sofort einen Punkt setzen und das Quadrat wachsen
   // lassen - ohne Neuladen. Der Server hat den Eintrag schon gespeichert.
+  function anteileErhoehen(anteile, name) {
+    const neu = anteile.slice();
+    for (let i = 0; i < neu.length; i++) {
+      const m = neu[i].match(/^(.*) (\d+)x$/);
+      if (m && m[1] === name) { neu[i] = name + ' ' + (parseInt(m[2], 10) + 1) + 'x'; return neu; }
+    }
+    neu.push(name + ' 1x');
+    return neu;
+  }
+
   function matrixPunkt(aufgabeId, uid, tag, aufgabeName) {
     const person = PERSONEN[String(uid)];
-    const zelle = document.getElementById('mx-' + aufgabeId + '-' + tag);
+    let zelle = document.getElementById('mx-' + aufgabeId + '-' + tag);
     if (person && zelle) {
+      if (zelle.tagName !== 'BUTTON') {
+        // Erste Erledigung in dieser Zelle: aus dem stummen Feld wird ein
+        // Knopf, der das Detail-Blatt oeffnet - wie serverseitig gerendert.
+        const knopf = document.createElement('button');
+        knopf.type = 'button';
+        knopf.className = zelle.className;
+        knopf.id = zelle.id;
+        knopf.dataset.klick = 'zelleDetails';
+        knopf.dataset.args = JSON.stringify([aufgabeName, zelle.dataset.datum || tag, []]);
+        zelle.replaceWith(knopf);
+        zelle = knopf;
+      }
+      let args = [];
+      try { args = JSON.parse(zelle.dataset.args); } catch (e) { args = [aufgabeName, tag, []]; }
+      args[2] = anteileErhoehen(args[2] || [], person.name);
+      zelle.dataset.args = JSON.stringify(args);
+      zelle.setAttribute('aria-label', aufgabeName + ', ' + args[1] + ' – ' + args[2].join(', '));
       const punkte = zelle.querySelectorAll('.punkt').length;
       if (punkte < PUNKTE_MAX) {
         const p = document.createElement('span');
@@ -256,9 +392,6 @@
         p.dataset.uid = String(uid);
         p.style.setProperty('--ft-dunkel', person.dunkel);
         p.style.setProperty('--ft-hell', person.hell);
-        p.setAttribute('role', 'img');
-        p.title = person.name + ' – ' + aufgabeName;
-        p.setAttribute('aria-label', p.title);
         const mehr = zelle.querySelector('.mx-mehr');
         zelle.insertBefore(p, mehr);
       } else {
@@ -280,8 +413,7 @@
       if (q) {
         q.className = 'quadrat farbflaeche g' + Math.min(n, 4);
         q.setAttribute('role', 'img');
-        q.title = person.name + ', heute: ' + n + (n === 1 ? ' Aufgabe' : ' Aufgaben');
-        q.setAttribute('aria-label', q.title);
+        q.setAttribute('aria-label', person.name + ', heute: ' + n + (n === 1 ? ' Aufgabe' : ' Aufgaben'));
       }
     }
   }

@@ -591,15 +591,28 @@ teile/
                        angezeigt, weil die UTC-Grenze frueher liegt). Personen
                        erst Eltern, dann Kinder, je alphabetisch (Wunsch #44).
                        Beide Komponenten teilen die Spaltendefinition
-                       `.mx-zeile` (118px Label + 10 x 52px), Label-Spalte
-                       sticky links, Block waagerecht scrollbar; kein
-                       vertikal klebender Kopf (ein overflow-x-Container ist
-                       zugleich der Sticky-Bezug, sticky-top zum Viewport geht
-                       damit nicht - bei 10-12 Zeilen verschmerzbar).
-                       Personen-Chips (Buttons, aria-pressed) dimmen Punkte
-                       (Opazitaet .15), entfernen nichts; `matrixPunkt()` im
-                       Template setzt nach dem Antippen sofort Punkt/Quadrat
-                       (tippen liefert `tag=heute_lokal()`). Wunsch #275:
+                       `.mx-raster` (Desktop: 150px Label + 10 x minmax(0,1fr);
+                       unter 600 px: nur 10 x 1fr, das Label wird zur eigenen
+                       Zeile ueber dem Raster, Kopf zweizeilig wt/tz -
+                       Wunsch #278). Kein min-width, kein Scroll-Container,
+                       Kopf `position:sticky` unter der App-Leiste. Zellen mit
+                       Eintraegen sind Buttons (44-px-Trefferflaeche aus
+                       base.html), `data-args` = [Aufgabe, datum_lang,
+                       anteile]; `zelleDetails()` oeffnet ein Blatt ueber
+                       `window.dialogFuehrung()` (dafuer in base.html
+                       freigegeben), keine title-Tooltips mehr. Handy:
+                       Punkte 7 px, Zeilen 28 px, Quadrate 12/18/24 px und
+                       zusaetzlich auf Spaltenbreite-2px gedeckelt
+                       (aspect-ratio), Personen-Label 56 px mit Vorname.
+                       Kopfschrift 12 px (nicht 11 wie im Wunsch - Regel
+                       #238). Personenstreifen mit eigener Ueberschrift und
+                       22 px Abstand (Wunsch #277).
+                       Personen-Chips (Buttons, aria-pressed, min. 32 px,
+                       ab 6 Personen schiebbar) dimmen Punkte (Opazitaet
+                       .15), entfernen nichts; `matrixPunkt()` im Template
+                       setzt nach dem Antippen sofort Punkt/Quadrat und
+                       macht eine leere Zelle zum Knopf (tippen liefert
+                       `tag=heute_lokal()`). Wunsch #275:
                        /aufgaben lehnt ein Emoji ohne lokale Twemoji-Grafik
                        ab (`emoji_grafik_vorhanden()` aus 00_kern,
                        Weiterleitung mit ?fehler=emoji, Name bleibt im
@@ -3070,9 +3083,11 @@ python -m venv .venv                                   # einmalig
   Haeufigkeit dann alphabetisch, inaktive Aufgaben nur mit Eintrag im
   Zeitraum, ab fuenf vier Punkte plus "+n" samt Tooltip, Stufen 0-4 des
   Personenstreifens (Zahl bleibt, nur die Stufe deckelt), Ereignisse
-  ausserhalb/unbekannt fallen weg. Seite: zehn Kopfzellen, Chips mit
-  aria-pressed, Punkte mit aria-label, tippen liefert den Familientag, ein
-  Eintrag 21:30 UTC zaehlt zum lokalen Tag davor.
+  ausserhalb/unbekannt fallen weg. Seite: zehn Kopfzellen (zweizeilig
+  wt/tz), Chips mit aria-pressed, volle Zellen als Knoepfe mit data-args und
+  aria-label, leere nicht, kein title in der Matrix, Dialog-Blatt mit
+  role=dialog, Titel „Je Person" (#277/#278); tippen liefert den
+  Familientag, ein Eintrag 21:30 UTC zaehlt zum lokalen Tag davor.
 - `test_sportschau_gewicht.py` – Wunsch #274. `_tages_werte` (lokaler Tag,
   spaetester Wert gewinnt, Muell und Werte ausserhalb fallen weg),
   `_linien_chart` (x je Tages-Index, y in gepolsterter Spanne, Pfad,
