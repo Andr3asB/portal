@@ -325,7 +325,17 @@ hängt nur im Bridge-Netz und kann die macvlan-IP des hae-Servers
   Wunsch #119 vorhanden). **Bei jedem neuen Zeichen deshalb prüfen, ob
   `raw.githubusercontent.com/twitter/twemoji/master/assets/svg/<cp>.svg`
   existiert (HTTP 200), und die Seite anschließend live auf 404er
-  kontrollieren** - der reine Blick ins Template genügt nicht. Code MIT-lizenziert,
+  kontrollieren** - der reine Blick ins Template genügt nicht.
+  **Wunsch #275 - Emoji aus Nutzereingaben:** `tests/test_emoji.py` prueft
+  nur Vorlagen und Quelltext; das Zauberstab-Emoji 🪄 fuer die Geholfen-
+  Aufgabe "Staubwischen" kam per Verwaltungsformular in die Datenbank und
+  blieb auf dem PC leer. Seither: `emoji_grafik_vorhanden()`/
+  `twemoji_datei()` in 00_kern beantworten zur Laufzeit dieselbe Frage (gleiche
+  Dateinamen-Regel wie twemoji.js: fe0f faellt ohne ZWJ weg), die Geholfen-
+  Verwaltung lehnt ein Emoji ohne Grafik ab und markiert bestehende
+  Aufgaben ohne Grafik; und base.html ersetzt ein `<img class="emoji">`, das
+  nicht laedt, durch das Zeichen selbst (Geraete mit Emoji-Schrift sehen es
+  dann wenigstens). Code MIT-lizenziert,
   Grafiken CC-BY 4.0 (Twitter/Twemoji) - Attribution laut deren eigener
   README per Erwähnung im Quellcode ausreichend (siehe Kommentar in
   base.html).
@@ -566,8 +576,34 @@ teile/
                        manage.py) - ab jetzt bei jedem Wunsch-Abschluss mitgeben.
                        `_de_datum()`-Jinja-Filter formatiert die SQLite-Zeitstempel
                        ("YYYY-MM-DD HH:MM:SS") lesbar als "DD.MM.YYYY, HH:MM Uhr".
-  06_geholfen.py     – /a/geholfen/<token>/ Tipp-Grid + 10-Tage-Heatmap (erst
-                       Eltern, dann Kinder, je alphabetisch – Wunsch #44);
+  06_geholfen.py     – /a/geholfen/<token>/ Tipp-Grid + Punktmatrix und
+                       Personenstreifen der letzten 10 Tage (Wunsch #276,
+                       ersetzt die 10-Tage-Heatmap aus #29): `matrix_daten()`
+                       ist eine reine Funktion (Ereignisse (tag, user, aufgabe)
+                       rein, Zeilen raus) - eine Zeile je Aufgabe, absteigend
+                       nach Gesamtzahl, Gleichstand alphabetisch, Sortierung
+                       aus dem UNGEFILTERTEN Datensatz; je Zelle bis zu vier
+                       Punkte in Personenfarbe (farbe_kontrast/_hell ueber die
+                       Klasse `farbflaeche` aus base.html) plus "+n";
+                       Personenstreifen mit Quadraten 18/26/34/40 px je
+                       Anzahl (Stufe 4 = Deckel). Tage in FAMILIENZEIT
+                       (`utc_zu_lokal_datum`, ein Tag mehr geholt als
+                       angezeigt, weil die UTC-Grenze frueher liegt). Personen
+                       erst Eltern, dann Kinder, je alphabetisch (Wunsch #44).
+                       Beide Komponenten teilen die Spaltendefinition
+                       `.mx-zeile` (118px Label + 10 x 52px), Label-Spalte
+                       sticky links, Block waagerecht scrollbar; kein
+                       vertikal klebender Kopf (ein overflow-x-Container ist
+                       zugleich der Sticky-Bezug, sticky-top zum Viewport geht
+                       damit nicht - bei 10-12 Zeilen verschmerzbar).
+                       Personen-Chips (Buttons, aria-pressed) dimmen Punkte
+                       (Opazitaet .15), entfernen nichts; `matrixPunkt()` im
+                       Template setzt nach dem Antippen sofort Punkt/Quadrat
+                       (tippen liefert `tag=heute_lokal()`). Wunsch #275:
+                       /aufgaben lehnt ein Emoji ohne lokale Twemoji-Grafik
+                       ab (`emoji_grafik_vorhanden()` aus 00_kern,
+                       Weiterleitung mit ?fehler=emoji, Name bleibt im
+                       Formular) und markiert bestehende Aufgaben ohne Grafik;
                        /verlauf (letzte 50 Einträge, eigene Seite, Eltern/Admin
                        können je Eintrag Zeit/Nutzer/Aufgabe bearbeiten oder löschen
                        über /eintrag/<id>/bearbeiten + /eintrag/<id>/loeschen);
@@ -951,7 +987,24 @@ teile/
                        verschiebt den Grid-Start nach rechts und bricht die
                        Ausrichtung mit dem Schritte-Wochenchart darunter
                        (das keine solche Spalte hat), live als Bug gefunden
-                       und wieder entfernt. Nur Andi granted (persönliche
+                       und wieder entfernt. Wunsch #274: Gewicht und BMI als
+                       zwei Linienfelder unter den Schritten (`_hae_metrik()`
+                       generisch fuer /api/metrics/<name>, `_hae_steps` ist
+                       nur noch ein Wrapper; Namen `weight_body_mass` und
+                       `body_mass_index` aus Health Auto Export, Quelle
+                       Withings, eine Messung je Tag ~21-22 Uhr UTC;
+                       scripts/hae_metriken.py listet, was der Server kennt).
+                       `_tages_werte()` nimmt je LOKALEM Tag den spaetesten
+                       Wert, `_linien_chart()` liefert Prozentkoordinaten,
+                       einen SVG-Pfad im 100x100-Raum (preserveAspectRatio
+                       none, vector-effect non-scaling-stroke), drei
+                       Gitterlinien ueber eine um 15 % (mind. 0,5)
+                       gepolsterte Spanne, letzten Wert und Delta zum ersten
+                       Wert im Zeitraum. Zwei Felder statt einem, weil BMI =
+                       Gewicht/Konstante - in einem Feld laegen die Linien
+                       deckungsgleich. Messpunkte sind HTML-Elemente mit
+                       title/aria-label, keine SVG-Kreise (die wuerden beim
+                       Strecken zu Ellipsen). Nur Andi granted (persönliche
                        Fitnessdaten)
   15_tierbaukasten.py – /a/tierbaukasten/<token>/ eigene Figur aus
                        Bausteinen (Wunsch #64, Assistent+Mensch+Körperbau
@@ -3012,6 +3065,26 @@ python -m venv .venv                                   # einmalig
   respektiert die 30-Minuten-Pause nach einem Fehlschlag, und der Schalter
   steht in app.py, conftest und .env.example. Der Thread selbst laeuft im
   Test nie.
+- `test_geholfen_matrix.py` – Wunsch #276. `matrix_daten()` ohne Datenbank:
+  Spaltenkoepfe "Mo 1.", Wochenende und Heute markiert, Zeilen nach
+  Haeufigkeit dann alphabetisch, inaktive Aufgaben nur mit Eintrag im
+  Zeitraum, ab fuenf vier Punkte plus "+n" samt Tooltip, Stufen 0-4 des
+  Personenstreifens (Zahl bleibt, nur die Stufe deckelt), Ereignisse
+  ausserhalb/unbekannt fallen weg. Seite: zehn Kopfzellen, Chips mit
+  aria-pressed, Punkte mit aria-label, tippen liefert den Familientag, ein
+  Eintrag 21:30 UTC zaehlt zum lokalen Tag davor.
+- `test_sportschau_gewicht.py` – Wunsch #274. `_tages_werte` (lokaler Tag,
+  spaetester Wert gewinnt, Muell und Werte ausserhalb fallen weg),
+  `_linien_chart` (x je Tages-Index, y in gepolsterter Spanne, Pfad,
+  Gitter, aktuell/Delta, Achsenlabels, None ohne Werte, ein Wert sitzt
+  mittig), Seite mit beiden Linien und Tooltips, Hinweise bei hae-Ausfall
+  und ohne Messungen. Messungen relativ zu heute, weil `date.today` als
+  eingebauter Typ nicht zu patchen ist.
+- `test_emoji_grafik.py` – Wunsch #275. Dateinamen-Regel wie twemoji.js
+  (fe0f ohne/mit ZWJ), 1fa84 liegt jetzt lokal, Verwaltungsformular lehnt
+  ein Emoji ohne Grafik ab (302 mit ?fehler=emoji, Name bleibt stehen,
+  nichts angelegt), mit Grafik wird angelegt, bestehende Aufgaben ohne
+  Grafik tragen eine Warnung.
 - `test_briefing.py` – Wunsch #272. Inhalt (beide Mahlzeit-Slots immer da,
   Rezeptname mit Kategorie-Symbol vs. Freitext, Geburtstage heute+morgen
   aber nicht uebermorgen, „morgen" ueber den Jahreswechsel, Ausblendung

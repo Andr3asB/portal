@@ -92,6 +92,14 @@
     @media (prefers-color-scheme: dark) {
       body.auto .farbtext { color: var(--ft-hell); }
     }
+    {#- Wunsch #276: dasselbe fuer FLAECHEN in Personenfarbe (Punkte und
+        Quadrate der Geholfen-Matrix) - gleiche zwei Variablen, gleicher
+        Wechsel, damit die Punkte auch im Dunkelmodus Kontrast behalten. -#}
+    .farbflaeche { background: var(--ft-dunkel); }
+    body.dark .farbflaeche { background: var(--ft-hell); }
+    @media (prefers-color-scheme: dark) {
+      body.auto .farbflaeche { background: var(--ft-hell); }
+    }
 
     /* Wunsch #244: color-scheme am WURZEL-Element, nicht nur an Feldern -
        sonst bleiben Scrollbalken und native Bedienelemente (Datumswaehler,
@@ -1408,6 +1416,14 @@ if (typeof twemoji !== 'undefined') {
   // neben einem Text oder in einem Knopf mit aria-label, der die Bedeutung
   // laengst traegt.
   document.querySelectorAll('img.emoji').forEach(function (img) {
+    // Wunsch #275: Fehlt die lokale Grafik (Emoji aus Nutzereingabe, das
+    // nicht gebuendelt ist), bleibt sonst ein leeres Bild stehen. Dann
+    // lieber das Zeichen selbst zurueck - Geraete mit Emoji-Schrift zeigen
+    // es, und nur die anderen sehen ein Kaestchen statt gar nichts.
+    img.dataset.zeichen = img.getAttribute('alt') || '';
+    img.addEventListener('error', function () {
+      img.replaceWith(document.createTextNode(img.dataset.zeichen));
+    });
     if (!img.closest('[data-emoji-alt]')) {
       img.setAttribute('alt', '');
       img.setAttribute('aria-hidden', 'true');

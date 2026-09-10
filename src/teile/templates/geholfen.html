@@ -28,23 +28,65 @@
 @media(min-width:500px) { .aufgaben-grid { grid-template-columns:repeat(4,1fr); } }
 @media(min-width:700px) { .aufgaben-grid { grid-template-columns:repeat(5,1fr); } }
 
-/* Heatmap (Wunsch #29) */
-.heatmap-section {
-  background:var(--surface); border-radius:14px; padding:14px 16px;
+/* Wunsch #276: Punktmatrix (A) und Personenstreifen (B) - beide CSS Grid mit
+   DERSELBEN Spaltendefinition (.mx-zeile), damit sie untereinander fluchten.
+   Jede Zeile ist ein eigenes Grid, damit Zeilenhintergrund und die links
+   festgepinnte Label-Spalte funktionieren; die Spaltenbreiten sind fest,
+   auf schmalen Bildschirmen scrollt der Block waagerecht (nie weniger als
+   zehn Tage - sonst stimmt "letzte 10 Tage" nicht mehr). */
+.matrix-section {
+  background:var(--surface); border-radius:14px; padding:14px 0 12px;
   box-shadow:0 1px 3px var(--shadow); margin-top:4px;
 }
-.heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:12px; }
-.heatmap-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
-.heatmap-name {
-  font-size:13px; font-weight:600; width:72px; flex-shrink:0;
+.matrix-section .heatmap-title { padding:0 16px; }
+.heatmap-title { font-size:13px; font-weight:600; color:var(--text-2); margin:0 0 10px; }
+.mx-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.mx-chips { display:flex; gap:6px; flex-wrap:wrap; padding:0 16px; margin-bottom:10px; }
+.mx-chip {
+  display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--border);
+  border-radius:20px; padding:5px 11px; font-size:13px; font-weight:600; font-family:inherit;
+  background:var(--chip-bg); color:var(--chip-text); cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.mx-chip[aria-pressed="false"] { opacity:.45; }
+.mx-chip-punkt { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.matrix-scroll { overflow-x:auto; padding:0 0 4px; }
+.mx-zeile {
+  display:grid; grid-template-columns:118px repeat(10, 52px); align-items:center;
+  min-width:max-content;
+}
+.mx-zeile.alt { background:var(--surface-2); }
+.mx-kopf { border-bottom:1px solid var(--border-subtle); }
+.mx-label {
+  position:sticky; left:0; z-index:1; background:var(--surface);
+  font-size:13px; font-weight:600; padding:0 8px 0 16px; height:44px; line-height:44px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.heatmap-cells { display:flex; gap:4px; flex:1; }
-.heatmap-cell {
-  flex:1; aspect-ratio:1; border-radius:4px; background:var(--surface-2);
-  max-width:22px; transition:background .2s;
+.mx-zeile.alt .mx-label { background:var(--surface-2); }
+.mx-zelle {
+  height:44px; display:flex; align-items:center; justify-content:center; gap:3px;
+  position:relative;
 }
-.heatmap-cell.gruen { background:#34c759; }
+.mx-kopfzelle { font-size:12px; color:var(--text-2); font-weight:600; }
+.mx-kopfzelle.heute { color:var(--farbe-kontrast); }
+/* Wochenende: leicht abgesetzt ueber die volle Hoehe - subtil, kein Farbblock. */
+.mx-zelle.we { background:rgba(127,127,127,.09); }
+.punkt {
+  width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0;
+  transition:opacity .15s;
+}
+.punkt.gedimmt { opacity:.15; }
+.mx-mehr { font-size:12px; color:var(--text-2); font-weight:600; margin-left:1px; }
+.ps-zeile .mx-label { height:48px; line-height:48px; }
+.ps-zeile .mx-zelle { height:48px; }
+.quadrat { display:inline-block; border-radius:5px; }
+.quadrat.g0 { display:none; }
+.quadrat.g1 { width:18px; height:18px; }
+.quadrat.g2 { width:26px; height:26px; }
+.quadrat.g3 { width:34px; height:34px; }
+.quadrat.g4 { width:40px; height:40px; }
+.mx-trenner { height:10px; }
+.ps-legende { font-size:12px; color:var(--text-2); padding:8px 16px 0; line-height:1.4; }
 /* Nutzer-Picker */
 .nutzer-picker { margin-bottom:12px; }
 .nutzer-picker-label { font-size:12px; color:var(--text-2); font-weight:600;
@@ -93,21 +135,56 @@
     {% endfor %}
   </div>
 
-  {% if heatmap_nutzer %}
-  <div class="heatmap-section">
-    <div class="heatmap-title">📊 Letzte 10 Tage</div>
-    {% for n in heatmap_nutzer %}
-    <div class="heatmap-row">
-      <span class="heatmap-name farbtext" style="--ft-dunkel:{{ farbe_kontrast(n.farbe) }};--ft-hell:{{ farbe_kontrast_hell(n.farbe) }}">{{ n.name }}</span>
-      <div class="heatmap-cells">
-        {% for tag in tage %}
-        <span class="heatmap-cell{% if tag in geholfen_tage.get(n.id, []) %} gruen{% endif %}"
-              id="heat-{{ n.id }}-{{ tag }}" title="{{ tag }}"></span>
+  {% if matrix.personen %}
+  <section class="matrix-section" aria-describedby="matrix-erklaerung">
+    <h2 class="heatmap-title">📊 Letzte 10 Tage</h2>
+    <p id="matrix-erklaerung" class="mx-sr">Punktmatrix: eine Zeile je Aufgabe, eine Spalte je Tag der letzten zehn Tage, älteste links. Jeder Punkt ist eine Erledigung in der Farbe der Person. Darunter je Person und Tag ein Quadrat, dessen Größe die Anzahl erledigter Aufgaben zeigt.</p>
+
+    <div class="mx-chips" role="group" aria-label="Personen filtern">
+      <button type="button" class="mx-chip" id="mx-chip-alle" aria-pressed="true" data-klick="matrixFilter" data-args='["alle"]'>alle</button>
+      {% for p in matrix.personen %}
+      <button type="button" class="mx-chip" aria-pressed="true" data-uid="{{ p.id }}" data-klick="matrixFilter" data-args='["{{ p.id }}"]'>
+        <span class="mx-chip-punkt farbflaeche" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"></span>{{ p.name }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="matrix-scroll">
+      <div class="mx-zeile mx-kopf">
+        <div class="mx-label"></div>
+        {% for s in matrix.spalten %}
+        <div class="mx-zelle mx-kopfzelle{% if s.wochenende %} we{% endif %}{% if s.heute %} heute{% endif %}">{{ s.label }}</div>
         {% endfor %}
       </div>
+      {% for z in matrix.zeilen %}
+      <div class="mx-zeile{{ ' alt' if loop.index is even else '' }}" data-aufgabe="{{ z.id }}">
+        <div class="mx-label" title="{{ z.name }}">{{ z.emoji }} {{ z.name }}</div>
+        {% for c in z.zellen %}
+        <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="mx-{{ z.id }}-{{ c.iso }}"{% if c.tooltip %} title="{{ c.tooltip }}"{% endif %}>
+          {%- for p in c.punkte -%}
+          <span class="punkt farbflaeche" data-uid="{{ p.uid }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}" role="img" title="{{ p.name }} – {{ z.name }}" aria-label="{{ p.name }} – {{ z.name }}"></span>
+          {%- endfor -%}
+          {%- if c.mehr %}<span class="mx-mehr">+{{ c.mehr }}</span>{% endif -%}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <div class="mx-trenner"></div>
+
+      {% for p in matrix.personen %}
+      <div class="mx-zeile ps-zeile{{ ' alt' if loop.index is even else '' }}">
+        <div class="mx-label farbtext" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}">{{ p.name }}</div>
+        {% for c in p.zellen %}
+        <div class="mx-zelle{% if c.wochenende %} we{% endif %}" id="ps-{{ p.id }}-{{ c.iso }}" data-anzahl="{{ c.anzahl }}">
+          <span class="quadrat farbflaeche g{{ c.stufe }}" style="--ft-dunkel:{{ p.dunkel }};--ft-hell:{{ p.hell }}"{% if c.anzahl %} role="img" title="{{ c.tooltip }}" aria-label="{{ c.tooltip }}"{% endif %}></span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
-  </div>
+    <div class="ps-legende">Kantenlänge = Anzahl erledigter Aufgaben an diesem Tag, leer = nichts erledigt</div>
+  </section>
   {% endif %}
 </main>
 
@@ -124,6 +201,8 @@
 <script{{ csp_nonce }}>
 (function() {
   const TP = {{ tp|tojson }};
+  const PERSONEN = {{ personen_js|tojson }};
+  const PUNKTE_MAX = 4;
   let fuerUserId = {{ user.id }};
   let toastTimer;
 
@@ -147,6 +226,66 @@
     btn.style.color = '#fff';
   };
 
+  // Wunsch #276: Personenfilter. Deaktivierte Personen werden GEDIMMT, nicht
+  // entfernt - sonst zentrieren sich die uebrigen Punkte neu und das Raster
+  // wackelt. "alle" setzt zurueck.
+  window.matrixFilter = function(uid, btn) {
+    const chips = Array.from(document.querySelectorAll('.mx-chip[data-uid]'));
+    if (uid === 'alle') {
+      chips.forEach(c => c.setAttribute('aria-pressed', 'true'));
+    } else {
+      btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    }
+    const aus = new Set(chips.filter(c => c.getAttribute('aria-pressed') !== 'true').map(c => c.dataset.uid));
+    document.querySelectorAll('.punkt[data-uid]').forEach(p => {
+      p.classList.toggle('gedimmt', aus.has(p.dataset.uid));
+    });
+    document.getElementById('mx-chip-alle').setAttribute('aria-pressed', aus.size === 0 ? 'true' : 'false');
+  };
+
+  // Nach dem Antippen sofort einen Punkt setzen und das Quadrat wachsen
+  // lassen - ohne Neuladen. Der Server hat den Eintrag schon gespeichert.
+  function matrixPunkt(aufgabeId, uid, tag, aufgabeName) {
+    const person = PERSONEN[String(uid)];
+    const zelle = document.getElementById('mx-' + aufgabeId + '-' + tag);
+    if (person && zelle) {
+      const punkte = zelle.querySelectorAll('.punkt').length;
+      if (punkte < PUNKTE_MAX) {
+        const p = document.createElement('span');
+        p.className = 'punkt farbflaeche';
+        p.dataset.uid = String(uid);
+        p.style.setProperty('--ft-dunkel', person.dunkel);
+        p.style.setProperty('--ft-hell', person.hell);
+        p.setAttribute('role', 'img');
+        p.title = person.name + ' – ' + aufgabeName;
+        p.setAttribute('aria-label', p.title);
+        const mehr = zelle.querySelector('.mx-mehr');
+        zelle.insertBefore(p, mehr);
+      } else {
+        let mehr = zelle.querySelector('.mx-mehr');
+        if (!mehr) {
+          mehr = document.createElement('span');
+          mehr.className = 'mx-mehr';
+          mehr.textContent = '+0';
+          zelle.appendChild(mehr);
+        }
+        mehr.textContent = '+' + (parseInt(mehr.textContent.slice(1), 10) + 1);
+      }
+    }
+    const ps = document.getElementById('ps-' + uid + '-' + tag);
+    if (person && ps) {
+      const n = (parseInt(ps.dataset.anzahl || '0', 10) || 0) + 1;
+      ps.dataset.anzahl = String(n);
+      const q = ps.querySelector('.quadrat');
+      if (q) {
+        q.className = 'quadrat farbflaeche g' + Math.min(n, 4);
+        q.setAttribute('role', 'img');
+        q.title = person.name + ', heute: ' + n + (n === 1 ? ' Aufgabe' : ' Aufgaben');
+        q.setAttribute('aria-label', q.title);
+      }
+    }
+  }
+
   document.querySelectorAll('.aufgabe-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
       const id  = this.dataset.id;
@@ -162,8 +301,7 @@
         const d = await r.json();
         if (d.ok) {
           showToast(d.emoji + ' ' + d.aufgabe + ' ✓');
-          const cell = document.getElementById(`heat-${d.fuer_user_id}-${d.tag}`);
-          if (cell) cell.classList.add('gruen');
+          matrixPunkt(id, d.fuer_user_id, d.tag, d.aufgabe);
         }
       } catch(e) {
         const f = document.createElement('form');

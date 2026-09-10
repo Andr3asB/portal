@@ -177,7 +177,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
         <span class="app-emoji">🙋</span>
         <div class="app-desc">
           <strong>Geholfen</strong>
-          <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Unter den Kacheln zeigt eine kleine Heatmap, wer sich in den letzten 10 Tagen wie eingebracht hat.</span>
+          <span>Wenn du zu Hause geholfen hast, hier kurz antippen. Unter den Kacheln zeigt eine Punktmatrix, wer in den letzten 10 Tagen was erledigt hat.</span>
         </div>
       </li>
       <li>
@@ -244,10 +244,11 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
 
   <details class="section" id="kapitel-5">
     <summary class="section-title"><h2>🙋 Geholfen – Heatmap, Verlauf & Statistik</h2></summary>
-    <p>Unter den Kacheln zeigt eine <strong>Heatmap</strong> für jedes Familienmitglied die letzten 10 Tage: grün, wenn an dem Tag geholfen wurde, sonst grau. Nach dem Antippen einer Kachel färbt sich das heutige Feld sofort ein – ohne Neuladen der Seite.</p>
+    <p>Unter den Kacheln stehen die <strong>letzten 10 Tage</strong> als Punktmatrix: eine Zeile je Aufgabe, eine Spalte je Tag (älteste links, Wochenende leicht grau hinterlegt). Jeder Punkt ist eine Erledigung in der Farbe der Person, die sie eingetragen hat; ab fünf an einem Tag stehen vier Punkte und ein „+n“. Die Aufgaben sind nach Häufigkeit sortiert. Ein Tipp auf einen Namen in der Chip-Leiste darüber blendet die Punkte dieser Person aus (sie werden nur blass, damit nichts verrutscht), „alle“ holt sie zurück.</p>
+    <p>Darunter zeigt der <strong>Personenstreifen</strong> je Person und Tag ein Quadrat – je größer, desto mehr Aufgaben an dem Tag (leer = nichts erledigt). Nach dem Antippen einer Kachel erscheint der neue Punkt sofort, ohne Neuladen. Auf dem Handy lässt sich der Block seitlich schieben, die Aufgabennamen bleiben dabei links stehen.</p>
     <p>Die Liste der letzten Eintragungen findest du unter <strong>„📜 Zuletzt geholfen"</strong> im Menü (☰ oben rechts). Eltern können dort mit ✏️ Datum, Person und Hilfsleistung eines Eintrags nachträglich korrigieren oder den Eintrag löschen.</p>
     <p>In der <strong>Statistik</strong> (📊, im Menü, nur für Admins) gibt es einen Kalender, der zeigt, wer in den letzten 10 oder 30 Tagen an welchem Tag geholfen hat. Mit den Buttons oben rechts kannst du zwischen den Zeiträumen wechseln.</p>
-    <p>Unter <strong>„⚙️ Aufgaben"</strong> (Statistik-Seite, nur für Admins) lassen sich Aufgaben hinzufügen, deaktivieren und mit ✏️ auch umbenennen.</p>
+    <p>Unter <strong>„⚙️ Aufgaben"</strong> (Statistik-Seite, nur für Admins) lassen sich Aufgaben hinzufügen, deaktivieren und mit ✏️ auch umbenennen. Das Emoji einer neuen Aufgabe muss im Portal als Grafik vorliegen – sonst bliebe die Kachel auf Rechnern ohne Emoji-Schrift leer. Fehlt die Grafik, lehnt das Portal die Aufgabe mit einem Hinweis ab; bei bestehenden Aufgaben steht dann „⚠️ Emoji ohne Grafik“ dabei.</p>
   </details>
 
   <details class="section" id="kapitel-6">
@@ -374,6 +375,7 @@ details[open] > summary.section-title::after { transform:rotate(-90deg); }
     <summary class="section-title"><h2>🏃 Sportschau</h2></summary>
     <p>Zeigt Andis Trainings als Heatmap – eine Zeile pro Trainingsart (z. B. "Outdoor Laufen", "Outdoor Gehen"), grün markiert der Tag, an dem trainiert wurde. Oben lässt sich der Zeitraum umschalten: 14 (Standard), 30, 60 oder 90 Tage – Heatmap und Schritte-Diagramm passen sich entsprechend an.</p>
     <p>Im <strong>Schritte-Diagramm</strong> zeigt jeder Balken die Schritte eines Tages, unterteilt in "beim Training" und "sonstige Schritte". Rechts neben der Überschrift steht der Durchschnitt für den gewählten Zeitraum – der heutige Tag zählt dabei bewusst nicht mit, da er meist noch nicht vorbei ist und den Schnitt verfälschen würde.</p>
+    <p>Unter den Schritten stehen <strong>Gewicht und BMI</strong> als zwei Linien mit je eigener Skala (die Waage meldet einmal am Tag; Tage ohne Messung lassen die Linie einfach weiterlaufen). Rechts über jeder Linie steht der letzte Wert und die Veränderung seit dem ersten Wert im gewählten Zeitraum; ein Tipp auf einen Punkt zeigt Datum und Wert.</p>
     <p>Die Daten kommen live von Andis hae-Server, es wird nichts im Portal gespeichert – ist der Server gerade nicht erreichbar, erscheint stattdessen ein Hinweis.</p>
   </details>
 

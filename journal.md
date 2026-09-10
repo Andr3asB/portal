@@ -2,6 +2,91 @@
 
 ---
 
+## 2026-09-10 – portal-v253: #275 Staubwischen-Icon, #274 Gewicht & BMI, #276 Punktmatrix
+
+### #275 – „Icon für Staubwischen ist am PC nicht sichtbar" [hoch]
+
+Ursache: Die Aufgabe „Staubwischen" trägt 🪄 (U+1FA84), angelegt über das
+Verwaltungsformular. `tests/test_emoji.py` prüft nur Vorlagen und
+Quelltext – ein Emoji, das nur in der Datenbank steht, läuft daran vorbei,
+und die lokale Twemoji-Sammlung (114 Dateien) hatte die Grafik nicht. Auf
+dem PC (Linux/Chrome ohne Emoji-Schrift) blieb also ein leeres Bild.
+
+Drei Dinge, damit das nicht wiederkommt:
+
+- `1fa84.svg` geholt (und beim Bauen von #274 gleich `2696.svg` für ⚖️ –
+  der Wächter hat es gemeldet, wie er soll).
+- `emoji_grafik_vorhanden()` / `twemoji_datei()` in `00_kern.py` stellen
+  zur Laufzeit dieselbe Frage wie der Test, mit der Dateinamen-Regel von
+  twemoji.js (fe0f fällt weg, solange kein ZWJ in der Folge steckt). Die
+  Geholfen-Verwaltung lehnt eine neue Aufgabe mit einem Emoji ohne Grafik
+  ab (Hinweis, Name bleibt im Formular) und markiert bestehende Aufgaben
+  ohne Grafik mit „⚠️ Emoji ohne Grafik".
+- `base.html`: lädt ein Twemoji-Bild nicht, ersetzt ein `error`-Listener es
+  durch das Zeichen selbst – auf Geräten mit Emoji-Schrift steht dann
+  wenigstens das Emoji, nicht ein leeres Bild.
+
+### #274 – „Gewichts- und BMI-Diagramm" [mittel]
+
+Erst nachgesehen, was der hae-Server überhaupt liefert – dafür gibt es
+jetzt `scripts/hae_metriken.py` (läuft im Container, gleiche stdin-Bauart
+wie `wunsch_lauf_check.py`, gibt den Schlüssel nie aus): `weight_body_mass`
+(kg), `body_mass_index`, dazu `body_fat_percentage` und `lean_body_mass`,
+alle von der Withings-Waage, eine Messung je Tag gegen 21–22 Uhr UTC. Ein
+erster Versuch, das ad hoc per Heredoc zu probieren, wurde vom Auto-Modus
+blockiert – zu Recht ein Skript im Repo statt SQL/Python im Prompt.
+
+Bau: `_hae_steps` ist zum Wrapper um ein generisches `_hae_metrik(name, …)`
+geworden. `_tages_werte()` nimmt je lokalem Kalendertag den spätesten Wert,
+`_linien_chart()` rechnet Prozentkoordinaten, einen SVG-Pfad im
+100×100-Raum (auf die Feldgröße gestreckt, Strichstärke bleibt dank
+`vector-effect`), drei Gitterlinien über eine um 15 % gepolsterte Spanne,
+letzten Wert und Delta. **Zwei Felder statt einem**, obwohl der Wunsch „ein
+Linechart" sagt: BMI ist Gewicht durch eine Konstante, in einem Feld lägen
+beide Linien deckungsgleich übereinander – zwei Felder mit eigener Skala
+zeigen dasselbe, aber lesbar. Messpunkte sind HTML-Elemente mit Tooltip,
+keine SVG-Kreise (die würden beim Strecken zu Ellipsen). Live liefert der
+hae-Server für beide Metriken je eine Messung pro Tag (50 in 90 Tagen), die
+Seite antwortet mit 200; die Darstellung selbst ist über die Tests mit
+nachgebauten Antworten abgesichert.
+
+### #276 – „Visualisierung erledigter Aufgaben" [mittel]
+
+Andis Spezifikation (Punktmatrix + Personenstreifen, CSS Grid, keine
+Bibliothek) eins zu eins umgesetzt; sie ersetzt die 10-Tage-Heatmap aus #29
+auf der Geholfen-Seite, deren Aussage (wer hat an welchem Tag geholfen) im
+Personenstreifen aufgeht.
+
+- `matrix_daten()` ist eine reine Funktion: Ereignisse `(tag, user,
+  aufgabe)` rein, Zeilen raus. Sortierung absteigend nach Gesamtzahl,
+  Gleichstand alphabetisch, aus dem ungefilterten Datensatz. Ab fünf
+  Erledigungen vier Punkte plus „+n". Quadrate 18/26/34/40 px.
+- **Familienzeit statt UTC:** Die alte Heatmap rechnete mit
+  `date(zeitstempel)` in UTC – ein Eintrag um 23:30 landete am nächsten Tag.
+  Jetzt `utc_zu_lokal_datum()`, und die Abfrage holt einen Tag mehr, weil
+  die UTC-Grenze früher liegt als die lokale.
+- **Farben:** neue Klasse `farbflaeche` in `base.html` – dasselbe Muster wie
+  `farbtext` (zwei Variablen, hell/dunkel), nur für Hintergründe. Damit
+  bleiben die Punkte auch im Dunkelmodus kontrastfest, ohne einen zweiten
+  Farbblock.
+- **Filter dimmt, entfernt nicht** (Opazität .15), Chips sind Buttons mit
+  `aria-pressed`, „alle" setzt zurück. Nach dem Antippen einer Kachel setzt
+  `matrixPunkt()` sofort den Punkt und lässt das Quadrat wachsen; `tippen`
+  liefert dafür `tag=heute_lokal()`.
+- **Eine Abweichung von der Spezifikation:** kein vertikal klebender
+  Spaltenkopf. Der Block ist waagerecht scrollbar (overflow-x), und ein
+  Scroll-Container ist zugleich der Bezug für `position: sticky` – ein
+  Kopf, der am Viewport klebt, geht damit nicht. Bei 10–12 Zeilen passt die
+  Matrix ohnehin auf einen Bildschirm; die Label-Spalte klebt links wie
+  gefordert.
+
+Tests: 8 (Matrix) + 7 (Gewicht) + 6 (Emoji) neue, Suite 2419 grün nach dem
+Nachholen von `2696.svg`. Auslieferung v253, `live_pruefung.py` grün
+(Geholfen 74 ms, Sportschau 187 ms), beide SVGs live mit 200. Hilfe: Kapitel
+5 (Matrix, Emoji-Regel bei Aufgaben) und 13 (Gewicht & BMI) angepasst.
+
+---
+
 ## 2026-09-07 – portal-v252: #272 Morning Briefing
 
 ### #272 – „Morning Briefing mit Essensplan und Geburtstagen"

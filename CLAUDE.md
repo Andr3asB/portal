@@ -538,7 +538,10 @@ ausschließlich in `.claude/settings.json`.
   nie wieder ad hoc mit `curl` prüfen, das hat 808 nie ablaufende Zugänge
   in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026).
   `wunsch_lauf_check.py` beantwortet nur lesend, ob der stündliche Lauf gerade
-  Arbeit hat (siehe „Prüfung gegen das laufende Portal").
+  Arbeit hat (siehe „Prüfung gegen das laufende Portal"). `hae_metriken.py`
+  (gleiche stdin-Bauart) listet, welche Metriken der hae-Server liefert –
+  **so** nachsehen, nicht per Heredoc mit dem API-Schlüssel im Prompt (der
+  Auto-Modus blockiert das, #274).
 - `docs/a11y/` – eingefrorene Kopien der AccessLint-Methodik (WCAG-EM,
   Prüf-Checkpoints; MIT) als Referenz für Hand-Reviews. Bewusst NUR die
   Dokumente übernommen – der zugehörige MCP-Server (`npx @latest`,

@@ -134,20 +134,100 @@ def _hae_workouts(start_date, end_date):
         return None
 
 
-def _hae_steps(start_ms, end_ms):
-    """Ruft stündliche Schrittzahlen ab. None bei Konfigurations-/Netzwerkfehler."""
+def _hae_metrik(name, start_ms, end_ms):
+    """Ruft eine Metrik-Reihe ab (/api/metrics/<name>, from/to als Unix-
+    Millisekunden). None bei Konfigurations-/Netzwerkfehler.
+
+    Wunsch #274: dieselbe Funktion fuer Schritte, Gewicht und BMI - die
+    Namen kommen aus Health Auto Export (`weight_body_mass`,
+    `body_mass_index`); scripts/hae_metriken.py zeigt, was der Server
+    sonst noch kennt."""
     url = current_app.config.get("HAE_API_URL", "")
     key = current_app.config.get("HAE_API_KEY", "")
     if not url or not key:
         return None
-    steps_url = url.rsplit("/", 1)[0] + "/metrics/step_count"
+    metrik_url = url.rsplit("/", 1)[0] + "/metrics/" + name
     query = urllib.parse.urlencode({"from": start_ms, "to": end_ms})
-    req = urllib.request.Request(f"{steps_url}?{query}", headers={"api-key": key})
+    req = urllib.request.Request(f"{metrik_url}?{query}", headers={"api-key": key})
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
             return json.loads(resp.read())
     except Exception:
         return None
+
+
+def _hae_steps(start_ms, end_ms):
+    """Ruft stündliche Schrittzahlen ab. None bei Konfigurations-/Netzwerkfehler."""
+    return _hae_metrik("step_count", start_ms, end_ms)
+
+
+def _tages_werte(roh, tage):
+    """Wunsch #274: {tag_iso: letzter Messwert des lokalen Kalendertags} fuer
+    Gewicht/BMI. Die Waage liefert eine Messung je Tag, bei mehreren zaehlt
+    die spaeteste; Tage ohne Messung fehlen im Dict (das Diagramm laesst sie
+    aus, ueberspringt aber keine Spalte)."""
+    werte = {}
+    zeiten = {}
+    for eintrag in (roh or []):
+        try:
+            wann = datetime.fromisoformat(eintrag["date"])
+            wert = float(eintrag["qty"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        tag = wann.astimezone(_TZ).date().isoformat()
+        if tag not in tage:
+            continue
+        if tag not in zeiten or wann >= zeiten[tag]:
+            zeiten[tag] = wann
+            werte[tag] = wert
+    return werte
+
+
+def _linien_chart(tage, werte, einheit=""):
+    """Wunsch #274: Geometrie fuer ein Liniendiagramm ohne Bibliothek.
+
+    x laeuft ueber den Tages-Index (0..100 %, aelteste links), y ueber eine
+    gepolsterte Spanne min..max (0..100 % von unten). Zurueck kommen die
+    Punkte (mit Prozentkoordinaten und Tooltip), die Linie als SVG-Pfad in
+    einem 100x100-Koordinatenraum, drei Gitterlinien mit Beschriftung sowie
+    der letzte Wert und die Aenderung zum ersten Wert im Zeitraum."""
+    vorhanden = [(i, t, werte[t]) for i, t in enumerate(tage) if t in werte]
+    if not vorhanden:
+        return None
+    zahlen = [w for _i, _t, w in vorhanden]
+    lo, hi = min(zahlen), max(zahlen)
+    polster = max(0.5, (hi - lo) * 0.15)
+    unten, oben = lo - polster, hi + polster
+    spanne = oben - unten
+    breite = max(1, len(tage) - 1)
+
+    def _fmt(w):
+        return f"{w:.1f}".replace(".", ",")
+
+    punkte = []
+    for i, t, w in vorhanden:
+        d = datetime.fromisoformat(t)
+        punkte.append({
+            "tag": t,
+            "x": i / breite * 100,
+            "y": (w - unten) / spanne * 100,
+            "wert": w,
+            "text": f"{d.strftime('%d.%m.')}: {_fmt(w)} {einheit}".strip(),
+        })
+    pfad = " ".join(f"{'M' if k == 0 else 'L'} {p['x']:.2f},{100 - p['y']:.2f}"
+                    for k, p in enumerate(punkte))
+    gitter = [{"wert": _fmt(unten + spanne * f), "pct": f * 100} for f in (0, 0.5, 1)]
+    return {
+        "punkte": punkte, "pfad": pfad, "gitter": gitter, "einheit": einheit,
+        "aktuell": _fmt(zahlen[-1]),
+        "delta": _fmt(zahlen[-1] - zahlen[0]) if len(zahlen) > 1 else None,
+        "delta_vorzeichen": "+" if len(zahlen) > 1 and zahlen[-1] - zahlen[0] > 0 else "",
+        "achse": [
+            {"label": datetime.fromisoformat(tage[0]).strftime("%d.%m."), "x": 0},
+            {"label": datetime.fromisoformat(tage[len(tage) // 2]).strftime("%d.%m."), "x": len(tage) // 2 / breite * 100},
+            {"label": "heute", "x": 100},
+        ],
+    }
 
 
 def _tages_schritte(steps_roh, workout_fenster, tage):
@@ -294,6 +374,15 @@ def index(token):
     wochen, max_wochen_schritte = _wochen_ansicht(tage, schritte_balken)
     wochen_gridlines = _gridlines(max_wochen_schritte, 10000)
 
+    # Wunsch #274: Gewicht und BMI als Linien unter dem Schritte-Chart. Zwei
+    # getrennte Felder mit eigener Skala - BMI ist Gewicht durch eine
+    # Konstante, in EINEM Feld laegen die Linien deckungsgleich uebereinander.
+    gewicht_roh = _hae_metrik("weight_body_mass", start_ms, now_ms)
+    bmi_roh     = _hae_metrik("body_mass_index", start_ms, now_ms)
+    fehler_koerper = gewicht_roh is None and bmi_roh is None
+    gewicht = _linien_chart(tage, _tages_werte(gewicht_roh, tage), "kg")
+    bmi     = _linien_chart(tage, _tages_werte(bmi_roh, tage))
+
     return render_template("sportschau.html",
         user=user, token=token, farbe=user["farbe"],
         tage=tage, trainingsarten=trainingsarten, trainings_tage=trainings_tage,
@@ -301,6 +390,7 @@ def index(token):
         fehler_schritte=fehler_schritte, schritte_balken=schritte_balken, gridlines=gridlines,
         schritte_schnitt=schritte_schnitt,
         wochen=wochen, wochen_gridlines=wochen_gridlines,
+        fehler_koerper=fehler_koerper, gewicht=gewicht, bmi=bmi,
     )
 
 

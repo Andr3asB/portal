@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 import sqlite3
 import threading
@@ -1054,6 +1055,44 @@ def antwort_oder_weiter(ziel_url: str, **daten):
     if "application/json" in (request.headers.get("Accept") or ""):
         return jsonify(ok=True, **daten)
     return redirect(ziel_url)
+
+
+# Wunsch #275: Emoji aus NUTZEREINGABEN (Geholfen-Aufgaben) laufen an
+# tests/test_emoji.py vorbei - der prueft nur Vorlagen und Quelltext. Das
+# Zauberstab-Emoji fuer "Staubwischen" hatte deshalb keine lokale Grafik
+# und blieb auf dem PC leer. Diese beiden Helfer fragen zur Laufzeit dieselbe
+# Frage wie der Test: Liegt unter static/twemoji/svg/ eine Datei dafuer?
+TWEMOJI_SVG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "..", "static", "twemoji", "svg")
+_EMOJI_UNSICHTBAR = {"fe0f", "200d", "20e3"}
+
+
+def twemoji_datei(zeichen: str) -> str:
+    """Dateiname, unter dem twemoji.js die Grafik sucht: Codepoints mit '-'
+    verbunden, der Varianten-Selektor fe0f faellt weg, solange kein ZWJ
+    (200d) in der Folge steckt - so macht es twemoji.js selbst."""
+    punkte = [f"{ord(c):x}" for c in zeichen]
+    if "200d" not in punkte:
+        punkte = [p for p in punkte if p != "fe0f"]
+    return "-".join(punkte) + ".svg"
+
+
+def emoji_grafik_vorhanden(text: str) -> bool:
+    """True, wenn twemoji.js fuer diesen (kurzen) Text Grafiken hat - entweder
+    fuer die ganze Folge (ZWJ-Sequenzen, Flaggen) oder fuer jedes einzelne
+    Zeichen. Reiner Text ohne Emoji zaehlt als vorhanden."""
+    text = (text or "").strip()
+    if not text:
+        return True
+    if os.path.isfile(os.path.join(TWEMOJI_SVG_DIR, twemoji_datei(text))):
+        return True
+    for c in text:
+        punkt = f"{ord(c):x}"
+        if punkt in _EMOJI_UNSICHTBAR or ord(c) < 0x2190:
+            continue      # Buchstaben, Ziffern, Satzzeichen - kein Emoji
+        if not os.path.isfile(os.path.join(TWEMOJI_SVG_DIR, f"{punkt}.svg")):
+            return False
+    return True
 
 
 def to_int(value, default=None):
