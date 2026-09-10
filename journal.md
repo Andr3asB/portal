@@ -29,6 +29,13 @@ sagt das. Keine Datenmigration nötig, die gespeicherten Optionen waren
 immer richtig. Vier Tests, darunter die Galerieseite mit zwei gleich
 gebauten Figuren ohne doppelte IDs.
 
+**Nachschlag v257:** Die Kontrolle an den echten Figuren im Container (acht
+Menschen von Friederike) fand noch zwei Doppel: `accessoriesSunglasses-a`
+und `-b` – Maske und Verlauf *innerhalb* der Sonnenbrille tragen bei
+DiceBear feste IDs ohne Seed-Hash. Deshalb hängt `_ids_suffixieren()` den
+Seed jetzt an **jede** ID des SVG samt `href="#…"` und `url(#…)`. Danach:
+acht Figuren, 63 IDs, null doppelt.
+
 ### #279 – „Werkstatt-Badge für unpriorisierte Wünsche" [mittel]
 
 Die Werkstatt-Kachel auf der Startseite trägt für Admins eine Zahl

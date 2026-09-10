@@ -2657,7 +2657,10 @@ Der Datenstrom geht seit dem 31.08.2026 **verschlüsselt** aufs NAS (`age`, asym
   Figuren haben die falsche Kleidungsfarbe" (v256). Seit v256 bekommt jede
   Galerie-Figur `seed="figur-<id>"`, die Vorschau `"vorschau"`; die
   Muetzenfarbe (`hatColor`, das einzige, was DiceBear sonst aus dem Seed
-  wuerfelt) folgt fest der Kleidungsfarbe. `test_tierbaukasten_ids.py`
+  wuerfelt) folgt fest der Kleidungsfarbe. Reicht NICHT allein: Masken und
+  Verlaeufe innerhalb eines Teils (`accessoriesSunglasses-a/-b`) tragen
+  feste IDs ohne Seed-Hash - `_ids_suffixieren()` haengt den Seed deshalb
+  an jede ID samt `href="#…"`/`url(#…)` (v257). `test_tierbaukasten_ids.py`
   wacht darueber. Dasselbe Muster wie der Eintrag darunter (Wunsch #83).
 - **SVG `<use href="#id">`/`clipPath` gegen eine nicht existierende ID
   resolved zu einem leeren Clip-Bereich, ohne Fehler.** Betraf Wunsch #83

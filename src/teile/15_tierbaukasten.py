@@ -206,7 +206,26 @@ def _mensch_svg_rendern(optionen, seed="vorschau"):
         dicebear_optionen["accessoriesColor"] = [optionen["accessoirefarbe"]]
         dicebear_optionen["accessoriesProbability"] = 100
     avatar = Avatar(_AVATAAARS_STYLE, dicebear_optionen)
-    return avatar.to_string()
+    return _ids_suffixieren(avatar.to_string(), seed)
+
+
+_ID_ZEICHEN = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _ids_suffixieren(svg, seed):
+    """Haengt den Seed an JEDE SVG-ID samt ihrer Verweise (`href="#…"`,
+    `url(#…)`). Noetig, weil DiceBear nur die Teile-Gruppen mit dem Seed-Hash
+    versieht - Masken und Verlaeufe INNERHALB eines Teils (z. B.
+    `accessoriesSunglasses-a`) tragen feste IDs und kollidieren wieder,
+    sobald zwei Figuren dieselbe Brille tragen (live gefunden, #273)."""
+    suffix = "-" + _ID_ZEICHEN.sub("", seed)
+    ids = set(re.findall(r'\bid="([^"]+)"', svg))
+    for alt in sorted(ids, key=len, reverse=True):
+        neu = alt + suffix
+        svg = (svg.replace(f'id="{alt}"', f'id="{neu}"')
+                  .replace(f'href="#{alt}"', f'href="#{neu}"')
+                  .replace(f'url(#{alt})', f'url(#{neu})'))
+    return svg
 
 
 @bp.route("/a/tierbaukasten/vorschau-mensch", defaults={"token": None}, methods=["POST"])

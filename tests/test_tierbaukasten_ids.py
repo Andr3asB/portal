@@ -42,6 +42,20 @@ def test_zwei_figuren_haben_eigene_ids(modul):
         assert refs and refs <= set(_ids(svg))
 
 
+def test_auch_ids_innerhalb_eines_teils_sind_eigen(modul):
+    """Live gefunden: die Sonnenbrille bringt feste IDs (accessoriesSunglasses-a/-b)
+    mit, die DiceBear NICHT mit dem Seed versieht - drei Figuren mit
+    Sonnenbrille teilten sie sich."""
+    brille = dict(OPTIONEN, accessoire="sunglasses")
+    a = modul._mensch_svg_rendern(brille, seed="figur-1")
+    b = modul._mensch_svg_rendern(brille, seed="figur-2")
+    assert any("Sunglasses" in i for i in _ids(a))
+    assert not set(_ids(a)) & set(_ids(b))
+    for svg in (a, b):
+        refs = set(re.findall(r'href="#([^"]+)"', svg)) | set(re.findall(r'url\(#([^)]+)\)', svg))
+        assert refs and refs <= set(_ids(svg)), "jeder Verweis findet seine Definition"
+
+
 def test_vorschau_kollidiert_nicht_mit_der_galerie(modul):
     vorschau = modul._mensch_svg_rendern(OPTIONEN)
     figur = modul._mensch_svg_rendern(OPTIONEN, seed="figur-1")
