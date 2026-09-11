@@ -2,6 +2,25 @@
 
 ---
 
+## 2026-09-11 – CLAUDE.md nachgezogen (kein Portal-Code)
+
+`/init` als Abgleich der Datei gegen den Stand v257. Kein Deploy, keine
+Auslieferung. Korrigiert: Testzahl (2068 → 2428, gezählt per `--co`),
+Umfang von `server.md`/`journal.md` (3.354 bzw. 12.536 Zeilen statt
+~2.500/~9.000), die Alias-Liste in `teile/__init__.py` (seit #272 vier
+weitere: `essensplan`, `geburtstage`, `start_token`, `briefing` – samt
+Hinweis auf die Reihenfolge Lieferant vor Abnehmer). Ergänzt, weil nirgends
+sonst erklärt: `glogging_redact.py` (Gunicorn-Logger, kürzt Tokens in
+Access-Log-Pfaden – ohne ihn stünde jeder Zugang im Container-Log),
+`generate_icons.py` (Icons entstehen beim Image-Build, liegen nicht im Repo),
+`test_umschalter_ohne_sprung.py` in der Wächter-Liste, und dass `Caddyfile`,
+`docker-compose.yml`, `.env.example` mit ins Auslieferungspaket gehören.
+
+Stundenlauf (#157) nach Sitzungswechsel neu angelegt (wörtlicher Auftragstext
+vom 13.08.2026, :23, Job f13c496d), Testlauf: `ARBEIT: 0`.
+
+---
+
 ## 2026-09-11 – portal-v256: #273 Kleidungsfarben im Tierbaukasten, #279 Werkstatt-Badge
 
 ### #273 – „Manche Figuren haben die falsche Kleidungsfarbe" [sehr_hoch]

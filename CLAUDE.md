@@ -16,8 +16,8 @@ gelesen. Sie ersetzt das manuelle Übergeben des Bauplans.
 2. `server.md` – aktueller Zustand des Systems.
 3. `journal.md` – was zuletzt passiert ist und warum.
 
-`server.md` und `journal.md` sind beide groß (~2.500 bzw. ~9.000 Zeilen,
-neuester Journal-Eintrag oben). Nicht am Stück lesen – `journal.md` von oben
+`server.md` und `journal.md` sind beide groß (~3.400 bzw. ~12.500 Zeilen,
+Stand 11.09.2026, neuester Journal-Eintrag oben). Nicht am Stück lesen – `journal.md` von oben
 für den letzten Stand, in `server.md` gezielt per Grep in den Abschnitt
 springen, der zur Aufgabe passt („Bekannte Issues", „Code-Struktur",
 „Deployment-Ablauf", die Test-Liste).
@@ -173,7 +173,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2068 Tests, gut eine Minute)
+# Alles (2428 Tests, Stand 11.09.2026, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -234,8 +234,9 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 `test_kopfleiste.py`, `test_emoji.py`, `test_csp.py`,
 `test_formular_labels.py`, `test_ueberschriften.py`, `test_farbkontrast.py`,
 `test_interaktion.py`, `test_arbeitet_anzeige.py`,
-`test_verteiler_argumente.py`, `test_darkmode.py`, `test_hilfe_kapitel.py`
-und `test_kopfzeile_bleibt.py` lesen die Vorlagen im Quelltext und schlagen
+`test_verteiler_argumente.py`, `test_darkmode.py`, `test_hilfe_kapitel.py`,
+`test_kopfzeile_bleibt.py` und `test_umschalter_ohne_sprung.py` lesen die
+Vorlagen im Quelltext und schlagen
 an, wenn eine neue Vorlage gegen eine der UI-Konventionen weiter unten
 verstößt. Drei weitere wächtern nicht Vorlagen, sondern Struktur:
 `test_routen_inventar.py` (jede ändernde Route braucht eine Regel mit
@@ -306,15 +307,26 @@ nie von fremden CDNs.
 einen Namensraum – neue Funktionalität heißt: neue Datei mit nächster
 freier Nummer, kein Umbau von `app.py`.
 
+Zwei kleine Dateien neben `app.py`, die man sonst übersieht: `src/Dockerfile`
+startet Gunicorn mit `--logger-class glogging_redact.RedactingLogger` –
+`glogging_redact.py` kürzt den Token in `/p/<token>` und `/a/<slug>/<token>/`
+in jeder Access-Log-Zeile auf `<redacted>`, sonst stünde jeder Zugang im
+Klartext im Container-Log. `generate_icons.py` erzeugt PWA-Icons und Favicon
+beim Image-Build (ohne Pillow) – die Icons liegen deshalb nicht im Repo.
+
 **Modulübergreifende Importe brauchen einen Alias in `teile/__init__.py`.**
 Ein führendes `0N_` ist kein gültiger Python-Modulname, `from teile.16_vokabeln
 import …` geht schlicht nicht. Darum registriert `teile/__init__.py` die
 Module, die andere brauchen, zusätzlich unter einem sprechenden Namen in
 `sys.modules`: `teile.kern`, `teile.todo` (#90), `teile.rezepte` (#184),
-`teile.werkstatt` (#187), `teile.werkstatt_app`, `teile.vokabeln` (#194). Wer
-aus Modul A eine Funktion von Modul B braucht, trägt B dort ein – und zwar
-**statt** die Funktion zu kopieren: jeder dieser Aliase existiert, weil ein
-Duplikat sonst irgendwann auseinandergelaufen wäre.
+`teile.werkstatt` (#187), `teile.werkstatt_app`, `teile.vokabeln` (#194) sowie
+seit #272 `teile.essensplan`, `teile.geburtstage`, `teile.start_token` und
+`teile.briefing` (das Briefing zieht Mahlzeiten, Geburtstagslogik und
+Home-Nutzer per Alias, damit z. B. der 29. Februar nur an einer Stelle
+behandelt wird). Reihenfolge dort beachten: erst die Lieferanten, dann das
+Modul, das sie braucht. Wer aus Modul A eine Funktion von Modul B braucht,
+trägt B dort ein – und zwar **statt** die Funktion zu kopieren: jeder dieser
+Aliase existiert, weil ein Duplikat sonst irgendwann auseinandergelaufen wäre.
 
 **`teile/00_kern.py` ist die gemeinsame Basis, jedes weitere Modul baut darauf auf:**
 - `SCHEMA` (alle `CREATE TABLE IF NOT EXISTS`) + `_init_db()` (idempotente
@@ -526,6 +538,10 @@ ausschließlich in `.claude/settings.json`.
 ## Verzeichnisse
 
 - `src/` – Quellcode des Portals (wird nach `/srv/familienportal/src` ausgeliefert)
+- `Caddyfile`, `docker-compose.yml`, `.env.example` im Root – gehören mit ins
+  Auslieferungspaket (das `tar` in „Deployment-Ablauf" packt das ganze Repo
+  außer `deploy/`, `.git`, `data`, `.env`); die echte `.env` liegt nur auf
+  dem Server.
 - `util/` – Quellcode des **zweiten Containers** mit eigenem `Dockerfile` und
   eigener `requirements.txt`: `scheduler.py` (Takt), `db_snapshot.py`
   (stündlicher SQLite-Snapshot), `backup.py` (tägliches Backup aufs NAS per
