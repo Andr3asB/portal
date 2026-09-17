@@ -73,8 +73,12 @@ from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, render_template, request
 
+from teile.kern import begrenzt_lesen, to_int
 from teile.kern import grant as check_grant
-from teile.kern import to_int
+
+# Wunsch #289: Obergrenze fuer Antworten des hae-Servers (eigener Server,
+# aber ein resp.read() ohne Grenze bleibt ein resp.read() ohne Grenze).
+_HAE_MAX_BYTES = 8 * 1024 * 1024
 
 bp  = Blueprint("sportschau_app", __name__)
 APP = "sportschau"
@@ -129,7 +133,7 @@ def _hae_workouts(start_date, end_date):
     )
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
-            return json.loads(resp.read())
+            return json.loads(begrenzt_lesen(resp, _HAE_MAX_BYTES))
     except Exception:
         return None
 
@@ -151,7 +155,7 @@ def _hae_metrik(name, start_ms, end_ms):
     req = urllib.request.Request(f"{metrik_url}?{query}", headers={"api-key": key})
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
-            return json.loads(resp.read())
+            return json.loads(begrenzt_lesen(resp, _HAE_MAX_BYTES))
     except Exception:
         return None
 

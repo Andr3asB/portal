@@ -94,3 +94,36 @@ def test_zip_bombe_wird_abgewiesen(rezepte, monkeypatch):
                         lambda url: _FakeAntwort(bombe, "gzip"))
     with pytest.raises(ValueError, match="zu groß"):
         rezepte._seite_abrufen("https://example.org/rezept")
+
+
+def test_echte_bombe_wird_nie_ganz_entpackt(rezepte, monkeypatch):
+    """Wunsch #282 (Sicherheitsaudit 16.09.2026, Befund N-03): Der Test oben
+    täuschte Abdeckung vor - seine "Bombe" war 3 MB gross und passte bequem
+    in den Speicher, die Prüfung DANACH schlug an. Die echte Gefahr war das
+    Entpacken selbst: gzip.decompress() materialisierte alles, bevor jemand
+    messen konnte. 300 MB Nullen sind ~300 KB gzip; entpackt lägen sie über
+    dem Containerlimit. Hier darf nie mehr als die Grenze entstehen - deshalb
+    werden die unbegrenzten Entpacker verboten und das Ergebnis vermessen."""
+    import zlib as _zlib
+
+    def verboten(*a, **kw):
+        raise AssertionError("unbegrenztes Entpacken - die Bombe läge komplett im Speicher")
+    monkeypatch.setattr(gzip, "decompress", verboten)
+    monkeypatch.setattr(_zlib, "decompress", verboten)
+
+    bombe = gzip.compress(b"\x00" * (300 * 1024 * 1024), compresslevel=9)
+    assert len(bombe) < 1024 * 1024
+    with pytest.raises(ValueError, match="zu groß"):
+        rezepte._entpacken(bombe, "gzip")
+
+    # Dieselbe Grenze für deflate (mit und ohne zlib-Kopf).
+    with pytest.raises(ValueError, match="zu groß"):
+        rezepte._entpacken(zlib.compress(b"\x00" * (rezepte._MAX_FETCH_BYTES + 1)), "deflate")
+    roh = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+    with pytest.raises(ValueError, match="zu groß"):
+        rezepte._entpacken(roh.compress(b"\x00" * (rezepte._MAX_FETCH_BYTES + 1)) + roh.flush(),
+                           "deflate")
+
+    # Genau an der Grenze ist noch in Ordnung.
+    knapp = b"\x01" * rezepte._MAX_FETCH_BYTES
+    assert rezepte._entpacken(gzip.compress(knapp), "gzip") == knapp

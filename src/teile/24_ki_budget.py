@@ -39,7 +39,14 @@ import urllib.request
 
 from flask import Blueprint, abort, current_app, render_template
 
-from teile.kern import get_db, ki_modell_uebersicht, new_db, push_send
+from teile.kern import (
+    LESE_GRENZE_KI,
+    begrenzt_lesen,
+    get_db,
+    ki_modell_uebersicht,
+    new_db,
+    push_send,
+)
 from teile.kern import grant as check_grant
 
 bp  = Blueprint("ki_budget", __name__)
@@ -75,7 +82,8 @@ def _openrouter(pfad: str, api_key: str):
             "https://openrouter.ai" + pfad,
             headers={"Authorization": "Bearer " + api_key})
         with urllib.request.urlopen(anfrage, timeout=15) as antwort:
-            return json.loads(antwort.read()).get("data")
+            # Wunsch #289: Obergrenze wie bei ki_anfrage() im Kern.
+            return json.loads(begrenzt_lesen(antwort, LESE_GRENZE_KI)).get("data")
     except Exception as fehler:
         log.info("OpenRouter %s nicht abrufbar: %s", pfad, fehler)
         return None

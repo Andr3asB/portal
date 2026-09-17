@@ -176,7 +176,7 @@ def test_ki_anfrage_korrigiert_auf_den_echten_verbrauch(app, kern, admin, db, mo
     class Antwort:
         def __enter__(self): return self
         def __exit__(self, *a): return False
-        def read(self):
+        def read(self, n=-1):
             return json.dumps({
                 "choices": [{"message": {"content": "Hallo"}}],
                 "usage": {"total_tokens": 17},

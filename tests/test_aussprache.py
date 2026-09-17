@@ -142,7 +142,7 @@ class _Antwort:
     def __init__(self, text):
         self._text = text
 
-    def read(self):
+    def read(self, n=-1):
         return json.dumps({
             "choices": [{"message": {"content": self._text}}],
             "usage": {"total_tokens": 42},

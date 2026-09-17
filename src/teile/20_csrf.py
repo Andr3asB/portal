@@ -39,6 +39,8 @@ from urllib.parse import urlparse
 
 from flask import abort, current_app, request
 
+from teile.kern import log_sicher
+
 UNSICHERE_METHODEN = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Wunsch #142: Der Browser meldet CSP-Verstösse per POST an diesen Endpunkt -
@@ -118,10 +120,20 @@ def init_app(app):
             return
 
         # Ein Wort, nach dem sich greppen lässt: "CSRF-Verdacht".
+        #
+        # Wunsch #285 (Sicherheitsaudit 16.09.2026, Befund N-06): Pfad, Grund
+        # (enthält bei älteren Browsern den Origin-Header wörtlich) und
+        # User-Agent gehen durch log_sicher(): Gunicorn dekodiert `%0a` im
+        # Pfad zu einem echten Zeilenumbruch, und dieser Hook läuft auch für
+        # Pfade, die es gar nicht gibt - ohne Säuberung konnte jeder Fremde
+        # per POST eine gefälschte zweite Log-Zeile erzeugen. Und auf
+        # Token-Pfaden (/a/<slug>/<token>/…) stand der Zugangstoken sonst im
+        # Anwendungs-Log; der Access-Logger kürzt nur seine eigenen Zeilen.
         current_app.logger.warning(
             "CSRF-Verdacht (%s): %s %s – %s – UA=%s",
-            modus, request.method, request.path, grund,
-            (request.headers.get("User-Agent") or "")[:60],
+            modus, request.method, log_sicher(request.path, 200),
+            log_sicher(grund, 200),
+            log_sicher(request.headers.get("User-Agent") or "", 60),
         )
         if modus == "beobachten":
             return          # protokollieren, aber durchlassen

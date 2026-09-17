@@ -298,6 +298,14 @@ def neue_tokens(token, uid):
     # Token erneuert wurde. Steht hier schon ab Stufe 1, damit es nicht
     # vergessen wird, wenn es zählt.
     db.execute("DELETE FROM sitzungen WHERE user_id=?", (uid,))
+    # Wunsch #283 (Sicherheitsaudit 16.09.2026, Befund N-04): Auch die
+    # Push-Abos müssen weg. Sonst bekäme das verlorene Handy nach dem
+    # Widerruf weiter jede Benachrichtigung samt Inhalt - Aufgabentexte,
+    # Werkstatt-Rückfragen, Geburtstage, Briefing. Sitzung und Push-Abo sind
+    # nicht miteinander verknüpft (der Endpunkt gehört dem Browser, nicht
+    # der Sitzung), deshalb geht nur: alle Abos dieses Nutzers, und die
+    # verbleibenden Geräte erlauben Push einmal neu.
+    db.execute("DELETE FROM push_abos WHERE user_id=?", (uid,))
     db.commit()
 
     # Hat der Nutzer (aus welchem Grund auch immer) keinen Home-Grant, gibt es
@@ -318,6 +326,8 @@ def neue_tokens(token, uid):
     if uid == admin["id"]:
         hinweis += (" Dieses Gerät bleibt angemeldet – alle anderen Geräte "
                     "müssen den neuen Zugang einmal öffnen.")
+    hinweis += (" Push-Benachrichtigungen wurden auf allen Geräten abgemeldet "
+                "und müssen dort einmal neu erlaubt werden.")
     return _zugang_anzeigen(admin, token, ziel["name"], neuer_home_token, hinweis)
 
 

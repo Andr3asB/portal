@@ -64,7 +64,7 @@ def test_produktabfrage_lehnt_unsauberen_code_ab(app, modul):
 
 def _falsche_antwort(nutzlast):
     class Antwort:
-        def read(self):
+        def read(self, n=-1):
             return json.dumps(nutzlast).encode()
         def __enter__(self):
             return self

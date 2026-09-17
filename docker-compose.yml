@@ -50,6 +50,9 @@ services:
         volume:
           subpath: portal.16schwaben.de
       - caddy_data:/data
+      # Wunsch #280: Admin-API als Unix-Socket, nur fuer util erreichbar
+      # (Zertifikats-Reload). portal bekommt dieses Volume bewusst NICHT.
+      - caddy_admin:/run/caddy-admin
     mem_limit: 64m
     cpus: "0.2"
     logging: *log_grenzen
@@ -80,6 +83,9 @@ services:
         read_only: true
         volume:
           subpath: portal.16schwaben.de
+      # Wunsch #280: derselbe Socket wie bei caddy - cert_watcher.py spricht
+      # darueber die Admin-API an, wenn sich das Zertifikat geaendert hat.
+      - caddy_admin:/run/caddy-admin
     environment:
       DATA_DIR: /data
       BACKUP_NAS_HOST: "${BACKUP_NAS_HOST:-10.60.0.4}"
@@ -108,3 +114,5 @@ volumes:
     external: true
     name: certbot-domainoffensive_iobroker-certs
   caddy_data:
+  # Wunsch #280: traegt nur den Unix-Socket der Caddy-Admin-API.
+  caddy_admin:

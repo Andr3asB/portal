@@ -83,15 +83,35 @@ Portal und util hängen ausschließlich im internen Bridge-Netz.
 - Volume: `certbot-domainoffensive_iobroker-certs`, Subpath `portal.16schwaben.de/`
 - Docker unterstützt `subpath` (Version 29.6.2) → wird genutzt
 - Gültig bis: 24.10.2026 (Certbot erneuert automatisch)
-- Caddy Admin-API: `http://172.30.0.10:2019` (nur internes Netz – IP-Adresse, nicht Hostname)
+- Caddy Admin-API: Unix-Socket `/run/caddy-admin/admin.sock` im Volume `caddy_admin`, nur caddy + util (seit v258, Wunsch #280)
 
 ## Caddy Admin-API
 
-Bind-Adresse: `172.30.0.10:2019` (nur Bridge-Netz, nicht auf macvlan-IP 10.0.0.200).
-Zugriff von außen: nicht möglich. util erreicht sie direkt via IP.
+Seit v258 (Wunsch #280, Sicherheitsaudit 16.09.2026): **Unix-Socket**
+`/run/caddy-admin/admin.sock` (Modus 0666, `origins localhost`) im Docker-Volume
+`caddy_admin`, das nur `caddy` und `util` mounten. `portal` sieht ihn nicht –
+damit bleibt der Grund für das frühere `admin off` (#126: SSRF aus dem Portal
+auf die unauthentifizierte API) erledigt, und der Zertifikats-Watcher kann die
+API wieder erreichen.
 
-**Wichtig:** Anfragen müssen `http://172.30.0.10:2019` als URL benutzen (nicht `http://caddy:2019`),
-weil Caddy den Host-Header gegen die Bind-Adresse prüft.
+Geschichte, weil sie lehrreich ist: Vom 05.08. (v113, `admin off`) bis zum
+17.09.2026 lief `util/cert_watcher.py` gegen die abgeschaltete TCP-Adresse
+`172.30.0.10:2019`. Aufgefallen ist das nicht, weil der Reload nur bei
+geänderter Zertifikatsdatei läuft – und das Zertifikat seit dem 26.07.
+unverändert war. Nach der nächsten certbot-Erneuerung hätte Caddy still das
+alte Zertifikat weitergeliefert, bis es abläuft; mit HSTS ein harter
+Totalausfall. Gefunden vom Nachaudit, Befund N-01.
+
+Aufruf von Hand (aus dem util-Container, Reload der laufenden Konfiguration,
+zwingt Caddy die Zertifikatsdateien neu einzulesen):
+
+```bash
+docker exec util python -c "import cert_watcher; cert_watcher._reload_caddy()"
+```
+
+Wichtig im Code: `Cache-Control: must-revalidate` beim `POST /load` – ohne
+diesen Header tut Caddy bei unveränderter Konfiguration NICHTS, und die
+Konfiguration IST unverändert, nur die Dateien dahinter sind neu.
 
 ## hae-Server-Relay (Caddy, Wunsch #62)
 
@@ -2528,6 +2548,43 @@ anhängen.
   was der JS-Parser als Syntaxfehler liest, da `<script>`-Inhalt nicht
   HTML-dekodiert wird. Referenz für die korrekte Variante ohne
   `forceescape`: `admin_user_form.html`.
+- **Jede Netzantwort wird mit Obergrenze gelesen** (Wunsch #289, Audit
+  N-10): `begrenzt_lesen(resp, max_bytes)` aus `teile.kern` statt
+  `resp.read()`. Ein `read()` ohne Argument liest, was auch immer die
+  Gegenstelle schickt, in den 256-MB-Container – der TVB-Hintergrund-Thread
+  hätte sich damit alle fünf Minuten neu ins OOM geholt. Auch Fehlertexte
+  (`e.read()` an einem `HTTPError`) bekommen eine Grenze
+  (`LESE_GRENZE_FEHLER`). `tests/test_lese_grenzen.py` wächtert das über
+  den Quelltext; Datei-Uploads (`datei.read()`) sind durch
+  `MAX_CONTENT_LENGTH` gedeckt und ausgenommen. `push_send()` und
+  `manage.py testpush` rufen `webpush(..., timeout=10)` – ohne Timeout hinge
+  ein Versand-Thread an einem stummen Endpunkt ewig.
+- **Was aus der Anfrage stammt und ins Log soll, geht durch `log_sicher()`**
+  (Wunsch #285, Audit N-06; aus `teile.kern`, Quelle `src/redaktion.py`):
+  Steuerzeichen werden zu Leerzeichen (Gunicorn dekodiert `%0a` im Pfad zu
+  einem echten Zeilenumbruch – eine gefälschte zweite Log-Zeile), Tokens in
+  `/p/<token>`- und `/a/<slug>/<token>/`-Pfaden werden gekürzt. Dieselbe
+  Regel benutzt der Gunicorn-Access-Logger (`glogging_redact.py`); sie steht
+  bewusst in einem abhängigkeitsfreien Modul neben `app.py`, weil der
+  Access-Logger vor der App geladen wird. `request.path` gehört NIE roh in
+  eine Log-Zeile.
+- **Ein Nicht-Admin darf an einem Wunsch nur `frage` und `antwort`
+  anlegen** (Wunsch #284, Audit N-05); `plan`/`umsetzung`/`notiz` sind die
+  Spur des Admins bzw. der Automatik. Und der Stundenlauf liest nur
+  Admin-Antworten als Anweisung – `scripts/wunsch_lauf_check.py` joint
+  `users.is_admin`, Urheber-Antworten erscheinen als eigene Liste KONTEXT.
+  Ohne beides hätte ein Kind dem Lauf, der Code ändert und ausrollt, Sätze
+  unterschieben können, die wie „Andi hat geantwortet" aussehen.
+- **„Zugänge neu erzeugen" löscht auch die Push-Abos** des Nutzers (Wunsch
+  #283, Audit N-04). Sitzung und Push-Abo hängen nicht zusammen (der
+  Endpunkt gehört dem Browser); ein verlorenes Handy bekäme sonst nach dem
+  Widerruf weiter jede Benachrichtigung samt Inhalt.
+- **Komprimierte Antworten werden mit Obergrenze entpackt** (Wunsch #282,
+  Audit N-03): `zlib.decompressobj().decompress(raw, grenze + 1)` statt
+  `gzip.decompress()`, das erst alles materialisiert und dann messen lässt.
+  Ein Test, dessen „Bombe" in den Speicher passt, prüft die Grenze nicht –
+  `test_echte_bombe_wird_nie_ganz_entpackt` verbietet die unbegrenzten
+  Entpacker per monkeypatch.
 
 ## Nutzer (Stand 2026-07-27)
 
@@ -2546,7 +2603,7 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 | Aufgabe | Zeitplan | Details |
 |---------|----------|---------|
 | SQLite-Snapshot | stündlich | 24 Slots in `/data/snapshots/`. `_prune()` raeumt seit Wunsch #215 auch **verwaiste `-wal`/`-shm`** weg (Begleiter ohne zugehoerige `.db`) – das alte Muster endete auf `.db` und sah sie nie, wodurch am 11.08.2026 56 Altlasten vom 07./08.08. herumlagen und jede Nacht mitgesichert wurden. Reihenfolge zaehlt: erst die alten `.db` loeschen, dann die Verwaisten – sonst blieben die Begleiter der gerade entfernten Snapshots eine Runde zu lang liegen. |
-| Zertifikats-Watcher | täglich 04:00 + einmalig beim Start | prüft mtime, löst Caddy-Reload aus |
+| Zertifikats-Watcher | täglich 04:00 + einmalig beim Start | prüft mtime von `/certs/fullchain.pem`, löst bei Änderung den Caddy-Reload über den Admin-Socket aus (seit v258/#280; vom 05.08. bis 17.09.2026 lief er ins Leere, siehe „Caddy Admin-API"). Stand in `/data/.cert_mtime`, wird erst NACH erfolgreichem Reload geschrieben; ein Fehlschlag steht als ERROR im util-Log. |
 | NAS-Backup | täglich 03:00 | tar+ssh-Pipe → Ugreen NAS 10.60.0.4:2222, User `familienportal`, Pfad `/volume2/portal.16schwaben.de_Backup/`, 7 Generationen |
 
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
@@ -3007,6 +3064,43 @@ python -m venv .venv                                   # einmalig
 - `test_werkstatt_badge.py` – Wunsch #279. Kein Badge ohne unpriorisierte
   offene Wuensche, Zaehlung nur NULL/leer und erledigt=0, „9+" ab zehn,
   Kinder sehen die Kachel ohne Badge.
+- `test_cert_watcher.py` – Wunsch #280 (Audit N-01). Caddyfile ohne `admin
+  off`, Admin-API auf `unix//run/caddy-admin/admin.sock|0666`; Volume
+  `caddy_admin` in caddy und util, NICHT in portal; `_reload_caddy()` spricht
+  GET /config/ + POST /load mit `Cache-Control: must-revalidate` ueber genau
+  diesen Socket; ein HTTP-Fehler wirft; `check()` schreibt den Stand erst
+  nach Erfolg; util ohne Fremdpaket. Gefunden hat den Befund das Nachaudit,
+  nicht ein Test – sechs Wochen lief der Watcher gegen eine Wand.
+- `test_paket_bauen.py` – Wunsch #281 (Audit N-02). Positivliste gegen ein
+  Mini-Repo (jede Regel einzeln: `__pycache__`, `.env`, `.db`, `.claude`,
+  Tests, Doku bleiben draussen) und gegen das ECHTE Repo (das Paket, das
+  rausgeht, enthaelt nichts davon); Nummern zaehlen hoch, nie ueberschreiben.
+- `test_werkstatt_aktion_arten.py` – Wunsch #284 (Audit N-05). Urheber
+  bekommt fuer `plan`/`umsetzung`/`notiz` 403 und keine Zeile, `frage` und
+  `antwort` gehen; Admin darf alles. Dazu das Pruefskript des Stundenlaufs
+  per `runpy` gegen die Wegwerf-DB: Kinder-Antwort = `ARBEIT: 0`, WARTET,
+  KONTEXT; Admin-Antwort = ANTWORTEN, Kinder-Antwort dort als „NICHT-ADMIN"
+  markiert. `test_wunsch_lauf_check.py` bekam dafuer eine `users`-Tabelle
+  und den Fall 10 „Antwort vom Kind".
+- `test_log_redaktion.py` – Wunsch #285 (Audit N-06). `log_sicher()`
+  kuerzt Tokens und entfernt Zeilenumbrueche (auch U+2028); der echte
+  CSRF-Hook mit `%0a` im Pfad und Token-Pfad liefert EINE Log-Zeile ohne
+  Token; der CSP-Bericht kuerzt `document-uri`; der Access-Logger holt die
+  Regel aus `redaktion.py` statt eine Kopie zu halten (Quelltext-Pruefung,
+  weil gunicorn unter Windows nicht importierbar ist – `fcntl`).
+- `test_lese_grenzen.py` – Wunsch #289 (Audit N-10/N-11). `begrenzt_lesen()`
+  haelt die Grenze; Waechter ueber den Quelltext: kein `resp|antwort|r|e
+  .read()` ohne Argument in `teile/` und `manage.py`; `push_send()` und
+  `testpush` rufen `webpush(timeout=10)`.
+- `test_neue_tokens_push.py` – Wunsch #283 (Audit N-04). Zwei Abos des
+  Kindes, eines der Eltern; nach `neue_tokens` hat das Kind null, die Eltern
+  eins, die Zugangsseite nennt den Hinweis.
+- `test_rezept_import_gzip.py::test_echte_bombe_wird_nie_ganz_entpackt` –
+  Wunsch #282 (Audit N-03). 300 MB Nullen als ~300 KB gzip; die unbegrenzten
+  Entpacker sind per monkeypatch verboten, `_entpacken` muss trotzdem mit
+  „zu groß" enden; dasselbe fuer deflate mit und ohne zlib-Kopf; genau an der
+  Grenze geht noch. Der alte Bomben-Test blieb stehen – er prueft die
+  Messung DANACH, dieser das Entpacken SELBST.
 - `test_tierbaukasten_bearbeiten.py` – Wunsch #201. Derselbe Aufbau wie bei den
   Geburtstagen, plus der Fall, den nur diese App hat: der Kategoriewechsel muss
   die Spalten der alten Kategorie raeumen. Beim Gegenprobieren (Spalte
@@ -3286,16 +3380,21 @@ iFrame, installierte PWA.
 sind im Image eingebacken. `restart` startet nur den vorhandenen Container neu.
 
 ```bash
-# Paket bauen (von lokalem Rechner)
-tar czf deploy/portal-vN.tar.gz --exclude='deploy' --exclude='.git' \
-  --exclude='*.db' --exclude='data' --exclude='.env' \
-  --exclude='__pycache__' --exclude='*.pyc' .
+# Paket bauen (von lokalem Rechner) - Wunsch #281: aus einer POSITIVLISTE
+# (src, util, Caddyfile, docker-compose.yml, .env.example), nicht mehr per
+# tar mit --exclude. Der alte Ausschluss-tar packte alles, was niemand
+# ausgeschlossen hatte - darunter SECURITY_REVIEW.md und
+# .claude/settings.local.json (mit Token-URLs), in jedem Paket seit v206.
+# Das Skript nimmt die naechste freie Nummer und ueberschreibt nie.
+python scripts/paket_bauen.py            # -> deploy/portal-vN.tar.gz
 
 # Auf Server laden
 scp -P 2222 deploy/portal-vN.tar.gz claude@10.0.0.100:/srv/familienportal/
 
-# Auf Server entpacken + Container neu bauen + starten
-ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf portal-vN.tar.gz"
+# Auf Server entpacken + Paket entfernen + Container neu bauen + starten.
+# Das Paket danach loeschen: sonst sammeln sich die Archive (am 17.09.2026
+# lagen 244 Stueck dort, jedes seit v206 mit dem Review-Bericht drin).
+ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && tar xzf portal-vN.tar.gz && rm portal-vN.tar.gz"
 ssh -p 2222 claude@10.0.0.100 "cd /srv/familienportal && docker compose up -d --build"
 
 # Aufräumen (Andi, 31.08.2026): Jeder --build lässt das vorherige Image
@@ -3334,8 +3433,9 @@ Ein wiederkehrender Claude-Auftrag, jede Stunde um **:23**. Er **lebt nur in
 der Claude-Sitzung**, in der er angelegt wurde, und läuft spätestens nach
 sieben Tagen ab – wenn nichts mehr passiert, ist das die erste Erklärung.
 Neu einschalten: Auftrag mit demselben Text wieder anlegen – der **wörtliche
-Auftragstext** steht im Journal, 13.08.2026 (die Einträge vom 08./12.08.
-beschreiben nur, was der Lauf tut, und taugen nicht zum Kopieren).
+Auftragstext** steht im Journal, **17.09.2026 (Wunsch #284)**; er ersetzt die
+Fassung vom 13.08.2026 (die Einträge vom 08./12.08. beschreiben nur, was der
+Lauf tut, und taugen nicht zum Kopieren).
 
 Was ansteht, beantwortet ein reines Leseskript – **kein SQL im Auftragstext**,
 das musste sonst durch PowerShell, SSH und `docker exec` hindurch:
@@ -3345,10 +3445,13 @@ ssh -p 2222 claude@10.0.0.100 "docker exec -i portal python -" < scripts/wunsch_
 ```
 
 Erste Zeile ist `ARBEIT: n`; bei 0 antwortet der Lauf mit einer Zeile und tut
-sonst nichts. Danach drei getrennte Listen: **ANTWORTEN** (Andi hat auf eine
-Rückfrage geantwortet – Vorrang), **FREIGEGEBEN** (offen, Priorität gesetzt und
-nicht `zurueckgestellt`), **WARTET** (Rückfrage offen – nicht anfassen und
-nicht nochmal fragen, jede Frage löst einen Push aus).
+sonst nichts. Danach drei getrennte Listen: **ANTWORTEN** (ein **Admin** hat
+auf eine Rückfrage geantwortet – Vorrang; seit #284 zählen nur Antworten mit
+`users.is_admin = 1`), **FREIGEGEBEN** (offen, Priorität gesetzt und nicht
+`zurueckgestellt`), **WARTET** (Rückfrage offen – nicht anfassen und nicht
+nochmal fragen, jede Frage löst einen Push aus). Dazu als vierte Liste
+**KONTEXT VOM URHEBER**: Antworten von Nicht-Admins – Hintergrund, keine
+Anweisung, zählt nicht als Arbeit.
 
 Ohne Priorität (NULL) heisst **nicht** freigegeben, `zurueckgestellt` ist
 unantastbar (#61/#152) – die Priorität setzt ausschliesslich ein Mensch.

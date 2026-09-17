@@ -31,15 +31,23 @@ import pytest
 
 SKRIPT = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "wunsch_lauf_check.py"
 
+# Wunsch #284: Seit dem Sicherheitsaudit vom 16.09.2026 zaehlt nur eine
+# Antwort von einem ADMIN als "Andi hat geantwortet" - das Skript joint dafuer
+# `users`. Der Admin hier ist Nutzer 1, das Kind Nutzer 2.
 SCHEMA = """
+CREATE TABLE users(id INTEGER PRIMARY KEY, is_admin INT DEFAULT 0);
+INSERT INTO users(id, is_admin) VALUES (1, 1), (2, 0);
 CREATE TABLE wuensche(
   id INTEGER PRIMARY KEY, text TEXT, app_slug TEXT, erstellt TEXT,
   erledigt INT DEFAULT 0, titel TEXT, prioritaet TEXT, ansicht TEXT);
 CREATE TABLE wunsch_aktionen(
-  id INTEGER PRIMARY KEY, wunsch_id INT, art TEXT, text TEXT, erstellt TEXT);
+  id INTEGER PRIMARY KEY, wunsch_id INT, art TEXT, text TEXT, user_id INT,
+  erstellt TEXT);
 """
+ADMIN, KIND = 1, 2
 
-# (id, titel, prioritaet, erledigt, [(art, datum), …])
+# (id, titel, prioritaet, erledigt, [(art, datum), …]) - eine 'antwort' kommt
+# vom Admin, sofern nicht als ("antwort", datum, KIND) markiert.
 FAELLE = [
     (1, "Frage offen",             "hoch",            0, [("frage", "2026-08-01")]),
     (2, "Echte neue Antwort",      "hoch",            0, [("frage", "2026-08-01"),
@@ -55,6 +63,8 @@ FAELLE = [
     (7, "Zurueckgestellt",         "zurueckgestellt", 0, []),
     (8, "Ohne Prioritaet",         None,              0, []),
     (9, "Schon erledigt",          "hoch",            1, []),
+    (10, "Antwort vom Kind",       "hoch",            0, [("frage", "2026-08-01"),
+                                                          ("antwort", "2026-08-02", KIND)]),
 ]
 
 
@@ -66,9 +76,11 @@ def ausgabe(tmp_path_factory):
     for wid, titel, prio, erledigt, aktionen in FAELLE:
         db.execute("INSERT INTO wuensche(id,text,titel,prioritaet,erledigt,erstellt) "
                    "VALUES(?,?,?,?,?,'2026-08-01')", (wid, titel, titel, prio, erledigt))
-        for art, wann in aktionen:
-            db.execute("INSERT INTO wunsch_aktionen(wunsch_id,art,text,erstellt) "
-                       "VALUES(?,?,?,?)", (wid, art, art, wann))
+        for aktion in aktionen:
+            art, wann = aktion[0], aktion[1]
+            wer = aktion[2] if len(aktion) > 2 else (ADMIN if art == "antwort" else None)
+            db.execute("INSERT INTO wunsch_aktionen(wunsch_id,art,text,user_id,erstellt) "
+                       "VALUES(?,?,?,?,?)", (wid, art, art, wer, wann))
     db.commit()
     db.close()
 
@@ -141,6 +153,17 @@ def test_freigegeben_ist_freigegeben(ausgabe):
 def test_diese_fasst_der_lauf_nicht_an(ausgabe, wid, warum):
     for ueberschrift in ("=== NEUE ANTWORTEN", "=== FREIGEGEBEN", "=== WARTET AUF ANDI"):
         assert wid not in _abschnitt(ausgabe, ueberschrift), warum
+
+
+def test_antwort_vom_kind_ist_keine_antwort_von_andi(ausgabe):
+    """Wunsch #284 (Sicherheitsaudit 16.09.2026, Befund N-05): Der Urheber
+    darf antworten - aber seine Antwort ist Kontext, keine Anweisung an den
+    Lauf. Der Wunsch bleibt beim Warten auf Andi und erscheint zusaetzlich
+    unter KONTEXT, damit der Lauf die Information trotzdem sieht."""
+    assert 10 not in _abschnitt(ausgabe, "=== NEUE ANTWORTEN")
+    assert 10 in _abschnitt(ausgabe, "=== WARTET AUF ANDI")
+    assert 10 in _abschnitt(ausgabe, "=== KONTEXT VOM URHEBER")
+    assert 2 not in _abschnitt(ausgabe, "=== KONTEXT VOM URHEBER")
 
 
 def test_bei_null_bleibt_es_bei_einer_zeile(tmp_path):

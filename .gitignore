@@ -42,6 +42,14 @@ screenshots/
 dumps/
 *.har
 
+# ── Claude-Code-Sitzungsdateien – gehoeren weder ins Repo noch ins Paket ─
+# settings.local.json ist eine gewachsene allow-Liste, die zeitweise ganze
+# Zugangs-URLs enthielt (Audit 16.09.2026, #281). Bisher nur ueber die
+# globale ~/.config/git/ignore ausgeschlossen - ein frischer Klon auf einem
+# anderen Rechner haette das nicht. Deshalb hier ausdruecklich.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
 # ── Sicherheitsberichte – bleiben lokal ─────────────────────────────────
 # Enthalten unbehobene Schwachstellen samt Ausnutzungspfad. Auch ein
 # privates Repo ist dafür der falsche Ort: der Bericht ist eine Anleitung,

@@ -21,6 +21,7 @@ from flask import Blueprint, abort, jsonify, redirect, render_template, request,
 from teile.kern import (
     KiFehler,
     KiLimitError,
+    begrenzt_lesen,
     get_db,
     ki_anfrage,
     to_int,
@@ -174,11 +175,15 @@ def _produkt_zu_barcode(code: str):
     })
     try:
         with urllib.request.urlopen(req, timeout=_OFF_TIMEOUT) as resp:
-            daten = json.loads(resp.read())
+            # Wunsch #289: vier kurze Felder, 64 KB sind grosszuegig. Mehr ist
+            # keine Produktantwort und wird wie "kein Produkt" behandelt.
+            daten = json.loads(begrenzt_lesen(resp, 64 * 1024))
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
         raise
+    except ValueError:
+        return None
     if daten.get("status") != 1:
         return None
     p = daten.get("product") or {}

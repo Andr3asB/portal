@@ -9,7 +9,30 @@
 	# zum Umbiegen von portal.16schwaben.de auf einen fremden Server.
 	# Wir brauchen die API nicht: die Konfiguration kommt aus dieser Datei,
 	# Änderungen gehen über ein Neuaufsetzen des Containers.
-	admin off
+	#
+	# Wunsch #280 (Sicherheitsaudit 16.09.2026, Befund N-01): `admin off`
+	# hatte eine Nebenwirkung, die vom 05.08. bis 17.09.2026 niemandem
+	# auffiel - util/cert_watcher.py löst die Zertifikats-Erneuerung genau
+	# über diese API aus (GET /config/ + POST /load). Mit abgeschalteter API
+	# hätte Caddy nach der nächsten certbot-Erneuerung still das ALTE
+	# Zertifikat weitergeliefert, bis es abläuft; mit HSTS ist das ein
+	# harter Totalausfall ohne Klickweg im Browser.
+	#
+	# Deshalb jetzt ein Unix-Socket statt TCP: Die Datei liegt im Volume
+	# `caddy_admin`, das NUR caddy und util mounten - portal bekommt es nicht
+	# (docker-compose.yml). Der Angriffsweg aus #126 (SSRF aus dem
+	# portal-Container) bleibt damit geschlossen: eine URL kann keinen
+	# Unix-Socket erreichen, und den Pfad gibt es im portal-Container gar
+	# nicht. Rechte 0666, weil Caddy als root läuft und util als 1001 den
+	# Socket beschreiben (= verbinden) muss; die Zugriffskontrolle ist der
+	# Volume-Mount, nicht der Dateimodus.
+	#
+	# `origins localhost`: Caddy prüft auch am Socket den Host-Header. util
+	# schickt `Host: localhost` (http.client-Standard), damit ist die Liste
+	# eindeutig und hängt nicht am Caddy-Default für Unix-Sockets.
+	admin unix//run/caddy-admin/admin.sock|0666 {
+		origins localhost
+	}
 }
 
 portal.16schwaben.de {

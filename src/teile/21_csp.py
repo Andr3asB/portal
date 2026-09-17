@@ -40,7 +40,6 @@ Der Beobachtungsmodus ist hier mehr wert als beim CSRF-Riegel: Ein übersehener
 Inline-Handler fällt sonst erst auf, wenn jemand den betreffenden Knopf
 drückt – und das kann Wochen dauern.
 """
-import re
 import secrets
 
 from flask import Blueprint, current_app, g, request
@@ -48,12 +47,13 @@ from flask import Blueprint, current_app, g, request
 # Flask 3 reicht Markup nicht mehr durch - es kommt aus markupsafe.
 from markupsafe import Markup
 
-from teile.kern import rate_ueberschritten
-
 # Wunsch #205 (Sicherheitsaudit 11.08.2026): Steuerzeichen aus den drei
 # gemeldeten Feldern entfernen, bevor sie in eine Log-Zeile eingesetzt
-# werden - siehe bericht() weiter unten.
-_STEUERZEICHEN = re.compile(r"[\r\n\x00-\x1f]+")
+# werden - siehe bericht() weiter unten. Seit Wunsch #285 liegt die Regel in
+# `redaktion.py` (ueber teile.kern) und kuerzt zusaetzlich Zugangstokens -
+# `document-uri` einer Verstossmeldung kann `/p/<token>` enthalten.
+from teile.kern import log_sicher as _log_sicher
+from teile.kern import rate_ueberschritten
 
 bp = Blueprint("csp", __name__)
 
@@ -107,16 +107,13 @@ def _streng(nonce: str, melden: bool = False) -> str:
     return regel
 
 
-def _log_sicher(wert, laenge: int) -> str:
-    """Ein gemeldetes Feld log-tauglich machen.
-
-    Wunsch #205 (Sicherheitsaudit 11.08.2026): Der Endpunkt ist absichtlich
-    unauthentifiziert (siehe bericht()) - jeder kann also beliebigen Text mit
-    eingebetteten Zeilenumbruechen einschicken. Ohne dieses Saeubern liesse
-    sich damit eine zusaetzliche, frei erfundene Log-Zeile einschleusen, die
-    wie eine ECHTE Meldung aussieht (z. B. eine gefaelschte "CSRF-Verdacht:"-
-    Zeile) - Log-Faelschung durch reine Zeichenketten-Formatierung."""
-    return _STEUERZEICHEN.sub(" ", str(wert if wert is not None else "?"))[:laenge]
+# `_log_sicher` (Wunsch #205): Der Endpunkt ist absichtlich unauthentifiziert
+# (siehe bericht()) - jeder kann also beliebigen Text mit eingebetteten
+# Zeilenumbruechen einschicken. Ohne das Saeubern liesse sich damit eine
+# zusaetzliche, frei erfundene Log-Zeile einschleusen, die wie eine ECHTE
+# Meldung aussieht (z. B. eine gefaelschte "CSRF-Verdacht:"-Zeile) -
+# Log-Faelschung durch reine Zeichenketten-Formatierung. Die Funktion selbst
+# steht seit #285 in redaktion.py, importiert oben.
 
 
 @bp.route(_MELDEZIEL, methods=["POST"])

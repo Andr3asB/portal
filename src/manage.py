@@ -485,6 +485,9 @@ def cmd_testpush(args):
                 # HTTP 400 ab ("Ttl value conflicts with X-WNS-Cache-Policy").
                 # Gleicher Wert wie PUSH_TTL in 00_kern.py.
                 ttl=86400,
+                # Wunsch #289: wie PUSH_TIMEOUT in 00_kern.py - ohne Timeout
+                # bliebe der Aufruf an einem stummen Endpunkt ewig haengen.
+                timeout=10,
             )
             print(f"  OK       {geraet}")
             ok += 1

@@ -263,6 +263,14 @@ def aktion_neu(token, wid):
     text = (request.form.get("text") or "").strip()[:2000]
     if art not in AKTIONS_ARTEN or not text:
         return redirect(url_for("werkstatt_app.index", token=token) + f"#wunsch-{wid}")
+    # Wunsch #284 (Sicherheitsaudit 16.09.2026, Befund N-05): Der Urheber darf
+    # fragen und antworten - mehr nicht. `plan`, `umsetzung` und `notiz` sind
+    # die Spur der Automatik bzw. des Admins; die Vorlage blendet sie fuer
+    # Nicht-Admins nur aus, der Server liess sie bisher durch. Damit haette
+    # ein Kind per handgebautem POST die "letzte Arbeit" faelschen und eine
+    # echte Admin-Antwort aus der Liste des Stundenlaufs verdraengen koennen.
+    if not user["is_admin"] and art not in ("frage", "antwort"):
+        abort(403)
 
     db.execute(
         "INSERT INTO wunsch_aktionen(wunsch_id, art, text, user_id) VALUES(?,?,?,?)",

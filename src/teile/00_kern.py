@@ -13,6 +13,14 @@ from zoneinfo import ZoneInfo
 
 from flask import current_app, g, jsonify, request
 
+# Wunsch #285: dieselbe Log-Redaktion wie im Gunicorn-Access-Logger
+# (glogging_redact.py) - Tokens kuerzen, Steuerzeichen entfernen. Liegt in
+# einem eigenen, abhaengigkeitsfreien Modul neben app.py, weil der
+# Access-Logger vor der App geladen wird und teile.kern nicht importieren
+# darf. Hier re-exportiert, damit die App-Module `from teile.kern import
+# log_sicher` schreiben koennen.
+from redaktion import log_sicher, token_kuerzen  # noqa: F401
+
 log = logging.getLogger("portal.kern")
 
 SCHEMA = """
@@ -1194,6 +1202,12 @@ def bereinige_erfuellte_rezeptwuensche(db):
 # (Wunsch #140, Stufe 6, Pruefpunkt S6-06) die Zustellung je Geraet einzeln
 # ausgab.
 PUSH_TTL = 86400
+# Wunsch #289 (Sicherheitsaudit 16.09.2026, Befund N-11): pywebpush laesst
+# `timeout` auf None, also requests.post OHNE Timeout. Ein Endpunkt, der die
+# Verbindung annimmt und nie antwortet, hielte den Versand-Thread ewig - und
+# push_send() startet je Aufruf einen. Zehn Sekunden reichen jedem echten
+# Push-Dienst mit grossem Abstand.
+PUSH_TIMEOUT = 10
 
 
 # Wunsch #207 (Sicherheitsaudit 11.08.2026): Es gab im gesamten Portal keine
@@ -1311,6 +1325,27 @@ def ip_ist_oeffentlich(ip) -> bool:
     return bool(ip.is_global) and not ip.is_multicast
 
 
+# Wunsch #289 (Sicherheitsaudit 16.09.2026, Befund N-10): Obergrenzen fuer
+# Antworten von Drittquellen. Die Hosts sind Konstanten und TLS wird
+# geprueft - aber `resp.read()` ohne Argument liest, was auch immer die
+# Gegenstelle schickt, komplett in den Speicher des 256-MB-Containers. Der
+# TVB-Hintergrund-Thread ruft alle fuenf Minuten von selbst an; eine kaputte
+# oder feindliche Antwort wuerde ihn WIEDERHOLT ins OOM schicken.
+LESE_GRENZE_KI      = 2 * 1024 * 1024    # OpenRouter-Chat: JSON, ein paar KB
+LESE_GRENZE_TTS     = 8 * 1024 * 1024    # Audio, 24 kHz/16 bit = 48 KB/s
+LESE_GRENZE_FEHLER  = 4096               # Fehlertexte von HTTPError-Antworten
+
+
+def begrenzt_lesen(resp, max_bytes: int) -> bytes:
+    """Liest hoechstens `max_bytes` aus einer urlopen-Antwort. Ist mehr da,
+    fliegt ValueError - BEVOR der Rest im Speicher liegt. Vorbild ist
+    `_bild_holen()` in 18_tvb.py, das es von Anfang an so machte."""
+    daten = resp.read(max_bytes + 1)
+    if len(daten) > max_bytes:
+        raise ValueError(f"Antwort zu groß (mehr als {max_bytes} Bytes)")
+    return daten
+
+
 def push_send(user_id: int, title: str, body: str,
               app_slug: str = "", url: str = "", dedup_key: str = ""):
     """Push-Benachrichtigung an alle Geräte von user_id. Nicht-blockierend (Thread)."""
@@ -1351,6 +1386,7 @@ def push_send(user_id: int, title: str, body: str,
                         vapid_private_key=private_key,
                         vapid_claims={"sub": subject},
                         ttl=PUSH_TTL,
+                        timeout=PUSH_TIMEOUT,
                     )
                 except WebPushException as e:
                     log.warning("push failed user=%d: %s", user_id, e)
@@ -1738,10 +1774,10 @@ def ki_anfrage(user_id: int, feature: str, system: str, prompt: str, max_tokens:
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
+            data = json.loads(begrenzt_lesen(resp, LESE_GRENZE_KI))
     except urllib.error.HTTPError as e:
         _kontingent_freigeben("ki_nutzung", platzhalter_id)
-        detail = e.read().decode()[:200]
+        detail = e.read(LESE_GRENZE_FEHLER).decode(errors="replace")[:200]
         raise KiFehler(f"OpenRouter-Fehler {e.code}: {detail}")
     except Exception as e:
         _kontingent_freigeben("ki_nutzung", platzhalter_id)
@@ -1768,7 +1804,7 @@ def _tts_anfrage(text, modell, stimme, key, response_format):
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+        return begrenzt_lesen(resp, LESE_GRENZE_TTS)
 
 
 def ki_tts_zeichen_uebrig(user_id: int) -> int:
@@ -1839,7 +1875,7 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
         audio = _tts_anfrage(eingabe, modell, stimme, key, "mp3")
         return audio, "audio/mpeg"
     except urllib.error.HTTPError as e:
-        detail = e.read().decode()[:300]
+        detail = e.read(LESE_GRENZE_FEHLER).decode(errors="replace")[:300]
         if e.code != 400 or "pcm" not in detail.lower():
             _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
             raise KiFehler(f"TTS-Fehler {e.code}: {detail}")
@@ -1851,7 +1887,9 @@ def ki_text_zu_sprache(user_id: int, text: str, sprache_id: int):
         pcm = _tts_anfrage(eingabe, modell, stimme, key, "pcm")
     except urllib.error.HTTPError as e:
         _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
-        raise KiFehler(f"TTS-Fehler {e.code}: {e.read().decode()[:200]}")
+        raise KiFehler(
+            f"TTS-Fehler {e.code}: "
+            f"{e.read(LESE_GRENZE_FEHLER).decode(errors='replace')[:200]}")
     except Exception as e:
         _kontingent_freigeben("ki_tts_nutzung", platzhalter_id)
         raise KiFehler(f"TTS-Aufruf fehlgeschlagen: {e}")

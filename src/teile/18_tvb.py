@@ -101,8 +101,16 @@ from flask import (
     send_file,
 )
 
-from teile.kern import get_db, new_db, to_int, utc_zu_lokal
+from teile.kern import begrenzt_lesen, get_db, new_db, to_int, utc_zu_lokal
 from teile.kern import grant as check_grant
+
+# Wunsch #289 (Sicherheitsaudit 16.09.2026, Befund N-10): Obergrenze fuer
+# alles, was handball.net, Sportradar und HPI zurueckschicken. Die
+# Startseite von handball.net ist rund 1,4 MB - 4 MB lassen Luft, halten
+# aber eine kaputte oder feindliche Antwort vom 256-MB-Container fern. Der
+# Hintergrund-Thread (#270) ruft alle fuenf Minuten von selbst an; ohne
+# Grenze wuerde er den Container wiederholt ins OOM schicken.
+_ANTWORT_MAX_BYTES = 4 * 1024 * 1024
 
 _log = logging.getLogger(__name__)
 
@@ -288,7 +296,7 @@ def _client_token(erneuern=False):
     req = urllib.request.Request(_HB_BASE + "/", headers={"User-Agent": _UA})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            html = resp.read().decode("utf-8", "replace")
+            html = begrenzt_lesen(resp, _ANTWORT_MAX_BYTES).decode("utf-8", "replace")
     except Exception:
         return _token_cache["wert"]          # abgelaufen ist besser als keiner
     treffer = re.findall(
@@ -315,7 +323,7 @@ def _neu_api_get(pfad, _zweiter_versuch=False):
     )
     try:
         with urllib.request.urlopen(req, timeout=12) as resp:
-            return json.loads(resp.read())
+            return json.loads(begrenzt_lesen(resp, _ANTWORT_MAX_BYTES))
     except urllib.error.HTTPError as fehler:
         if fehler.code == 403 and not _zweiter_versuch:
             _client_token(erneuern=True)
@@ -357,7 +365,7 @@ def _sr_get(pfad, embed=248):
     )
     try:
         with urllib.request.urlopen(req, timeout=12) as resp:
-            return json.loads(resp.read())
+            return json.loads(begrenzt_lesen(resp, _ANTWORT_MAX_BYTES))
     except Exception:
         return None
 
@@ -372,7 +380,7 @@ def _hpi_get(pfad):
     )
     try:
         with urllib.request.urlopen(req, timeout=12) as resp:
-            return json.loads(resp.read())
+            return json.loads(begrenzt_lesen(resp, _ANTWORT_MAX_BYTES))
     except Exception:
         return None
 
@@ -1420,7 +1428,7 @@ def _profil_html_holen(dc_id):
     )
     try:
         with urllib.request.urlopen(req, timeout=12) as resp:
-            return resp.read().decode("utf-8", "replace")
+            return begrenzt_lesen(resp, _ANTWORT_MAX_BYTES).decode("utf-8", "replace")
     except Exception:
         return None
 

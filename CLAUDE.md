@@ -88,8 +88,10 @@ Sitzungsende bzw. Rechner-Neustart. Deshalb am Anfang jeder neuen Session
 
 1. Mit `CronList` prüfen, ob der Lauf existiert.
 2. Fehlt er: neu anlegen mit dem **wörtlichen Auftragstext** aus
-   `journal.md`, Eintrag vom 13.08.2026 („Stundenlauf wieder an") – nicht
-   aus der Beschreibung rekonstruieren.
+   `journal.md`, Eintrag vom **17.09.2026** (portal-v258, Abschnitt „#284")
+   – er ersetzt die Fassung vom 13.08.2026 um die Regel, dass nur
+   Admin-Antworten Anweisungen sind. Nicht aus der Beschreibung
+   rekonstruieren.
 3. Danach sofort einen Testlauf von `scripts/wunsch_lauf_check.py` machen
    (siehe „Prüfung gegen das laufende Portal"), ob Arbeit ansteht.
 
@@ -135,8 +137,12 @@ listet sie; die kommentierte Fassung steht in `server.md`, Abschnitt
 „manage.py – Wichtige Befehle".
 
 Auslieferung ist ein Dreischritt (Paket bauen → hochladen → entpacken +
-`--build`), die vollständige Fassung mit allen `--exclude` steht in
-`server.md`, Abschnitt „Deployment-Ablauf". **Zu jedem Deploy gehört danach
+`--build`); das Paket baut **`python scripts/paket_bauen.py`** aus einer
+Positivliste (`src`, `util`, `Caddyfile`, `docker-compose.yml`,
+`.env.example`) – seit #281 kein `tar … --exclude` mehr, das packte
+`SECURITY_REVIEW.md` und `.claude/settings.local.json` mit. Die vollständige
+Fassung steht in `server.md`, Abschnitt „Deployment-Ablauf"; das entpackte
+Archiv wird auf dem Server gleich wieder gelöscht. **Zu jedem Deploy gehört danach
 das Aufräumen** – jeder `--build` lässt das vorherige Image ungetaggt zurück
 (Andi, 31.08.2026: 151 Stück in Portainer):
 
@@ -173,7 +179,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2428 Tests, Stand 11.09.2026, gut eine Minute)
+# Alles (2455 Tests, Stand 17.09.2026, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -238,12 +244,15 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 `test_kopfzeile_bleibt.py` und `test_umschalter_ohne_sprung.py` lesen die
 Vorlagen im Quelltext und schlagen
 an, wenn eine neue Vorlage gegen eine der UI-Konventionen weiter unten
-verstößt. Drei weitere wächtern nicht Vorlagen, sondern Struktur:
+verstößt. Fünf weitere wächtern nicht Vorlagen, sondern Struktur:
 `test_routen_inventar.py` (jede ändernde Route braucht eine Regel mit
 `<token>` im Pfad, siehe „Zugangsmodell"), `test_seiten_erreichbar.py`
-(Rauchtest, ruft jede GET-Seite mit `<token>` als einziger Variable auf)
-und `test_log_grenzen.py` (jeder Dienst in `docker-compose.yml` braucht
-`logging:` mit Obergrenze). Schlägt einer davon an, ist die Vorlage bzw. der
+(Rauchtest, ruft jede GET-Seite mit `<token>` als einziger Variable auf),
+`test_log_grenzen.py` (jeder Dienst in `docker-compose.yml` braucht
+`logging:` mit Obergrenze), `test_lese_grenzen.py` (kein `resp.read()` ohne
+Obergrenze auf Netzantworten – `begrenzt_lesen()` aus dem Kern nehmen, #289)
+und `test_cert_watcher.py` (Admin-Socket-Volume in caddy und util, nie in
+portal, #280). Schlägt einer davon an, ist die Vorlage bzw. der
 Code falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
 gegenprüfen, dass er auch wirklich auslöst (absichtlichen Fehler einbauen) –
 ein Wächter, der nicht anschlagen kann, ist schlimmer als keiner.
@@ -307,12 +316,16 @@ nie von fremden CDNs.
 einen Namensraum – neue Funktionalität heißt: neue Datei mit nächster
 freier Nummer, kein Umbau von `app.py`.
 
-Zwei kleine Dateien neben `app.py`, die man sonst übersieht: `src/Dockerfile`
+Drei kleine Dateien neben `app.py`, die man sonst übersieht: `src/Dockerfile`
 startet Gunicorn mit `--logger-class glogging_redact.RedactingLogger` –
 `glogging_redact.py` kürzt den Token in `/p/<token>` und `/a/<slug>/<token>/`
 in jeder Access-Log-Zeile auf `<redacted>`, sonst stünde jeder Zugang im
-Klartext im Container-Log. `generate_icons.py` erzeugt PWA-Icons und Favicon
-beim Image-Build (ohne Pillow) – die Icons liegen deshalb nicht im Repo.
+Klartext im Container-Log. Die Regel dafür liegt seit #285 in
+`redaktion.py` (abhängigkeitsfrei, weil der Access-Logger vor der App
+geladen wird) und wird über `teile.kern.log_sicher()` auch vom Anwendungs-Log
+benutzt – **`request.path` gehört nie roh in eine Log-Zeile.**
+`generate_icons.py` erzeugt PWA-Icons und Favicon beim Image-Build (ohne
+Pillow) – die Icons liegen deshalb nicht im Repo.
 
 **Modulübergreifende Importe brauchen einen Alias in `teile/__init__.py`.**
 Ein führendes `0N_` ist kein gültiger Python-Modulname, `from teile.16_vokabeln
@@ -554,7 +567,8 @@ ausschließlich in `.claude/settings.json`.
   nie wieder ad hoc mit `curl` prüfen, das hat 808 nie ablaufende Zugänge
   in der Datenbank hinterlassen (siehe `journal.md`, 08.08.2026).
   `wunsch_lauf_check.py` beantwortet nur lesend, ob der stündliche Lauf gerade
-  Arbeit hat (siehe „Prüfung gegen das laufende Portal"). `hae_metriken.py`
+  Arbeit hat (siehe „Prüfung gegen das laufende Portal"). `paket_bauen.py`
+  baut das Auslieferungspaket aus der Positivliste (#281). `hae_metriken.py`
   (gleiche stdin-Bauart) listet, welche Metriken der hae-Server liefert –
   **so** nachsehen, nicht per Heredoc mit dem API-Schlüssel im Prompt (der
   Auto-Modus blockiert das, #274).

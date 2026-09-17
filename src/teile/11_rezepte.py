@@ -44,7 +44,6 @@ Neuanlegen und Import-Vorschau, unterschieden nur über den bearbeiten-Parameter
 Speichern komplett ersetzt, kein Zeilen-Diffing.
 """
 import base64
-import gzip
 import http.client
 import ipaddress
 import json
@@ -273,22 +272,44 @@ def _entpacken(raw: bytes, encoding) -> bytes:
 
     Nur gzip und deflate: mehr kann ein Server ohne Accept-Encoding nicht
     ernsthaft erwarten. Alles andere (br, zstd) ist ein klarer Fehler mit
-    klarer Meldung statt stillem Brei."""
+    klarer Meldung statt stillem Brei.
+
+    Wunsch #282 (Sicherheitsaudit 16.09.2026, Befund N-03): Entpackt wird
+    mit OBERGRENZE, nicht mit gzip.decompress(). Das materialisierte das
+    gesamte Ergebnis im Speicher, bevor der Aufrufer die Groesse pruefen
+    konnte - 3 MB Nullen komprimiert sind rund 3 GB entpackt, gegen ein
+    Containerlimit von 256 MB. Der alte Test bemerkte das nicht, weil seine
+    "Bombe" nur 3 MB gross war und bequem in den Speicher passte.
+    `decompressobj().decompress(raw, max_length)` liefert hoechstens
+    max_length Bytes; bleibt danach Rest (`unconsumed_tail`), war die Antwort
+    zu gross - ohne dass je mehr als die Grenze im Speicher lag."""
     enc = (encoding or "").lower().strip()
     if enc in ("", "identity"):
         return raw
-    try:
-        if enc == "gzip":
-            return gzip.decompress(raw)
-        if enc == "deflate":
-            try:
-                return zlib.decompress(raw)
-            except zlib.error:
-                # "raw deflate" ohne zlib-Kopf, schicken manche Server so.
-                return zlib.decompress(raw, -zlib.MAX_WBITS)
-    except (OSError, zlib.error) as e:
-        raise ValueError(f"Antwort liess sich nicht entpacken ({enc})") from e
+    if enc == "gzip":
+        return _begrenzt_entpacken(raw, 16 + zlib.MAX_WBITS, enc)
+    if enc == "deflate":
+        try:
+            return _begrenzt_entpacken(raw, zlib.MAX_WBITS, enc)
+        except ValueError as fehler:
+            if "zu groß" in str(fehler):
+                raise
+            # "raw deflate" ohne zlib-Kopf, schicken manche Server so.
+            return _begrenzt_entpacken(raw, -zlib.MAX_WBITS, enc)
     raise ValueError(f"Unbekannte Komprimierung ({enc})")
+
+
+def _begrenzt_entpacken(raw: bytes, wbits: int, enc: str) -> bytes:
+    """Hoechstens _MAX_FETCH_BYTES entpacken; alles darueber ist ein Fehler,
+    der geworfen wird, BEVOR es im Speicher liegt."""
+    try:
+        d = zlib.decompressobj(wbits)
+        daten = d.decompress(raw, _MAX_FETCH_BYTES + 1)
+    except zlib.error as e:
+        raise ValueError(f"Antwort liess sich nicht entpacken ({enc})") from e
+    if len(daten) > _MAX_FETCH_BYTES or d.unconsumed_tail:
+        raise ValueError("Seite zu groß (entpackt)")
+    return daten
 
 
 def _seite_abrufen(url: str) -> str:
