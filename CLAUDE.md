@@ -155,7 +155,12 @@ Bewusst ohne `-a` (nur ungetaggte, fremde Stacks bleiben unberührt); `system`/
 untergehen:
 
 - **Code-Änderungen brauchen `--build`, nicht `restart`.** Templates und
-  Python-Dateien sind ins Image eingebacken.
+  Python-Dateien sind ins Image eingebacken. Die Container laufen seit #291
+  mit **read_only-Wurzel** – wer etwas Neues auf Platte schreiben will,
+  braucht ein Volume oder tmpfs in `docker-compose.yml`, sonst scheitert es
+  erst im Betrieb (lokal und im Test fällt es nicht auf). Basisimages sind
+  per Digest gepinnt (`server.md` „Container-Härtung" sagt, wie man sie
+  aktualisiert).
 - **Caddyfile-Änderungen brauchen `docker compose up -d --force-recreate
   caddy`** – die Datei ist als einzelne Datei bind-gemountet, ein
   Reload/Restart greift dort nicht.
@@ -179,7 +184,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2455 Tests, Stand 17.09.2026, gut eine Minute)
+# Alles (2481 Tests, Stand 17.09.2026, gut eine Minute)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -250,9 +255,13 @@ verstößt. Fünf weitere wächtern nicht Vorlagen, sondern Struktur:
 (Rauchtest, ruft jede GET-Seite mit `<token>` als einziger Variable auf),
 `test_log_grenzen.py` (jeder Dienst in `docker-compose.yml` braucht
 `logging:` mit Obergrenze), `test_lese_grenzen.py` (kein `resp.read()` ohne
-Obergrenze auf Netzantworten – `begrenzt_lesen()` aus dem Kern nehmen, #289)
-und `test_cert_watcher.py` (Admin-Socket-Volume in caddy und util, nie in
-portal, #280). Schlägt einer davon an, ist die Vorlage bzw. der
+Obergrenze auf Netzantworten – `begrenzt_lesen()` aus dem Kern nehmen, #289),
+`test_cert_watcher.py` (Admin-Socket-Volume in caddy und util, nie in
+portal, #280), `test_container_haertung.py` (no-new-privileges, cap_drop,
+read_only, pids_limit, Digest-Pins, `.dockerignore` – #291; ein Dienst darf
+nur schreiben, was in `server.md` „Container-Härtung" steht) und
+`test_service_worker.py` (Quelltext von `sw.js`: nichts unter `/p/` cachen,
+401/403 leert den Cache – #286). Schlägt einer davon an, ist die Vorlage bzw. der
 Code falsch, nicht der Test. Wer einen neuen Wächter schreibt: vorher
 gegenprüfen, dass er auch wirklich auslöst (absichtlichen Fehler einbauen) –
 ein Wächter, der nicht anschlagen kann, ist schlimmer als keiner.

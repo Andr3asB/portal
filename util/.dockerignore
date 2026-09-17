@@ -1,0 +1,11 @@
+# Wunsch #291: siehe src/.dockerignore (auch zum `**/`-Praefix).
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.db
+**/*.db-*
+**/.pytest_cache
+**/.ruff_cache

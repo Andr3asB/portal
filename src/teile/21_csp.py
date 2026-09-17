@@ -176,7 +176,13 @@ def init_app(app):
         nonce = getattr(g, "csp_nonce_wert", "")
 
         if modus == "scharf" and nonce:
-            antwort.headers["Content-Security-Policy"] = _streng(nonce)
+            # Wunsch #294 (Sicherheitsaudit 16.09.2026, Befund N-16): auch die
+            # scharfe Regel meldet. Vorher stand `report-uri` nur in der
+            # Report-Only-Regel des Modus `beobachten` - in Produktion wurden
+            # Verstoesse blockiert, aber nirgends gemeldet; ein uebersehener
+            # Inline-Handler oder ein Injektionsversuch blieb unsichtbar. Der
+            # Endpunkt ist gebremst (#207) und saeubert (#205), er traegt das.
+            antwort.headers["Content-Security-Policy"] = _streng(nonce, melden=True)
         elif modus == "beobachten" and nonce:
             antwort.headers["Content-Security-Policy"] = _freizuegig()
             antwort.headers["Content-Security-Policy-Report-Only"] = \

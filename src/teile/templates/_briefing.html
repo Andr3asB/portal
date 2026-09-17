@@ -10,6 +10,8 @@
   </div>
 </div>
 
+{# Wunsch #292: nur mit Essensplan-Grant - sonst fehlt der Block ganz. #}
+{% if briefing.essensplan %}
 <div class="briefing-block">
   <div class="briefing-label">🍽️ Essen heute</div>
   {% for m in briefing.mahlzeiten %}
@@ -20,6 +22,7 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
 
 <div class="briefing-block">
   <div class="briefing-label">🎂 Geburtstage</div>

@@ -77,7 +77,9 @@ def test_kind_sieht_das_private_todo_nicht(client, todos):
 def test_kind_kann_den_status_nicht_setzen(client, todos):
     tid = todos["ids"]["privat_rollenziel"]
     antwort = _status_setzen(client, todos["tokens"]["TestKind"], tid)
-    assert antwort.status_code == 403
+    # Wunsch #288: Unsichtbares antwortet seit dem Orakel-Fix 404 (wie nicht
+    # vorhanden), nicht mehr 403 - beides ist "kommt nicht durch".
+    assert antwort.status_code == 404
     assert _zeile(todos, tid)["status"] == "offen"
 
 
@@ -145,6 +147,12 @@ def test_ohne_die_privat_bedingung_stuende_es_offen(client, todos, monkeypatch):
     monkeypatch.setattr(modul, "_darf_erledigen", alt)
 
     tid = todos["ids"]["privat_rollenziel"]
+    # Wunsch #288: set_status antwortet fuer Unsichtbares jetzt 404, BEVOR
+    # _darf_erledigen gefragt wird. Fuer diese Gegenprobe muss deshalb auch
+    # die Sichtbarkeit die Aufgabe durchlassen - sonst bewiese der Test nur
+    # noch den neuen Riegel, nicht mehr den alten.
+    echte = modul._sichtbare_ids
+    monkeypatch.setattr(modul, "_sichtbare_ids", lambda db, user: echte(db, user) | {tid})
     _status_setzen(client, todos["tokens"]["TestKind"], tid)
     assert _zeile(todos, tid)["status"] == "erledigt", (
         "Auch mit der alten Fassung kommt das Kind nicht durch - der Test "

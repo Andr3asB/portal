@@ -39,7 +39,14 @@ from flask import Blueprint, abort, render_template, url_for
 
 from teile.essensplan import MAHLZEIT_LABELS, MAHLZEITEN
 from teile.geburtstage import MONATE, _alter_am_geburtstag, _tage_bis
-from teile.kern import LOKAL_TZ, antwort_oder_weiter, get_db, new_db, push_send
+from teile.kern import (
+    LOKAL_TZ,
+    antwort_oder_weiter,
+    get_db,
+    hat_grant,
+    new_db,
+    push_send,
+)
 from teile.rezepte import kategorie_symbol
 from teile.start_token import _home_user
 
@@ -135,11 +142,19 @@ def briefing_fuer(db, user_id: int, jetzt: datetime | None = None) -> dict:
     der Push-Lauf benutzt dieselbe Funktion fuer seinen Text."""
     jetzt = jetzt or jetzt_lokal()
     tag = jetzt.date()
+    # Wunsch #292 (Sicherheitsaudit 16.09.2026, Befund N-14): Der Essensplan
+    # gehoert nur ins Briefing, wenn der Nutzer die Essensplan-App auch hat.
+    # Vorher las _mahlzeiten() ohne Grant-Pruefung - ein Nutzer (auch Rolle
+    # gast), dem Andi die App bewusst nicht gegeben hatte, sah Mittag und
+    # Abend trotzdem auf der Startseite. Geburtstage sind an alle vergeben
+    # (00_kern._auto_grant_all), dort stellt sich die Frage nicht.
+    essensplan = hat_grant(db, user_id, "essensplan")
     return {
         "tag": tag.isoformat(),
         "datum_text": f"{WOCHENTAGE[tag.weekday()]}, {tag.day}. {MONATE[tag.month - 1]}",
         "gruss": gruss(jetzt),
-        "mahlzeiten": _mahlzeiten(db, tag),
+        "essensplan": essensplan,
+        "mahlzeiten": _mahlzeiten(db, tag) if essensplan else [],
         "geburtstage": _geburtstage(db, user_id, tag),
     }
 

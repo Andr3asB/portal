@@ -1,0 +1,20 @@
+# Wunsch #291 (Sicherheitsaudit 16.09.2026, Befund N-13): COPY . . nimmt
+# sonst alles mit, was zufaellig im Build-Kontext liegt. Das Paket aus
+# scripts/paket_bauen.py filtert schon - das hier ist der zweite Riegel fuer
+# einen Build direkt aus dem Repo UND fuer Altlasten, die `tar xzf` auf dem
+# Server nie loescht (am 17.09.2026 lagen dort cpython-314.pyc aus einem
+# fruehen Deploy und landeten im Image).
+#
+# Docker-Muster: ohne `**/` gilt ein Muster nur fuer die oberste Ebene des
+# Kontexts - `__pycache__/` haette teile/__pycache__ NICHT erfasst.
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.db
+**/*.db-*
+**/*.sqlite*
+**/.pytest_cache
+**/.ruff_cache

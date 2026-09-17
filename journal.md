@@ -2,6 +2,113 @@
 
 ---
 
+## 2026-09-17 – portal-v259: Sieben weitere Audit-Befunde (#286–#288, #291, #292, #294, #295)
+
+Zweiter Lauf des Tages, Andi hatte die nächsten sieben freigegeben. Alles
+kleiner als am Vormittag, aber #291 verändert, wie die Container laufen.
+
+### #291 (N-13, `mittel`) – Container-Härtung, Digest-Pins, .dockerignore
+
+Alle drei Dienste: `no-new-privileges`, `cap_drop ALL`, `pids_limit 128`,
+`read_only: true`. Schreibbar nur, was sein muss – und das musste ich vorher
+nachsehen: `portal` schreibt nach `/data` und `/tmp` (Gunicorn-Heartbeat,
+tmpfs 16 MB); `caddy` legt `autosave.json` unter `/config` ab (tmpfs) und
+braucht als einzige Capability `NET_BIND_SERVICE`; `util` packt das
+Backup-Archiv unter `/tmp` – als **Volume `util_tmp`**, nicht tmpfs, weil
+tmpfs gegen die 64 MB des Containers zählte und das Archiv (DB plus 24
+Snapshots) das sprengen würde. Basisimages per Digest:
+`python:3.12-slim@sha256:78387bc…` (beide Dockerfiles) und
+`caddy:2.11.4-alpine@sha256:5f5c864…`. Den Python-Digest liefert nur
+`docker buildx imagetools inspect` – `docker image inspect` kennt das Image
+nicht, BuildKit hält Basisimages in seinem eigenen Cache. Dockerfiles mit
+`USER` und `compileall` (read_only-Wurzel kann keine `__pycache__` mehr
+schreiben), `.dockerignore` in `src/` und `util/`. **Bewusst ohne**
+`--require-hashes`: Linux-Wheels im Container und Windows-Wheels in der
+lokalen `.venv` lesen dieselbe `requirements.txt`, zwei Hash-Sätze je Paket
+wären mehr Fehlerquelle als Gewinn. `tests/test_container_haertung.py`.
+
+### #286 (N-07, `hoch`) – Service-Worker-Cache
+
+`sw.js` cacht nichts mehr unter `/p/` und wirft bei 401/403 auf eine
+Navigation den ganzen Seiten-Cache weg (vorher blieb der alte Stand nach
+„Zugänge neu erzeugen" offline lesbar). `denied.html` schickt dem Worker
+`nutzer: 0` – dafür musste die Prüfung in `sw.js` von `d.id` auf
+`d.id !== undefined` (0 ist falsy, die Meldung wäre nie angekommen).
+`CACHE_NAME` auf v3, damit jedes Gerät einmal aufräumt.
+`tests/test_service_worker.py` liest den Quelltext.
+
+### #287 (N-08, `hoch`) – /push/subscribe
+
+Reihenfolge gedreht: erst Ratenbremse (10/min), dann `aktueller_nutzer()`,
+dann Länge (2000), erst dann DNS. Höchstens 20 Abos je Nutzer, das älteste
+fällt. Der wichtigste Test lässt `getaddrinfo` AssertionError werfen und
+schickt einen Unbekannten hinein – 403, ohne dass DNS je gerufen wurde.
+
+### #292 (N-14, `hoch`) – Briefing nur mit Essensplan-Grant
+
+`hat_grant(db, user_id, slug)` neu im Kern; `briefing_fuer()` liefert
+`essensplan: bool` und leere Mahlzeiten ohne Grant, `_briefing.html` blendet
+den Block aus. `test_briefing.py` brauchte ein autouse-Fixture, das der
+Testfamilie den Grant gibt – die Inhaltstests setzen ihn voraus.
+
+### #288 (N-09, `mittel`) – Todo-Orakel
+
+`set_status` und `bearbeiten` prüfen erst `_sichtbare_ids()` (404), dann
+`_darf_erledigen()` (403) – wie im Kanban. Für ein Kind fallen sichtbar und
+änderbar praktisch zusammen, der 403-Zweig bleibt als zweiter Riegel.
+`test_todo_privat_rollenziel.py` erwartet jetzt 404, und seine Gegenprobe
+patcht zusätzlich `_sichtbare_ids` – sonst bewiese sie nur noch den neuen
+Riegel.
+
+### #294 (N-16, `mittel`) – CSP meldet, HTML/JSON `no-store`
+
+Die scharfe CSP trägt jetzt `report-uri /csp-bericht`; Verstöße in Produktion
+landen im Log. `after_request` im Kern setzt `Cache-Control: no-store` auf
+`text/html` und `application/json`, sofern niemand schon einen Cache-Header
+gesetzt hat (Flask gibt statischen Dateien `no-cache`, das TVB-SVG hat seine
+Frist). Docstring in `19_sitzung.py` korrigiert (behauptete noch
+`unsafe-inline`).
+
+### #295 (N-17, `mittel`) – Doku und Zeitzone
+
+`server.md`: `TOKEN_KEY` ist base64url, nicht Hex; Admin-API und Watcher
+waren schon mit v258 korrigiert. Neu: `TZ=Europe/Berlin` für den
+util-Container – das „03:00-Backup" lief bisher um 05:00 MESZ, der Watcher
+um 06:00, und niemand hat es gemerkt, weil beides trotzdem täglich lief.
+
+### Auslieferung und Prüfung
+
+Suite **2482 Tests grün**, ruff sauber. v259 per `scripts/paket_bauen.py`.
+Compose-Änderung erzeugt alle drei Container neu; caddy zieht zum ersten Mal
+das per Digest gepinnte Image. Live: `docker inspect` zeigt für alle drei
+`ReadonlyRootfs=true`, `CapDrop=[ALL]`, `Pids=128`, `no-new-privileges`;
+`touch /app/x` scheitert in portal und util, `/tmp` geht, caddy schreibt
+`autosave.json` nach `/config`, der Socket-Reload läuft, util zeigt CEST,
+alle 25 Seiten der Live-Prüfung grün, CSP mit `report-uri`, HTML/JSON mit
+`no-store`, `sw.js` v3 mit `/p/`-Regel, denied.html mit Nonce-Skript,
+`/push/subscribe` ohne Token 403.
+
+Zwei Dinge, die erst der read_only-Betrieb zeigte, mit **v260/v261**
+nachgezogen: Gunicorn 26 legt beim Start ein Steuer-Socket unter
+`$HOME/.gunicorn` an – HOME ist für UID 1001 die Wurzel, im Log stand
+`[ERROR] Control server error: Read-only file system`. Und im Image lagen
+`cpython-314.pyc` aus einem frühen Deploy: `tar xzf` löscht auf dem Server
+nie, und `__pycache__/` in `.dockerignore` gilt bei Docker nur für die
+oberste Ebene – jetzt `**/__pycache__` und `**/*.py[cod]`, die Altlasten
+auf home02 entfernt.
+
+**Panne bei v260, ehrlich festgehalten:** Ich hatte das Gunicorn-Flag aus
+dem Namen der Konfigurationsoption geraten (`--control-socket-disable`).
+Das CLI kennt es nicht, der Container lief in eine Neustart-Schleife, das
+Portal war rund vier Minuten nicht erreichbar – bis v261 mit dem richtigen
+Flag `--no-control-socket` (nachgelesen in `gunicorn/config.py`,
+`cli = ["--no-control-socket"]`) oben war. Lehre, die auch in den Dockerfile-
+Kommentar wanderte: Ein Flag, das lokal nicht startbar ist (gunicorn läuft
+unter Windows nicht), wird vor dem Deploy in der Quelle nachgeschlagen,
+nicht geraten. `test_container_haertung.py` prüft jetzt die CMD-Zeile.
+
+---
+
 ## 2026-09-17 – portal-v258: Sieben Audit-Befunde (#280–#285, #289), Deploy per Positivliste
 
 Am 16.09. lief ein komplettes Nachaudit gegen v257 (fünf parallele

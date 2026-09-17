@@ -4,8 +4,12 @@ Prüft jede Minute, ob Aufgaben fällig sind.
 
 Aufgaben:
   - Jede volle Stunde:  SQLite-Snapshot
-  - Täglich 03:00 Uhr:  rsync-Backup auf NAS
+  - Täglich 03:00 Uhr:  tar+ssh-Backup auf NAS (age-verschlüsselt, #130/#211)
   - Täglich 04:00 Uhr:  Zertifikats-Watcher (Caddy-Reload bei Erneuerung)
+
+Uhrzeiten sind Familienzeit: docker-compose.yml setzt für util
+`TZ=Europe/Berlin` (Wunsch #295). Vorher lief der Container auf UTC, und das
+"03:00-Backup" lief tatsächlich um 05:00 MESZ - die Doku sagte 03:00.
 """
 import logging
 import time

@@ -7,9 +7,21 @@ POST /push/unsubscribe       → {"endpoint":"...", "token":"..."}
 """
 from flask import Blueprint, abort, current_app, jsonify, request
 
-from teile.kern import aktueller_nutzer, get_db, ist_oeffentliche_url
+from teile.kern import (
+    aktueller_nutzer,
+    get_db,
+    ist_oeffentliche_url,
+    rate_ueberschritten,
+)
 
 bp = Blueprint("push", __name__)
+
+# Wunsch #287 (Sicherheitsaudit 16.09.2026, Befund N-08): Grenzen fuer das
+# Registrieren. Ein Push-Endpunkt der grossen Dienste ist 150-300 Zeichen
+# lang; 2000 ist grosszuegig. Zwanzig Abos je Nutzer decken jedes Geraet und
+# jeden Browser der Familie - das aelteste faellt, wenn ein 21. dazukommt.
+_ENDPOINT_MAX   = 2000
+_ABOS_JE_NUTZER = 20
 
 
 @bp.route("/push/vapid-public-key")
@@ -36,6 +48,26 @@ def subscribe():
     if not (endpoint and p256dh and auth):
         return jsonify(ok=False, error="Ungültige Anfrage"), 400
 
+    # Wunsch #287 (Sicherheitsaudit 16.09.2026, Befund N-08): Reihenfolge.
+    # Vorher lief `ist_oeffentliche_url()` - also socket.getaddrinfo() - VOR
+    # der Identitaetspruefung. Jeder Unbekannte konnte das Portal beliebige
+    # Namen aufloesen lassen, und ein traeger Nameserver haelt einen der vier
+    # Gunicorn-Threads sekundenlang fest. Jetzt: erst die Bremse (das
+    # Billigste), dann die Identitaet, dann die Laenge, und erst fuer einen
+    # bekannten Nutzer die DNS-Aufloesung.
+    if rate_ueberschritten("push-subscribe", max_anfragen=10, fenster_sekunden=60):
+        return jsonify(ok=False, error="Zu viele Anfragen"), 429
+
+    # Nutzer über irgendein gültiges Token oder das Sitzungs-Cookie
+    db  = get_db()
+    row = aktueller_nutzer(token)
+    if not row:
+        abort(403)
+    user_id = row["id"]
+
+    if len(endpoint) > _ENDPOINT_MAX:
+        return jsonify(ok=False, error="Ungültige Anfrage"), 400
+
     # Wunsch #203 (Sicherheitsaudit 11.08.2026): `endpoint` kommt vollstaendig
     # vom Client - ohne diese Pruefung koennte er auf eine interne Adresse
     # zeigen (z. B. einen anderen Container im Bridge-Netz), und push_send()
@@ -50,13 +82,6 @@ def subscribe():
     # kaeme eine interne Adresse gar nicht erst in die Datenbank.
     if not ist_oeffentliche_url(endpoint):
         return jsonify(ok=False, error="Ungültige Anfrage"), 400
-
-    # Nutzer über irgendein gültiges Token oder das Sitzungs-Cookie
-    db  = get_db()
-    row = aktueller_nutzer(token)
-    if not row:
-        abort(403)
-    user_id = row["id"]
 
     # Wunsch #209 (Audit-Befund F-01): `user_id` gehoert in die UPDATE-Liste.
     # `endpoint` ist UNIQUE und identifiziert den BROWSER, nicht die Person.
@@ -76,6 +101,15 @@ def subscribe():
           SET user_id=excluded.user_id, p256dh=excluded.p256dh,
               auth=excluded.auth, geraet=excluded.geraet
     """, (user_id, endpoint, p256dh, auth, geraet))
+    # Wunsch #287: Obergrenze je Nutzer - das aelteste Abo faellt. Sonst
+    # koennte ein einzelner Nutzer die Tabelle (und jeden Push-Lauf, der alle
+    # Endpunkte eines Nutzers abklappert) unbegrenzt wachsen lassen.
+    db.execute("""
+        DELETE FROM push_abos
+        WHERE user_id = ?
+          AND id NOT IN (SELECT id FROM push_abos WHERE user_id = ?
+                         ORDER BY id DESC LIMIT ?)
+    """, (user_id, user_id, _ABOS_JE_NUTZER))
     db.commit()
     return jsonify(ok=True)
 

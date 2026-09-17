@@ -85,6 +85,41 @@ Portal und util hängen ausschließlich im internen Bridge-Netz.
 - Gültig bis: 24.10.2026 (Certbot erneuert automatisch)
 - Caddy Admin-API: Unix-Socket `/run/caddy-admin/admin.sock` im Volume `caddy_admin`, nur caddy + util (seit v258, Wunsch #280)
 
+## Container-Härtung (Wunsch #291, seit v259)
+
+Alle drei Dienste in `docker-compose.yml`: `security_opt no-new-privileges`,
+`cap_drop ALL`, `pids_limit 128`, `read_only: true`. Schreibbar bleibt nur,
+was sein muss: `portal` → `/data` (Volume) und `/tmp` (tmpfs 16 MB,
+Gunicorn-Heartbeat); `util` → `/data` und `/tmp` als **Volume `util_tmp`**
+(nicht tmpfs – `backup.py` packt dort das komplette Archiv, und tmpfs zählte
+gegen die 64 MB des Containers); `caddy` → `/data` (Volume), `/run/caddy-admin`
+(Socket-Volume) und `/config` (tmpfs, `autosave.json`), dazu als einzige
+Capability `NET_BIND_SERVICE` für Port 443. `tests/test_container_haertung.py`
+wächtert das Ganze.
+
+Basisimages sind **per Digest** festgenagelt: `python:3.12-slim@sha256:…` in
+beiden Dockerfiles, `caddy:2.11.4-alpine@sha256:…` in compose. Ein Tag kann
+sich unter der Hand ändern, ein Digest nicht. Aktualisieren bewusst von Hand:
+
+```bash
+ssh -p 2222 claude@10.0.0.100 "docker buildx imagetools inspect python:3.12-slim | head -3"
+ssh -p 2222 claude@10.0.0.100 "docker buildx imagetools inspect caddy:2.12.0-alpine | head -3"
+```
+
+(`docker image inspect` liefert den Digest NICHT – BuildKit hält Basisimages
+in seinem eigenen Cache, nicht im klassischen Image-Store.) Dockerfiles
+setzen `USER` und erzeugen den Bytecode beim Bauen (`compileall`), weil eine
+read_only-Wurzel zur Laufzeit keine `__pycache__` mehr schreiben kann.
+`src/.dockerignore` und `util/.dockerignore` halten `.env*`, `*.db` und
+`__pycache__` aus dem Build-Kontext.
+
+**Bewusst nicht gemacht:** `pip install --require-hashes`. Die Hashes wären
+plattformspezifisch (Linux-Wheels im Container, Windows-Wheels in der
+lokalen `.venv`, die dieselbe `src/requirements.txt` liest); zwei Hash-Sätze
+je Paket pflegen wäre mehr Fehlerquelle als Gewinn. Der gewählte Stand:
+exakte Versionen (#135), Digest-Pin des Basisimages, `pip-audit` gegen den
+Produktions-`freeze`.
+
 ## Caddy Admin-API
 
 Seit v258 (Wunsch #280, Sicherheitsaudit 16.09.2026): **Unix-Socket**
@@ -239,7 +274,7 @@ VAPID_SUBJECT=mailto:andreas.bosch@gmail.com
 OPENROUTER_API_KEY=<Key von openrouter.ai, mit Ausgabenlimit im OpenRouter-Konto>
 HAE_API_URL=http://caddy:2021/api/workouts
 HAE_API_KEY=<Read-Token vom hae-Server, NICHT der Write-Token der iPhone-Automation>
-TOKEN_KEY=<32 Byte Hex, Schluessel fuer die Token-Verschluesselung (Wunsch #129)>
+TOKEN_KEY=<base64url-kodierte 32 Byte (NICHT Hex - #295), Schluessel fuer die Token-HMACs (Wunsch #129)>
 SITZUNG_AUSSTELLEN=1     # Wunsch #140, Stufe 1
 CSRF_MODUS=scharf        # Wunsch #140, Stufe 2: aus | beobachten | scharf
 PORTAL_ORIGIN=           # leer = aus der Anfrage ableiten
@@ -2579,6 +2614,31 @@ anhängen.
   #283, Audit N-04). Sitzung und Push-Abo hängen nicht zusammen (der
   Endpunkt gehört dem Browser); ein verlorenes Handy bekäme sonst nach dem
   Widerruf weiter jede Benachrichtigung samt Inhalt.
+- **Unsichtbares antwortet 404, nicht 403** (Wunsch #288, Audit N-09): Wer
+  eine Aufgabe nicht sehen darf, soll nicht erfahren, dass es sie gibt.
+  `set_status`/`bearbeiten` in `04_todo.py` prüfen erst `_sichtbare_ids()`
+  (404), dann `_darf_erledigen()` (403) – dieselbe Reihenfolge wie im Kanban.
+  Gilt als Muster für jede Route, die eine ID entgegennimmt.
+- **Was Zeit kostet, kommt NACH der Identitätsprüfung** (Wunsch #287, Audit
+  N-08): `/push/subscribe` bremst zuerst (`rate_ueberschritten`, 10/min),
+  prüft dann `aktueller_nutzer()`, dann die Länge (2000 Zeichen) und löst
+  erst für einen bekannten Nutzer DNS auf. Höchstens 20 Abos je Nutzer, das
+  älteste fällt. Eine DNS-Auflösung für Unbekannte blockiert einen der vier
+  Gunicorn-Threads – vier davon halten das Portal an.
+- **Der App-Grant entscheidet auch ausserhalb der App** (Wunsch #292, Audit
+  N-14): `hat_grant(db, user_id, slug)` im Kern; das Briefing zeigt den
+  Essensplan nur mit Essensplan-Grant. Wer Daten einer App an anderer Stelle
+  zeigt, fragt vorher.
+- **Der Service Worker cached nichts unter `/p/` und leert bei 401/403 auf
+  eine Navigation den Seiten-Cache** (Wunsch #286, Audit N-07); `denied.html`
+  meldet dem Worker `nutzer: 0`, was wie ein Nutzerwechsel wirkt. Wer am
+  Cache-Verhalten dreht: `CACHE_NAME` hochzählen, sonst bleibt auf jedem
+  Gerät der alte Stand liegen. `tests/test_service_worker.py` liest den
+  Quelltext.
+- **HTML und JSON gehen mit `Cache-Control: no-store`** raus (Wunsch #294,
+  Audit N-16; `after_request` im Kern, nur wenn niemand schon einen
+  Cache-Header gesetzt hat). Die scharfe CSP trägt `report-uri /csp-bericht`
+  – Verstöße in Produktion landen im Log (`grep CSP-Verstoss`).
 - **Komprimierte Antworten werden mit Obergrenze entpackt** (Wunsch #282,
   Audit N-03): `zlib.decompressobj().decompress(raw, grenze + 1)` statt
   `gzip.decompress()`, das erst alles materialisiert und dann messen lässt.
@@ -2603,8 +2663,8 @@ Andi + Simone haben Rolle 'eltern' → sehen "Als wer?"-Selektor in Geholfen.
 | Aufgabe | Zeitplan | Details |
 |---------|----------|---------|
 | SQLite-Snapshot | stündlich | 24 Slots in `/data/snapshots/`. `_prune()` raeumt seit Wunsch #215 auch **verwaiste `-wal`/`-shm`** weg (Begleiter ohne zugehoerige `.db`) – das alte Muster endete auf `.db` und sah sie nie, wodurch am 11.08.2026 56 Altlasten vom 07./08.08. herumlagen und jede Nacht mitgesichert wurden. Reihenfolge zaehlt: erst die alten `.db` loeschen, dann die Verwaisten – sonst blieben die Begleiter der gerade entfernten Snapshots eine Runde zu lang liegen. |
-| Zertifikats-Watcher | täglich 04:00 + einmalig beim Start | prüft mtime von `/certs/fullchain.pem`, löst bei Änderung den Caddy-Reload über den Admin-Socket aus (seit v258/#280; vom 05.08. bis 17.09.2026 lief er ins Leere, siehe „Caddy Admin-API"). Stand in `/data/.cert_mtime`, wird erst NACH erfolgreichem Reload geschrieben; ein Fehlschlag steht als ERROR im util-Log. |
-| NAS-Backup | täglich 03:00 | tar+ssh-Pipe → Ugreen NAS 10.60.0.4:2222, User `familienportal`, Pfad `/volume2/portal.16schwaben.de_Backup/`, 7 Generationen |
+| Zertifikats-Watcher | täglich 04:00 Familienzeit + einmalig beim Start (seit v259/#295 `TZ=Europe/Berlin` im util-Container; vorher UTC, also 06:00 MESZ) | prüft mtime von `/certs/fullchain.pem`, löst bei Änderung den Caddy-Reload über den Admin-Socket aus (seit v258/#280; vom 05.08. bis 17.09.2026 lief er ins Leere, siehe „Caddy Admin-API"). Stand in `/data/.cert_mtime`, wird erst NACH erfolgreichem Reload geschrieben; ein Fehlschlag steht als ERROR im util-Log. |
+| NAS-Backup | täglich 03:00 Familienzeit (vor v259: 03:00 UTC = 05:00 MESZ, die Doku sagte 03:00) | tar+ssh-Pipe → Ugreen NAS 10.60.0.4:2222, User `familienportal`, Pfad `/volume2/portal.16schwaben.de_Backup/`, 7 Generationen |
 
 SSH-Key für Backup: `/srv/familienportal/ssh/id_ed25519` (bind-mount als `/ssh/id_ed25519` im Container, read-only). Public Key auf NAS in `/home/familienportal/.ssh/authorized_keys`.
 
@@ -3095,6 +3155,34 @@ python -m venv .venv                                   # einmalig
 - `test_neue_tokens_push.py` – Wunsch #283 (Audit N-04). Zwei Abos des
   Kindes, eines der Eltern; nach `neue_tokens` hat das Kind null, die Eltern
   eins, die Zugangsseite nennt den Hinweis.
+- `test_push_subscribe_haertung.py` – Wunsch #287 (Audit N-08). Unbekannter
+  loest keine DNS-Aufloesung aus (getaddrinfo wirft AssertionError, Antwort
+  403), Ratenbremse nach zehn (429), ueberlanger Endpunkt 400 ohne DNS,
+  hoechstens 20 Abos je Nutzer (das aelteste faellt).
+- `test_todo_orakel.py` – Wunsch #288 (Audit N-09). Private fremde Aufgabe:
+  404 fuer status und bearbeiten, unveraendert; nicht vorhandene ID: 404;
+  fremde nicht-private Aufgabe fuer ein Kind ebenfalls unsichtbar (404);
+  Eltern kommen ueberall durch. `test_todo_privat_rollenziel.py` erwartet
+  seitdem 404 statt 403, und seine Gegenprobe patcht zusaetzlich
+  `_sichtbare_ids`, weil der neue Riegel VOR `_darf_erledigen` greift.
+- `test_briefing_grant.py` – Wunsch #292 (Audit N-14). Ohne Essensplan-
+  Grant: `essensplan=False`, leere Mahlzeiten, nichts davon im Push-Text;
+  mit Grant alles da; die Startseite zeigt den Block „Essen heute" nur mit
+  Grant. `test_briefing.py` bekam dafuer ein autouse-Fixture, das der
+  Testfamilie den Grant gibt.
+- `test_service_worker.py` – Wunsch #286 (Audit N-07). Quelltext-Waechter:
+  `CACHE_NAME` v3, `cache.put` nur ausserhalb `/p/`, 401/403 auf Navigation
+  loescht den Cache, `id: 0` wird nicht als falsy verschluckt, denied.html
+  meldet `nutzer: 0` mit Nonce.
+- `test_cache_control.py` – Wunsch #294 (Audit N-16). HTML und JSON mit
+  `no-store`, statische Dateien behalten Flasks `no-cache`.
+  `test_csp.py::test_scharf_meldet_verstoesse`: scharfe Regel mit
+  `report-uri`, kein Report-Only-Header daneben.
+- `test_container_haertung.py` – Wunsch #291 (Audit N-13). Jeder Dienst mit
+  no-new-privileges, cap_drop ALL, pids_limit, read_only; caddy als einziger
+  mit cap_add NET_BIND_SERVICE und /config; util_tmp als Volume statt tmpfs;
+  Images per Version+Digest; Dockerfiles mit FROM-Digest, USER, compileall;
+  .dockerignore mit `.env*`/`*.db`/`__pycache__`; util in Familienzeit.
 - `test_rezept_import_gzip.py::test_echte_bombe_wird_nie_ganz_entpackt` –
   Wunsch #282 (Audit N-03). 300 MB Nullen als ~300 KB gzip; die unbegrenzten
   Entpacker sind per monkeypatch verboten, `_entpacken` muss trotzdem mit

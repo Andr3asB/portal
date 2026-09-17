@@ -15,6 +15,19 @@ services:
     env_file: .env
     mem_limit: 256m
     cpus: "0.5"
+    # Wunsch #291 (Sicherheitsaudit 16.09.2026, Befund N-13): Standard-
+    # Haertung. Kein Rechteausbau ueber setuid, keine Capabilities (der
+    # Prozess laeuft als 1001 und braucht keine), Obergrenze fuer Threads und
+    # Prozesse, Wurzel nur lesbar - die App schreibt ausschliesslich nach
+    # /data (Volume) und /tmp (Gunicorn-Heartbeat, tmpfs, winzig).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
     # Wunsch #210: json-file waechst sonst unbegrenzt. /opt/docker liegt auf
     # derselben Platte wie iobroker, Paperless, Pi-hole und Portainer - ein
     # volllaufendes Log ist deren Problem, nicht nur unseres. In
@@ -33,7 +46,11 @@ services:
       start_period: 20s
 
   caddy:
-    image: caddy:2-alpine
+    # Wunsch #291: fester Digest statt schwimmendem Major-Tag (`2-alpine`
+    # konnte mit jedem Pull eine andere Minor bringen). Stand 17.09.2026 =
+    # v2.11.4. Aktualisieren von Hand: `docker buildx imagetools inspect
+    # caddy:<version>-alpine` auf home02 nennt den Digest.
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     container_name: caddy
     networks:
@@ -55,6 +72,21 @@ services:
       - caddy_admin:/run/caddy-admin
     mem_limit: 64m
     cpus: "0.2"
+    # Wunsch #291: Caddy laeuft im Image als root und braucht genau EINE
+    # Faehigkeit - Port 443 binden. Alles andere weg, Wurzel nur lesbar;
+    # schreibbar bleiben /data (Volume), /run/caddy-admin (Socket-Volume)
+    # und /config (Caddy legt dort autosave.json ab - tmpfs reicht).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /config:size=8m
+      - /tmp:size=8m
     logging: *log_grenzen
     healthcheck:
       # Wunsch #126: fragte vorher die Caddy-Admin-API ab (172.30.0.10:2019),
@@ -86,8 +118,15 @@ services:
       # Wunsch #280: derselbe Socket wie bei caddy - cert_watcher.py spricht
       # darueber die Admin-API an, wenn sich das Zertifikat geaendert hat.
       - caddy_admin:/run/caddy-admin
+      # Wunsch #291: /tmp als Volume, NICHT als tmpfs - backup.py packt dort
+      # das komplette Archiv (Datenbank plus 24 Snapshots), und tmpfs zaehlt
+      # gegen die 64 MB Speichergrenze des Containers.
+      - util_tmp:/tmp
     environment:
       DATA_DIR: /data
+      # Wunsch #295: Familienzeit statt UTC - sonst lief das "03:00-Backup"
+      # um 05:00 MESZ und der Zertifikats-Watcher um 06:00.
+      TZ: Europe/Berlin
       BACKUP_NAS_HOST: "${BACKUP_NAS_HOST:-10.60.0.4}"
       BACKUP_NAS_USER: "${BACKUP_NAS_USER:-familienportal}"
       BACKUP_NAS_PATH: "${BACKUP_NAS_PATH:-/volume2/portal.16schwaben.de_Backup}"
@@ -96,6 +135,13 @@ services:
       BACKUP_AGE_RECIPIENT: "${BACKUP_AGE_RECIPIENT:-}"
     mem_limit: 64m
     cpus: "0.1"
+    # Wunsch #291: wie bei portal. Schreibbar nur /data und /tmp (Volume).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    read_only: true
     logging: *log_grenzen
 
 networks:
@@ -116,3 +162,5 @@ volumes:
   caddy_data:
   # Wunsch #280: traegt nur den Unix-Socket der Caddy-Admin-API.
   caddy_admin:
+  # Wunsch #291: Arbeitsverzeichnis des Backups (read_only-Wurzel bei util).
+  util_tmp:

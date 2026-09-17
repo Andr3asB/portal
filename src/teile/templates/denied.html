@@ -33,5 +33,18 @@
   <p>Dieser Link ist ungültig oder abgelaufen.<br>Bitte Andi um einen neuen Link.</p>
 {% endif %}
 <p class="hint">portal.16schwaben.de</p>
+<script{{ csp_nonce }}>
+// Wunsch #286 (Sicherheitsaudit 16.09.2026, Befund N-07): Wer hier landet,
+// hat keinen Zugang mehr - der Service Worker soll den Seiten-Cache des
+// vorigen Nutzers wegwerfen, sonst bleibt er offline weiter lesbar.
+// `id: 0` heisst "niemand"; nutzerPruefen() in sw.js behandelt es wie einen
+// Nutzerwechsel.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then(reg => {
+    const ziel = reg.active || navigator.serviceWorker.controller;
+    if (ziel) ziel.postMessage({ typ: 'nutzer', id: 0 });
+  });
+}
+</script>
 </body>
 </html>

@@ -144,6 +144,15 @@ def test_beobachten_blockiert_nichts(client, admin, beobachten):
     assert "report-uri /csp-bericht" in nur_bericht
 
 
+def test_scharf_meldet_verstoesse(client, admin, scharf):
+    """Wunsch #294 (Sicherheitsaudit 16.09.2026, Befund N-16): Auch die
+    scharfe Regel traegt report-uri. Vorher meldete nur die Report-Only-Regel
+    im Modus beobachten - in Produktion wurde blockiert, aber nie gemeldet."""
+    antwort = client.get(f"/p/{admin['tokens']['home']}", follow_redirects=True)
+    assert "report-uri /csp-bericht" in antwort.headers["Content-Security-Policy"]
+    assert "Content-Security-Policy-Report-Only" not in antwort.headers
+
+
 def test_frame_ancestors_bleibt_in_jedem_modus(client, admin, scharf):
     """Fällt das weg, ist der Esszimmerbildschirm schwarz."""
     antwort = client.get(f"/p/{admin['tokens']['home']}")

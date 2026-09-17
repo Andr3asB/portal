@@ -1,7 +1,9 @@
 // v2 wegen Wunsch #140, Stufe 4: Der Namenswechsel raeumt beim ersten Start
 // nach der Auslieferung einmal alles weg, was noch unter Token-Adressen im
 // Cache lag.
-const CACHE_NAME = 'portal-cache-v2';
+// v3 wegen Wunsch #286 (Sicherheitsaudit 16.09.2026, Befund N-07): raeumt
+// einmalig, was bis dahin unter /p/<token> gecacht wurde - siehe fetch unten.
+const CACHE_NAME = 'portal-cache-v3';
 
 // Wunsch #140, Stufe 4: Merker, WESSEN Seiten im Cache liegen.
 //
@@ -47,7 +49,11 @@ async function nutzerPruefen(id) {
 // Jede Seite meldet nach dem Laden, wer sie sieht (siehe base.html).
 self.addEventListener('message', event => {
   const d = event.data || {};
-  if (d.typ === 'nutzer' && d.id) {
+  // Wunsch #286: `id: 0` kommt von denied.html - "hier ist niemand mehr
+  // angemeldet" - und muss den Cache des vorigen Nutzers genauso wegwerfen
+  // wie ein Nutzerwechsel. Deshalb nicht `d.id` (0 waere falsy), sondern
+  // die Frage, ob das Feld ueberhaupt da ist.
+  if (d.typ === 'nutzer' && d.id !== undefined && d.id !== null) {
     event.waitUntil(nutzerPruefen(String(d.id)));
   }
 });
@@ -66,7 +72,20 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     fetch(req).then(resp => {
-      if (resp.ok) {
+      // Wunsch #286 (Sicherheitsaudit 16.09.2026, Befund N-07), zwei Regeln:
+      //
+      // 1. Antwortet der Server auf eine Navigation mit 401/403, ist der
+      //    Zugang weg - "Zugaenge neu erzeugen" oder ein abgemeldetes Geraet.
+      //    Bis dahin blieb der alte Stand im Cache liegen (ein 403 ist nicht
+      //    `ok`, ersetzte also nichts) und war offline weiter lesbar.
+      // 2. Seiten unter /p/ werden nie gecacht: Der Erstbesuch von
+      //    /p/<token> antwortet mit dem Token in der Adresse und im Body,
+      //    und die Cache-Storage ist in den DevTools lesbar.
+      if (req.mode === 'navigate' && (resp.status === 401 || resp.status === 403)) {
+        caches.delete(CACHE_NAME);
+        return resp;
+      }
+      if (resp.ok && !url.pathname.startsWith('/p/')) {
         const kopie = resp.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, kopie));
       }

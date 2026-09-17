@@ -25,9 +25,9 @@ das bei #129 an der Navigation gescheitert ist.
 
 Cookie-Attribute und ihre Begründung:
   Secure     – HTTPS-only; HSTS steht bereits (Wunsch #134)
-  HttpOnly   – die CSP erlaubt bewusst `unsafe-inline` bei script-src
-               (59 Inline-Handler, Wunsch #142); bei XSS ist HttpOnly die
-               verbleibende Bremse
+  HttpOnly   – seit Wunsch #142 läuft script-src über ein Nonce, aber bei
+               einer künftigen XSS-Lücke bleibt HttpOnly die Bremse, die
+               das Cookie vom Skript fernhält (Stand korrigiert mit #294)
   SameSite=Lax – `wir4` und `portal` sind Subdomains von `16schwaben.de`,
                also same-site: das Cookie geht auch im Home-Assistant-iFrame
                auf dem Esszimmerbildschirm mit. `Strict` würde beim ersten

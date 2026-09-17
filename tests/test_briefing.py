@@ -18,6 +18,22 @@ def modul(app):
     return importlib.import_module("teile.27_briefing")
 
 
+@pytest.fixture(autouse=True)
+def essensplan_fuer_alle(app, db):
+    """Wunsch #292: Das Briefing zeigt Mahlzeiten nur noch mit Essensplan-
+    Grant. Die Testfamilie aus conftest hat ihn nicht - hier bekommen ihn
+    alle, damit diese Tests weiter den INHALT pruefen. Den Grant-Fall selbst
+    prueft tests/test_briefing_grant.py."""
+    from teile.kern import new_token, token_lookup
+    v = db["verbindung"]
+    app_id = v.execute("SELECT id FROM apps WHERE slug='essensplan'").fetchone()["id"]
+    with app.app_context():
+        for daten in db["familie"].values():
+            v.execute("INSERT OR IGNORE INTO grants(user_id, app_id, token_lookup) VALUES(?,?,?)",
+                      (daten["id"], app_id, token_lookup(new_token())))
+    v.commit()
+
+
 def _zeit(jahr, monat, tag, stunde, minute=0):
     return datetime(jahr, monat, tag, stunde, minute, tzinfo=LOKAL_TZ)
 

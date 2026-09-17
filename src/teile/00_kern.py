@@ -904,6 +904,20 @@ def grant_anlegen(db, user_id: int, app_id: int) -> str:
     return token if cur.rowcount else None
 
 
+def hat_grant(db, user_id: int, app_slug: str) -> bool:
+    """Hat der Nutzer die App freigeschaltet? Reine Sichtbarkeitsfrage ohne
+    Token - fuer Stellen, die Daten EINER App an anderer Stelle zeigen.
+
+    Wunsch #292 (Sicherheitsaudit 16.09.2026, Befund N-14): Das Briefing auf
+    der Startseite zeigte den Essensplan auch, wenn Andi einem Nutzer die
+    Essensplan-App bewusst NICHT gegeben hatte. Der App-Grant entscheidet,
+    wer was sieht - auch ausserhalb der App selbst."""
+    return db.execute(
+        "SELECT 1 FROM grants g JOIN apps a ON a.id = g.app_id "
+        "WHERE g.user_id = ? AND a.slug = ?", (user_id, app_slug)
+    ).fetchone() is not None
+
+
 def new_token() -> str:
     return secrets.token_urlsafe(18)
 
@@ -2765,4 +2779,14 @@ def init_app(app):
         # Seite (/p/..., /a/.../...) kontrollieren koennen, nicht nur /static/.
         if request.path == "/static/sw.js":
             resp.headers["Service-Worker-Allowed"] = "/"
+        # Wunsch #294 (Sicherheitsaudit 16.09.2026, Befund N-16): Seiten und
+        # JSON-Antworten sind personalisiert und gehoeren in keinen
+        # HTTP-Cache - auf dem geteilten Geraet sah der naechste Nutzer per
+        # Zurueck-Taste sonst Seiten des vorigen. Nur setzen, wenn niemand
+        # schon etwas gesetzt hat (Flask gibt statischen Dateien `no-cache`,
+        # das TVB-SVG traegt eine eigene Frist). Der Service Worker cached
+        # unabhaengig davon, Offline-Faehigkeit bleibt.
+        if ("Cache-Control" not in resp.headers
+                and resp.mimetype in ("text/html", "application/json")):
+            resp.headers["Cache-Control"] = "no-store"
         return resp

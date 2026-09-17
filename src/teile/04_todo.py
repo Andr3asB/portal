@@ -440,6 +440,12 @@ def set_status(token, tid):
     row = db.execute("SELECT * FROM todos WHERE id=?", (tid,)).fetchone()
     if not row:
         abort(404)
+    # Wunsch #288 (Sicherheitsaudit 16.09.2026, Befund N-09): Unsichtbare
+    # Aufgaben antworten 404 wie nicht vorhandene - dieselbe Regel wie im
+    # Kanban. Vorher liess sich per Durchzaehlen der IDs aus 403 gegen 404
+    # ablesen, wie viele fremde private Aufgaben es gibt.
+    if tid not in _sichtbare_ids(db, user):
+        abort(404)
     if not _darf_erledigen(user, row):
         abort(403)
     status = request.form.get("status", "")
@@ -596,6 +602,8 @@ def bearbeiten(token, tid):
     row = db.execute("SELECT * FROM todos WHERE id=?", (tid,)).fetchone()
     if not row:
         abort(404)
+    if tid not in _sichtbare_ids(db, user):
+        abort(404)                      # Wunsch #288, siehe set_status()
     if not _darf_erledigen(user, row):
         abort(403)
 
