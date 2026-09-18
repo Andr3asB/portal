@@ -162,8 +162,16 @@ def db(app):
 
 @pytest.fixture()
 def client(app, db):
-    """Test-Client mit frisch aufgebauter Familie."""
-    return app.test_client()
+    """Test-Client mit frisch aufgebauter Familie.
+
+    Wunsch #293: Der Client tritt als BROWSER auf (`Accept: text/html`) -
+    seitdem stellt das Portal nur noch fuer Browser-Navigationen ein
+    Sitzungs-Cookie aus, nicht mehr fuer curl und Skripte. Ein Test, der ein
+    Skript nachstellen will, gibt `headers={"Accept": "*/*"}` mit; das
+    ueberschreibt diesen Vorgabewert fuer die eine Anfrage."""
+    c = app.test_client()
+    c.environ_base = {"HTTP_ACCEPT": "text/html,application/xhtml+xml,*/*;q=0.8"}
+    return c
 
 
 @pytest.fixture()

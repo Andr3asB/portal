@@ -32,6 +32,11 @@ BEKANNTE_AUSNAHMEN = {
     # Autorisierung - die Meldung kommt vom Browser selbst, nicht von einer
     # Seite, und der Endpunkt aendert keine Daten.
     "/csp-bericht",
+    # Wunsch #293: Bestaetigung "Auf diesem Geraet als X anmelden?". Der
+    # Token kommt aus dem Formular (nicht aus der Adresse, damit er nicht in
+    # den Verlauf faellt) und wird gegen `grants` geprueft - dieselbe Klasse
+    # wie /wunsch und /push/subscribe.
+    "/sitzung/uebernehmen",
 }
 
 

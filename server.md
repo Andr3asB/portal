@@ -2639,6 +2639,41 @@ anhängen.
   Audit N-16; `after_request` im Kern, nur wenn niemand schon einen
   Cache-Header gesetzt hat). Die scharfe CSP trägt `report-uri /csp-bericht`
   – Verstöße in Produktion landen im Log (`grep CSP-Verstoss`).
+- **Sitzungen haben einen Ablauf (365 Tage wie das Cookie), höchstens 20
+  je Nutzer, und nur Browser-Navigationen bekommen eine** (Wunsch #293,
+  Audit N-15): `19_sitzung.py` stellt nur aus, wenn `Sec-Fetch-Mode:
+  navigate` oder `Accept: text/html` mitkommt – `curl`, Skripte und
+  Healthchecks (der Fall der 808 Sitzungen vom 08.08.2026) gehen leer aus.
+  Der Test-Client in `conftest.py` tritt deshalb als Browser auf
+  (`environ_base` mit `Accept: text/html`); wer ein Skript nachstellt, gibt
+  `headers={"Accept": "*/*"}` mit. Die Kiosk-Sitzung ohne `ablauf` bleibt
+  gültig, Abgelaufenes wird beim Anlegen einer neuen Sitzung geräumt.
+- **Ein fremder Link von einer fremden Seite fragt erst** (Wunsch #293,
+  Login-CSRF): Trägt eine `Sec-Fetch-Site: cross-site`-Navigation einen
+  Pfad-Token eines ANDEREN Nutzers als das Cookie, rendert `19_sitzung.py`
+  `sitzung_wechsel.html` („Auf diesem Gerät als X anmelden?"); die
+  Bestätigung ist ein same-origin-POST auf `/sitzung/uebernehmen` (Token im
+  Formular, Ziel nur als lokaler Pfad). QR-Scan, Adresszeile, Lesezeichen
+  (`none`) und eigene Links (`same-origin`) übernehmen wie gehabt sofort.
+- **Die Stufenschalter werden beim Start geprüft** (Wunsch #293, Teil 2):
+  `app.py:stufen_pruefen()` verweigert den Start bei einem Wert ausserhalb
+  `{0,1,true,false,ja,nein}` bzw. `{aus,beobachten,scharf}` – auch bei
+  leerem Wert – und schreibt den Stand als eine Zeile ins Log
+  (`grep "Stufenschalter beim Start"`). `scripts/live_pruefung.py` prüft
+  zusätzlich von aussen: CSP mit Nonce und `report-uri`, POST ohne Herkunft
+  → 403.
+- **Der Guardrail-Hook ist fail-closed und kennt Abfluss-Regeln** (Wunsch
+  #290, Audit N-12): unlesbare Nutzlast = blockiert; `cat/grep/… .env`,
+  `.env.vor-*`, `/srv/familienportal/ssh/`, `id_ed25519`, `/proc/*/environ`,
+  `docker exec … env|printenv`, `docker compose config`, `docker inspect`
+  ohne engen `--format` (oder mit `.Env`), Container mit `--privileged`/
+  Docker-Socket/Host-Wurzel, `exec -u 0`, base64-Pipes in eine Shell,
+  Löschen von `/srv/familienportal/data`, force-push, `git remote set-url`,
+  `filter-branch`. `tests/test_guardrails.py` fährt den Hook mit Beispielen
+  durch und prüft, dass `.claude/guardrails.sh` und `.claude/settings.json`
+  mit den Vorlagen im Root übereinstimmen. `.claude/settings.local.json`
+  enthält nur noch konkrete Formen (kein `ssh *`, `scp *`, `curl *`,
+  `git *`, `python3 *`).
 - **Komprimierte Antworten werden mit Obergrenze entpackt** (Wunsch #282,
   Audit N-03): `zlib.decompressobj().decompress(raw, grenze + 1)` statt
   `gzip.decompress()`, das erst alles materialisiert und dann messen lässt.
@@ -3183,6 +3218,24 @@ python -m venv .venv                                   # einmalig
   mit cap_add NET_BIND_SERVICE und /config; util_tmp als Volume statt tmpfs;
   Images per Version+Digest; Dockerfiles mit FROM-Digest, USER, compileall;
   .dockerignore mit `.env*`/`*.db`/`__pycache__`; util in Familienzeit.
+- `test_sitzung_haertung.py` – Wunsch #293 (Audit N-15). Neue Sitzung mit
+  `ablauf` in 365 Tagen; Abgelaufenes wird geraeumt, Kiosk-Sitzung ohne
+  Ablauf bleibt; hoechstens 20 je Nutzer, die am laengsten unbenutzte
+  faellt; `Accept: */*` (curl) bekommt keine Sitzung, `Sec-Fetch-Mode:
+  navigate` oder `Accept: text/html` schon; cross-site-Link eines anderen
+  Nutzers liefert die Rueckfrage ohne Cookie-Tausch; `none`/`same-origin`/
+  ohne Header uebernehmen direkt; eigener Link fragt nie; die Bestaetigung
+  tauscht die Sitzung (303, neues Cookie); falscher Token 403, fremdes Ziel
+  400 ohne Nebenwirkung.
+- `test_stufen_schalter.py` – Wunsch #293, Teil 2. Produktionsstand
+  gueltig, Voreinstellung gueltig, getrimmte/grossgeschriebene Werte
+  gueltig, leerer Wert und Tippfehler (`schraf`, `on`, `yes`, `2`)
+  verweigern den Start mit dem Namen des Schalters in der Meldung.
+- `test_guardrails.py` – Wunsch #290 (Audit N-12). 17 erlaubte und 40
+  blockierte Beispielbefehle durch den echten Hook (`bash guardrails.sh`,
+  JSON auf stdin); fuenf unlesbare Nutzlasten muessen fail-closed enden;
+  `.claude/`-Kopien identisch mit den Vorlagen; `settings.local.json` ohne
+  pauschale Freigaben und ohne Token. Uebersprungen, wenn kein bash im PATH.
 - `test_rezept_import_gzip.py::test_echte_bombe_wird_nie_ganz_entpackt` –
   Wunsch #282 (Audit N-03). 300 MB Nullen als ~300 KB gzip; die unbegrenzten
   Entpacker sind per monkeypatch verboten, `_entpacken` muss trotzdem mit

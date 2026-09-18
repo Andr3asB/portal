@@ -64,6 +64,39 @@ app.config["TVB_HINTERGRUND"] = os.environ.get("TVB_HINTERGRUND", "1")
 app.config["BRIEFING_PUSH"] = os.environ.get("BRIEFING_PUSH", "1")
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
+# Wunsch #293 (Sicherheitsaudit 16.09.2026, Befund N-15, Teil 2): Die
+# Stufenschalter fielen bei einer fehlenden oder verschriebenen Zeile still
+# auf ihre unsichere Voreinstellung zurueck - `CSRF_MODUS=scharf` mit einem
+# Tippfehler hiess: kein CSRF-Riegel, und nichts meldete es. Jetzt verweigert
+# die App den Start bei einem Wert ausserhalb der erlaubten Menge (Gunicorn
+# bricht ab, der Container bleibt im Neustart, das faellt auf), und der
+# tatsaechliche Stand steht bei jedem Start als eine Zeile im Log.
+STUFEN_WERTE = {
+    "SITZUNG_AUSSTELLEN":  {"0", "1", "true", "false", "ja", "nein"},
+    "SITZUNG_KONSUMIEREN": {"0", "1", "true", "false", "ja", "nein"},
+    "TOKENFREIE_URLS":     {"0", "1", "true", "false", "ja", "nein"},
+    "CSRF_MODUS":          {"aus", "beobachten", "scharf"},
+    "CSP_MODUS":           {"aus", "beobachten", "scharf"},
+}
+
+
+def stufen_pruefen(config) -> dict:
+    """Wirft SystemExit bei einem ungueltigen Schalterwert; sonst der Stand."""
+    stand, fehler = {}, []
+    for name, erlaubt in STUFEN_WERTE.items():
+        roh = config.get(name, "")
+        wert = str(roh).strip().lower()
+        if wert not in erlaubt:
+            fehler.append(f"{name}={roh!r} (erlaubt: {', '.join(sorted(erlaubt))})")
+        stand[name] = wert
+    if fehler:
+        raise SystemExit("Stufenschalter ungueltig - Start verweigert: " + "; ".join(fehler))
+    return stand
+
+
+app.logger.warning("Stufenschalter beim Start: %s",
+                   ", ".join(f"{k}={v}" for k, v in stufen_pruefen(app.config).items()))
+
 # Wunsch #133: Obergrenze für den Anfrage-Body. Die Foto-Importe (Rezepte,
 # Vokabeln) lasen die Datei bisher erst komplett per .read() in den Speicher
 # und prüften DANACH auf 8 MB - bei 256 MB RAM-Limit reichen ein paar

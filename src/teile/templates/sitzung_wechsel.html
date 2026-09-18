@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gerät übernehmen? · 16schwaben.de</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f7; color: #1d1d1f;
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 16px; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
+    p  { font-size: 16px; color: #6e6e73; line-height: 1.6; max-width: 320px; }
+    form { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+    button {
+      font: inherit; font-size: 17px; font-weight: 600;
+      padding: 14px 24px; border-radius: 12px; border: 0;
+      background: #1d1d1f; color: #fff; cursor: pointer;
+    }
+    a.bleiben { font-size: 15px; color: #6e6e73; }
+    .hint { margin-top: 24px; font-size: 14px; color: #aeaeb2; }
+  </style>
+</head>
+<body>
+{# Wunsch #293: Rueckfrage, bevor ein fremder Link von einer fremden Seite
+   aus das Geraet uebernimmt. Der Token steckt im Formular, nicht in der
+   Adresse; der POST ist same-origin und damit vom CSRF-Riegel gedeckt. #}
+  <div class="icon">👥</div>
+  <h1>Auf diesem Gerät als {{ neuer_name }} anmelden?</h1>
+  <p>Hier ist gerade <strong>{{ alter_name }}</strong> angemeldet. Der Link, den du geöffnet hast, gehört <strong>{{ neuer_name }}</strong>. Wenn du weitermachst, ist danach {{ neuer_name }} angemeldet.</p>
+  <form method="post" action="/sitzung/uebernehmen">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="ziel" value="{{ ziel }}">
+    <button type="submit">Ja, als {{ neuer_name }} anmelden</button>
+    <a class="bleiben knopf" href="/start">Nein, als {{ alter_name }} bleiben</a>
+  </form>
+  <p class="hint">portal.16schwaben.de</p>
+</body>
+</html>

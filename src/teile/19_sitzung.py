@@ -39,14 +39,28 @@ Cookie-Attribute und ihre Begründung:
 """
 import secrets
 
-from flask import current_app, g, request
+from flask import abort, current_app, g, redirect, render_template, request
 
-from teile.kern import SITZUNG_COOKIE, get_db, token_lookup
+from teile.kern import (
+    SITZUNG_COOKIE,
+    get_db,
+    sitzung_nutzer_id,
+    sitzung_vormerken,
+    token_lookup,
+)
 
 # Der Name liegt im Kern, weil grant() das Cookie ab Stufe 3 selbst liest -
 # ein Import in die andere Richtung waere ein Ringschluss.
 COOKIE_NAME = SITZUNG_COOKIE
 _MAX_AGE = 365 * 24 * 3600
+# Wunsch #293 (Sicherheitsaudit 16.09.2026, Befund N-15): Eine Sitzung lebt
+# so lange wie ihr Cookie (ein Jahr) - vorher stand `ablauf` immer auf NULL,
+# jede Zeile war ein nie ablaufender Zugang. Und je Nutzer hoechstens 20
+# Sitzungen: die aelteste faellt, wenn eine 21. dazukommt. Das deckt jedes
+# Geraet und jeden Browser der Familie und macht Schluss mit dem Muster vom
+# 08.08.2026 (808 Zeilen aus Pruef-Aufrufen).
+_ABLAUF_TAGE = 365
+_SITZUNGEN_JE_NUTZER = 20
 # Wunsch #154: 80 Zeichen schnitten bei JEDEM echten Browser vor dem Namen ab -
 # "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like
 # Gecko)" ist bereits genau 80 lang, "Chrome/141.0" kam nie an. Die
@@ -77,16 +91,110 @@ def _sitzung_anlegen(db, user_id: int, quelle: str) -> str:
     der existiert nur hier und geht direkt an den Browser."""
     wert = secrets.token_urlsafe(32)
     db.execute(
-        "INSERT INTO sitzungen(user_id, kennung_lookup, quelle, geraet, gesehen) "
-        "VALUES(?,?,?,?, datetime('now'))",
+        "INSERT INTO sitzungen(user_id, kennung_lookup, quelle, geraet, gesehen, ablauf) "
+        "VALUES(?,?,?,?, datetime('now'), datetime('now', ?))",
         (user_id, token_lookup(wert), quelle,
-         (request.headers.get("User-Agent") or "")[:_GERAET_MAX]),
+         (request.headers.get("User-Agent") or "")[:_GERAET_MAX],
+         f"+{_ABLAUF_TAGE} days"),
     )
+    # Wunsch #293: Abgelaufenes raeumen (huckepack, statt eines eigenen
+    # Threads - eine neue Sitzung ist selten genug) und die Obergrenze je
+    # Nutzer halten. Sortiert nach "zuletzt benutzt": ein Geraet, das seit
+    # Monaten nicht mehr da war, faellt zuerst.
+    db.execute("DELETE FROM sitzungen WHERE ablauf IS NOT NULL AND ablauf < datetime('now')")
+    db.execute("""
+        DELETE FROM sitzungen
+        WHERE user_id = ?
+          AND id NOT IN (SELECT id FROM sitzungen WHERE user_id = ?
+                         ORDER BY COALESCE(gesehen, erstellt) DESC, id DESC LIMIT ?)
+    """, (user_id, user_id, _SITZUNGEN_JE_NUTZER))
     db.commit()
     return wert
 
 
+def _ist_browser_navigation() -> bool:
+    """Wunsch #293: Nur ein Browser, der eine Seite anzeigt, bekommt eine
+    Sitzung. `curl`, Skripte und Healthchecks schicken kein `Accept:
+    text/html` und keinen `Sec-Fetch-Mode: navigate` - genau die haben am
+    08.08.2026 die 808 nie ablaufenden Sitzungen erzeugt. Ein Browser schickt
+    bei jeder Navigation mindestens eines von beiden (Safari das Accept, alle
+    modernen dazu Sec-Fetch-Mode)."""
+    if request.headers.get("Sec-Fetch-Mode") == "navigate":
+        return True
+    return "text/html" in (request.headers.get("Accept") or "")
+
+
+def _nutzername(db, user_id):
+    zeile = db.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+    return zeile["name"] if zeile else "?"
+
+
+def _ziel_ist_lokal(ziel: str) -> bool:
+    """Nur eigene Pfade - kein Open Redirect ueber das Bestaetigungsformular."""
+    return bool(ziel) and ziel.startswith("/") and not ziel.startswith("//") \
+        and "\\" not in ziel and ":" not in ziel.split("?", 1)[0]
+
+
 def init_app(app):
+    @app.before_request
+    def fremde_sitzung_abfangen():
+        """Wunsch #293 (Login-CSRF innerhalb der Familie): Ein Klick auf einen
+        fremden Zugangslink von einer FREMDEN Seite aus (Chat, Mail im
+        Browser) uebernahm bisher still das Geraet - `/p/<token>` ersetzt die
+        vorhandene Sitzung ohne Rueckfrage (gewollt fuers geteilte iPad),
+        und GET wird vom CSRF-Riegel nie geprueft. Folge-Eingaben landeten im
+        falschen Konto.
+
+        Deshalb: Traegt eine cross-site-Navigation einen Pfad-Token, der zu
+        einem ANDEREN Nutzer gehoert als das Cookie, gibt es erst eine
+        Rueckfrage. QR-Scan, Adresszeile und Lesezeichen (Sec-Fetch-Site:
+        none) und eigene Links (same-origin) bleiben wie gehabt - nur der
+        Klick aus einer fremden Seite fragt."""
+        if request.method != "GET" or not _schalter_an():
+            return None
+        if request.headers.get("Sec-Fetch-Site") != "cross-site":
+            return None
+        token = (request.view_args or {}).get("token")
+        if not token:
+            return None
+        db = get_db()
+        cookie_uid = sitzung_nutzer_id(db)
+        if cookie_uid is None:
+            return None
+        inhaber = db.execute(
+            "SELECT user_id FROM grants WHERE token_lookup = ?", (token_lookup(token),)
+        ).fetchone()
+        if not inhaber or inhaber["user_id"] == cookie_uid:
+            return None
+        return render_template(
+            "sitzung_wechsel.html",
+            neuer_name=_nutzername(db, inhaber["user_id"]),
+            alter_name=_nutzername(db, cookie_uid),
+            token=token, ziel=request.full_path.rstrip("?"),
+        ), 200
+
+    @app.route("/sitzung/uebernehmen", methods=["POST"])
+    def sitzung_uebernehmen():
+        """Die Bestaetigung aus sitzung_wechsel.html: same-origin-POST, also
+        vom CSRF-Riegel gedeckt. Der Token kommt aus dem Formular, nicht aus
+        der Adresse; danach geht es zum urspruenglichen Ziel."""
+        token = (request.form.get("token") or "").strip()
+        ziel = (request.form.get("ziel") or "/start").strip()
+        if not token or not _ziel_ist_lokal(ziel):
+            abort(400)
+        db = get_db()
+        inhaber = db.execute(
+            "SELECT user_id FROM grants WHERE token_lookup = ?", (token_lookup(token),)
+        ).fetchone()
+        if not inhaber:
+            abort(403)
+        vorhanden = sitzung_aus_cookie(db)
+        if vorhanden is not None:
+            db.execute("DELETE FROM sitzungen WHERE id = ?", (vorhanden["id"],))
+            db.commit()
+        sitzung_vormerken(inhaber["user_id"])      # after_request stellt aus
+        return redirect(ziel, code=303)
+
     @app.after_request
     def sitzung_ausstellen(antwort):
         # `g.sitzung_fuer` setzt kern.sitzung_vormerken(), sobald ein
@@ -101,6 +209,9 @@ def init_app(app):
         # das Gegenteil, der Code tat es nie – beim Prüfen von Stufe 3
         # aufgefallen.)
         if antwort.status_code >= 400:
+            return antwort
+        # Wunsch #293: kein Cookie fuer curl, Skripte und Healthchecks.
+        if not _ist_browser_navigation():
             return antwort
 
         try:

@@ -2,6 +2,78 @@
 
 ---
 
+## 2026-09-18 – portal-v262: Guardrails fail-closed (#290), Sitzungen mit Ablauf und Rückfrage (#293)
+
+Die letzten beiden priorisierten Audit-Befunde. Beide berühren Dinge, die
+CLAUDE.md unter Absprache-Vorbehalt stellt – die Priorisierung durch Andi
+ist diese Absprache; geändert wurde trotzdem nur, was der Wunschtext nennt.
+
+### #290 (N-12, `mittel`) – der Guardrail-Hook war fail-open und blind für Abfluss
+
+`guardrails.sh` liess bei jedem Parsefehler der Nutzlast ALLES durch (leeres
+`CMD` → `exit 0`) und kannte keine einzige Regel gegen das Lesen von
+Geheimnissen: `cat .env`, `docker exec portal env`, `docker inspect portal`
+waren frei – und jede Ausgabe landet im Sitzungs-Transkript beim
+Modellanbieter. Jetzt: fail-closed (python3, dann python, sonst blockiert),
+Abfluss-Regeln (`.env`, `.env.vor-*`, `ssh/`, `id_ed25519`, `/proc/*/environ`,
+`env|printenv` im Container, `compose config`, `inspect` ohne engen
+`--format`), Container-Ausbruch (`--privileged`, Docker-Socket, Host-Wurzel,
+`exec -u 0`), base64-Pipes in eine Shell, `rm -rf` auf `/srv/familienportal/
+data|ssh` und lokales `data/`, force-push, `remote set-url`, `filter-branch`,
+`systemctl daemon-reload|kill|edit`, `\sudo`. Die Kopie in `.claude/` ist
+nachgezogen. `.claude/settings.local.json` ist auf 14 konkrete Einträge
+geschrumpft – die alte Liste enthielt neben `ssh *`/`scp *`/`curl *`/`git *`
+auch noch einen curl-POST mit einem Token im JSON-Body vom 27.07. (mein
+Regex vom 17.09. hatte nur URL-Formen gesucht). `tests/test_guardrails.py`
+fährt 17 erlaubte und 40 blockierte Befehle durch den echten Hook, fünf
+unlesbare Nutzlasten müssen blockieren, und die `.claude/`-Kopien müssen den
+Vorlagen gleichen. Nicht angefasst: `settings.json` (die Beobachtung aus dem
+Audit – `Bash(cat:*)` erlaubt `cat .env` – erledigt der Hook, der vor jeder
+allow-Regel läuft).
+
+Beim Testen der Abfluss-Regel fiel auf, dass ich selbst am 17.09. `docker
+exec portal sh -c 'env | grep -i gunicorn'` gefahren hatte – genau die
+Klasse Befehl, die der Hook jetzt abweist.
+
+### #293 (N-15, `mittel`) – Sitzungen mit Ablauf, Obergrenze, nur für Browser; Rückfrage bei fremdem Link
+
+`_sitzung_anlegen()` setzt `ablauf` auf +365 Tage (wie das Cookie), räumt
+Abgelaufenes und hält 20 je Nutzer (die am längsten unbenutzte fällt;
+Kiosk-Sitzungen ohne Ablauf bleiben). Ausgestellt wird nur noch für
+Browser-Navigationen (`Sec-Fetch-Mode: navigate` oder `Accept: text/html`) –
+`curl` und Skripte, die am 08.08.2026 808 Sitzungen erzeugt hatten, gehen leer
+aus. Damit die 400 bestehenden Sitzungs-Tests nicht alle Header setzen
+müssen, tritt der Test-Client in `conftest.py` per `environ_base` als
+Browser auf.
+
+Login-CSRF innerhalb der Familie: `before_request` in `19_sitzung.py` fängt
+eine `cross-site`-Navigation mit fremdem Pfad-Token ab und rendert
+`sitzung_wechsel.html` („Auf diesem Gerät als X anmelden?"); die Bestätigung
+ist ein same-origin-POST auf `/sitzung/uebernehmen` (Token im Formular,
+Ziel nur als lokaler Pfad, Eintrag in `BEKANNTE_AUSNAHMEN` des
+Routen-Inventars). QR-Scan, Adresszeile, Lesezeichen und Portal-eigene
+Links übernehmen wie bisher sofort. Hilfe-Kapitel „Dein Zugang" ergänzt.
+
+Teil 2: `app.py:stufen_pruefen()` verweigert den Start bei einem Wert
+ausserhalb der erlaubten Menge (auch leer) und loggt den Stand
+(`Stufenschalter beim Start: …`). `live_pruefung.py` prüft von aussen
+CSP-Nonce, `report-uri` und dass ein POST ohne Herkunft 403 bekommt.
+
+### Auslieferung und Prüfung
+
+Suite 2589 grün, ruff sauber; **ein** Altfehler ohne Bezug zu diesem Lauf:
+`test_geholfen_matrix.py::test_eintrag_kurz_vor_mitternacht_zaehlt_zum_familientag`
+ist am 17.09. grün und am 18.09. rot, auch auf dem unveränderten Stand (per
+`git stash` gegengeprüft) – der Test hängt offenbar an einer zweiten Stelle
+am echten Kalender. Als Wunsch für die Geholfen-App eingetragen, nicht
+umgesetzt (keine Priorität). v262 nur portal neu gebaut; Startzeile im Log:
+`Stufenschalter beim Start: SITZUNG_AUSSTELLEN=1, SITZUNG_KONSUMIEREN=1,
+TOKENFREIE_URLS=1, CSRF_MODUS=scharf, CSP_MODUS=scharf`. Live-Prüfung
+inklusive der neuen Stufen-Kontrolle grün. Der neue Guardrail-Hook ist seit
+dem Kopieren aktiv und hat die Deploy-Befehle dieses Laufs durchgelassen.
+
+---
+
 ## 2026-09-17 – portal-v259: Sieben weitere Audit-Befunde (#286–#288, #291, #292, #294, #295)
 
 Zweiter Lauf des Tages, Andi hatte die nächsten sieben freigegeben. Alles

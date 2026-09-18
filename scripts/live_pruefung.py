@@ -124,6 +124,41 @@ def hole(pfad: str, cookie: str) -> tuple[int, int]:
         return 0, int((time.monotonic() - start) * 1000)
 
 
+def stufen_pruefen(cookie: str) -> list[str]:
+    """Wunsch #293: Sieht man dem laufenden Portal an, dass die Stufen scharf
+    sind? Zwei Dinge lassen sich von aussen ablesen - die CSP traegt ein
+    Nonce (CSP_MODUS=scharf) und einen report-uri (#294), und eine
+    aendernde Anfrage ohne Herkunft wird mit 403 abgewiesen (CSRF_MODUS=
+    scharf). Ein Tippfehler in der .env faellt damit hier auf, nicht erst
+    beim naechsten Audit."""
+    maengel = []
+    anfrage = urllib.request.Request(BASIS + "/start", headers={
+        "Cookie": f"portal_sitzung={cookie}", "User-Agent": "portal-live-pruefung"})
+    with urllib.request.urlopen(anfrage, timeout=20,
+                                context=ssl.create_default_context()) as antwort:
+        csp = antwort.headers.get("Content-Security-Policy") or ""
+    if "'nonce-" not in csp:
+        maengel.append("CSP ohne Nonce - steht CSP_MODUS auf scharf?")
+    if "report-uri" not in csp:
+        maengel.append("CSP ohne report-uri (#294)")
+    # POST ohne Origin/Sec-Fetch-Site auf einen Pfad, der nichts aendert, wenn
+    # er durchkaeme (ungueltiger Token) - bei CSRF scharf antwortet der Riegel
+    # VOR der Route mit 403; bei aus/beobachten die Route selbst mit 403. Der
+    # Unterschied steckt im Log, nicht im Status - darum hier nur die
+    # Gegenprobe, dass ueberhaupt 403 kommt und nichts anderes.
+    anfrage = urllib.request.Request(BASIS + "/a/todo/status/1", method="POST",
+                                     data=b"status=offen",
+                                     headers={"Content-Type": "application/x-www-form-urlencoded",
+                                              "User-Agent": "portal-live-pruefung"})
+    try:
+        with urllib.request.urlopen(anfrage, timeout=20, context=ssl.create_default_context()):
+            maengel.append("POST ohne Herkunft und ohne Token kam durch")
+    except urllib.error.HTTPError as fehler:
+        if fehler.code != 403:
+            maengel.append(f"POST ohne Herkunft: HTTP {fehler.code} statt 403")
+    return maengel
+
+
 def main() -> int:
     nutzer = sys.argv[1] if len(sys.argv) > 1 else None
     cookie, name, apps = sitzung_anlegen(nutzer)
@@ -136,6 +171,10 @@ def main() -> int:
             print(f"  {code}  {ms:5d} ms  {beschriftung}")
             if code != 200:
                 fehler.append((beschriftung, code))
+        for mangel in stufen_pruefen(cookie):
+            print(f"  !!!          {mangel}")
+            fehler.append((mangel, 0))
+        print("  ok           Stufen: CSP-Nonce, report-uri, CSRF-Riegel")
         for app in apps:
             if app["slug"] == "home":
                 continue          # die Startseite hängt nicht unter /a/

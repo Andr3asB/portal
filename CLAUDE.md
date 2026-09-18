@@ -184,7 +184,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2481 Tests, Stand 17.09.2026, gut eine Minute)
+# Alles (2590 Tests, Stand 18.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -419,7 +419,13 @@ Zurücknehmen einer Stufe ist damit **eine Zeile plus `docker compose up -d
 portal` – kein Rebuild, kein Paket, keine entfernte Route**. Implementiert in
 `19_sitzung.py`, `20_csrf.py`, `21_csp.py`; Vollreferenz mit allen
 Abhängigkeiten in `.env.example`, der aktuell auf dem Server gesetzte Stand in
-`server.md` („Umgebungsvariablen").
+`server.md` („Umgebungsvariablen"). Seit #293 prüft `app.py:stufen_pruefen()`
+die fünf Werte beim Start und **verweigert bei Tippfehler oder leerem Wert
+den Start** (vorher fiel `CSRF_MODUS=schraf` still auf `aus` zurück); der
+Stand steht bei jedem Start als eine Log-Zeile, und `live_pruefung.py` prüft
+CSP-Nonce, `report-uri` und CSRF-Riegel von aussen. Sitzungen bekommen nur
+Browser-Navigationen (`Accept: text/html` oder `Sec-Fetch-Mode: navigate`) –
+der Test-Client tritt dafür in `conftest.py` als Browser auf.
 
 **Verbindliche Konventionen (siehe auch `server.md` „Sicherheitskonventionen"):**
 - Ganzzahlen aus Nutzereingaben immer über `to_int()`, nie nacktes `int()`.
@@ -548,12 +554,21 @@ zusätzlich als **aktive Kopie in `.claude/`** – erst dort greifen sie:
   JSON und setzt dieselben Verbote durch – **auch wenn der Befehl erst per SSH
   auf `home02` landet**, denn präfixbasierte deny-Regeln greifen dort nicht,
   weil die Zeile mit `ssh` beginnt. Rückgabe: `0` = erlaubt, `2` = blockiert,
-  stderr geht an Claude.
+  stderr geht an Claude. Seit #290 (18.09.2026) **fail-closed** (unlesbare
+  Nutzlast = blockiert) und mit Regeln gegen den **Abfluss von Geheimnissen**:
+  kein `cat`/`grep`/… auf `.env`, `.env.vor-*`, `/srv/familienportal/ssh/`,
+  `id_ed25519`, `/proc/*/environ`; kein `docker exec … env|printenv`, kein
+  `docker compose config`, kein `docker inspect` ohne engen `--format`.
+  Wer eine dieser Ausgaben braucht, fragt Andi. Die Regeln stehen in
+  `server.md` „Sicherheitskonventionen"; `tests/test_guardrails.py` fährt den
+  Hook mit Beispielen durch – eine neue Regel bekommt dort einen Fall.
 
 Werden die Vorlagen im Root geändert, müssen beide Kopien nachgezogen werden
-(`.claude/guardrails.sh` zusätzlich `chmod +x`). `.claude/settings.local.json`
-enthält nur eine gewachsene allow-Liste, keine Verbote – die Verbote stehen
-ausschließlich in `.claude/settings.json`.
+(`.claude/guardrails.sh` zusätzlich `chmod +x`) – `test_guardrails.py`
+schlägt an, wenn sie auseinanderlaufen. `.claude/settings.local.json`
+enthält nur eine kleine allow-Liste konkreter Formen (seit #290 kein
+`ssh *`, `scp *`, `curl *`, `git *`, `python3 *` mehr), keine Verbote – die
+Verbote stehen ausschließlich in `.claude/settings.json` und im Hook.
 
 **Nicht ändern** – außer nach expliziter Absprache mit Andi.
 
