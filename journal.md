@@ -2,6 +2,25 @@
 
 ---
 
+## 2026-09-19 – Bestandsaufnahme Aufgaben / Geholfen / Aufgabenplan (kein Portal-Code)
+
+Andi plant eine Überarbeitung der drei Apps und wollte vorher den vollständigen
+Status quo als Markdown, damit ein anderer Agent ihn übernehmen kann – ohne
+dass schon etwas optimiert wird. Ergebnis:
+`docs/status_quo_aufgaben_geholfen_aufgabenplan.md` (1.027 Zeilen):
+gemeinsamer Rahmen (Zugang, Rollen, UI-Konventionen, Zeit/Push), je App
+Datenmodell, Rechte, alle Routen, UI je Vorlage, Serienlogik, Zeitlogik, Push,
+Verflechtungen, Konstanten, Wunsch-Historie, Eigenheiten, Tests – und ein
+Schlussabschnitt mit den app-übergreifenden Fakten (gemeinsame Tabellen
+`geholfen_eintraege`/`todos`, drei nebeneinander laufende Tagesbegriffe,
+Sperr-/Rechtelogik, Doku-Reste). Drei parallele Analysen je App, die
+auffälligen Punkte habe ich am Code gegengeprüft (u. a. `-11 days` in
+`_matrix_fuer`, 20-Uhr-Sperre nur in `zuweisen`/`serie_einsortieren`,
+`serie_verfuegbar_am` ohne Personenbezug). Kein Deploy, nichts am Portal
+geändert.
+
+---
+
 ## 2026-09-18 – portal-v262: Guardrails fail-closed (#290), Sitzungen mit Ablauf und Rückfrage (#293)
 
 Die letzten beiden priorisierten Audit-Befunde. Beide berühren Dinge, die
