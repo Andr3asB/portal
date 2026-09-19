@@ -2,6 +2,104 @@
 
 ---
 
+## 2026-09-19 – portal-v265: Aufgaben (neu), Schritt 2 – Heute, Formular, Reiterleiste, Rückgängig-Meldung (#298)
+
+Direkt nach Schritt 1 (v264) der zweite Schritt aus Abschnitt 14 der
+Spezifikation: die erste sichtbare Fassung der neuen App. Andi hatte
+gebeten, gleich mit der Umsetzung anzufangen; die Wünsche #297–#305 sind
+weiterhin unpriorisiert, die Reihenfolge kommt aus der Spezifikation.
+
+**Neu auf dem Server:** App-Zeile `aufgaben` („Aufgaben (neu)", 📝) in
+`_CORE_APPS`, Grant zunächst nur für Andi (per `manage.py grant 1 aufgaben`,
+Token nicht ausgegeben – die Kachel verlinkt token-frei). Weitere Tester
+bekommen ihren Zugang über die Verwaltung.
+
+**Routen (`28_aufgaben.py`, Blueprint `aufgaben_app`, jede mit Token- und
+token-freier Regel):**
+
+- `GET /` – Heute: Tagesbalken („N von M geschafft" / „Alles geschafft" /
+  „Heute ist nichts dran", nur Termine ohne `spontan` – Kacheln füllen den
+  Balken nicht, 5.4), „X Punkte diese Woche" (nur eigene, Mo–So über
+  `erledigt_tag`), „Heute dran" mit überfälligen Terminen zuerst („Seit
+  gestern offen" / „Seit N Tagen offen", rot gerahmt), Infozeile (Von
+  mir / Von Name · Uhrzeit · Diese Woche), Schloss-Marke bei eingeschränkter
+  Sicht, Punkte-Pille, Stift nur wenn `darf_bearbeiten`. `?fuer=<id>` zeigt
+  Eltern die Heute-Seite einer anderen Person (Kopf „Name: Heute"). „Morgen:
+  N Aufgaben" vorerst ohne Link – der Sprung in die Woche kommt mit Schritt 5.
+- `POST /termin/<id>/haken` – Toggle offen ↔ erledigt, 404 vor 403
+  (`termin_sichtbar()` liefert None für beides), `darf_haken`. Beim
+  Erledigen Schnappschuss `termine.punkte` aus der Aufgabe, `erledigt_tag`
+  = Familientag; beim Zurücknehmen alles wieder NULL. Antwort über
+  `antwort_oder_weiter()`: JSON mit neuen Zählern für die Seite, sonst
+  Weiterleitung mit `#termin-<id>`.
+- `GET/POST /neu`, `GET/POST /aufgabe/<id>` – EIN Formular (6.2): Was? ·
+  Wer? (nur Eltern: Ich, Personen mit Hinweiszeile) · Wann? (Heute, Tag
+  wählen mit Datum + freiwilliger Uhrzeit) · Mehr einstellen (zugeklappt mit
+  Zusammenfassung „Alle sehen es · keine Punkte"; Sichtbarkeit, für Eltern
+  Punkte-Stepper und Symbol). Bearbeiten schreibt eine Textänderung als alte
+  Fassung in `aufgaben_historie` („Frühere Fassungen" unter dem Formular);
+  Kinder ändern Text, Wann und Sicht, Punkte/Symbol/Ziel bleiben aus dem
+  Bestand. Fehler bleiben mit Meldung und Eingaben auf der Seite (400).
+  Bewusst noch nicht im Formular: „Später" (Schritt 3), „Regelmäßig"
+  (Schritt 5), Gruppen „Eltern/Kinder/Wer will" (Schritt 6) und „Auch als
+  Kachel" (Schritt 4) – nichts anlegen, was man auf keiner Seite wiederfindet.
+- `POST /aufgabe/<id>/loeschen` – `darf_loeschen`, 🗑️ mit
+  `data-bestaetigen`, Termine und Verlauf hängen per CASCADE daran.
+
+`aufgabe_neu()` und das neue `aufgabe_aendern()` teilen sich die Prüfung
+`_felder_pruefen()` (Lehre aus #158: eine Grenze, die nur beim Anlegen gilt,
+lässt sich per Bearbeiten umgehen). `sichtbare_termine()` kann jetzt auch
+nach `erledigt_tag` filtern (`erledigt_von`/`erledigt_bis`).
+
+**base.html, für alle Apps (Spezifikation 12):**
+
+- **Reiterleiste unten** (`nav.reiter`, `aria-label="Ansichten"`,
+  `aria-current="page"`, fest unten mit Safe-Area, z-index 120 zwischen
+  Kopfzeile und Menü). Eine Vorlage bekommt sie, indem sie `reiter`
+  (name/href/aktiv) an `render_template` gibt; `body` bekommt dann die
+  Klasse `mit-reiter`, damit der Inhalt nicht unter der Leiste endet.
+  Abgrenzung zur Regel aus #155: Die Leiste ist Navigation zwischen den
+  Ansichten einer App, keine Aktion – Aktionen bleiben oben im `<main>`.
+  In Schritt 2 gibt es nur den Reiter „Heute"; Später (3), Woche (5) und
+  Familie (6) kommen mit ihren Schritten.
+- **Rückgängig-Meldung** (`#rueckgaengig`, `role="status"`, ein Text, ein
+  Knopf, nach 6 s weg): `window.rueckgaengigMeldung(text, aktion)`. Erster
+  Nutzer ist Schritt 3 („Vokabeln stehen jetzt bei Morgen. – Rückgängig").
+
+**Wächter:** `tests/test_reiterleiste.py` prüft Markup, Safe-Area,
+z-Reihenfolge, dass keine Vorlage eine eigene Leiste baut, die Meldung mit
+genau einem Knopf und 6000 ms, und live: die Aufgaben-Seite hat die Leiste,
+die Hilfe nicht. `tests/test_aufgaben_heute.py` (14 Tests) deckt Seite,
+Haken (JSON und Weiterleitung), 404 vor 403, Überfällig-Reihenfolge, das
+Formular für Kind und Eltern (Punkte ignoriert, „Nur Eltern" abgelehnt,
+Tag + Uhrzeit + Push), Verlauf, Rechte beim Bearbeiten und Löschen,
+Wochenpunkte nur eigene, Gast nur lesend.
+
+**Zwei Stolpersteine beim Bauen**, beide von Wächtern gefangen:
+`tests/test_tippflaeche.py` erkennt Feldklassen am Namensteil `feld` –
+die Klassen `.feld-hinweis` (13 px) und `.tag-felder` hießen deshalb um in
+`.block-hinweis` / `.tag-eingaben`. Und ein `monkeypatch.setattr` auf den
+Punktpfad `teile.aufgaben.push_send` scheitert, weil `teile.aufgaben` ein
+Alias in `sys.modules` ist, aber kein Attribut von `teile` – das Modulobjekt
+selbst patchen.
+
+**Fund nebenbei, als Wunsch eingetragen (nicht angefasst):** Der
+fetch-Verteiler in `base.html` ruft `rufeAuf(f, f.dataset.fetch, d)` und
+damit `handler(form, antwort)` – die beiden Handler aus #171,
+`gekochtAktualisiert(antwort)` (Essensplan) und `stornoAktualisiert(antwort)`
+(Kassenbuch), erwarten die Antwort aber als ERSTEN Parameter, prüfen
+`antwort.ok` am Formular-Element und kehren still zurück. Der Server ändert
+den Zustand, die Seite zeigt es erst nach einem Neuladen. Vermutlich seit
+#200 (Argument-Reihenfolge des Verteilers). Das Briefing (`briefingBestaetigt
+(form)`) hat die richtige Reihenfolge, der neue Haken auch.
+
+**Live:** v265 ausgeliefert, `docker compose up -d --build portal`, Prune,
+Live-Prüfung grün, Andis Grant angelegt. Suite 2735 Tests grün, ruff sauber.
+Hilfe-Kapitel folgt laut Spezifikation mit Schritt 8 (#304), solange die
+App nur Andi zum Testen hat.
+
+---
+
 ## 2026-09-19 – portal-v264: Aufgaben (neu), Schritt 1 – Schema, Sichtbarkeit, Rechte, aufgabe_neu() (#297)
 
 Andi hat die Spezifikation der neuen Aufgaben-App geliefert

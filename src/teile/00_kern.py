@@ -633,6 +633,10 @@ _CORE_APPS = [
     ("rezepte",     "Rezepte",      "🍲", "Lieblingsrezepte mit Zutaten und Zubereitung"),
     ("essensplan",  "Essensplan",   "🍽️", "Wochenplan fürs Essen"),
     ("kinderplan",  "Aufgabenplan", "🗓️", "Wiederkehrende Aufgaben wochentagsweise planen"),
+    # Aufgaben (neu), Wunsch #298: waehrend der Testphase als eigene Kachel
+    # neben den drei alten Apps; nach dem Umzug (Schritt 9) heisst sie
+    # "Aufgaben" und die alten Kacheln werden entzogen (Spezifikation 10).
+    ("aufgaben",    "Aufgaben (neu)", "📝", "Aufgaben der Familie – neue Fassung (Testphase)"),
     # Die fünf unten fehlten hier bis Wunsch #140, Stufe 4. Auf dem laufenden
     # Server gibt es sie längst - sie wurden seinerzeit von Hand über
     # `manage.py addapp` angelegt und nie nachgetragen. Auf einer FRISCHEN

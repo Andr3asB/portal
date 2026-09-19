@@ -464,12 +464,59 @@
       position: absolute; width: 1px; height: 1px;
       overflow: hidden; clip-path: inset(50%); white-space: nowrap;
     }
+    /* Aufgaben (neu), Wunsch #298 - zwei Bausteine fuer alle Apps:
+
+       1. Reiterleiste unten (`nav.reiter`). Sie ist NAVIGATION zwischen den
+          Ansichten einer App (Heute / Woche / Spaeter), keine Aktion - die
+          Regel "Aktionsknoepfe oben als .top-aktionen" bleibt unberuehrt.
+          Eine Vorlage bekommt sie, indem sie `reiter` (Liste aus name/href/
+          aktiv) an render_template gibt; base.html zeichnet sie und gibt
+          dem body die Klasse `mit-reiter`, damit der Inhalt nicht unter der
+          Leiste endet. Feste Position mit Safe-Area (iPhone-Balken), unter
+          Menue (200) und Dialog (300), ueber dem Inhalt.
+       2. Rueckgaengig-Meldung (`#rueckgaengig`, role=status): EIN Text, EIN
+          Knopf, verschwindet nach 6 s. Ersetzt die Rueckfrage vor
+          umkehrbaren Aktionen ("Vokabeln stehen jetzt bei Morgen. -
+          Rueckgaengig"). Aufruf: window.rueckgaengigMeldung(text, aktion).
+       tests/test_reiterleiste.py wachtert beides. */
+    .reiter {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 120;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 6px calc(8px + var(--sr)) calc(6px + var(--sb)) calc(8px + var(--sl));
+    }
+    .reiter-innen {
+      max-width: 720px; margin: 0 auto;
+      display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
+    }
+    .reiter a {
+      min-height: 48px; display: flex; align-items: center; justify-content: center;
+      border-radius: 14px; color: var(--text); font-size: 16px; font-weight: 600;
+      text-decoration: none;
+    }
+    .reiter a[aria-current="page"] { background: var(--surface-2); color: var(--farbe-kontrast); }
+    body.mit-reiter { padding-bottom: calc(76px + var(--sb)); }
+    .rueckgaengig {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(16px + var(--sb)); z-index: 130;
+      width: min(calc(100% - 32px), 688px); box-sizing: border-box;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 8px 8px 14px; border-radius: 14px;
+      background: var(--text); color: var(--bg);
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    body.mit-reiter .rueckgaengig { bottom: calc(76px + var(--sb)); }
+    .rueckgaengig span { flex: 1; font-size: 15px; }
+    .rueckgaengig button {
+      min-height: 44px; padding: 0 14px; border-radius: 12px;
+      border: 2px solid var(--bg); background: transparent; color: var(--bg);
+      font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
     {% block extra_styles %}{% endblock %}
   </style>
 </head>
 {#- Wunsch #172: 0 = immer hell, 1 = immer dunkel, 2 = wie das Geraet. -#}
 {%- set dm = user.dark_mode if user is defined and user else 0 -%}
-<body class="{{ 'dark' if dm == 1 else ('auto' if dm == 2 else '') }}">
+<body class="{{ 'dark' if dm == 1 else ('auto' if dm == 2 else '') }}{% if reiter is defined and reiter %} mit-reiter{% endif %}">
 
 <!-- Wunsch #245: erster Tab-Stopp, springt ueber die Kopfleiste -->
 <a class="skip-link" href="#main">Zum Inhalt springen</a>
@@ -509,6 +556,23 @@
    ist entfernt, damit das Muster nicht zurueckkommt. #}
 
 {% block body %}{% endblock %}
+
+{#- Wunsch #298: Reiterleiste unten - nur, wenn die Vorlage `reiter` liefert.
+    Jeder Eintrag: name, href, aktiv. Siehe den Stil-Kommentar oben. -#}
+{% if reiter is defined and reiter %}
+<nav class="reiter" aria-label="Ansichten">
+  <div class="reiter-innen">
+    {% for r in reiter %}<a href="{{ r.href }}"{% if r.aktiv %} aria-current="page"{% endif %}>{{ r.name }}</a>{% endfor %}
+  </div>
+</nav>
+{% endif %}
+
+{#- Wunsch #298: Rueckgaengig-Meldung. Ein Text, ein Knopf, 6 Sekunden;
+    gefuellt von window.rueckgaengigMeldung() im Skript unten. -#}
+<div class="rueckgaengig" id="rueckgaengig" role="status" aria-live="polite" hidden>
+  <span id="rueckgaengig-text"></span>
+  <button type="button" id="rueckgaengig-knopf">Rückgängig</button>
+</div>
 
 {% if user is defined and user %}
 <!-- Hamburger-Menü -->
@@ -1304,6 +1368,37 @@
   // Geholfen-Matrix) ueber DIESE Fuehrung - nie ueber nacktes
   // classList.toggle (Wunsch #248). Deshalb global erreichbar.
   window.dialogFuehrung = dialogFuehrung;
+
+  // Wunsch #298: Rueckgaengig-Meldung statt Rueckfrage. Eine umkehrbare
+  // Aktion (verschieben, parken, streichen) passiert sofort; danach steht
+  // 6 s lang unten "X steht jetzt bei Morgen." mit EINEM Knopf. Ohne
+  // `aktion` gibt es nur den Text (Knopf bleibt versteckt). Ein zweiter
+  // Aufruf ersetzt die erste Meldung - zwei Stapel waeren ein Dialog.
+  const RUECKGAENGIG_MS = 6000;
+  let rueckgaengigTimer = null;
+  let rueckgaengigAktion = null;
+  window.rueckgaengigMeldung = function (text, aktion, knopfText) {
+    const box = document.getElementById('rueckgaengig');
+    const knopf = document.getElementById('rueckgaengig-knopf');
+    if (!box || !knopf) return;
+    clearTimeout(rueckgaengigTimer);
+    document.getElementById('rueckgaengig-text').textContent = text;
+    rueckgaengigAktion = (typeof aktion === 'function') ? aktion : null;
+    knopf.textContent = knopfText || 'Rückgängig';
+    knopf.hidden = !rueckgaengigAktion;
+    box.hidden = false;
+    rueckgaengigTimer = setTimeout(function () { box.hidden = true; }, RUECKGAENGIG_MS);
+  };
+  const rueckgaengigKnopf = document.getElementById('rueckgaengig-knopf');
+  if (rueckgaengigKnopf) {
+    rueckgaengigKnopf.addEventListener('click', function () {
+      clearTimeout(rueckgaengigTimer);
+      document.getElementById('rueckgaengig').hidden = true;
+      const fn = rueckgaengigAktion;
+      rueckgaengigAktion = null;
+      if (fn) fn();
+    });
+  }
 
   const menueDialog = dialogFuehrung(menuOverlay, menuPanel);
   menuBtn.addEventListener('click', menueDialog.oeffnen);

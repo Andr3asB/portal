@@ -1703,10 +1703,20 @@ teile/
                        (Ziel muss sehen duerfen; Kinder: Ziel = ich, Punkte/
                        Kachel/Symbol verworfen; Regeln validiert, Termine
                        daraus erst mit Schritt 5). Alias teile.aufgaben.
-                       Naechste Schritte: #298 Heute + Formular, #299
-                       Spaeter, #300 Kacheln, #301 Regeln/Woche, #302
-                       Gruppen/Familie/Alle, #303 Migration, #304 Push/
-                       Sonntagsjob/Hilfe, #305 Umzug.
+                       Stand v265 = Schritt 2 (#298): Blueprint aufgaben_app,
+                       Slug `aufgaben`, Kachel "Aufgaben (neu)" (Grant
+                       vorerst nur Andi). Routen GET / (Heute: Tagesbalken,
+                       Wochenpunkte, "Heute dran" mit Ueberfaelligen zuerst,
+                       ?fuer=<id> fuer Eltern), POST termin/<id>/haken
+                       (Toggle, JSON oder Weiterleitung mit Anker),
+                       GET/POST neu und aufgabe/<id> (EIN Formular, Verlauf
+                       aus aufgaben_historie), POST aufgabe/<id>/loeschen.
+                       aufgabe_aendern() teilt sich _felder_pruefen() mit
+                       aufgabe_neu(). Noch nicht im Formular: Spaeter (#299),
+                       Kachel (#300), Regelmaessig (#301), Gruppen (#302).
+                       Naechste Schritte: #299 Spaeter/Parken, #300 Kacheln,
+                       #301 Regeln/Woche, #302 Gruppen/Familie/Alle, #303
+                       Migration, #304 Push/Sonntagsjob/Hilfe, #305 Umzug.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1716,6 +1726,14 @@ teile/
     startseite.html         – Startseite: App-Kacheln in Gruppen, Drag-&-Drop Sortierung,
                               Edit-Mode (✎/✓), Gruppen anlegen/umbenennen/löschen
     denied.html             – Zugang verweigert / Landing ohne Token
+    aufgaben_heute.html     – Aufgaben (neu) #298: Tagesbalken, "Heute dran" (Haken-
+                              Formular mit data-fetch="terminGehakt", Stift-Link, Seit-N-
+                              Tagen-Zeile), "+ Eigene Aufgabe", "Morgen: N Aufgaben";
+                              liefert `reiter` an base.html (Reiterleiste unten)
+    aufgaben_formular.html  – Aufgaben (neu) #298: EIN Formular fuer Anlegen und
+                              Bearbeiten (Was/Wer/Wann/Mehr einstellen), Chips als
+                              <label><input type=radio>>, Hinweise ueber data-args,
+                              Loeschen mit data-bestaetigen, "Fruehere Fassungen"
     admin.html              – Nutzerverwaltung, Rollen-Badge, Grant-Chips, QR-Modal, Push-Abo-Badge
     admin_apps.html         – Wunsch #266: Tabelle Apps x Mitglieder, jede Zelle ein
                               Schalter (grant/revoke mit `zurueck`)
@@ -2150,6 +2168,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
 | `ausfaelle` | Ausfälle | 🚗 | Ausfallprotokoll fürs Auto: Knopfdruck hält Zeitpunkt und GPS fest, Notiz kommt hinterher (Wunsch #222) | ✅ nur `eltern` |
+| `aufgaben` | Aufgaben (neu) | 📝 | Neue Aufgaben-App (#297 ff., `docs/aufgaben_neu/`), Testphase neben todo/geholfen/kinderplan; nach dem Umzug (#305) heißt sie „Aufgaben" | – (zunächst nur Andi, #298) |
 
 ## Testdatenbank leeren (conftest.py)
 
@@ -3263,6 +3282,21 @@ python -m venv .venv                                   # einmalig
   Kind-Eingaben (Punkte/Kachel/Symbol/Ziel) still verworfen, Punkte auf halbe
   gerundet, Regeln geprueft und ohne Sofort-Termin, Tag im Fenster,
   geparkt mit Position, keine_dublette, Push nur bei Zuweisung an andere.
+- `test_aufgaben_heute.py` – Wunsch #298. Routen der neuen App gegen den
+  Test-Client: Seite mit Balken, Reiter und Stift; Haken toggelt und liefert
+  Zaehler (JSON) bzw. leitet mit Anker weiter; 404 vor 403; Ueberfaellige
+  zuerst mit "Seit gestern/N Tagen offen", Morgiges nicht; Formular Kind
+  (kein Wer?, keine Punkte, "Nur Eltern" abgelehnt, Punkte-POST ignoriert)
+  und Eltern (Tag + Uhrzeit, Zuweisung mit Push, ?fuer=); Fehler bleiben
+  auf der Seite (400); Bearbeiten schreibt Verlauf nur bei Textaenderung,
+  Kind verliert beim Bearbeiten keine Punkte; Loeschen-Rechte mit CASCADE;
+  Wochenpunkte nur eigene; Gast nur lesend.
+- `test_reiterleiste.py` – Wunsch #298. Reiterleiste und Rueckgaengig-
+  Meldung in base.html: nav mit aria-label/aria-current, fest unten mit
+  Safe-Area, body.mit-reiter, z-Reihenfolge Kopf <= Reiter < Menue, keine
+  Vorlage baut eine eigene Leiste; Meldung mit role=status, genau einem
+  Knopf, 6000 ms, ueber der Leiste; live hat die Aufgaben-Seite die Leiste,
+  die Hilfe nicht.
 - `test_sitzung_haertung.py` – Wunsch #293 (Audit N-15). Neue Sitzung mit
   `ablauf` in 365 Tagen; Abgelaufenes wird geraeumt, Kiosk-Sitzung ohne
   Ablauf bleibt; hoechstens 20 je Nutzer, die am laengsten unbenutzte

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Heute{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 2 (Wunsch #298). Aufbau, Reihenfolge und Wortlaut
+    aus docs/aufgaben_neu/entwurf/Main.dc.html; Farben aus dem Portal-Design
+    (Spezifikation 12). Zeilen mindestens 60 px hoch, EIN Hauptknopf je
+    Zeile (der grosse Haken-Bereich). -#}
+.tagesbalken {
+  background:var(--surface); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 3px var(--shadow); margin-bottom:18px;
+}
+.tagesbalken-kopf { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.tagesbalken-text { font-size:20px; font-weight:700; }
+.tagesbalken-punkte { font-size:14px; color:var(--text-2); }
+.tagesbalken-leiste { height:12px; border-radius:6px; background:var(--surface-2); overflow:hidden; margin-top:10px; }
+.tagesbalken-fuellung { height:12px; border-radius:6px; background:var(--farbe-band); transition:width .3s; }
+.abschnitt-titel { font-size:18px; font-weight:700; margin:18px 0 10px; }
+.zeile {
+  display:flex; flex-direction:column; border-radius:16px; overflow:hidden;
+  border:2px solid var(--border); background:var(--surface); margin-bottom:10px;
+}
+.zeile.erledigt { border-color:var(--farbe-kontrast); background:var(--surface-2); }
+.zeile.ueberfaellig { border-color:var(--rot-text); }
+.zeile-oben { display:flex; align-items:stretch; }
+.haken-form { flex:1; min-width:0; display:flex; }
+.haken {
+  flex:1; min-width:0; display:flex; align-items:center; gap:12px; min-height:68px;
+  padding:10px 8px 10px 14px; text-align:left; border:none; background:transparent;
+  color:var(--text); font-family:inherit; cursor:pointer;
+}
+.haken:disabled { cursor:default; }
+.kreis {
+  flex-shrink:0; width:36px; height:36px; border-radius:18px; box-sizing:border-box;
+  border:3px solid var(--farbe-kontrast); background:transparent;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+}
+.zeile.erledigt .kreis { background:var(--farbe-band); }
+.kreis svg { opacity:0; }
+.zeile.erledigt .kreis svg { opacity:1; }
+.zeile-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.zeile-name { font-size:17px; font-weight:700; word-break:break-word; }
+.zeile.erledigt .zeile-name { text-decoration:line-through; color:var(--text-2); }
+.zeile-info { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:13px; color:var(--text-2); }
+.marke { font-weight:700; color:var(--text); background:var(--surface-2); padding:2px 8px; border-radius:10px; }
+.pkt { flex-shrink:0; font-size:13px; font-weight:700; color:var(--farbe-kontrast); border:1.5px solid var(--farbe-kontrast); padding:3px 9px; border-radius:12px; }
+.stift {
+  flex-shrink:0; width:48px; display:flex; align-items:center; justify-content:center;
+  border-left:1px solid var(--border); text-decoration:none; font-size:18px;
+}
+.seit {
+  display:flex; align-items:center; gap:8px; padding:8px 14px;
+  border-top:1px solid var(--border); font-size:14px; font-weight:700; color:var(--rot-text);
+}
+.hinweis { font-size:13px; color:var(--text-2); margin:4px 0 12px; }
+.neu-link {
+  display:flex; align-items:center; justify-content:center; min-height:52px;
+  border-radius:16px; border:2px dashed var(--border); color:var(--farbe-kontrast);
+  text-decoration:none; font-size:17px; font-weight:700; margin-bottom:8px;
+}
+.morgen {
+  display:flex; align-items:center; justify-content:space-between; min-height:52px;
+  padding:0 16px; border-radius:16px; background:var(--surface-2); color:var(--text);
+  font-size:16px; font-weight:700; margin-top:18px;
+}
+.leer { text-align:center; color:var(--text-2); padding:24px 12px; font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 {% if fremd %}{{ person.name }}: Heute{% else %}Hallo {{ person.name }}{% endif %}</h1>
+<div class="nav-sub">{{ datum }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+
+  <div class="tagesbalken" id="tagesbalken">
+    <div class="tagesbalken-kopf">
+      <div class="tagesbalken-text" id="balken-text">{{ balken_text }}</div>
+      <div class="tagesbalken-punkte"><span id="punkte-woche">{{ punkte_woche }}</span> Punkte diese Woche</div>
+    </div>
+    <div class="tagesbalken-leiste" aria-hidden="true"><div class="tagesbalken-fuellung" id="balken-fuellung" style="width:{{ balken_prozent }}%"></div></div>
+  </div>
+
+  <h2 class="abschnitt-titel">Heute dran</h2>
+  {% if not zeilen %}
+  <div class="leer">Heute steht nichts an.</div>
+  {% endif %}
+  {% for z in zeilen %}
+  <div class="zeile{% if z.erledigt %} erledigt{% endif %}{% if z.ueberfaellig %} ueberfaellig{% endif %}" id="termin-{{ z.id }}">
+    <div class="zeile-oben">
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/haken" class="haken-form" data-fetch="terminGehakt">
+        <button type="submit" class="haken" aria-pressed="{{ 'true' if z.erledigt else 'false' }}"{% if not z.hakbar %} disabled{% endif %}>
+          <span class="kreis" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"></path></svg></span>
+          <span class="zeile-text">
+            <span class="zeile-name" data-emoji-alt>{% if z.emoji %}{{ z.emoji }} {% endif %}{{ z.inhalt }}</span>
+            <span class="zeile-info">
+              <span>{{ z.info }}</span>
+              {% if z.sicht_marke %}<span class="marke">🔒 {{ z.sicht_marke }}</span>{% endif %}
+            </span>
+          </span>
+          {% if z.punkte > 0 %}<span class="pkt">+{{ z.punkte_text }}</span>{% endif %}
+        </button>
+      </form>
+      {% if z.bearbeitbar %}
+      <a class="knopf stift" href="/a/aufgaben{{ tp }}aufgabe/{{ z.aufgabe_id }}" title="{{ z.inhalt }} bearbeiten" aria-label="{{ z.inhalt }} bearbeiten">✏️</a>
+      {% endif %}
+    </div>
+    {% if z.ueberfaellig %}
+    <div class="seit"><span>{{ z.seit_text }}</span></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if zeilen %}<div class="hinweis">Vertippt? Einfach nochmal antippen.</div>{% endif %}
+  {% if darf_anlegen and not fremd %}
+  <a class="knopf neu-link" href="/a/aufgaben{{ tp }}neu">+ Eigene Aufgabe</a>
+  {% endif %}
+
+  {# Der Sprung in die Woche kommt mit Schritt 5 - bis dahin nur die Zahl. #}
+  <div class="morgen"><span>Morgen: {{ morgen }} {% if morgen == 1 %}Aufgabe{% else %}Aufgaben{% endif %}</span></div>
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Wunsch #171/#298: Abhaken ohne Seitensprung. Die Zeile bleibt, wo sie
+// ist (kein Umsortieren), nur Zustand, Balken und Wochenpunkte aendern sich.
+// Verteiler-Konvention: erst das Formular, dann die Antwort.
+function terminGehakt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const zeile = form.closest('.zeile');
+  zeile.classList.toggle('erledigt', antwort.erledigt);
+  form.querySelector('.haken').setAttribute('aria-pressed', antwort.erledigt ? 'true' : 'false');
+  document.getElementById('balken-text').textContent = antwort.balken_text;
+  document.getElementById('balken-fuellung').style.width = antwort.balken_prozent + '%';
+  document.getElementById('punkte-woche').textContent = antwort.punkte_woche;
+}
+</script>
+{% endblock %}

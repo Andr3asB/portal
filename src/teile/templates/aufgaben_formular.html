@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}{% if aufgabe %}Aufgabe bearbeiten{% else %}Neue Aufgabe{% endif %}{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 2 (Wunsch #298): EIN Formular fuer Anlegen und
+    Bearbeiten (Spezifikation 6.2, Entwurf NeueAufgabe.dc.html). Reihenfolge:
+    Was? - Wer? (nur Eltern) - Wann? - Mehr einstellen. "Spaeter" und
+    "Regelmaessig" kommen mit den Schritten 3 und 5, sobald es die Seiten
+    gibt, auf denen man das Ergebnis wiederfindet. -#}
+.zurueck { display:inline-block; margin-bottom:14px; color:var(--farbe-kontrast); font-weight:600; text-decoration:none; }
+.block { display:flex; flex-direction:column; gap:6px; margin-bottom:22px; }
+.block-titel { font-size:16px; font-weight:700; }
+.block-hinweis { font-size:13px; color:var(--text-2); }
+.text-eingabe {
+  height:56px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:18px; padding:0 14px; width:100%; font-family:inherit;
+}
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chips.raster { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.chip {
+  position:relative; display:flex; align-items:center; justify-content:center; min-height:48px; padding:0 16px;
+  border-radius:24px; border:2px solid var(--border); background:var(--surface); color:var(--text);
+  font-size:16px; font-weight:700; cursor:pointer; user-select:none;
+}
+.chips.raster .chip { border-radius:12px; min-height:56px; }
+.chip input { position:absolute; opacity:0; width:1px; height:1px; }
+.chip:has(input:checked) { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.chip:has(input:focus-visible) { outline:2px solid var(--farbe-kontrast); outline-offset:2px; }
+.tag-eingaben { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.tag-eingaben label { display:flex; flex-direction:column; gap:4px; color:var(--text-2); font-weight:600; }
+.tag-eingaben label span { font-size:13px; }
+.tag-eingaben input {
+  height:48px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); padding:0 10px; font-family:inherit;
+}
+.mehr-knopf {
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:60px;
+  padding:8px 14px; text-align:left; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;
+}
+.mehr-knopf .titel { font-size:16px; font-weight:700; display:block; }
+.mehr-knopf .zusammen { font-size:13px; color:var(--text-2); display:block; margin-top:2px; }
+.mehr-knopf .pfeil { font-size:14px; font-weight:700; color:var(--farbe-kontrast); flex-shrink:0; }
+.mehr-panel {
+  display:flex; flex-direction:column; gap:18px; padding:14px; border-radius:14px;
+  background:var(--surface); border:1px solid var(--border); margin-top:10px;
+}
+.mehr-panel .block { margin-bottom:0; }
+.zeile-2 { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; }
+.stepper { display:flex; align-items:center; gap:6px; }
+.stepper button {
+  width:44px; height:44px; border-radius:12px; border:2px solid var(--border); background:var(--surface);
+  font-size:22px; color:var(--text); font-family:inherit; cursor:pointer;
+}
+.stepper input {
+  width:56px; height:44px; text-align:center; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); font-weight:700; font-family:inherit;
+}
+.emoji-eingabe {
+  width:96px; height:48px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); text-align:center; font-family:inherit;
+}
+.fehler { background:var(--surface); border:2px solid var(--rot-text); color:var(--rot-text); border-radius:12px; padding:10px 14px; font-weight:600; margin-bottom:16px; }
+.unten { display:flex; gap:10px; margin-top:8px; }
+.speichern {
+  flex:1; min-height:60px; border-radius:16px; border:none; background:var(--farbe-band); color:#fff;
+  font-size:19px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.loeschen-form { display:flex; }
+.loeschen {
+  min-height:60px; padding:0 18px; border-radius:16px; border:2px solid var(--rot-text); background:var(--surface);
+  color:var(--rot-text); font-size:16px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.verlauf { margin-top:24px; }
+.verlauf-titel { font-size:14px; font-weight:700; color:var(--text-2); margin-bottom:8px; }
+.verlauf-eintrag { font-size:14px; color:var(--text-2); padding:6px 0; border-top:1px solid var(--border); }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 {% if aufgabe %}Aufgabe bearbeiten{% else %}Neue Aufgabe{% endif %}</h1>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <a class="zurueck" href="/a/aufgaben{{ tp }}">← Zurück zu Heute</a>
+
+  {% if fehler %}<div class="fehler" role="alert">{{ fehler }}</div>{% endif %}
+
+  <form method="post" action="{% if aufgabe %}/a/aufgaben{{ tp }}aufgabe/{{ aufgabe.id }}{% else %}/a/aufgaben{{ tp }}neu{% endif %}" id="aufgabe-form">
+
+    <div class="block">
+      <label class="block-titel" for="inhalt">Was ist zu tun?</label>
+      <input class="text-eingabe" id="inhalt" name="inhalt" type="text" maxlength="300" required
+             value="{{ werte.inhalt }}" placeholder="z. B. Fahrrad aufpumpen" autocomplete="off">
+    </div>
+
+    {% if ist_eltern %}
+    <div class="block">
+      <div class="block-titel">Wer?</div>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="ziel" value="ich" data-aendern="werGewaehlt" data-args='["Landet auf deiner Liste."]'{% if werte.ziel == 'ich' %} checked{% endif %}>Ich</label>
+        {% for p in personen %}
+        <label class="chip"><input type="radio" name="ziel" value="{{ p.id }}" data-aendern="werGewaehlt" data-args='[{{ (p.name ~ " bekommt eine Benachrichtigung.")|tojson }}]'{% if werte.ziel == p.id|string %} checked{% endif %}>{{ p.name }}</label>
+        {% endfor %}
+      </div>
+      <div class="block-hinweis" id="wer-hinweis">{% if werte.ziel == 'ich' %}Landet auf deiner Liste.{% else %}{% for p in personen %}{% if werte.ziel == p.id|string %}{{ p.name }} bekommt eine Benachrichtigung.{% endif %}{% endfor %}{% endif %}</div>
+    </div>
+    {% endif %}
+
+    <div class="block">
+      <div class="block-titel">Wann?</div>
+      <div class="chips raster">
+        <label class="chip"><input type="radio" name="wann" value="heute" data-aendern="wannGewaehlt" data-args='["heute"]'{% if werte.wann == 'heute' %} checked{% endif %}>Heute</label>
+        <label class="chip"><input type="radio" name="wann" value="tag" data-aendern="wannGewaehlt" data-args='["tag"]'{% if werte.wann == 'tag' %} checked{% endif %}>Tag wählen</label>
+      </div>
+      <div class="block-hinweis" id="wann-hinweis">{% if werte.wann == 'tag' %}Uhrzeit ist freiwillig.{% else %}Steht sofort bei Heute.{% endif %}</div>
+      <div class="tag-eingaben" id="tag-eingaben"{% if werte.wann != 'tag' %} hidden{% endif %}>
+        <label><span>Tag</span><input type="date" id="tag" name="tag" value="{{ werte.tag }}" min="{{ tag_min }}" max="{{ tag_max }}"></label>
+        <label><span>Uhrzeit (freiwillig)</span><input type="time" id="uhrzeit" name="uhrzeit" value="{{ werte.uhrzeit }}"></label>
+      </div>
+    </div>
+
+    <div class="block">
+      {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+      <button type="button" class="mehr-knopf" data-klick="mehrUmschalten" data-panel="mehr-panel">
+        <span><span class="titel">Mehr einstellen</span><span class="zusammen" id="mehr-zusammenfassung"></span></span>
+        <span class="pfeil" id="mehr-pfeil">Ändern</span>
+      </button>
+      <div class="mehr-panel" id="mehr-panel" hidden>
+        <div class="block">
+          <div class="block-titel">Wer darf das sehen?</div>
+          <div class="chips raster">
+            {% for wert, name, text in sichten %}
+            <label class="chip"><input type="radio" name="sicht" value="{{ wert }}" data-aendern="sichtGewaehlt" data-args='[{{ text|tojson }}, {{ name|tojson }}]'{% if werte.sicht == wert %} checked{% endif %}>{{ name }}</label>
+            {% endfor %}
+          </div>
+          <div class="block-hinweis" id="sicht-hinweis">{% for wert, name, text in sichten %}{% if werte.sicht == wert %}{{ text }}{% endif %}{% endfor %}</div>
+        </div>
+        {% if ist_eltern %}
+        <div class="zeile-2">
+          <label for="punkte"><span class="block-titel">Punkte</span><br><span class="block-hinweis">Zählen in die Wochenpunkte</span></label>
+          <div class="stepper">
+            <button type="button" data-klick="punkteSchritt" data-args='[-0.5]' aria-label="Weniger Punkte" title="Weniger Punkte">−</button>
+            <input type="text" inputmode="decimal" id="punkte" name="punkte" value="{{ werte.punkte }}" data-eingabe="zusammenfassung">
+            <button type="button" data-klick="punkteSchritt" data-args='[0.5]' aria-label="Mehr Punkte" title="Mehr Punkte">+</button>
+          </div>
+        </div>
+        <div class="zeile-2">
+          <label class="block-titel" for="emoji">Symbol</label>
+          <input class="emoji-eingabe" type="text" id="emoji" name="emoji" value="{{ werte.emoji }}" placeholder="Emoji" maxlength="8">
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="unten">
+      <button type="submit" class="speichern">Speichern</button>
+    </div>
+  </form>
+
+  {% if darf_loeschen %}
+  <form method="post" action="/a/aufgaben{{ tp }}aufgabe/{{ aufgabe.id }}/loeschen" class="loeschen-form" style="margin-top:10px"
+        data-bestaetigen="{{ ('„' ~ aufgabe.inhalt|truncate(40) ~ '“ löschen?') }}">
+    <button type="submit" class="loeschen">🗑️ Löschen</button>
+  </form>
+  {% endif %}
+
+  {% if verlauf %}
+  <div class="verlauf">
+    <div class="verlauf-titel">Frühere Fassungen</div>
+    {% for h in verlauf %}
+    <div class="verlauf-eintrag" data-emoji-alt>„{{ h.alter_inhalt }}“ · bis {{ h.bis }} · geändert von {{ h.von }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Verteiler-Konvention (Wunsch #200): erst die Werte aus data-args, dann das
+// Element. Alle Hinweise stehen als Text in den data-args der Chips, damit
+// Vorlage und Skript dieselbe Quelle haben.
+function werGewaehlt(text) {
+  document.getElementById('wer-hinweis').textContent = text;
+}
+function wannGewaehlt(wert) {
+  const felder = document.getElementById("tag-eingaben");
+  felder.hidden = wert !== 'tag';
+  document.getElementById('wann-hinweis').textContent =
+    wert === 'tag' ? 'Uhrzeit ist freiwillig.' : 'Steht sofort bei Heute.';
+  if (wert === 'tag') {
+    const tag = document.getElementById('tag');
+    if (!tag.value) tag.value = tag.min ? {{ heute|tojson }} : '';
+    tag.focus();
+  }
+}
+function sichtGewaehlt(text) {
+  document.getElementById('sicht-hinweis').textContent = text;
+  zusammenfassung();
+}
+function punkteSchritt(delta) {
+  const feld = document.getElementById('punkte');
+  let wert = parseFloat(String(feld.value).replace(',', '.')) || 0;
+  wert = Math.min(10, Math.max(0, Math.round((wert + delta) * 2) / 2));
+  feld.value = String(wert).replace('.', ',');
+  zusammenfassung();
+}
+function mehrUmschalten(knopf) {
+  const panel = document.getElementById('mehr-panel');
+  panel.hidden = !panel.hidden;
+  document.getElementById('mehr-pfeil').textContent = panel.hidden ? 'Ändern' : 'Zuklappen';
+}
+function zusammenfassung() {
+  const sicht = document.querySelector('input[name=sicht]:checked');
+  const sichtName = sicht ? sicht.closest('.chip').textContent.trim() : 'Alle';
+  let text = sichtName === 'Alle' ? 'Alle sehen es' : sichtName;
+  const punkte = document.getElementById('punkte');
+  if (punkte) {
+    const wert = parseFloat(String(punkte.value).replace(',', '.')) || 0;
+    text += wert > 0 ? ' · ' + String(wert).replace('.', ',') + ' Punkte' : ' · keine Punkte';
+  }
+  document.getElementById('mehr-zusammenfassung').textContent = text;
+}
+zusammenfassung();
+</script>
+{% endblock %}

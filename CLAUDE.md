@@ -184,7 +184,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2607 Tests, Stand 19.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
+# Alles (2735 Tests, Stand 19.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -246,8 +246,8 @@ ssh -p 2222 claude@10.0.0.100 "docker exec portal pip freeze" > freeze.txt
 `test_formular_labels.py`, `test_ueberschriften.py`, `test_farbkontrast.py`,
 `test_interaktion.py`, `test_arbeitet_anzeige.py`,
 `test_verteiler_argumente.py`, `test_darkmode.py`, `test_hilfe_kapitel.py`,
-`test_kopfzeile_bleibt.py` und `test_umschalter_ohne_sprung.py` lesen die
-Vorlagen im Quelltext und schlagen
+`test_kopfzeile_bleibt.py`, `test_umschalter_ohne_sprung.py` und
+`test_reiterleiste.py` lesen die Vorlagen im Quelltext und schlagen
 an, wenn eine neue Vorlage gegen eine der UI-Konventionen weiter unten
 verstößt. Fünf weitere wächtern nicht Vorlagen, sondern Struktur:
 `test_routen_inventar.py` (jede ändernde Route braucht eine Regel mit
@@ -519,6 +519,15 @@ der Test-Client tritt dafür in `conftest.py` als Browser auf.
   (Vorbild `todo.html`: Rahmen in `var(--farbe)`, transparenter Grund) – nie auf
   dem farbigen Kopfband. Der dafür gedachte Block `header_extra` ist mit
   Wunsch #155 aus `base.html` entfernt; `tests/test_kopfleiste.py` wächtert das.
+- **Reiterleiste unten und Rückgängig-Meldung** (Wunsch #298,
+  `tests/test_reiterleiste.py`), beide zentral in `base.html`: Eine App mit
+  mehreren Ansichten (Heute/Woche/Später) gibt `reiter=[{name, href,
+  aktiv}]` an `render_template` und bekommt die feste Leiste unten samt
+  Safe-Area und `body.mit-reiter` – keine eigene Leiste in der Vorlage. Sie
+  ist Navigation, keine Aktion; Aktionsknöpfe bleiben in `.top-aktionen`.
+  Umkehrbare Aktionen (verschieben, parken, streichen) fragen nicht vorher,
+  sondern melden danach über `window.rueckgaengigMeldung(text, aktion)`
+  (ein Text, ein Knopf, 6 s). Echte Löschungen bleiben bei `data-bestaetigen`.
 - Jede neue Funktion gehört in die Hilfe-App (`09_hilfe.py`/`hilfe.html`),
   bei Bedarf als eigenes Kapitel mit Sprunglink im Inhaltsverzeichnis.
   Ein Kapitel ist seit Wunsch #242 ein `<details class="section"
