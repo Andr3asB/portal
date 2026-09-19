@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Woche – Plan mit Vorschlägen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Bricolage+Grotesque:wght@600;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Atkinson Hyperlegible',Verdana,sans-serif;background:#F6F3EC;color:#1F2A2E}
+button{font-family:inherit;cursor:pointer}
+a{color:#1F5F5B}a:hover{color:#123F3C}
+</style>
+</helmet>
+<div style="width: 390px; height: 1900px; box-sizing: border-box; background: #F6F3EC; display: flex; flex-direction: column;">
+
+<header style="background: #1F5F5B; color: #ffffff; padding: 16px 12px 16px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<button aria-label="Vorherige Woche" style="width: 48px; height: 48px; border-radius: 24px; border: none; background: #174A47; color: #ffffff; display: flex; align-items: center; justify-content: center;">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l-6 6 6 6"></path></svg>
+</button>
+<div style="text-align: center; display: flex; flex-direction: column; gap: 2px;">
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 24px;">Nächste Woche</h1>
+<div style="font-size: 14px; opacity: 0.9;">21. bis 27. September · KW 39</div>
+</div>
+<button aria-label="Folgende Woche" style="width: 48px; height: 48px; border-radius: 24px; border: none; background: #174A47; color: #ffffff; display: flex; align-items: center; justify-content: center;">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"></path></svg>
+</button>
+</div>
+<div style="display: flex; gap: 8px; justify-content: center;">
+<sc-for list="{{filter}}" as="f" hint-placeholder-count="4">
+<button onClick="{{f.waehlen}}" aria-pressed="{{f.aktiv}}" style="min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid #ffffff; background: {{f.bg}}; color: {{f.fg}}; font-size: 15px; font-weight: 700;">{{f.name}}</button>
+</sc-for>
+</div>
+</header>
+
+<main style="flex-grow: 1; padding: 16px; display: flex; flex-direction: column; gap: 20px;">
+
+<sc-if value="{{hatOffene}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: #FBE9B4; color: #3D2A00;">
+<div style="flex-grow: 1; font-size: 15px;"><strong>{{offeneText}}</strong> Gestrichelt heißt: noch nicht bestätigt.</div>
+<button onClick="{{alleOk}}" style="flex-shrink: 0; min-height: 48px; padding: 0 14px; border-radius: 12px; border: none; background: #3D2A00; color: #ffffff; font-size: 15px; font-weight: 700;">{{alleOkText}}</button>
+</div>
+</sc-if>
+<sc-if value="{{allesBestaetigt}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 12px 14px; border-radius: 16px; background: #E6F1EF; color: #123F3C; font-size: 15px; font-weight: 700;">{{fertigText}}</div>
+</sc-if>
+
+<sc-if value="{{hatMeldung}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 10px 14px; border-radius: 14px; background: #1F2A2E; color: #ffffff;">
+<span style="font-size: 15px;">{{meldung}}</span>
+<div style="display: flex; gap: 8px;">
+<button onClick="{{rueckgaengig}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #ffffff; background: #1F2A2E; color: #ffffff; font-size: 15px; font-weight: 700;">Rückgängig</button>
+<sc-if value="{{kannWocheStreichen}}" hint-placeholder-val="{{ false }}">
+<button onClick="{{wocheStreichen}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: none; background: #ffffff; color: #1F2A2E; font-size: 15px; font-weight: 700;">{{wocheStreichenText}}</button>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-for list="{{tage}}" as="d" hint-placeholder-count="7">
+<section style="display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 8px; min-height: 48px;">
+<h2 style="flex-grow: 1; margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 18px;">{{d.titel}}</h2>
+<sc-if value="{{d.hatOffene}}" hint-placeholder-val="{{ true }}">
+<button onClick="{{d.ok}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #1F5F5B; background: #ffffff; color: #123F3C; font-size: 15px; font-weight: 700;">{{d.okText}}</button>
+</sc-if>
+<a href="NeueAufgabe.dc.html" aria-label="{{d.neuLabel}}" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; border: 1px solid #8A8472; display: flex; align-items: center; justify-content: center; color: #1F2A2E; text-decoration: none; font-size: 24px;">+</a>
+</div>
+
+<sc-if value="{{d.leer}}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 15px; color: #4A5558; padding: 4px 2px;">Nichts geplant</div>
+</sc-if>
+
+<sc-for list="{{d.eintraege}}" as="t" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; border-radius: 14px; background: {{t.bg}}; border: 2px {{t.linie}} {{t.rand}}; overflow: hidden;">
+<div style="display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 4px 8px 4px 4px;">
+<button onClick="{{t.auf}}" aria-expanded="{{t.offen}}" style="flex-grow: 1; min-width: 0; min-height: 52px; padding: 4px 10px; text-align: left; border: none; background: {{t.bg}}; color: #1F2A2E; display: flex; flex-direction: column; justify-content: center; gap: 2px;">
+<span style="font-size: 17px; font-weight: 700;">{{t.name}}</span>
+<span style="font-size: 14px; color: #4A5558;">{{t.info}}</span>
+</button>
+<button onClick="{{t.personWechseln}}" aria-label="{{t.personLabel}}" style="flex-shrink: 0; min-height: 44px; padding: 0 12px; border-radius: 22px; border: none; background: {{t.personFarbe}}; color: #ffffff; font-size: 14px; font-weight: 700;">{{t.person}}</button>
+<sc-if value="{{t.vorschlag}}" hint-placeholder-val="{{ true }}">
+<button onClick="{{t.ok}}" aria-label="{{t.okLabel}}" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 22px; border: 2px solid #1F5F5B; background: #ffffff; display: flex; align-items: center; justify-content: center;">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1F5F5B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9"></path></svg>
+</button>
+</sc-if>
+</div>
+<sc-if value="{{t.offen}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; border-top: 1px solid #D9D3C4; background: #ffffff;">
+<div style="font-size: 14px; font-weight: 700;">An einen anderen Tag legen</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px;">
+<sc-for list="{{t.ziele}}" as="z" hint-placeholder-count="7">
+<button onClick="{{z.legen}}" aria-pressed="{{z.aktiv}}" style="min-height: 48px; padding: 0; border-radius: 12px; border: 2px solid {{z.rand}}; background: {{z.bg}}; color: {{z.fg}}; font-size: 15px; font-weight: 700;">{{z.name}}</button>
+</sc-for>
+</div>
+<button onClick="{{t.faelltAus}}" style="min-height: 48px; border-radius: 12px; border: 2px solid #9B1C1C; background: #ffffff; color: #9B1C1C; font-size: 15px; font-weight: 700;">Fällt aus</button>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</section>
+</sc-for>
+
+</main>
+
+<nav aria-label="Ansichten" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0px; background: #ffffff; border-top: 1px solid #D9D3C4; padding: 8px 8px 14px;">
+<a href="Main.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #1F2A2E; font-size: 16px; text-decoration: none;">Heute</a>
+<a href="Woche.dc.html" aria-current="page" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: #DDEBE9; color: #123F3C; font-weight: 700; font-size: 16px; text-decoration: none;">Woche</a>
+<a href="Familie.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #1F2A2E; font-size: 16px; text-decoration: none;">Familie</a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1900}}'>
+class Component extends DCLogic {
+start() {
+return [
+{ id: 1, name: 'Tisch decken', regel: 'Jeden Mo, Mi, Fr', tag: 0, p: 'F', s: 'v' },
+{ id: 2, name: 'Spülmaschine ausräumen', regel: 'Mo bis Fr, im Wechsel', tag: 0, p: 'J', s: 'v' },
+{ id: 3, name: 'Papiermüll rausstellen', regel: 'Einmalig · bis 19:00', tag: 0, p: 'P', s: 'ok' },
+{ id: 4, name: 'Spülmaschine ausräumen', regel: 'Mo bis Fr, im Wechsel', tag: 1, p: 'F', s: 'v' },
+{ id: 5, name: 'Blumen gießen', regel: 'Alle 3 Tage', tag: 1, p: 'F', s: 'v' },
+{ id: 6, name: 'Tisch decken', regel: 'Jeden Mo, Mi, Fr', tag: 2, p: 'F', s: 'ok' },
+{ id: 7, name: 'Spülmaschine ausräumen', regel: 'Mo bis Fr, im Wechsel', tag: 2, p: 'J', s: 'v' },
+{ id: 8, name: 'Spülmaschine ausräumen', regel: 'Mo bis Fr, im Wechsel', tag: 3, p: 'F', s: 'v' },
+{ id: 9, name: 'Tisch decken', regel: 'Jeden Mo, Mi, Fr', tag: 4, p: 'F', s: 'v' },
+{ id: 10, name: 'Spülmaschine ausräumen', regel: 'Mo bis Fr, im Wechsel', tag: 4, p: 'J', s: 'v' },
+{ id: 11, name: 'Blumen gießen', regel: 'Alle 3 Tage', tag: 4, p: 'F', s: 'v' }
+];
+}
+renderVals() {
+const st = this.state || {};
+const items = st.items || this.start();
+const flt = st.flt || 'alle';
+const offenId = st.offenId || 0;
+const letzte = st.letzte || null;
+const PERS = { F: ['Friederike', '#8A2F5C'], J: ['Johannes', '#2B5FA8'], P: ['Papa', '#1F5F5B'], M: ['Mama', '#9A4A12'] };
+const FOLGE = { F: 'J', J: 'F', P: 'M', M: 'P' };
+const KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const LANG = ['Montag, 21.9.', 'Dienstag, 22.9.', 'Mittwoch, 23.9.', 'Donnerstag, 24.9.', 'Freitag, 25.9.', 'Samstag, 26.9.', 'Sonntag, 27.9.'];
+const TAG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+const passt = (t) => flt === 'alle' || (flt === 'E' ? (t.p === 'P' || t.p === 'M') : t.p === flt);
+const setze = (neu, extra) => this.setState(Object.assign({ items: neu, vorher: items }, extra || {}));
+const aendere = (id, feld) => items.map((t) => (t.id === id ? Object.assign({}, t, feld) : t));
+const sichtbar = items.filter((t) => t.s !== 'aus' && passt(t));
+const offene = sichtbar.filter((t) => t.s === 'v');
+
+const filter = [['alle', 'Alle'], ['F', 'Friederike'], ['J', 'Johannes'], ['E', 'Eltern']].map((x) => {
+const aktiv = flt === x[0];
+return { name: x[1], aktiv: aktiv, bg: aktiv ? '#ffffff' : '#1F5F5B', fg: aktiv ? '#123F3C' : '#ffffff', waehlen: () => this.setState({ flt: x[0], offenId: 0 }) };
+});
+const fltName = { alle: '', F: 'Friederike', J: 'Johannes', E: 'Eltern' }[flt];
+
+const tage = LANG.map((titel, i) => {
+const liste = sichtbar.filter((t) => t.tag === i);
+const off = liste.filter((t) => t.s === 'v');
+return {
+titel: titel, leer: liste.length === 0, hatOffene: off.length > 0,
+okText: KURZ[i] + ' ok', neuLabel: 'Neue Aufgabe für ' + TAG[i],
+ok: () => setze(items.map((t) => (t.tag === i && t.s === 'v' && passt(t) ? Object.assign({}, t, { s: 'ok' }) : t)), { offenId: 0, letzte: { text: TAG[i] + ': ' + off.length + ' bestätigt.' } }),
+eintraege: liste.map((t) => {
+const v = t.s === 'v';
+const offen = offenId === t.id;
+return {
+name: t.name, info: v ? t.regel : t.regel + ' · bestätigt', vorschlag: v, offen: offen,
+bg: v ? '#FFFDF6' : '#ffffff', linie: v ? 'dashed' : 'solid', rand: v ? '#8A8472' : '#D9D3C4',
+person: PERS[t.p][0], personFarbe: PERS[t.p][1],
+personLabel: 'Person ändern, aktuell ' + PERS[t.p][0], okLabel: t.name + ' am ' + TAG[i] + ' bestätigen',
+auf: () => this.setState({ offenId: offen ? 0 : t.id }),
+personWechseln: () => setze(aendere(t.id, { p: FOLGE[t.p] }), { letzte: null }),
+ok: () => setze(aendere(t.id, { s: 'ok' }), { offenId: 0, letzte: null }),
+faelltAus: () => setze(aendere(t.id, { s: 'aus' }), { offenId: 0, letzte: { text: t.name + ' am ' + TAG[i] + ' fällt aus.', name: t.name } }),
+ziele: KURZ.map((k, z) => {
+const aktiv = z === i;
+return { name: k, aktiv: aktiv, rand: aktiv ? '#1F5F5B' : '#8A8472', bg: aktiv ? '#1F5F5B' : '#ffffff', fg: aktiv ? '#ffffff' : '#1F2A2E',
+legen: () => (aktiv ? this.setState({ offenId: 0 }) : setze(aendere(t.id, { tag: z }), { offenId: 0, letzte: { text: t.name + ' liegt jetzt am ' + TAG[z] + '.' } })) };
+})
+};
+})
+};
+});
+
+const rest = letzte && letzte.name ? items.filter((t) => t.name === letzte.name && t.s !== 'aus').length : 0;
+return {
+filter: filter, tage: tage,
+hatOffene: offene.length > 0,
+allesBestaetigt: offene.length === 0,
+fertigText: flt === 'alle' ? 'Die Woche steht. Alles bestätigt.' : 'Für ' + fltName + ' ist alles bestätigt.',
+offeneText: offene.length + (offene.length === 1 ? ' Vorschlag' : ' Vorschläge') + (flt === 'alle' ? '.' : ' für ' + fltName + '.'),
+alleOkText: flt === 'alle' ? 'Alle ' + offene.length + ' ok' : 'Diese ' + offene.length + ' ok',
+alleOk: () => setze(items.map((t) => (t.s === 'v' && passt(t) ? Object.assign({}, t, { s: 'ok' }) : t)), { offenId: 0, letzte: { text: offene.length + ' bestätigt.' } }),
+hatMeldung: !!letzte, meldung: letzte ? letzte.text : '',
+rueckgaengig: () => this.setState({ items: st.vorher || this.start(), letzte: null }),
+kannWocheStreichen: rest > 0,
+wocheStreichenText: 'Auch die anderen ' + rest + ' streichen',
+wocheStreichen: () => this.setState({ items: items.map((t) => (t.name === letzte.name ? Object.assign({}, t, { s: 'aus' }) : t)), letzte: { text: letzte.name + ' fällt diese Woche ganz aus.' } })
+};
+}
+}
+</script>
+</body>
+</html>

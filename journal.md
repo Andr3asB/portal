@@ -2,6 +2,59 @@
 
 ---
 
+## 2026-09-19 – portal-v264: Aufgaben (neu), Schritt 1 – Schema, Sichtbarkeit, Rechte, aufgabe_neu() (#297)
+
+Andi hat die Spezifikation der neuen Aufgaben-App geliefert
+(`docs/aufgaben_neu/spezifikation.md`, dazu sieben Screen-Entwürfe unter
+`docs/aufgaben_neu/entwurf/`) und den Start freigegeben. Die neun Schritte
+aus Abschnitt 14 stehen als Wünsche #297–#305 in der Werkstatt (App `todo`,
+ohne Priorität – die Reihenfolge steht in der Spezifikation, Andi
+priorisiert). Schritt 1 gleich umgesetzt, weil er ohne Oberfläche und ohne
+Kachel auskommt und nichts am Bestand ändert.
+
+**Schema** (`00_kern.py`, Ende von `SCHEMA`): `aufgaben`, `termine` mit
+dem partiellen Unique-Index `termine_regel_tag (aufgabe_id, tag) WHERE
+spontan = 0 AND tag IS NOT NULL AND flexibel = 0` (Idempotenz der späteren
+Vorschläge), `termine_user_tag`, `aufgaben_historie`, `aufgaben_migration`.
+Alles hängt per CASCADE am Nutzer bzw. an `aufgaben`, `conftest.py`
+braucht keinen `BLEIBT`-Eintrag. Die alten Tabellen bleiben unberührt.
+
+**Modul `28_aufgaben.py`** (Alias `teile.aufgaben`), noch ohne Routen:
+
+- `sichtbare_termine()` / `sichtbare_aufgaben()` – die EINE
+  Sichtbarkeitsfunktion (3.1) als SQL-Bedingung, Gast nur `alle`,
+  `is_admin` ohne Sonderrecht. `termin_sichtbar()` liefert `None` für
+  „gibt es nicht" und „unsichtbar" gleichermaßen – die Grundlage der
+  404-vor-403-Regel.
+- `darf_*` nach der Matrix in 3.2: haken, bearbeiten, parken, löschen
+  (Kinder nur selbst angelegte ohne Punkte), nehmen/freigeben bei
+  Gruppenaufgaben, Vorschläge (nur Eltern), Kachel zurück (Kinder eigener
+  Tipp nur heute). Regelmäßige Aufgaben parkt man nicht.
+- `aufgabe_neu()` als einzige Schreibschnittstelle: prüft, dass das Ziel
+  die Aufgabe sehen darf („Für Johannes" mit „Nur Eltern" wird abgelehnt),
+  setzt bei Kindern Ziel = ich und verwirft Punkte/Kachel/Symbol still,
+  rundet Punkte auf halbe (0–10), prüft Emoji gegen die lokale
+  Twemoji-Grafik, Regeln (`wochentage` normalisiert zu `0,2,4`,
+  `intervall` ≥ 2; eine Regel erzeugt jetzt keinen Termin – das kommt mit
+  den Vorschlägen in Schritt 5), `wann` = heute / geparkt / woche
+  (flexibel, Sonntag) / ISO-Tag im Fenster −7…+60. `keine_dublette=True`
+  für externe Aufrufer wie das KI-Budget. Push bei Zuweisung an eine andere
+  Person (token-freier Deep-Link), nicht bei Gruppen.
+
+**Tests:** `test_aufgaben_sicht.py` (jede Sichtstufe je Rolle inklusive
+zweitem Kind und Gast, Admin ohne Sonderrecht, Zuweisung öffnet genau den
+Termin, unsichtbar = nicht vorhanden, private Termine fehlen in fremden
+Zählern, Filter) und `test_aufgaben_rechte.py` (Matrix, Kind-Eingaben
+werden ignoriert, Normalisierung, Regeln, Fenster, geparkt, Dublette,
+Push). Ausgeliefert als v264 (Schema entsteht beim Start idempotent).
+
+**Offene Punkte aus Abschnitt 15**, vor Schritt 4/5 zu klären – als Rückfragen
+an die jeweiligen Wünsche (#300, #301) gestellt, sobald sie priorisiert sind;
+Modulname (15.3) ist mit `28_aufgaben.py` / Slug `aufgaben` entschieden,
+der Kachelname „Aufgaben (neu)" für die Testphase kommt mit Schritt 2.
+
+---
+
 ## 2026-09-19 – portal-v263: #296 Matrix-Fenster aus einer Kalenderquelle; #281 Betroffenheit geprüft
 
 ### #296 (`hoch`) – der Geholfen-Test kippte nach elf Tagen

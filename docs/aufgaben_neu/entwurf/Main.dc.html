@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Heute – Ansicht Kind</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Bricolage+Grotesque:wght@600;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Atkinson Hyperlegible',Verdana,sans-serif;background:#F6F3EC;color:#1F2A2E}
+button{font-family:inherit;cursor:pointer}
+a{color:#1F5F5B}a:hover{color:#123F3C}
+</style>
+</helmet>
+<div style="width: 390px; height: 1660px; box-sizing: border-box; background: #F6F3EC; display: flex; flex-direction: column;">
+
+<header style="background: #8A2F5C; color: #ffffff; padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<div style="font-size: 14px; opacity: 0.9;">Samstag, 19. September</div>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 30px; line-height: 1.1;">Hallo Friederike</h1>
+</div>
+<button aria-label="Person wechseln" style="width: 48px; height: 48px; border-radius: 24px; border: 2px solid #ffffff; background: #6E2449; color: #ffffff; font-size: 18px; font-weight: 700;">F</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;">
+<div style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 22px;">{{erledigtText}}</div>
+<div style="font-size: 15px;">{{punkte}} Punkte diese Woche</div>
+</div>
+<div style="height: 12px; border-radius: 6px; background: #6E2449; overflow: hidden;">
+<div style="height: 12px; border-radius: 6px; background: #F4C95D; width: {{balken}};"></div>
+</div>
+</div>
+</header>
+
+<main style="flex-grow: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px;">
+
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 20px;">Heute dran</h2>
+<sc-for list="{{aufgaben}}" as="a" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; border-radius: 16px; border: 2px solid {{a.rand}}; background: {{a.flaeche}}; overflow: hidden;">
+<div style="display: flex; align-items: stretch;">
+<button onClick="{{a.kippen}}" aria-pressed="{{a.fertig}}" style="flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 10px 8px 10px 14px; box-sizing: border-box; text-align: left; border: none; background: {{a.flaeche}}; color: #1F2A2E;">
+<span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 18px; box-sizing: border-box; border: 3px solid #1F5F5B; background: {{a.kreis}}; display: flex; align-items: center; justify-content: center;">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9"></path></svg>
+</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<span style="font-size: 18px; font-weight: 700; text-decoration: {{a.strich}};">{{a.name}}</span>
+<span style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: #4A5558;">
+<span>{{a.info}}</span>
+<sc-if value="{{a.hatSicht}}" hint-placeholder-val="{{ false }}">
+<span style="display: flex; align-items: center; gap: 4px; font-weight: 700; color: #1F2A2E; background: #E9E4D6; padding: 2px 8px; border-radius: 10px;">
+<svg width="12" height="14" viewBox="0 0 14 16" fill="none" stroke="#1F2A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="7" width="11" height="8" rx="2"></rect><path d="M4 7V4.5a3 3 0 0 1 6 0V7"></path></svg>
+<span>{{a.sicht}}</span>
+</span>
+</sc-if>
+</span>
+</span>
+<sc-if value="{{a.hatPunkte}}" hint-placeholder-val="{{ true }}">
+<span style="flex-shrink: 0; font-size: 14px; font-weight: 700; color: #6B4A00; background: #FBE9B4; padding: 4px 10px; border-radius: 12px;">{{a.pkt}}</span>
+</sc-if>
+</button>
+<sc-if value="{{a.editierbar}}" hint-placeholder-val="{{ false }}">
+<a href="NeueAufgabe.dc.html" aria-label="{{a.editLabel}}" style="flex-shrink: 0; width: 48px; display: flex; align-items: center; justify-content: center; border-left: 1px solid {{a.rand}}; background: {{a.flaeche}};">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1F2A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l1-4L14 3l3 3L7 16l-4 1z"></path><path d="M12 5l3 3"></path></svg>
+</a>
+</sc-if>
+</div>
+<sc-if value="{{a.ueberfaellig}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px 14px; border-top: 1px solid #E7B9B9; background: #FDF0F0;">
+<span style="flex-grow: 1; font-size: 14px; font-weight: 700; color: #9B1C1C;">Seit gestern offen</span>
+<button onClick="{{a.morgen}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #1F2A2E; background: #ffffff; color: #1F2A2E; font-size: 15px; font-weight: 700;">Morgen</button>
+<button onClick="{{a.parken}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #1F2A2E; background: #ffffff; color: #1F2A2E; font-size: 15px; font-weight: 700;">Parken</button>
+</div>
+</sc-if>
+</div>
+</sc-for>
+<sc-if value="{{hatVerschoben}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: #1F2A2E; color: #ffffff;">
+<span style="flex-grow: 1; font-size: 15px;">{{verschobenText}}</span>
+<button onClick="{{rueckgaengig}}" style="min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #ffffff; background: #1F2A2E; color: #ffffff; font-size: 15px; font-weight: 700;">Rückgängig</button>
+</div>
+</sc-if>
+<div style="font-size: 14px; color: #4A5558;">Vertippt? Einfach nochmal antippen.</div>
+<a href="NeueAufgabe.dc.html" style="display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 16px; border: 2px dashed #8A8472; color: #1F2A2E; text-decoration: none; font-size: 17px; font-weight: 700;">+ Eigene Aufgabe</a>
+</section>
+
+<sc-if value="{{hatFreie}}" hint-placeholder-val="{{ true }}">
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 20px;">Noch zu haben</h2>
+<div style="font-size: 14px; color: #4A5558;">Wer zuerst tippt, hat sie</div>
+</div>
+<sc-for list="{{freie}}" as="x" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 68px; padding: 8px 8px 8px 14px; border-radius: 16px; background: #FFFDF6; border: 2px dashed #8A8472;">
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<span style="font-size: 17px; font-weight: 700;">{{x.name}}</span>
+<span style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: #4A5558;">
+<span>{{x.info}}</span>
+<sc-if value="{{x.hatSicht}}" hint-placeholder-val="{{ false }}">
+<span style="display: flex; align-items: center; gap: 4px; font-weight: 700; color: #1F2A2E; background: #E9E4D6; padding: 2px 8px; border-radius: 10px;">
+<svg width="12" height="14" viewBox="0 0 14 16" fill="none" stroke="#1F2A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="7" width="11" height="8" rx="2"></rect><path d="M4 7V4.5a3 3 0 0 1 6 0V7"></path></svg>
+<span>{{x.sicht}}</span>
+</span>
+</sc-if>
+<span style="font-weight: 700; color: #6B4A00; background: #FBE9B4; padding: 2px 8px; border-radius: 10px;">{{x.pkt}}</span>
+</span>
+</span>
+<button onClick="{{x.nehmen}}" style="flex-shrink: 0; min-height: 48px; padding: 0 14px; border-radius: 12px; border: none; background: #1F5F5B; color: #ffffff; font-size: 15px; font-weight: 700;">Ich mach’s</button>
+</div>
+</sc-for>
+</section>
+</sc-if>
+
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 20px;">Sonst noch geholfen?</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+<sc-for list="{{kacheln}}" as="k" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; border-radius: 16px; border: 2px solid {{k.rand}}; background: {{k.flaeche}}; overflow: hidden;">
+<button onClick="{{k.tippen}}" style="flex-grow: 1; min-height: 84px; padding: 10px 6px; border: none; background: {{k.flaeche}}; color: #1F2A2E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<span style="font-size: 15px; font-weight: 700; line-height: 1.2; text-align: center;">{{k.name}}</span>
+<span style="font-size: 13px; color: #4A5558;">{{k.zaehler}}</span>
+</button>
+<sc-if value="{{k.hatHeute}}" hint-placeholder-val="{{ false }}">
+<button onClick="{{k.zurueck}}" aria-label="{{k.zurueckLabel}}" style="min-height: 44px; border: none; border-top: 1px solid #B9D6D2; background: #ffffff; color: #123F3C; font-size: 14px; font-weight: 700;">− zurück</button>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+
+<a href="Woche.dc.html" style="display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 16px; border-radius: 16px; background: #E9E4D6; color: #1F2A2E; text-decoration: none; font-size: 16px; font-weight: 700;">
+<span>Morgen: 2 Aufgaben</span>
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1F2A2E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"></path></svg>
+</a>
+
+</main>
+
+<nav aria-label="Ansichten" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0px; background: #ffffff; border-top: 1px solid #D9D3C4; padding: 8px 8px 14px;">
+<a href="Main.dc.html" aria-current="page" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: #DDEBE9; color: #123F3C; font-weight: 700; font-size: 16px; text-decoration: none;">Heute</a>
+<a href="Woche.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #1F2A2E; font-size: 16px; text-decoration: none;">Woche</a>
+<a href="SpaeterKind.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; color: #1F2A2E; font-size: 16px; text-decoration: none;">Später</a>
+</nav>
+<div style="background: #ffffff; padding: 0 16px 16px; text-align: center; font-size: 14px;"><a href="#alt">Zur bisherigen Ansicht wechseln</a></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1660}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state || {};
+const fertig = st.fertig || { 2: true };
+const tipps = st.tipps || {};
+const roh = [
+{ id: 1, name: 'Tisch decken', info: 'Aus dem Wochenplan', p: 1 },
+{ id: 2, name: 'Spülmaschine ausräumen', info: 'Aus dem Wochenplan', p: 1 },
+{ id: 3, name: 'Blumen gießen', info: 'Alle 3 Tage', p: 1 },
+{ id: 4, name: 'Vokabeln Unit 2 lernen', info: 'Von mir', p: 0, edit: true, ueber: true },
+{ id: 6, name: 'Geschenk für Mama basteln', info: 'Von mir', p: 0, sicht: 'Nur ich', edit: true }
+];
+const kroh = [
+{ id: 'a', name: 'Tisch abräumen', p: 1 },
+{ id: 'b', name: 'Wäsche legen', p: 1.5 },
+{ id: 'c', name: 'Beim Kochen', p: 2 },
+{ id: 'd', name: 'Zimmer aufräumen', p: 2 },
+{ id: 'e', name: 'Einkaufen', p: 1.5 },
+{ id: 'f', name: 'Staubwischen', p: 1 }
+];
+let punkte = 11;
+let zahl = 0;
+const weg = st.weg || '';
+const genommen = st.genommen || {};
+const frh = [
+{ id: 7, name: 'Geburtstagstisch für Mama schmücken', info: 'Von Papa · für die Kinder', p: 2, sicht: 'Nur Kinder' },
+{ id: 8, name: 'Altglas wegbringen', info: 'Von Mama · wer will', p: 1 }
+];
+frh.filter((x) => genommen[x.id]).forEach((x) => roh.push({ id: x.id, name: x.name, info: 'Übernommen', p: x.p, sicht: x.sicht }));
+const freie = frh.filter((x) => !genommen[x.id]).map((x) => ({
+name: x.name, info: x.info, hatSicht: !!x.sicht, sicht: x.sicht || '', pkt: '+' + x.p,
+nehmen: () => this.setState({ genommen: Object.assign({}, genommen, { [x.id]: true }) })
+}));
+const sichtbar = roh.filter((a) => !(weg && a.ueber));
+const aufgaben = sichtbar.map((a) => {
+const f = !!fertig[a.id];
+if (f) { punkte += a.p; zahl += 1; }
+return {
+name: a.name, info: a.info, fertig: f,
+hatSicht: !!a.sicht, sicht: a.sicht || '', hatPunkte: a.p > 0, editierbar: !!a.edit, editLabel: a.name + ' bearbeiten',
+ueberfaellig: !!a.ueber && !f,
+morgen: () => this.setState({ weg: 'morgen' }),
+parken: () => this.setState({ weg: 'geparkt' }),
+pkt: '+' + a.p,
+rand: f ? '#B9D6D2' : (a.ueber ? '#E7B9B9' : '#D9D3C4'),
+flaeche: f ? '#E6F1EF' : '#ffffff',
+kreis: f ? '#1F5F5B' : '#ffffff',
+strich: f ? 'line-through' : 'none',
+kippen: () => this.setState({ fertig: Object.assign({}, fertig, { [a.id]: !f }) })
+};
+});
+const kacheln = kroh.map((k) => {
+const n = tipps[k.id] || 0;
+punkte += n * k.p;
+return {
+name: k.name,
+zaehler: n > 0 ? n + '× heute' : '+' + String(k.p).replace('.', ','),
+hatHeute: n > 0,
+rand: n > 0 ? '#B9D6D2' : '#D9D3C4',
+flaeche: n > 0 ? '#E6F1EF' : '#ffffff',
+zurueckLabel: k.name + ': letzten Eintrag von heute zurücknehmen',
+tippen: () => this.setState({ tipps: Object.assign({}, tipps, { [k.id]: n + 1 }) }),
+zurueck: () => this.setState({ tipps: Object.assign({}, tipps, { [k.id]: Math.max(0, n - 1) }) })
+};
+});
+const pct = sichtbar.length ? Math.round(zahl / sichtbar.length * 100) : 100;
+return {
+aufgaben: aufgaben,
+freie: freie,
+hatFreie: freie.length > 0,
+kacheln: kacheln,
+punkte: String(punkte).replace('.', ','),
+balken: pct + '%',
+erledigtText: sichtbar.length === 0 ? 'Heute ist nichts dran' : (zahl === sichtbar.length ? 'Alles geschafft' : zahl + ' von ' + sichtbar.length + ' geschafft'),
+hatVerschoben: !!weg,
+verschobenText: weg === 'morgen' ? 'Vokabeln stehen jetzt bei Morgen.' : 'Vokabeln sind geparkt. Du findest sie unter Später.',
+rueckgaengig: () => this.setState({ weg: '' })
+};
+}
+}
+</script>
+</body>
+</html>

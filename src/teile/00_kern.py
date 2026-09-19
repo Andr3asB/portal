@@ -560,6 +560,64 @@ CREATE TABLE IF NOT EXISTS kassenbuch_eintraege (
   storniert_von  INTEGER REFERENCES users(id),
   storniert_am   TEXT
 );
+-- Neue App "Aufgaben" (docs/aufgaben_neu/spezifikation.md, Abschnitt 4).
+-- Harter Schnitt: eigene Tabellen, keine Uebersetzungsschicht zu todos/
+-- geholfen_*/kinderplan_*; die alten Tabellen bleiben eingefroren bestehen.
+-- Alles haengt per CASCADE am Nutzer bzw. an aufgaben - kein BLEIBT-Eintrag
+-- in tests/conftest.py noetig.
+CREATE TABLE IF NOT EXISTS aufgaben (
+  id               INTEGER PRIMARY KEY,
+  inhalt           TEXT    NOT NULL,
+  emoji            TEXT,                            -- nur mit lokaler Twemoji-Grafik
+  punkte           REAL    NOT NULL DEFAULT 0,      -- 0..10, Schritt 0,5; nur Eltern
+  erstellt_von     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ziel_user        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  ziel_gruppe      TEXT,                            -- NULL | 'eltern' | 'kinder' | 'alle'; exklusiv zu ziel_user
+  sicht            TEXT    NOT NULL DEFAULT 'alle', -- 'alle' | 'eltern' | 'kinder' | 'ich'
+  regel_typ        TEXT,                            -- NULL | 'wochentage' | 'intervall'
+  regel_wochentage TEXT,                            -- '0,2,4' (0 = Montag)
+  regel_intervall  INTEGER,                         -- Tage, >= 2
+  kachel           INTEGER NOT NULL DEFAULT 0,
+  pausiert         INTEGER NOT NULL DEFAULT 0,
+  erstellt         TEXT    NOT NULL DEFAULT (datetime('now')),
+  geaendert        TEXT
+);
+CREATE TABLE IF NOT EXISTS termine (
+  id            INTEGER PRIMARY KEY,
+  aufgabe_id    INTEGER NOT NULL REFERENCES aufgaben(id) ON DELETE CASCADE,
+  tag           TEXT,                              -- Familientag ISO; NULL nur bei status='geparkt'
+  flexibel      INTEGER NOT NULL DEFAULT 0,        -- 1 = "diese Woche": tag ist der Sonntag der Woche
+  uhrzeit       TEXT,                              -- 'HH:MM' Ortszeit, optional
+  user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,  -- NULL = Gruppe, noch frei
+  status        TEXT    NOT NULL DEFAULT 'offen',  -- 'vorschlag' | 'offen' | 'erledigt' | 'aus' | 'geparkt'
+  inhalt        TEXT,                              -- Abweichung "nur dieser Termin", sonst NULL
+  spontan       INTEGER NOT NULL DEFAULT 0,        -- 1 = Kachel-Tipp
+  punkte        REAL,                              -- Schnappschuss beim Erledigen
+  erledigt_am   TEXT,                              -- UTC
+  erledigt_tag  TEXT,                              -- Familientag
+  erledigt_von  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  getippt_von   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  geparkt_am    TEXT,
+  position      INTEGER NOT NULL DEFAULT 0,        -- Reihenfolge in "Spaeter"
+  erstellt      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS termine_regel_tag ON termine(aufgabe_id, tag)
+  WHERE spontan = 0 AND tag IS NOT NULL AND flexibel = 0;
+CREATE INDEX IF NOT EXISTS termine_user_tag ON termine(user_id, tag);
+CREATE TABLE IF NOT EXISTS aufgaben_historie (
+  id            INTEGER PRIMARY KEY,
+  aufgabe_id    INTEGER NOT NULL REFERENCES aufgaben(id) ON DELETE CASCADE,
+  alter_inhalt  TEXT    NOT NULL,
+  geaendert_von INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  geaendert_am  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS aufgaben_migration (
+  alt_tabelle TEXT    NOT NULL,
+  alt_id      INTEGER NOT NULL,
+  neu_tabelle TEXT    NOT NULL,
+  neu_id      INTEGER NOT NULL,
+  PRIMARY KEY (alt_tabelle, alt_id, neu_tabelle)
+);
 """
 
 _DEFAULT_SPRACHEN = ["Englisch", "Latein", "Dänisch", "Italienisch", "Französisch"]

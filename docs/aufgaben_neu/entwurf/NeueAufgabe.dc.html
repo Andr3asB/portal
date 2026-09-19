@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Aufgabe anlegen oder bearbeiten</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Bricolage+Grotesque:wght@600;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Atkinson Hyperlegible',Verdana,sans-serif;background:#F6F3EC;color:#1F2A2E}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#1F5F5B}a:hover{color:#123F3C}
+</style>
+</helmet>
+<div style="width: 390px; height: 1400px; box-sizing: border-box; background: #F6F3EC; display: flex; flex-direction: column;">
+
+<header style="background: {{kopfFarbe}}; color: #ffffff; padding: 16px 12px; display: flex; align-items: center; gap: 8px;">
+<a href="Main.dc.html" aria-label="Abbrechen" style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 24px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"></path></svg>
+</a>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 26px;">{{titel}}</h1>
+</header>
+
+<main style="flex-grow: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px;">
+
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label for="n-text" style="font-size: 16px; font-weight: 700;">Was ist zu tun?</label>
+<input id="n-text" type="text" value="{{vorgabeText}}" placeholder="z. B. Fahrrad aufpumpen" style="height: 56px; box-sizing: border-box; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 18px; padding: 0 14px; width: 100%;">
+</div>
+
+<sc-if value="{{istEltern}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="font-size: 16px; font-weight: 700;">Wer?</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<sc-for list="{{personen}}" as="p" hint-placeholder-count="7">
+<button onClick="{{p.waehlen}}" aria-pressed="{{p.aktiv}}" style="min-height: 48px; padding: 0 16px; border-radius: 24px; border: 2px {{p.linie}} {{p.rand}}; background: {{p.bg}}; color: {{p.fg}}; font-size: 16px; font-weight: 700;">{{p.name}}</button>
+</sc-for>
+</div>
+<div style="font-size: 14px; color: #4A5558;">{{werHinweis}}</div>
+</div>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="font-size: 16px; font-weight: 700;">Wann?</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{wann}}" as="w" hint-placeholder-count="4">
+<button onClick="{{w.waehlen}}" aria-pressed="{{w.aktiv}}" style="min-height: 56px; border-radius: 12px; border: 2px solid {{w.rand}}; background: {{w.bg}}; color: {{w.fg}}; font-size: 17px; font-weight: 700;">{{w.name}}</button>
+</sc-for>
+</div>
+<sc-if value="{{nichtRegel}}" hint-placeholder-val="{{ true }}">
+<div style="font-size: 14px; color: #4A5558;">{{wannHinweis}}</div>
+</sc-if>
+<sc-if value="{{istRegel}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #D9D3C4;">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{arten}}" as="m" hint-placeholder-count="2">
+<button onClick="{{m.waehlen}}" aria-pressed="{{m.aktiv}}" style="min-height: 48px; border-radius: 12px; border: 2px solid {{m.rand}}; background: {{m.bg}}; color: #1F2A2E; font-size: 15px; font-weight: 700;">{{m.name}}</button>
+</sc-for>
+</div>
+<sc-if value="{{istWochentage}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px;">
+<sc-for list="{{tage}}" as="t" hint-placeholder-count="7">
+<button onClick="{{t.kippen}}" aria-pressed="{{t.aktiv}}" style="min-height: 48px; padding: 0; border-radius: 12px; border: 2px solid {{t.rand}}; background: {{t.bg}}; color: {{t.fg}}; font-size: 15px; font-weight: 700;">{{t.name}}</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{istIntervall}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+<span style="font-size: 17px;">Alle</span>
+<button onClick="{{nMinus}}" aria-label="Weniger Tage" style="width: 48px; height: 48px; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 22px; color: #1F2A2E;">−</button>
+<span style="width: 36px; text-align: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 26px;">{{n}}</span>
+<button onClick="{{nPlus}}" aria-label="Mehr Tage" style="width: 48px; height: 48px; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 22px; color: #1F2A2E;">+</button>
+<span style="font-size: 17px;">Tage</span>
+</div>
+<div style="font-size: 14px; color: #4A5558; text-align: center;">Gezählt ab dem Tag, an dem sie zuletzt erledigt wurde.</div>
+</sc-if>
+<div style="font-size: 15px; font-weight: 700; color: #123F3C;">{{regelVorschau}}</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<button onClick="{{mehrKippen}}" aria-expanded="{{mehrOffen}}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 8px 14px; text-align: left; border-radius: 14px; border: 1px solid #8A8472; background: #ffffff; color: #1F2A2E;">
+<span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 16px; font-weight: 700;">Mehr einstellen</span><span style="font-size: 14px; color: #4A5558;">{{mehrZusammenfassung}}</span></span>
+<span style="font-size: 15px; font-weight: 700; color: #123F3C;">{{mehrKnopf}}</span>
+</button>
+
+<sc-if value="{{mehrOffen}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 18px; padding: 14px; border-radius: 14px; background: #ffffff; border: 1px solid #D9D3C4;">
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="font-size: 16px; font-weight: 700;">Wer darf das sehen?</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{sicht}}" as="s" hint-placeholder-count="4">
+<button onClick="{{s.waehlen}}" aria-pressed="{{s.aktiv}}" style="min-height: 48px; border-radius: 12px; border: 2px solid {{s.rand}}; background: {{s.bg}}; color: #1F2A2E; font-size: 16px; font-weight: 700;">{{s.name}}</button>
+</sc-for>
+</div>
+<div style="font-size: 14px; color: #4A5558;">{{sichtHinweis}}</div>
+</div>
+
+<sc-if value="{{istEltern}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 16px; font-weight: 700;">Punkte</span><span style="font-size: 14px; color: #4A5558;">Zählen in die Wochenpunkte</span></div>
+<div style="display: flex; align-items: center; gap: 6px;">
+<button onClick="{{pktMinus}}" aria-label="Weniger Punkte" style="width: 44px; height: 44px; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 22px; color: #1F2A2E;">−</button>
+<div style="width: 40px; text-align: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 22px;">{{pkt}}</div>
+<button onClick="{{pktPlus}}" aria-label="Mehr Punkte" style="width: 44px; height: 44px; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 22px; color: #1F2A2E;">+</button>
+</div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px;">
+<label for="n-kachel" style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 16px; font-weight: 700;">Auch als Kachel</span><span style="font-size: 14px; color: #4A5558;">Zum spontanen Antippen bei „Sonst noch geholfen?“</span></label>
+<input id="n-kachel" type="checkbox" style="flex-shrink: 0; width: 28px; height: 28px; accent-color: #1F5F5B;">
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+<label for="n-symbol" style="font-size: 16px; font-weight: 700;">Symbol</label>
+<input id="n-symbol" type="text" placeholder="Emoji" style="width: 96px; height: 48px; box-sizing: border-box; border-radius: 12px; border: 2px solid #8A8472; background: #ffffff; font-size: 16px; text-align: center;">
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+<sc-if value="{{bearbeiten}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; border-radius: 14px; background: #FBE9B4;">
+<button aria-pressed="true" style="min-height: 48px; border-radius: 12px; border: 2px solid #3D2A00; background: #3D2A00; color: #ffffff; font-size: 15px; font-weight: 700;">Nur dieser Termin</button>
+<button aria-pressed="false" style="min-height: 48px; border-radius: 12px; border: 2px solid #3D2A00; background: #FBE9B4; color: #3D2A00; font-size: 15px; font-weight: 700;">Alle künftigen</button>
+</div>
+</sc-if>
+<div style="display: flex; gap: 10px;">
+<button style="flex-grow: 1; min-height: 60px; border-radius: 16px; border: none; background: {{kopfFarbe}}; color: #ffffff; font-size: 19px; font-weight: 700;">{{speichernText}}</button>
+<sc-if value="{{bearbeiten}}" hint-placeholder-val="{{ false }}">
+<button style="min-height: 60px; padding: 0 18px; border-radius: 16px; border: 2px solid #9B1C1C; background: #ffffff; color: #9B1C1C; font-size: 16px; font-weight: 700;">Löschen</button>
+</sc-if>
+</div>
+</div>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"ansicht":{"editor":"enum","options":["Eltern","Kind"],"default":"Eltern"},"modus":{"editor":"enum","options":["Neu","Bearbeiten"],"default":"Neu"},"$preview":{"width":390,"height":1400}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state || {};
+const eltern = (this.props.ansicht ?? 'Eltern') === 'Eltern';
+const bearbeiten = (this.props.modus ?? 'Neu') === 'Bearbeiten';
+const wer = st.wer || 'ich';
+const wann = st.wann || (bearbeiten ? 'regel' : 'heute');
+let sicht = st.sicht || 'alle';
+if (!eltern && sicht === 'eltern') { sicht = 'alle'; }
+const pkt = st.pkt === undefined ? (bearbeiten ? 1 : 0) : st.pkt;
+const art = st.art || 'wochentage';
+const n = st.n || 3;
+const tg = st.tg || { 0: true, 2: true, 4: true };
+const mehrOffen = !!st.mehr;
+
+const proh = [
+{ id: 'ich', name: 'Ich', farbe: '#1F5F5B' },
+{ id: 'f', name: 'Friederike', farbe: '#8A2F5C' },
+{ id: 'j', name: 'Johannes', farbe: '#2B5FA8' },
+{ id: 'm', name: 'Mama', farbe: '#9A4A12' },
+{ id: 'eltern', name: 'Eltern', farbe: '#3D2A00', gruppe: true },
+{ id: 'kinder', name: 'Kinder', farbe: '#3D2A00', gruppe: true },
+{ id: 'offen', name: 'Wer will', farbe: '#3D2A00', gruppe: true }
+];
+const personen = proh.map((p) => {
+const aktiv = wer === p.id;
+return { name: p.name, aktiv: aktiv, linie: p.gruppe ? 'dashed' : 'solid', rand: aktiv ? p.farbe : '#8A8472', bg: aktiv ? p.farbe : '#ffffff', fg: aktiv ? '#ffffff' : '#1F2A2E', waehlen: () => this.setState({ wer: p.id }) };
+});
+const regel = wann === 'regel';
+const werTexte = {
+ich: 'Landet auf deiner Liste.',
+f: 'Friederike bekommt eine Benachrichtigung.',
+j: 'Johannes bekommt eine Benachrichtigung.',
+m: 'Mama bekommt eine Benachrichtigung.',
+eltern: regel ? 'Wird abwechselnd Mama und Papa vorgeschlagen.' : 'Steht bei beiden Eltern, bis einer „Ich mach’s“ tippt.',
+kinder: regel ? 'Wird abwechselnd Friederike und Johannes vorgeschlagen.' : 'Steht bei beiden Kindern, bis eines „Ich mach’s“ tippt.',
+offen: 'Steht bei „Noch ohne Person“ für alle.'
+};
+const wroh = [
+{ id: 'heute', name: 'Heute', text: 'Steht sofort bei Heute.' },
+{ id: 'tag', name: 'Tag wählen', text: 'Kalender öffnet sich, Uhrzeit ist freiwillig.' },
+{ id: 'spaeter', name: 'Später', text: 'Wird geparkt, ohne Tag und ohne Frist.' },
+{ id: 'regel', name: 'Regelmäßig', text: '' }
+];
+const wannListe = wroh.map((w) => {
+const aktiv = wann === w.id;
+return { name: w.name, aktiv: aktiv, rand: aktiv ? '#1F5F5B' : '#8A8472', bg: aktiv ? '#1F5F5B' : '#ffffff', fg: aktiv ? '#ffffff' : '#1F2A2E', waehlen: () => this.setState({ wann: w.id }) };
+});
+const arten = [['wochentage', 'An Wochentagen'], ['intervall', 'Alle … Tage']].map((m) => {
+const aktiv = art === m[0];
+return { name: m[1], aktiv: aktiv, rand: aktiv ? '#1F5F5B' : '#8A8472', bg: aktiv ? '#DDEBE9' : '#ffffff', waehlen: () => this.setState({ art: m[0] }) };
+});
+const tage = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((name, i) => {
+const aktiv = !!tg[i];
+return { name: name, aktiv: aktiv, rand: aktiv ? '#1F5F5B' : '#8A8472', bg: aktiv ? '#1F5F5B' : '#ffffff', fg: aktiv ? '#ffffff' : '#1F2A2E', kippen: () => this.setState({ tg: Object.assign({}, tg, { [i]: !aktiv }) }) };
+});
+const gewaehlt = tage.filter((t) => t.aktiv).map((t) => t.name).join(', ');
+const regelVorschau = art === 'wochentage' ? (gewaehlt ? 'Jeden ' + gewaehlt : 'Bitte mindestens einen Tag wählen') : 'Alle ' + n + ' Tage, das nächste Mal am Dienstag, 22.9.';
+
+let sroh = [
+{ id: 'alle', name: 'Alle', text: 'Die ganze Familie sieht die Aufgabe.' },
+{ id: 'eltern', name: 'Nur Eltern', text: 'Die Kinder sehen sie nirgends.' },
+{ id: 'kinder', name: 'Nur Kinder', text: eltern ? 'Die Kinder und du. Der andere Elternteil nicht.' : 'Du und Johannes. Mama und Papa sehen sie nicht.' },
+{ id: 'ich', name: 'Nur ich', text: eltern ? 'Niemand sonst, auch nicht der andere Elternteil.' : 'Niemand sonst, auch Mama und Papa nicht.' }
+];
+if (!eltern) { sroh = sroh.filter((s) => s.id !== 'eltern'); }
+const sichtListe = sroh.map((s) => {
+const aktiv = sicht === s.id;
+return { name: s.name, aktiv: aktiv, rand: aktiv ? '#1F5F5B' : '#8A8472', bg: aktiv ? '#DDEBE9' : '#ffffff', waehlen: () => this.setState({ sicht: s.id }) };
+});
+const sichtAktiv = sroh.filter((s) => s.id === sicht)[0];
+const pktText = String(pkt).replace('.', ',');
+const zusammen = (sicht === 'alle' ? 'Alle sehen es' : sichtAktiv.name) + (eltern ? (pkt > 0 ? ' · ' + pktText + ' Punkte' : ' · keine Punkte') : '');
+
+return {
+istEltern: eltern, bearbeiten: bearbeiten,
+titel: bearbeiten ? 'Aufgabe bearbeiten' : 'Neue Aufgabe',
+vorgabeText: bearbeiten ? 'Tisch decken' : '',
+kopfFarbe: eltern ? '#1F5F5B' : '#8A2F5C',
+personen: personen, werHinweis: werTexte[wer],
+wann: wannListe, istRegel: regel, nichtRegel: !regel,
+wannHinweis: wroh.filter((w) => w.id === wann)[0].text,
+arten: arten, tage: tage, n: n,
+istWochentage: art === 'wochentage', istIntervall: art === 'intervall',
+nMinus: () => this.setState({ n: Math.max(2, n - 1) }),
+nPlus: () => this.setState({ n: Math.min(60, n + 1) }),
+regelVorschau: regelVorschau,
+mehrOffen: mehrOffen, mehrKnopf: mehrOffen ? 'Zuklappen' : 'Ändern',
+mehrZusammenfassung: zusammen,
+mehrKippen: () => this.setState({ mehr: !mehrOffen }),
+sicht: sichtListe, sichtHinweis: sichtAktiv.text,
+pkt: pktText,
+pktMinus: () => this.setState({ pkt: Math.max(0, pkt - 0.5) }),
+pktPlus: () => this.setState({ pkt: Math.min(10, pkt + 0.5) }),
+speichernText: wann === 'spaeter' ? 'Parken' : 'Speichern'
+};
+}
+}
+</script>
+</body>
+</html>

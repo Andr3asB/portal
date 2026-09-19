@@ -50,3 +50,9 @@ _start_token = importlib.import_module("teile.01_start_token")
 sys.modules.setdefault("teile.start_token", _start_token)
 _briefing = importlib.import_module("teile.27_briefing")
 sys.modules.setdefault("teile.briefing", _briefing)
+
+# Neue App "Aufgaben" (docs/aufgaben_neu/spezifikation.md): `aufgabe_neu()` ist
+# die EINZIGE Schreibschnittstelle fuer andere Module (spaeter 24_ki_budget
+# ueber AUFGABEN_NEU_PRIMAER) - kein direktes INSERT in `aufgaben`/`termine`.
+_aufgaben = importlib.import_module("teile.28_aufgaben")
+sys.modules.setdefault("teile.aufgaben", _aufgaben)

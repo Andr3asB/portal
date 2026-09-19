@@ -1685,6 +1685,28 @@ teile/
                        GEBURTSTAGS_ERINNERUNGEN (im Test immer 0 - ein Thread,
                        der nebenher in dieselbe SQLite-Datei schreibt, liess
                        die Fixtures mit "database is locked" auflaufen).
+  28_aufgaben.py     – Neue App „Aufgaben" (#297 ff., Spezifikation in
+                       docs/aufgaben_neu/spezifikation.md, Screens unter
+                       docs/aufgaben_neu/entwurf/). Harter Schnitt mit
+                       eigenen Tabellen aufgaben/termine/aufgaben_historie/
+                       aufgaben_migration; die alten Apps todo, geholfen,
+                       kinderplan bleiben eingefroren, bis die Familie
+                       umzieht (Schritt 9). Stand v264 = Schritt 1, ohne
+                       Routen und Kachel: sichtbare_termine()/
+                       sichtbare_aufgaben() sind die EINZIGE Sichtbarkeits-
+                       funktion (Gast nur sicht='alle', is_admin ohne
+                       Sonderrecht – privat heisst privat, auch gegenueber
+                       Eltern), termin_sichtbar() liefert None fuer
+                       unsichtbar UND nicht vorhanden (404 vor 403), darf_*
+                       nach der Matrix in Spezifikation 3.2, aufgabe_neu()
+                       als einzige Schreibschnittstelle fuer andere Module
+                       (Ziel muss sehen duerfen; Kinder: Ziel = ich, Punkte/
+                       Kachel/Symbol verworfen; Regeln validiert, Termine
+                       daraus erst mit Schritt 5). Alias teile.aufgaben.
+                       Naechste Schritte: #298 Heute + Formular, #299
+                       Spaeter, #300 Kacheln, #301 Regeln/Woche, #302
+                       Gruppen/Familie/Alle, #303 Migration, #304 Push/
+                       Sonntagsjob/Hilfe, #305 Umzug.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -2098,6 +2120,10 @@ der Sicherheitsanalyse und Gegenstand von Stufe 6 (echtes Hashing).
 | `rezept_gekocht` | id, rezept_id (FK rezepte, CASCADE), tag, mahlzeit, markiert_von (FK users, SET NULL), markiert_am; UNIQUE(rezept_id, tag, mahlzeit) – Wunsch #162. BEWUSST eine eigene Tabelle statt eines Haekchens auf essensplan_eintraege: ein Planeintrag wird ueberschrieben, verschoben (#35) und geloescht, die Historie muss das ueberleben. Haengt am REZEPT, nicht am Plan; Freitext-Eintraege koennen deshalb nicht abgehakt werden |
 | `wunsch_aktionen` | id, wunsch_id (FK wuensche, CASCADE), art ('frage'/'antwort'/'plan'/'umsetzung'/'notiz'), text, user_id (FK users, SET NULL), erstellt – Wunsch #161: Verlauf je Wunsch. `wuensche.umsetzung` BLEIBT daneben bestehen, sie traegt die Abschluesse von ~150 alten Wuenschen, die es als Aktion nie geben wird. `manage.py wunsch_erledigt` schreibt ab #161 beides |
 | `kassenbuch_eintraege` | id, user_id (FK users, cascade – das Kind, dem das Buch gehört), art ('start'/'einnahme'/'ausgabe'), betrag_cent (immer POSITIV, Vorzeichen kommt aus `art` – keine Fließkomma-Rundungsfehler), person ("Von wem?"/"An wen?", je EIN Feld für beide Richtungen), zweck, datum, erstellt_von, erstellt, storniert, storniert_von, storniert_am – Wunsch #144: unveränderlicher Ledger, "Löschen" = Stornieren (Zeile bleibt stehen, zählt aber nicht mehr zum Kontostand); der Start-Eintrag ist nie stornierbar |
+| `aufgaben` | **Neue Aufgaben-App** (#297, `docs/aufgaben_neu/spezifikation.md` Abschnitt 4): id, inhalt, emoji (nur mit lokaler Twemoji-Grafik), punkte (0–10, halbe Schritte, nur Eltern), erstellt_von (FK users, cascade), ziel_user (FK users, set null) XOR ziel_gruppe ('eltern'/'kinder'/'alle'), sicht ('alle'/'eltern'/'kinder'/'ich' – gilt auch gegenüber Eltern und Admin), regel_typ ('wochentage'/'intervall'), regel_wochentage ('0,2,4', 0 = Mo), regel_intervall (≥ 2), kachel, pausiert, erstellt, geaendert. Einzige Schreibschnittstelle: `aufgabe_neu()` in `28_aufgaben.py` |
+| `termine` | Ein Vorkommen einer Aufgabe: id, aufgabe_id (FK aufgaben, cascade), tag (Familientag ISO; NULL nur bei geparkt), flexibel (1 = „diese Woche", tag = Sonntag), uhrzeit, user_id (FK users, cascade; NULL = Gruppe, noch frei), status ('vorschlag'/'offen'/'erledigt'/'aus'/'geparkt'), inhalt (Abweichung nur dieser Termin), spontan (1 = Kachel-Tipp), punkte (Schnappschuss beim Erledigen), erledigt_am (UTC), erledigt_tag (Familientag), erledigt_von, getippt_von, geparkt_am, position (Reihenfolge in „Später"), erstellt. Partieller Unique-Index `termine_regel_tag (aufgabe_id, tag) WHERE spontan=0 AND tag IS NOT NULL AND flexibel=0` macht die Vorschlagserzeugung idempotent; Index `termine_user_tag` |
+| `aufgaben_historie` | wie todo_historie: aufgabe_id (cascade), alter_inhalt, geaendert_von, geaendert_am – nur Textänderungen |
+| `aufgaben_migration` | alt_tabelle, alt_id, neu_tabelle, neu_id (PK über die ersten drei) – Herkunft je migrierter Zeile, macht `manage.py aufgaben_migrieren` (Schritt 7) wiederholbar |
 
 App `slug='home'` = persönliche Startseite. URL-Schema: `/p/<token>`.
 Andere Apps: `/a/<slug>/<token>/`.
@@ -3224,6 +3250,19 @@ python -m venv .venv                                   # einmalig
   seit v263 kommt die Grenze aus derselben Kalenderquelle (Vortag des
   aeltesten Tages, 00:00 UTC). Wer `heute_lokal` in einem Test festnagelt,
   bekommt jetzt ein Fenster, das mitwandert.
+- `test_aufgaben_sicht.py` – Wunsch #297 (Aufgaben neu, Schritt 1). Jede
+  Sichtstufe je Rolle (Eltern, Kind, zweites Kind, Gast, Admin mit Rolle
+  eltern ohne Sonderrecht), Zuweisung oeffnet genau den einen Termin, Ziel
+  muss sehen duerfen (drei abgelehnte Kombinationen), unsichtbar = nicht
+  vorhanden (None), private Termine fehlen in fremden Zaehlern, Filter
+  status/frei/tag, Gast kann nichts anlegen.
+- `test_aufgaben_rechte.py` – Wunsch #297. Die Matrix aus Spezifikation 3.2
+  als Funktionen: Kind an Eigenem vs. Zugewiesenem, Eltern und Admin gleich,
+  Loeschen selbst angelegter Aufgaben nur ohne Punkte, Gruppenaufgabe nehmen/
+  freigeben, Kachel zurueck nur eigener Tipp von heute; aufgabe_neu():
+  Kind-Eingaben (Punkte/Kachel/Symbol/Ziel) still verworfen, Punkte auf halbe
+  gerundet, Regeln geprueft und ohne Sofort-Termin, Tag im Fenster,
+  geparkt mit Position, keine_dublette, Push nur bei Zuweisung an andere.
 - `test_sitzung_haertung.py` – Wunsch #293 (Audit N-15). Neue Sitzung mit
   `ablauf` in 365 Tagen; Abgelaufenes wird geraeumt, Kiosk-Sitzung ohne
   Ablauf bleibt; hoechstens 20 je Nutzer, die am laengsten unbenutzte

@@ -184,7 +184,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2590 Tests, Stand 18.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
+# Alles (2607 Tests, Stand 19.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -345,7 +345,10 @@ Module, die andere brauchen, zusätzlich unter einem sprechenden Namen in
 seit #272 `teile.essensplan`, `teile.geburtstage`, `teile.start_token` und
 `teile.briefing` (das Briefing zieht Mahlzeiten, Geburtstagslogik und
 Home-Nutzer per Alias, damit z. B. der 29. Februar nur an einer Stelle
-behandelt wird). Reihenfolge dort beachten: erst die Lieferanten, dann das
+behandelt wird) und seit #297 `teile.aufgaben` (neue Aufgaben-App nach
+`docs/aufgaben_neu/spezifikation.md`; `aufgabe_neu()` ist dort die einzige
+Schreibschnittstelle, kein direktes INSERT in `aufgaben`/`termine`).
+Reihenfolge dort beachten: erst die Lieferanten, dann das
 Modul, das sie braucht. Wer aus Modul A eine Funktion von Modul B braucht,
 trägt B dort ein – und zwar **statt** die Funktion zu kopieren: jeder dieser
 Aliase existiert, weil ein Duplikat sonst irgendwann auseinandergelaufen wäre.
