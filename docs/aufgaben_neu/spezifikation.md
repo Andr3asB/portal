@@ -146,6 +146,7 @@ Wochenpunkte einer Person = Summe `termine.punkte` mit `status='erledigt'`, `use
 - **Person:** Bei `ziel_user` diese Person. Bei Gruppe `eltern`/`kinder` abwechselnd nach Tagen, fortgesetzt vom letzten Termin derselben Aufgabe. Bei `alle` bleibt `user_id` leer.
 - **Status:** `vorschlag`, außer ein Kind hat die regelmäßige Aufgabe für sich selbst angelegt – dann direkt `offen`.
 - Pausierte Aufgaben erzeugen nichts.
+- **Automatische Freigabe am Tag selbst** (Entscheidung zu 15.1, 19.09.2026): In `vorschlaege_sicherstellen()` werden Termine mit `status='vorschlag'` und `tag = heute_lokal()` auf `offen` gesetzt. Auslöser ist der erste Aufruf des Tages durch irgendein Konto, auch das Kiosk-Konto. Kein Hintergrundjob, idempotent. Nur heute, nie künftige Tage – Vorschläge für morgen und später bleiben `vorschlag` und für Kinder unsichtbar. Status `aus` bleibt unberührt. Vorschläge vergangener Tage, die nie freigegeben wurden (niemand hat die App geöffnet), verfallen zu `aus`, nicht zu überfällig. Termine ohne Person (`ziel_gruppe='alle'`) werden ebenfalls `offen` und erscheinen damit unter „Noch zu haben". Spalte `termine.auto_bestaetigt INTEGER NOT NULL DEFAULT 0` wird dabei auf 1 gesetzt; Woche und Familie zeigen bei solchen Terminen den Zusatz „automatisch freigegeben", Eltern können sie weiterhin verlegen, die Person ändern oder „Fällt aus" setzen. „Familie" zeigt den Hinweis vorab: Gibt es in der laufenden Woche noch Vorschläge, steht im Kasten zusätzlich „N weitere diese Woche, werden am jeweiligen Tag automatisch freigegeben". Kein Push dafür, auch nicht an das Kind.
 
 ### 5.2 Gruppenaufgaben und „Ich mach's"
 
@@ -172,6 +173,19 @@ Das Formular fragt vor dem Speichern „Nur dieser Termin" oder „Alle künftig
 ### 5.6 Zeit
 
 Nur die Kern-Helfer (`heute_lokal()`, `utc_zu_lokal()`), keine eigene `_TZ`. Tage werden als Familientag gespeichert; nirgends `date(zeitstempel)` oder `date.today()`. Angezeigte Zeitstempel immer in Ortszeit.
+
+### 5.7 Kiosk im Esszimmer
+
+Entscheidung zu 15.2 (19.09.2026): eigener Kiosk-Modus – **am Konto, nicht per URL-Parameter**.
+
+- Der Kiosk läuft unter einem eigenen Konto mit Rolle `kiosk` (Verwaltung → Rolle „Kiosk"). Ein URL-Parameter ist keine Sicherheitsgrenze. Kein Elternkonto mit „Person wechseln" am Kiosk.
+- Einstieg ist immer die Personenwahl (große Flächen, eine je Elternteil/Kind). Nach 60 s ohne Eingabe und bei Wechsel des Familientags zurück zur Personenwahl.
+- Gezeigt wird für die gewählte Person nur „Heute dran", „Noch zu haben" und die Kacheln, ausschließlich Termine mit `sicht='alle'`. Alles andere existiert für das Kiosk-Konto nicht (404): anlegen, bearbeiten, parken, verlegen, löschen, Woche, Später, Familie, Alle Aufgaben, Vorschläge. Keine Reiterleiste.
+- Erlaubt: abhaken/zurücknehmen, „Ich mach's", Kachel tippen, „− zurück" nur für heutige Tipps mit `getippt_von` = Kiosk-Konto. Jedes Formular trägt die gewählte Person als `fuer`; ohne Person antwortet der Server 400.
+- `user_id` und `erledigt_von` = gewählte Person, `getippt_von` = Kiosk-Konto. Kein PIN je Person.
+- Das Kiosk-Konto bekommt keine Auto-Grants (`_auto_grant_all()` überspringt die Rolle) – es soll außer „Aufgaben" nichts haben.
+- „Person wechseln" auf Heute bleibt Eltern am eigenen Gerät vorbehalten.
+- Tests: `test_aufgaben_kiosk.py`.
 
 ## 6. Screens
 
@@ -306,8 +320,8 @@ Jeder Schritt ist ein eigener Wunsch, auslieferbar und end-to-end prüfbar.
 8. Push, Sonntagsjob, Startseiten-Zähler, Hilfe-Kapitel.
 9. Umzug: `AUFGABEN_NEU_PRIMAER=1`, Grants der alten Apps entziehen, Doku in `server.md`/`journal.md`.
 
-## 15. Offene Punkte (vor Schritt 5 bzw. 4 entscheiden)
+## 15. Offene Punkte – alle entschieden (19.09.2026)
 
-1. **Unbestätigte Vorschläge am Tag selbst.** Bleibt ein Vorschlag bis zum Morgen unbestätigt, sieht das Kind ihn nicht, und die Routine fällt still aus. Empfehlung: Beim ersten Aufruf am Tag werden Vorschläge für heute automatisch zu `offen`; „Familie" zeigt vorher deutlich, was noch aussteht. Alternative: nichts automatisch, nur der Hinweis.
-2. **Kiosk im Esszimmer.** Unter welchem Nutzer läuft er? Empfehlung: eigener Kiosk-Modus `?kiosk=1` mit Personenwahl als erstem Schritt, nur Kacheln und „Heute dran" der gewählten Person, keine privaten Aufgaben.
-3. **Modul- und Dateinamen** (nächste freie Nummer in `src/teile/`) und endgültiger App-Name auf der Kachel.
+1. **Unbestätigte Vorschläge am Tag selbst** – entschieden: Variante A, automatische Freigabe am Tag selbst. Umgesetzt in Abschnitt 5.1 (Wunsch #301).
+2. **Kiosk im Esszimmer** – entschieden: eigener Kiosk-Modus am Konto (Rolle `kiosk`), kein URL-Parameter. Umgesetzt in Abschnitt 5.7 (Wunsch #300).
+3. **Modul- und Dateinamen** – entschieden: `src/teile/28_aufgaben.py`, Alias `teile.aufgaben`, Slug `aufgaben`, Kachel „Aufgaben (neu)" bis zum Umzug (Wunsch #297/#298).

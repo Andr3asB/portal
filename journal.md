@@ -2,6 +2,123 @@
 
 ---
 
+## 2026-09-19 – portal-v266: Aufgaben (neu), Schritte 3–6 – Später, Kacheln, Kiosk, Regeln/Woche, Gruppen/Familie/Alle (#299–#302), dazu #306
+
+Andi hat #299, #300, #302, #306 freigegeben, die beiden Rückfragen aus
+Abschnitt 15 der Spezifikation entschieden und mittendrin auch #301
+freigegeben („schritt 5 ist auch freigegeben!"). Alles in einem Durchlauf
+gebaut, als v266 ausgeliefert. Die Entscheidungen stehen jetzt in der
+Spezifikation (5.1 ergänzt, 5.7 neu, 15 als entschieden markiert).
+
+**Schritt 3, Später (#299):** Reiter „Später" (Kinder) bzw. Familie →
+Später (Eltern): Schnell parken (POST `/neu` mit `wann=spaeter`), Liste
+mit `ziehSortierung()` (Tastatur inklusive, `/spaeter/reihenfolge` nimmt
+nur geparkte sichtbare Termine mit Parkrecht), „Geparkt seit heute /
+gestern / N Tagen / N Wochen / N Monaten" aus `geparkt_am` in
+Familientagen, Hervorholen mit Heute / Diese Woche (`flexibel=1`, Sonntag)
+/ Tag wählen – ohne Seitensprung, Hervorgeholtes wandert nach oben mit
+Rückweg „Parken". Auf Heute bei Überfälligem „Morgen" und „Parken" für
+Berechtigte (`darf_parken`); die Zeile verschwindet sofort, die
+Rückgängig-Meldung aus base.html bietet 6 s den Rückweg (der Server
+schickt ihn als `zurueck: {url, daten}` mit). Formular: „Später" als
+dritter Wann-Knopf, Speichern heißt dann „Parken".
+
+**Schritt 4, Kacheln und Kiosk (#300):** „Sonst noch geholfen?" auf Heute,
+drei Spalten, nach Häufigkeit der letzten 30 Tage. Tipp = spontaner
+erledigter Termin (`spontan=1`, `getippt_von`), „N× heute" und „− zurück"
+(Kinder: eigener Tipp, nur heute, der letzte; Eltern: jeder; Kiosk: eigene
+Tipps von heute). Steht dieselbe Aufgabe heute offen im Plan, hakt der
+Tipp DEN Termin ab statt einer Dublette. Kacheln füllen den Tagesbalken
+nicht, zählen aber Punkte. Fallback-POST trägt die Zielperson (`fuer`).
+„Person wechseln" für Eltern als Chip-Zeile oben im `<main>` (nicht auf
+dem Kopfband). Formular: „Auch als Kachel" (nur Eltern).
+
+**Kiosk (Entscheidung 15.2, neuer Abschnitt 5.7):** eigenes Konto mit
+Rolle `kiosk` (Verwaltung → Rolle „Kiosk"; `03_admin.py` kennt die Rolle,
+`_auto_grant_all()` überspringt sie). Einstieg ist die Personenwahl
+(`aufgaben_kiosk.html`), Heute zeigt für die gewählte Person nur „Heute
+dran", „Noch zu haben" und Kacheln, ausschließlich `sicht='alle'` (das
+ergibt sich aus `ist_gast()`), ohne Reiter, Stift, „+ Eigene Aufgabe",
+Morgen/Parken. Jedes Formular trägt `fuer`; `user_id`/`erledigt_von` =
+Person, `getippt_von` = Kiosk. Alles andere antwortet 404 (`_kein_kiosk()`),
+`test_aufgaben_kiosk.py` fährt jede gesperrte Route ab. 60 s ohne Eingabe
+oder Tageswechsel → zurück zur Personenwahl (JS in der Vorlage).
+**Andi legt das Konto selbst an** (Verwaltung: Rolle Kiosk, dann Zugang
+für „Aufgaben (neu)").
+
+**Schritt 5, Regeln und Woche (#301):** `vorschlaege_sicherstellen()`
+läuft beim Aufruf von Heute, Woche und Familie (auch Kiosk) – kein
+Hintergrund-Thread, idempotent über den Unique-Index (`INSERT OR
+IGNORE`). Wochentage: ein Termin je Tag bis Ende nächster Woche;
+Intervall: ab `erledigt_tag` des letzten erledigten Termins, keiner solange
+einer offen/vorschlag ist, ohne Vorgeschichte morgen, ein überfälliger
+Rhythmus landet auf heute; Gruppe eltern/kinder abwechselnd, fortgesetzt
+vom letzten Termin derselben Aufgabe; `alle` ohne Person; Kind-eigene
+Regel direkt `offen`; pausiert erzeugt nichts. **Entscheidung 15.1:**
+vergangene Vorschläge verfallen zu `aus`, heutige werden `offen` mit
+`auto_bestaetigt=1` (neue Spalte, idempotente Migration in `_init_db()`).
+Woche (`aufgaben_woche.html`): Wochenwechsel, Personenfilter (Alle, je
+Kind, Eltern), Kasten „N Vorschläge" mit „Alle N ok" / „Diese N ok"
+(bestätigt wird nur das Sichtbare – `woche_ok()` filtert genauso wie die
+Seite), „<Tag> ok", „+" je Tag, Zeile gestrichelt/durchgezogen, Haken
+bestätigt, Namens-Chip und Text klappen Verlegen (Mo–So), Person und
+„Fällt aus" auf; „Fällt aus" mit Rückgängig und „Auch die anderen N
+streichen"; „automatisch freigegeben" als Zusatz. Kinder sehen nur eigene
+offene/erledigte Termine, ohne Vorschläge, ohne Knöpfe. Formular:
+„Regelmäßig" mit „An Wochentagen" / „Alle … Tage" und Klartext-Vorschau;
+beim Bearbeiten einer Regel-Aufgabe „Nur dieser Termin" (`termin_einzeln_
+aendern()`: Abweichung in `termine.inhalt`, Tag, Uhrzeit, Person) oder
+„Alle künftigen" (`regel_aendern()`: Aufgabe schreiben; ändert sich Regel
+oder Ziel, werden die Termine ab heute im Status vorschlag/offen neu
+erzeugt, sonst bleiben sie). Verlegen fängt den Unique-Index ab („An dem
+Tag steht die Aufgabe schon."). Heute: „Morgen: N Aufgaben" verlinkt die
+Woche. Familie: Kasten „Nächste Woche: N Vorschläge" mit „Alle
+übernehmen" / „Ansehen" und dem Hinweis auf die automatische Freigabe.
+
+**Schritt 6, Gruppen, Familie, Alle (#302):** Gruppen im Formular
+(Eltern/Kinder/Wer will, gestrichelt), Termin mit `user_id NULL`; „Noch
+zu haben" auf Heute (nur wer zur Gruppe passt, bis Ende der Woche); „Ich
+mach's" atomar (`UPDATE … WHERE user_id IS NULL`, sonst Antwort
+„<Name> war schneller" – kein 403, das ist der Wettlauf aus 5.2);
+„Wieder freigeben" in der Zeile (`darf_freigeben`). Familie
+(`aufgaben_familie.html`, nur Eltern): Fortschritt je Person aus
+`heute_daten()` des Betrachters (private Aufgaben der Kinder fehlen
+also), Wochenpunkte, „N davon überfällig", Tipp öffnet deren Heute
+(`?fuer=`), „Noch ohne Person" mit „Ich mach's", Einstiege „Später · N
+geparkt" und „Alle Aufgaben · N", „+ Neue Aufgabe". Alle Aufgaben
+(`aufgaben_alle.html`): Suche und Filter (Alle/Regelmäßig/Einmalig/
+Geparkt) im Browser, je Zeile Rhythmus bzw. Termin, Person, Marken (Nur
+…/Kachel/Pausiert), Punkte, Tipp öffnet das Formular, Pausierte gedimmt
+am Ende, Pausieren/Fortsetzen nur für Regeln (`/aufgabe/<id>/pausieren`).
+
+**#306, Umschalter ohne Seitensprung:** Die drei Handler aus #171/#251,
+`gekochtAktualisiert(antwort)`, `stornoAktualisiert(antwort)` und
+`reservierungAktualisiert(d)` (Wunschzettel – erst der neue Wächter hat
+ihn gefunden), bekamen vom Verteiler das Formular als ersten Parameter,
+prüften `.ok` daran und kehrten still zurück. Alle drei auf
+`(form, antwort)` gedreht; `tests/test_umschalter_ohne_sprung.py::
+test_fetch_handler_nehmen_erst_das_formular` lässt keinen Handler mehr
+durch, der seinen einzigen Parameter wie eine Antwort benutzt.
+
+**Zwei Fallen aus dem Bau:** (1) Ein Skript, das eine Datei mit
+`io.open(..., newline=…)` schreibt, leert sie, wenn `open()` wegen eines
+ungültigen Arguments abbricht – `28_aufgaben.py` stand kurz auf 0 Zeilen,
+`git checkout` holte sie zurück. (2) Der Bash-Heredoc dieses Werkzeugs
+verändert Backslashes auch im gequoteten `<<'EOF'` – ein `\b` wurde zum
+Backspace-Zeichen in einem Regex. Skripte mit Backslashes deshalb immer
+als Datei schreiben und ausführen, nicht per Heredoc.
+
+**Tests:** `test_aufgaben_spaeter.py` (8), `test_aufgaben_kachel.py` (7),
+`test_aufgaben_kiosk.py` (19, davon 13 gesperrte Routen), `test_aufgaben_
+gruppe.py` (5), `test_aufgaben_vorschlaege.py` (7, darunter der
+Tageswechsel 23:30/00:30 mit gepatchter `datetime` im Kern – keine zweite
+Kalenderquelle), `test_aufgaben_woche.py` (4). Suite 2967 grün, ruff
+sauber. Live: v266, Migration `auto_bestaetigt` beim Start, Live-Prüfung
+grün. Hilfe-Kapitel weiterhin mit Schritt 8 (#304); Migration der
+Altdaten ist Schritt 7 (#303).
+
+---
+
 ## 2026-09-19 – portal-v265: Aufgaben (neu), Schritt 2 – Heute, Formular, Reiterleiste, Rückgängig-Meldung (#298)
 
 Direkt nach Schritt 1 (v264) der zweite Schritt aus Abschnitt 14 der

@@ -177,7 +177,9 @@ def user_neu(token):
         farbe    = _clean_farbe(request.form.get("farbe"))
         is_admin = 1 if request.form.get("is_admin") else 0
         rolle    = request.form.get("rolle", "gast")
-        if rolle not in ("eltern", "kind", "gast"):
+        # "kiosk" (#300): das Esszimmer-Konto der neuen Aufgaben-App, siehe
+        # docs/aufgaben_neu/spezifikation.md Abschnitt 5.7.
+        if rolle not in ("eltern", "kind", "gast", "kiosk"):
             rolle = "gast"
         ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"))
         ki_tts_zeichen_limit = _clean_ki_limit(request.form.get("ki_tts_zeichen_limit"), 50000)
@@ -215,7 +217,9 @@ def user_bearbeiten(token, uid):
         farbe    = _clean_farbe(request.form.get("farbe"), edit["farbe"])
         is_admin = 1 if request.form.get("is_admin") else 0
         rolle    = request.form.get("rolle", edit["rolle"] if edit["rolle"] else "gast")
-        if rolle not in ("eltern", "kind", "gast"):
+        # "kiosk" (#300): das Esszimmer-Konto der neuen Aufgaben-App, siehe
+        # docs/aufgaben_neu/spezifikation.md Abschnitt 5.7.
+        if rolle not in ("eltern", "kind", "gast", "kiosk"):
             rolle = "gast"
         ki_token_limit = _clean_ki_limit(request.form.get("ki_token_limit"), edit["ki_token_limit"])
         ki_tts_zeichen_limit = _clean_ki_limit(

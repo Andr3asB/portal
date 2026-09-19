@@ -1712,11 +1712,26 @@ teile/
                        GET/POST neu und aufgabe/<id> (EIN Formular, Verlauf
                        aus aufgaben_historie), POST aufgabe/<id>/loeschen.
                        aufgabe_aendern() teilt sich _felder_pruefen() mit
-                       aufgabe_neu(). Noch nicht im Formular: Spaeter (#299),
-                       Kachel (#300), Regelmaessig (#301), Gruppen (#302).
-                       Naechste Schritte: #299 Spaeter/Parken, #300 Kacheln,
-                       #301 Regeln/Woche, #302 Gruppen/Familie/Alle, #303
-                       Migration, #304 Push/Sonntagsjob/Hilfe, #305 Umzug.
+                       aufgabe_neu().
+                       Stand v266 = Schritte 3-6 (#299-#302): /spaeter
+                       (Schnell parken, ziehSortierung, Hervorholen),
+                       termin/<id>/parken|hervorholen|verlegen, spaeter/
+                       reihenfolge; Kacheln kachel/<id>/tippen|zurueck mit
+                       `fuer` (Zielperson), "Person wechseln" fuer Eltern;
+                       KIOSK = Rolle `kiosk` (Spezifikation 5.7: Personen-
+                       wahl aufgaben_kiosk.html, nur sicht='alle', alles
+                       ausser Heute/Haken/Nehmen/Kacheln 404 via
+                       _kein_kiosk()); Regeln: vorschlaege_sicherstellen()
+                       beim Aufruf von Heute/Woche/Familie (Wochentage,
+                       Intervall ab erledigt_tag, Abwechseln, Verfall zu
+                       'aus', Auto-Freigabe heute mit auto_bestaetigt=1),
+                       /woche (+ woche/ok, termin/<id>/ok|aus|person),
+                       regel_aendern() "Alle kuenftigen" / termin_einzeln_
+                       aendern() "Nur dieser Termin"; Gruppen (termin_nehmen
+                       atomar, "war schneller" statt 403; freigeben),
+                       /familie, /alle, aufgabe/<id>/pausieren.
+                       Naechste Schritte: #303 Migration, #304 Push/
+                       Sonntagsjob/Hilfe, #305 Umzug.
   templates/
     base.html               – Grundlayout: App-Header (⌂ links, ☰ rechts), Hamburger-Menü
                               (Dark Mode, Hilfe, ✨ Wunsch), SW-Registration, Manifest-Link;
@@ -1733,7 +1748,20 @@ teile/
     aufgaben_formular.html  – Aufgaben (neu) #298: EIN Formular fuer Anlegen und
                               Bearbeiten (Was/Wer/Wann/Mehr einstellen), Chips als
                               <label><input type=radio>>, Hinweise ueber data-args,
-                              Loeschen mit data-bestaetigen, "Fruehere Fassungen"
+                              Loeschen mit data-bestaetigen, "Fruehere Fassungen";
+                              seit v266 Gruppen (gestrichelt), Spaeter, Regelmaessig
+                              (Wochentage/Intervall mit Vorschau), Kachel-Haken,
+                              "Nur dieser Termin / Alle kuenftigen" (5.5)
+    aufgaben_spaeter.html   – #299: Schnell parken, geparkte Liste mit ziehSortierung(),
+                              Hervorholen (Heute/Diese Woche/Tag) ohne Seitensprung,
+                              "Gerade hervorgeholt" mit Rueckweg Parken
+    aufgaben_kiosk.html     – #300: Personenwahl des Kiosk-Kontos (Rolle kiosk, 5.7)
+    aufgaben_woche.html     – #301: Wochenwechsel, Personenfilter, Vorschlagskasten mit
+                              "Alle N ok"/"Diese N ok", "<Tag> ok", Zeile mit Haken/
+                              Namens-Chip/Aufklappen (Mo-So verlegen, Person, Faellt aus)
+    aufgaben_familie.html   – #302: Vorschlagskasten naechste Woche, Fortschritt je Person,
+                              "Noch ohne Person", Einstiege Spaeter/Alle Aufgaben
+    aufgaben_alle.html      – #302: Katalog mit Suche/Filter im Browser, Marken, Pausieren
     admin.html              – Nutzerverwaltung, Rollen-Badge, Grant-Chips, QR-Modal, Push-Abo-Badge
     admin_apps.html         – Wunsch #266: Tabelle Apps x Mitglieder, jede Zelle ein
                               Schalter (grant/revoke mit `zurueck`)
@@ -2168,7 +2196,7 @@ Andere Apps: `/a/<slug>/<token>/`.
 | `kassenbuch` | Kassenbuch | 🐷 | Taschengeld-Buchführung je Kind, Eltern/Admin sehen alle read-only (Wunsch #144) | ✅ alle |
 | `geburtstage` | Geburtstage | 🎂 | Gemeinsame Geburtstagsliste; Ausblenden und Erinnerungen gelten je Nutzer (Wunsch #145) | ✅ alle |
 | `ausfaelle` | Ausfälle | 🚗 | Ausfallprotokoll fürs Auto: Knopfdruck hält Zeitpunkt und GPS fest, Notiz kommt hinterher (Wunsch #222) | ✅ nur `eltern` |
-| `aufgaben` | Aufgaben (neu) | 📝 | Neue Aufgaben-App (#297 ff., `docs/aufgaben_neu/`), Testphase neben todo/geholfen/kinderplan; nach dem Umzug (#305) heißt sie „Aufgaben" | – (zunächst nur Andi, #298) |
+| `aufgaben` | Aufgaben (neu) | 📝 | Neue Aufgaben-App (#297 ff., `docs/aufgaben_neu/`), Testphase neben todo/geholfen/kinderplan; nach dem Umzug (#305) heißt sie „Aufgaben". Rolle `kiosk` (seit #300) sieht nur diese App und nur `sicht='alle'` | – (zunächst nur Andi, #298; Kiosk-Konto legt Andi an) |
 
 ## Testdatenbank leeren (conftest.py)
 
@@ -3297,6 +3325,50 @@ python -m venv .venv                                   # einmalig
   Vorlage baut eine eigene Leiste; Meldung mit role=status, genau einem
   Knopf, 6000 ms, ueber der Leiste; live hat die Aufgaben-Seite die Leiste,
   die Hilfe nicht.
+- `test_aufgaben_spaeter.py` – Wunsch #299. Parken mit Rueckweg
+  (hervorholen auf den alten Tag), Hervorholen mit drei Zielen und
+  ungueltigem Tag (400, nichts geaendert), Morgen verlegt mit Rueckweg,
+  Weiterleitung mit Anker, Kind nur selbst angelegte, 404 vor 403, Schnell
+  parken landet auf Spaeter, Reihenfolge nur fuer erlaubte Termine, geparkt
+  zaehlt nicht als offen, Formular "Spaeter"/"Parken", seit_text() in
+  Familientagen (23:30 UTC = heute), Kiosk 404 / Gast lesend.
+- `test_aufgaben_kachel.py` – Wunsch #300. Tipp zaehlt Punkte, nicht den
+  Balken; "N x heute" und Zurueck; Zurueck nur eigener Tipp von heute
+  (getippt_von), Eltern jeden; Tipp hakt geplanten Termin statt Dublette;
+  Sortierung nach Haeufigkeit, pausiert fehlt; Fallback-POST traegt die
+  Zielperson und leitet auf DEREN Heute; Person wechseln nur Eltern; Gast
+  darf nicht tippen.
+- `test_aufgaben_kiosk.py` – Wunsch #300 / Spezifikation 5.7. Einstieg
+  Personenwahl (Kiosk-Konto selbst ist keine Person), nur sicht='alle',
+  keine Reiter/Stift/Neu/Morgen, Haken fuer die gewaehlte Person (ohne
+  Person 400, falsche 403, erledigt_von = Person), Kachel mit getippt_von =
+  Kiosk und Zurueck nur eigene heutige Tipps, "Ich mach's" fuer die Person
+  (Gruppe muss zu ihr passen), 13 gesperrte Routen antworten 404, kein
+  Auto-Grant fuer die Rolle.
+- `test_aufgaben_gruppe.py` – Wunsch #302. Gruppenaufgabe bei allen
+  Passenden unter "Noch zu haben", "Ich mach's" atomar (zweiter: "war
+  schneller", kein 403; falsche Gruppe: Verboten), Freigeben; Gruppen im
+  Formular nur Eltern, sicht muss zur Gruppe passen, Person -> Gruppe macht
+  den Termin frei; Familie (403 fuer Kinder, Fortschritt ohne private
+  Aufgaben, Zaehler, zurueck-Feld nur innerhalb der App); Alle Aufgaben
+  (Arten, Wann/Wer-Texte, Marken, Pausieren nur Regeln und nur Eltern,
+  Pausierte am Ende).
+- `test_aufgaben_vorschlaege.py` – Wunsch #301 / Entscheidung 15.1.
+  Wochentage bis Ende naechster Woche, Doppelaufruf idempotent; Kind-eigene
+  Regel direkt offen; pausiert nichts; Intervall ab Erledigung, kein neuer
+  bei offenem, ueberfaelliger Rhythmus auf heute; Abwechseln setzt fort,
+  Gruppe alle ohne Person; gestrichen nicht neu; Freigabe nur heute
+  (auto_bestaetigt), Verfall zu 'aus', gruppenlose unter "Noch zu haben";
+  Tageswechsel 23:30/00:30 Ortszeit mit gepatchtem `datetime` im Kern.
+- `test_aufgaben_woche.py` – Wunsch #301. Seite mit Zaehlern und Filter,
+  Sammelbestaetigung respektiert Filter und Tag, Kinder lesend ohne
+  Vorschlaege (403 auf woche/ok); einzeln bestaetigen, verlegen (Unique-
+  Index -> 400), Person setzen, Faellt aus mit Rest und Rueckweg, ganze
+  Woche streichen, gestrichen entsteht nicht neu; Formular Regel anlegen
+  (Intervall -> ein Vorschlag morgen), fehlender Wochentag 400, "Alle
+  kuenftigen" erzeugt Termine neu, "Nur dieser Termin" schreibt
+  Abweichung/Person/Uhrzeit ohne Verlauf; Familie-Kasten, "Alle
+  uebernehmen" zurueck nach Familie, Morgen-Link, automatisch freigegeben.
 - `test_sitzung_haertung.py` – Wunsch #293 (Audit N-15). Neue Sitzung mit
   `ablauf` in 365 Tagen; Abgelaufenes wird geraeumt, Kiosk-Sitzung ohne
   Ablauf bleibt; hoechstens 20 je Nutzer, die am laengsten unbenutzte

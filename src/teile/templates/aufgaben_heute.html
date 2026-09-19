@@ -3,10 +3,12 @@
 {% block title %}Heute{% endblock %}
 
 {% block extra_styles %}
-{#- Aufgaben (neu), Schritt 2 (Wunsch #298). Aufbau, Reihenfolge und Wortlaut
-    aus docs/aufgaben_neu/entwurf/Main.dc.html; Farben aus dem Portal-Design
-    (Spezifikation 12). Zeilen mindestens 60 px hoch, EIN Hauptknopf je
-    Zeile (der grosse Haken-Bereich). -#}
+{#- Aufgaben (neu), Schritte 2-4 und 6 (#298, #299, #300, #302). Aufbau,
+    Reihenfolge und Wortlaut aus docs/aufgaben_neu/entwurf/Main.dc.html;
+    Farben aus dem Portal-Design (Spezifikation 12). Zeilen mindestens 60 px
+    hoch, EIN Hauptknopf je Zeile (der grosse Haken-Bereich). Im Kiosk
+    (Rolle kiosk, 5.7) fehlen Reiter, Stift, "+ Eigene Aufgabe" und
+    Morgen/Parken; jedes Formular traegt die gewaehlte Person als `fuer`. -#}
 .tagesbalken {
   background:var(--surface); border-radius:14px; padding:14px 16px;
   box-shadow:0 1px 3px var(--shadow); margin-bottom:18px;
@@ -16,13 +18,25 @@
 .tagesbalken-punkte { font-size:14px; color:var(--text-2); }
 .tagesbalken-leiste { height:12px; border-radius:6px; background:var(--surface-2); overflow:hidden; margin-top:10px; }
 .tagesbalken-fuellung { height:12px; border-radius:6px; background:var(--farbe-band); transition:width .3s; }
+.top-aktionen { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+.top-aktionen .etikett { font-size:13px; color:var(--text-2); font-weight:600; }
+.person-chip {
+  display:inline-flex; align-items:center; min-height:40px; padding:0 14px; border-radius:20px;
+  border:1.5px solid var(--border); color:var(--text); text-decoration:none; font-size:14px; font-weight:600;
+  background:var(--surface);
+}
+.person-chip[aria-current="true"] { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .abschnitt-titel { font-size:18px; font-weight:700; margin:18px 0 10px; }
+.abschnitt-kopf { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+.abschnitt-kopf .abschnitt-titel { margin-bottom:0; }
+.abschnitt-kopf .neben { font-size:13px; color:var(--text-2); }
 .zeile {
   display:flex; flex-direction:column; border-radius:16px; overflow:hidden;
   border:2px solid var(--border); background:var(--surface); margin-bottom:10px;
 }
 .zeile.erledigt { border-color:var(--farbe-kontrast); background:var(--surface-2); }
 .zeile.ueberfaellig { border-color:var(--rot-text); }
+.zeile.frei { border-style:dashed; }
 .zeile-oben { display:flex; align-items:stretch; }
 .haken-form { flex:1; min-width:0; display:flex; }
 .haken {
@@ -39,7 +53,8 @@
 .zeile.erledigt .kreis { background:var(--farbe-band); }
 .kreis svg { opacity:0; }
 .zeile.erledigt .kreis svg { opacity:1; }
-.zeile-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.zeile-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; padding:10px 0; }
+.zeile.frei .zeile-text { padding-left:14px; }
 .zeile-name { font-size:17px; font-weight:700; word-break:break-word; }
 .zeile.erledigt .zeile-name { text-decoration:line-through; color:var(--text-2); }
 .zeile-info { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:13px; color:var(--text-2); }
@@ -50,30 +65,77 @@
   border-left:1px solid var(--border); text-decoration:none; font-size:18px;
 }
 .seit {
-  display:flex; align-items:center; gap:8px; padding:8px 14px;
+  display:flex; align-items:center; gap:8px; padding:8px 8px 8px 14px; flex-wrap:wrap;
   border-top:1px solid var(--border); font-size:14px; font-weight:700; color:var(--rot-text);
 }
+.seit span { flex:1; }
+.zeile-aktion {
+  min-height:44px; padding:0 14px; border-radius:12px; border:2px solid var(--text);
+  background:var(--surface); color:var(--text); font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.zeile-aktion.primaer { border-color:var(--farbe-band); background:var(--farbe-band); color:#fff; }
+.zeile-aktion.leise { border-color:var(--border); color:var(--text-2); font-size:13px; min-height:40px; }
+.nehmen-form { display:flex; align-items:center; padding:8px 8px 8px 0; }
+.frei-aktionen { display:flex; justify-content:flex-end; padding:0 8px 8px; }
 .hinweis { font-size:13px; color:var(--text-2); margin:4px 0 12px; }
 .neu-link {
   display:flex; align-items:center; justify-content:center; min-height:52px;
   border-radius:16px; border:2px dashed var(--border); color:var(--farbe-kontrast);
   text-decoration:none; font-size:17px; font-weight:700; margin-bottom:8px;
 }
+.kacheln { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+.kachel {
+  display:flex; flex-direction:column; border-radius:16px; border:2px solid var(--border);
+  background:var(--surface); overflow:hidden;
+}
+.kachel.getippt { border-color:var(--farbe-kontrast); background:var(--surface-2); }
+.kachel-form { display:flex; flex:1; }
+.kachel-tipp {
+  flex:1; min-height:84px; padding:10px 6px; border:none; background:transparent; color:var(--text);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  font-family:inherit; cursor:pointer;
+}
+.kachel-emoji { font-size:24px; line-height:1; }
+.kachel-name { font-size:14px; font-weight:700; line-height:1.2; text-align:center; word-break:break-word; }
+.kachel-zaehler { font-size:13px; color:var(--text-2); }
+.kachel-zurueck-form { display:flex; }
+.kachel-zurueck {
+  flex:1; min-height:44px; border:none; border-top:1px solid var(--border); background:var(--surface);
+  color:var(--farbe-kontrast); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+}
 .morgen {
   display:flex; align-items:center; justify-content:space-between; min-height:52px;
   padding:0 16px; border-radius:16px; background:var(--surface-2); color:var(--text);
-  font-size:16px; font-weight:700; margin-top:18px;
+  font-size:16px; font-weight:700; margin-top:18px; text-decoration:none;
 }
 .leer { text-align:center; color:var(--text-2); padding:24px 12px; font-size:15px; }
 {% endblock %}
 
 {% block nav_title %}
-<h1 class="nav-title">📝 {% if fremd %}{{ person.name }}: Heute{% else %}Hallo {{ person.name }}{% endif %}</h1>
+<h1 class="nav-title">📝 {% if fremd and not kiosk %}{{ person.name }}: Heute{% else %}Hallo {{ person.name }}{% endif %}</h1>
 <div class="nav-sub">{{ datum }}</div>
 {% endblock %}
 
+{% macro fuer_feld() -%}
+{% if fremd or kiosk %}<input type="hidden" name="fuer" value="{{ person.id }}">{% endif %}
+{%- endmacro %}
+
 {% block body %}
 <main class="main" id="main">
+
+  {% if kiosk %}
+  <div class="top-aktionen">
+    <a class="person-chip knopf" href="/a/aufgaben{{ tp }}">← Person wechseln</a>
+  </div>
+  {% elif personen and personen|length > 1 %}
+  {#- Schritt 4: "Person wechseln" fuer Eltern am eigenen Geraet (6.1). -#}
+  <div class="top-aktionen" aria-label="Person wechseln">
+    <span class="etikett">Für:</span>
+    {% for p in personen %}
+    <a class="person-chip knopf" href="/a/aufgaben{{ tp }}{% if p.id != user.id %}?fuer={{ p.id }}{% endif %}"{% if p.id == person.id %} aria-current="true"{% endif %}>{{ p.name }}{% if p.id == user.id %} (ich){% endif %}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <div class="tagesbalken" id="tagesbalken">
     <div class="tagesbalken-kopf">
@@ -88,9 +150,10 @@
   <div class="leer">Heute steht nichts an.</div>
   {% endif %}
   {% for z in zeilen %}
-  <div class="zeile{% if z.erledigt %} erledigt{% endif %}{% if z.ueberfaellig %} ueberfaellig{% endif %}" id="termin-{{ z.id }}">
+  <div class="zeile{% if z.erledigt %} erledigt{% endif %}{% if z.ueberfaellig %} ueberfaellig{% endif %}" id="termin-{{ z.id }}" data-inhalt="{{ z.inhalt }}">
     <div class="zeile-oben">
       <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/haken" class="haken-form" data-fetch="terminGehakt">
+        {{ fuer_feld() }}
         <button type="submit" class="haken" aria-pressed="{{ 'true' if z.erledigt else 'false' }}"{% if not z.hakbar %} disabled{% endif %}>
           <span class="kreis" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"></path></svg></span>
           <span class="zeile-text">
@@ -103,22 +166,89 @@
           {% if z.punkte > 0 %}<span class="pkt">+{{ z.punkte_text }}</span>{% endif %}
         </button>
       </form>
-      {% if z.bearbeitbar %}
+      {% if z.bearbeitbar and not kiosk %}
       <a class="knopf stift" href="/a/aufgaben{{ tp }}aufgabe/{{ z.aufgabe_id }}" title="{{ z.inhalt }} bearbeiten" aria-label="{{ z.inhalt }} bearbeiten">✏️</a>
       {% endif %}
     </div>
-    {% if z.ueberfaellig %}
-    <div class="seit"><span>{{ z.seit_text }}</span></div>
+    {% if z.ueberfaellig or (z.freigebbar and not kiosk) %}
+    <div class="seit">
+      <span>{% if z.ueberfaellig %}{{ z.seit_text }}{% endif %}</span>
+      {% if z.ueberfaellig and z.parkbar and not kiosk %}
+      {#- Schritt 3 (5.3): Morgen / Parken ohne Rueckfrage, dafuer Rueckgaengig-Meldung. -#}
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/verlegen" data-fetch="terminVerschoben">
+        <input type="hidden" name="morgen" value="1">
+        <button type="submit" class="zeile-aktion">Morgen</button>
+      </form>
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/parken" data-fetch="terminVerschoben">
+        <button type="submit" class="zeile-aktion">Parken</button>
+      </form>
+      {% endif %}
+      {% if z.freigebbar and not kiosk %}
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/freigeben">
+        <button type="submit" class="zeile-aktion leise">Wieder freigeben</button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
   {% endfor %}
   {% if zeilen %}<div class="hinweis">Vertippt? Einfach nochmal antippen.</div>{% endif %}
-  {% if darf_anlegen and not fremd %}
+  {% if darf_anlegen and not fremd and not kiosk %}
   <a class="knopf neu-link" href="/a/aufgaben{{ tp }}neu">+ Eigene Aufgabe</a>
   {% endif %}
 
-  {# Der Sprung in die Woche kommt mit Schritt 5 - bis dahin nur die Zahl. #}
-  <div class="morgen"><span>Morgen: {{ morgen }} {% if morgen == 1 %}Aufgabe{% else %}Aufgaben{% endif %}</span></div>
+  {% if frei %}
+  {#- Schritt 6 (5.2): freie Gruppenaufgaben, "Ich mach's" atomar. -#}
+  <div class="abschnitt-kopf">
+    <h2 class="abschnitt-titel">Noch zu haben</h2>
+    <span class="neben">Wer zuerst tippt, hat sie</span>
+  </div>
+  {% for z in frei %}
+  <div class="zeile frei" id="termin-{{ z.id }}">
+    <div class="zeile-oben">
+      <span class="zeile-text">
+        <span class="zeile-name" data-emoji-alt>{% if z.emoji %}{{ z.emoji }} {% endif %}{{ z.inhalt }}</span>
+        <span class="zeile-info">
+          <span>{{ z.info }}</span>
+          {% if z.sicht_marke %}<span class="marke">🔒 {{ z.sicht_marke }}</span>{% endif %}
+          {% if z.punkte > 0 %}<span class="pkt">+{{ z.punkte_text }}</span>{% endif %}
+        </span>
+      </span>
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ z.id }}/nehmen" class="nehmen-form">
+        {{ fuer_feld() }}
+        <button type="submit" class="zeile-aktion primaer">Ich mach’s</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if kacheln %}
+  {#- Schritt 4 (5.4): Kacheln, drei Spalten, nach Haeufigkeit der letzten 30 Tage. -#}
+  <h2 class="abschnitt-titel">Sonst noch geholfen?</h2>
+  <div class="kacheln">
+    {% for k in kacheln %}
+    <div class="kachel{% if k.heute %} getippt{% endif %}" id="kachel-{{ k.aufgabe_id }}" data-punkte="{{ k.punkte_text }}">
+      <form method="post" action="/a/aufgaben{{ tp }}kachel/{{ k.aufgabe_id }}/tippen" class="kachel-form" data-fetch="kachelGetippt">
+        {{ fuer_feld() }}
+        <button type="submit" class="kachel-tipp">
+          {% if k.emoji %}<span class="kachel-emoji">{{ k.emoji }}</span>{% endif %}
+          <span class="kachel-name" data-emoji-alt>{{ k.inhalt }}</span>
+          <span class="kachel-zaehler">{% if k.heute %}{{ k.heute }}× heute{% else %}+{{ k.punkte_text }}{% endif %}</span>
+        </button>
+      </form>
+      <form method="post" action="/a/aufgaben{{ tp }}kachel/{{ k.aufgabe_id }}/zurueck" class="kachel-zurueck-form" data-fetch="kachelGetippt"{% if not k.zurueck %} hidden{% endif %}>
+        {{ fuer_feld() }}
+        <button type="submit" class="kachel-zurueck" title="{{ k.inhalt }}: letzten Eintrag von heute zurücknehmen" aria-label="{{ k.inhalt }}: letzten Eintrag von heute zurücknehmen">− zurück</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not kiosk %}
+  <a class="morgen knopf" href="/a/aufgaben{{ tp }}woche"><span>Morgen: {{ morgen }} {% if morgen == 1 %}Aufgabe{% else %}Aufgaben{% endif %}</span><span aria-hidden="true">›</span></a>
+  {% endif %}
 
 </main>
 {% endblock %}
@@ -128,14 +258,69 @@
 // Wunsch #171/#298: Abhaken ohne Seitensprung. Die Zeile bleibt, wo sie
 // ist (kein Umsortieren), nur Zustand, Balken und Wochenpunkte aendern sich.
 // Verteiler-Konvention: erst das Formular, dann die Antwort.
+function zaehlerNachziehen(antwort) {
+  document.getElementById('balken-text').textContent = antwort.balken_text;
+  document.getElementById('balken-fuellung').style.width = antwort.balken_prozent + '%';
+  document.getElementById('punkte-woche').textContent = antwort.punkte_woche;
+}
 function terminGehakt(form, antwort) {
   if (!antwort || !antwort.ok) return;
   const zeile = form.closest('.zeile');
   zeile.classList.toggle('erledigt', antwort.erledigt);
   form.querySelector('.haken').setAttribute('aria-pressed', antwort.erledigt ? 'true' : 'false');
-  document.getElementById('balken-text').textContent = antwort.balken_text;
-  document.getElementById('balken-fuellung').style.width = antwort.balken_prozent + '%';
-  document.getElementById('punkte-woche').textContent = antwort.punkte_woche;
+  zaehlerNachziehen(antwort);
 }
+
+// Schritt 3: Morgen / Parken. Die Zeile verschwindet sofort, die
+// Rueckgaengig-Meldung (base.html) bietet 6 s lang den Rueckweg - der ist
+// ein zweiter POST mit den Daten, die der Server mitgeschickt hat.
+function sendeZurueck(zurueck) {
+  const daten = new FormData();
+  Object.keys(zurueck.daten || {}).forEach(function (k) { daten.append(k, zurueck.daten[k]); });
+  return fetch(zurueck.url, { method: 'POST', body: daten, headers: { 'Accept': 'application/json' } })
+    .then(function () { location.reload(); });
+}
+function terminVerschoben(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const zeile = form.closest('.zeile');
+  zeile.remove();
+  window.rueckgaengigMeldung(antwort.text, function () { sendeZurueck(antwort.zurueck); });
+}
+
+// Schritt 4: Kachel tippen / zuruecknehmen - Zaehler und Rueckweg der Kachel
+// nachziehen, dazu Balken und Wochenpunkte (Punkte zaehlen, Balken nicht).
+function kachelGetippt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const kachel = form.closest('.kachel');
+  kachel.classList.toggle('getippt', antwort.heute > 0);
+  kachel.querySelector('.kachel-zaehler').textContent =
+    antwort.heute > 0 ? antwort.heute + '× heute' : '+' + kachel.dataset.punkte;
+  kachel.querySelector('.kachel-zurueck-form').hidden = !antwort.zurueck;
+  zaehlerNachziehen(antwort);
+}
+
+{% if kiosk %}
+// Kiosk (5.7): nach 60 s ohne Eingabe und beim Wechsel des Familientags
+// zurueck zur Personenwahl.
+(function () {
+  const BASIS = {{ ("/a/aufgaben" ~ tp)|tojson }};
+  const HEUTE = {{ heute|tojson }};
+  let timer = null;
+  function neuStarten() {
+    clearTimeout(timer);
+    timer = setTimeout(function () { location.href = BASIS; }, 60000);
+  }
+  ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(function (ev) {
+    document.addEventListener(ev, neuStarten, { passive: true });
+  });
+  neuStarten();
+  setInterval(function () {
+    const jetzt = new Date();
+    const lokal = jetzt.getFullYear() + '-' + String(jetzt.getMonth() + 1).padStart(2, '0')
+      + '-' + String(jetzt.getDate()).padStart(2, '0');
+    if (lokal !== HEUTE) location.href = BASIS;
+  }, 30000);
+})();
+{% endif %}
 </script>
 {% endblock %}

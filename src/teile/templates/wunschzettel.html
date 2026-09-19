@@ -174,7 +174,8 @@ function wzEdit(id) {
 /* Wunsch #171-Muster: Der Reservieren-Umschalter aktualisiert nur seine
  * eigene Zeile. textContent statt innerHTML (Konvention) - hier stehen
  * ohnehin nur feste Texte. */
-function reservierungAktualisiert(d) {
+// Wunsch #306: handler(form, antwort) - siehe Verteiler in base.html (#200).
+function reservierungAktualisiert(form, d) {
   if (!d || !d.ok) return;
   const knopf  = document.getElementById('resv-btn-' + d.id);
   const status = document.getElementById('resv-status-' + d.id);

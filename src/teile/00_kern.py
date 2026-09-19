@@ -599,6 +599,7 @@ CREATE TABLE IF NOT EXISTS termine (
   getippt_von   INTEGER REFERENCES users(id) ON DELETE SET NULL,
   geparkt_am    TEXT,
   position      INTEGER NOT NULL DEFAULT 0,        -- Reihenfolge in "Spaeter"
+  auto_bestaetigt INTEGER NOT NULL DEFAULT 0,      -- #301: Vorschlag am Tag selbst automatisch freigegeben
   erstellt      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS termine_regel_tag ON termine(aufgabe_id, tag)
@@ -1995,11 +1996,13 @@ def _auto_grant_all(db, slug, rollen=None):
     app_row = db.execute("SELECT id FROM apps WHERE slug=?", (slug,)).fetchone()
     if not app_row:
         return
-    bedingung = ""
+    # #300: Das Kiosk-Konto (Esszimmer, Aufgaben-App 5.7) bekommt NIE eine
+    # Auto-Kachel - es soll ausser "Aufgaben" nichts haben.
+    bedingung = " AND rolle != 'kiosk'"
     werte = [app_row[0]]
     if rollen:
         platzhalter = ",".join("?" * len(rollen))
-        bedingung = f" AND (is_admin=1 OR rolle IN ({platzhalter}))"
+        bedingung += f" AND (is_admin=1 OR rolle IN ({platzhalter}))"
         werte.extend(rollen)
     missing = db.execute(
         "SELECT id FROM users WHERE id NOT IN "
@@ -2770,6 +2773,15 @@ def _init_db(app):
         # Auswahlwerte als JSON in einer Spalte, nur bei tier_typ='mensch' befuellt.
         try:
             db.execute("ALTER TABLE tierbaukasten_kreationen ADD COLUMN dicebear_optionen TEXT")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Aufgaben (neu), #301 / Entscheidung 15.1: Vorschlaege fuer heute
+        # werden beim ersten Aufruf des Tages automatisch freigegeben und
+        # tragen dieses Kennzeichen (Woche/Familie zeigen "automatisch
+        # freigegeben"). Tabelle existierte ab v264 ohne die Spalte.
+        try:
+            db.execute("ALTER TABLE termine ADD COLUMN auto_bestaetigt INTEGER NOT NULL DEFAULT 0")
             db.commit()
         except sqlite3.OperationalError:
             pass

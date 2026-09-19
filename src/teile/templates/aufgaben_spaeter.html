@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Später{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 3 (#299, Spezifikation 6.5, Entwuerfe
+    Spaeter.dc.html / SpaeterKind.dc.html): Schnell parken, Liste mit
+    ziehSortierung() (Tastatur inklusive), Alter der Ablage, Hervorholen mit
+    drei Zielen, Hervorgeholtes oben mit Rueckweg "Parken". -#}
+.zurueck { display:inline-block; margin-bottom:14px; color:var(--farbe-kontrast); font-weight:600; text-decoration:none; }
+.abschnitt-titel { font-size:18px; font-weight:700; margin:18px 0 10px; }
+.abschnitt-kopf { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+.abschnitt-kopf .abschnitt-titel { margin-bottom:0; }
+.abschnitt-kopf .neben { font-size:13px; color:var(--text-2); }
+.schnell { background:var(--surface); border-radius:14px; padding:14px 16px; box-shadow:0 1px 3px var(--shadow); }
+.schnell label { display:block; font-size:16px; font-weight:700; margin-bottom:8px; }
+.schnell-zeile { display:flex; gap:8px; }
+.schnell-zeile input {
+  flex:1; min-width:0; height:52px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); padding:0 12px; font-family:inherit;
+}
+.schnell-zeile button {
+  width:52px; height:52px; border-radius:12px; border:none; background:var(--farbe-band); color:#fff;
+  font-size:26px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.schnell .hinweis { font-size:13px; color:var(--text-2); margin-top:8px; }
+.park-zeile {
+  display:flex; flex-direction:column; border-radius:16px; border:2px solid var(--border);
+  background:var(--surface); margin-bottom:10px; overflow:hidden;
+}
+.park-oben { display:flex; align-items:center; gap:8px; min-height:64px; padding:8px 8px 8px 6px; }
+.park-griff {
+  background:none; border:none; padding:0 6px; font-family:inherit; font-size:18px; color:var(--text-2);
+  cursor:grab; touch-action:none; flex-shrink:0; min-height:44px;
+}
+.park-griff:active { cursor:grabbing; }
+.park-placeholder { border:2px dashed var(--farbe-kontrast); border-radius:16px; margin-bottom:10px; background:var(--surface-2); }
+.park-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.park-name { font-size:17px; font-weight:700; word-break:break-word; }
+.park-seit { font-size:13px; color:var(--text-2); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.marke { font-weight:700; color:var(--text); background:var(--surface-2); padding:2px 8px; border-radius:10px; }
+.park-knopf {
+  flex-shrink:0; min-height:44px; padding:0 14px; border-radius:12px; border:none;
+  background:var(--farbe-band); color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.park-knopf[aria-expanded="true"] { background:var(--surface-2); color:var(--text); }
+.ziele { display:flex; flex-wrap:wrap; gap:8px; padding:0 10px 10px; border-top:1px solid var(--border); padding-top:10px; }
+.ziele form { display:flex; gap:6px; align-items:center; }
+.ziel-knopf {
+  min-height:44px; padding:0 14px; border-radius:12px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.ziele input[type=date] {
+  height:44px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); padding:0 8px; font-family:inherit;
+}
+.geholt-zeile {
+  display:flex; align-items:center; gap:10px; min-height:60px; padding:8px 8px 8px 14px;
+  border-radius:16px; background:var(--surface-2); border:2px solid var(--farbe-kontrast); margin-bottom:10px;
+}
+.geholt-zeile .park-text { flex:1; }
+.geholt-zeile .park-seit { color:var(--farbe-kontrast); font-weight:700; }
+.leer { text-align:center; color:var(--text-2); padding:24px 12px; font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 Später</h1>
+<div class="nav-sub"><span id="geparkt-zahl">{{ geparkt|length }}</span> geparkt · nur für dich sichtbar</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  {% if ist_eltern %}<a class="zurueck" href="/a/aufgaben{{ tp }}familie">← Zurück zu Familie</a>{% endif %}
+
+  {% if darf_anlegen %}
+  <section class="schnell">
+    <form method="post" action="/a/aufgaben{{ tp }}neu">
+      <input type="hidden" name="wann" value="spaeter">
+      <input type="hidden" name="sicht" value="alle">
+      <input type="hidden" name="ziel" value="ich">
+      <label for="s-neu">Schnell parken</label>
+      <div class="schnell-zeile">
+        <input id="s-neu" name="inhalt" type="text" maxlength="300" required placeholder="Was fällt dir gerade ein?" autocomplete="off">
+        <button type="submit" title="Parken" aria-label="Parken">+</button>
+      </div>
+    </form>
+    <div class="hinweis">Ohne Tag, ohne Frist. Zählt nicht als offen.</div>
+  </section>
+  {% endif %}
+
+  <section id="geholt-abschnitt" hidden>
+    <h2 class="abschnitt-titel">Gerade hervorgeholt</h2>
+    <div id="geholt-liste"></div>
+  </section>
+
+  <div class="abschnitt-kopf">
+    <h2 class="abschnitt-titel">Geparkt</h2>
+    <span class="neben">Wichtigstes oben, am Griff ziehen</span>
+  </div>
+  {% if not geparkt %}<div class="leer" id="park-leer">Nichts geparkt.</div>{% endif %}
+  <div id="park-liste">
+  {% for g in geparkt %}
+  <div class="park-zeile" id="termin-{{ g.id }}" data-inhalt="{{ g.inhalt }}">
+    <div class="park-oben">
+      {% if g.darf %}<button type="button" class="park-griff" title="Verschieben (Ziehen oder Pfeiltasten)" aria-label="Verschieben (Ziehen oder Pfeiltasten)">⠿</button>{% endif %}
+      <span class="park-text">
+        <span class="park-name" data-emoji-alt>{% if g.emoji %}{{ g.emoji }} {% endif %}{{ g.inhalt }}</span>
+        <span class="park-seit"><span>{{ g.seit }}</span>{% if g.sicht_marke %}<span class="marke">🔒 {{ g.sicht_marke }}</span>{% endif %}</span>
+      </span>
+      {% if g.darf %}
+      {#- Wunsch #248: data-panel -> aria-expanded, zentral in base.html. -#}
+      <button type="button" class="park-knopf" data-klick="zieleUmschalten" data-args='[{{ g.id }}]' data-panel="ziele-{{ g.id }}">Hervorholen</button>
+      {% endif %}
+    </div>
+    {% if g.darf %}
+    <div class="ziele" id="ziele-{{ g.id }}" hidden>
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ g.id }}/hervorholen" data-fetch="hervorgeholt">
+        <input type="hidden" name="ziel" value="heute"><button type="submit" class="ziel-knopf">Heute</button>
+      </form>
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ g.id }}/hervorholen" data-fetch="hervorgeholt">
+        <input type="hidden" name="ziel" value="woche"><button type="submit" class="ziel-knopf">Diese Woche</button>
+      </form>
+      <form method="post" action="/a/aufgaben{{ tp }}termin/{{ g.id }}/hervorholen" data-fetch="hervorgeholt">
+        <input type="date" name="ziel" value="{{ heute }}" aria-label="Tag wählen" required><button type="submit" class="ziel-knopf">Tag wählen</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+const TP = {{ tp|tojson }};
+
+function zieleUmschalten(id, knopf) {
+  const panel = document.getElementById('ziele-' + id);
+  panel.hidden = !panel.hidden;
+  knopf.textContent = panel.hidden ? 'Hervorholen' : 'Schließen';
+}
+
+// Hervorholen ohne Seitensprung: die Zeile wandert nach oben in "Gerade
+// hervorgeholt" mit dem Rueckweg "Parken" (Spezifikation 6.5).
+function hervorgeholt(form, antwort) {
+  if (!antwort || !antwort.ok) { if (antwort && antwort.fehler) alert(antwort.fehler); return; }
+  const zeile = form.closest('.park-zeile');
+  const id = zeile.id.replace('termin-', '');
+  zeile.remove();
+  const rest = document.querySelectorAll('.park-zeile').length;
+  document.getElementById('geparkt-zahl').textContent = rest;
+  const abschnitt = document.getElementById('geholt-abschnitt');
+  abschnitt.hidden = false;
+  const neu = document.createElement('div');
+  neu.className = 'geholt-zeile';
+  const text = document.createElement('span'); text.className = 'park-text';
+  const name = document.createElement('span'); name.className = 'park-name'; name.textContent = antwort.inhalt;
+  const wohin = document.createElement('span'); wohin.className = 'park-seit'; wohin.textContent = antwort.text;
+  text.appendChild(name); text.appendChild(wohin);
+  const f = document.createElement('form');
+  f.method = 'post'; f.action = '/a/aufgaben' + TP + 'termin/' + id + '/parken';
+  f.dataset.fetch = 'wiederGeparkt';
+  const k = document.createElement('button'); k.type = 'submit'; k.className = 'ziel-knopf'; k.textContent = 'Parken';
+  f.appendChild(k);
+  neu.appendChild(text); neu.appendChild(f);
+  document.getElementById('geholt-liste').prepend(neu);
+}
+function wiederGeparkt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  location.reload();
+}
+
+/* Wunsch #178/#248: Umsortieren per Ziehen, Tastatur inklusive. */
+ziehSortierung({
+  griff:       '.park-griff',
+  eintrag:     '.park-zeile',
+  platzhalter: 'park-placeholder',
+  idAus:       el => parseInt(el.id.replace('termin-', ''), 10),
+  speichern:   reihenfolge => {
+    fetch('/a/aufgaben' + TP + 'spaeter/reihenfolge', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({order: reihenfolge}),
+    }).catch(err => { console.error('Reihenfolge nicht gespeichert', err); });
+  },
+});
+</script>
+{% endblock %}

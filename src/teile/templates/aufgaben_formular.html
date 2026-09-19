@@ -24,7 +24,17 @@
   font-size:16px; font-weight:700; cursor:pointer; user-select:none;
 }
 .chips.raster .chip { border-radius:12px; min-height:56px; }
+.chip.gruppe { border-style:dashed; }
+.regel-kasten { display:flex; flex-direction:column; gap:12px; padding:12px; border-radius:14px; background:var(--surface); border:1px solid var(--border); margin-top:8px; }
+.wochentage { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:5px; }
+.chip.tagchip { padding:0; min-height:48px; border-radius:12px; font-size:15px; }
+.stepper.mittig { justify-content:center; gap:10px; font-size:17px; }
+.mittig-text { text-align:center; }
+.regel-vorschau { font-size:15px; font-weight:700; color:var(--farbe-kontrast); }
+.umfang { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; padding:10px; border-radius:14px; border:2px solid var(--farbe-kontrast); margin-bottom:10px; }
+.umfang .chip { border-radius:12px; }
 .chip input { position:absolute; opacity:0; width:1px; height:1px; }
+.kachel-haken { flex-shrink:0; width:28px; height:28px; accent-color:var(--farbe-band); }
 .chip:has(input:checked) { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
 .chip:has(input:focus-visible) { outline:2px solid var(--farbe-kontrast); outline-offset:2px; }
 .tag-eingaben { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
@@ -103,8 +113,12 @@
         {% for p in personen %}
         <label class="chip"><input type="radio" name="ziel" value="{{ p.id }}" data-aendern="werGewaehlt" data-args='[{{ (p.name ~ " bekommt eine Benachrichtigung.")|tojson }}]'{% if werte.ziel == p.id|string %} checked{% endif %}>{{ p.name }}</label>
         {% endfor %}
+        {#- Schritt 6 (5.2): Gruppen, gestrichelt - der Termin bleibt ohne Person, bis jemand "Ich mach's" tippt. -#}
+        {% for wert, name, text in gruppen %}
+        <label class="chip gruppe"><input type="radio" name="ziel" value="{{ wert }}" data-aendern="werGewaehlt" data-args='[{{ text|tojson }}]'{% if werte.ziel == wert %} checked{% endif %}>{{ name }}</label>
+        {% endfor %}
       </div>
-      <div class="block-hinweis" id="wer-hinweis">{% if werte.ziel == 'ich' %}Landet auf deiner Liste.{% else %}{% for p in personen %}{% if werte.ziel == p.id|string %}{{ p.name }} bekommt eine Benachrichtigung.{% endif %}{% endfor %}{% endif %}</div>
+      <div class="block-hinweis" id="wer-hinweis">{{ wer_hinweis }}</div>
     </div>
     {% endif %}
 
@@ -113,11 +127,42 @@
       <div class="chips raster">
         <label class="chip"><input type="radio" name="wann" value="heute" data-aendern="wannGewaehlt" data-args='["heute"]'{% if werte.wann == 'heute' %} checked{% endif %}>Heute</label>
         <label class="chip"><input type="radio" name="wann" value="tag" data-aendern="wannGewaehlt" data-args='["tag"]'{% if werte.wann == 'tag' %} checked{% endif %}>Tag wählen</label>
+        {#- Schritt 3 (5.3): Spaeter = geparkt, ohne Tag und ohne Frist. -#}
+        <label class="chip"><input type="radio" name="wann" value="spaeter" data-aendern="wannGewaehlt" data-args='["spaeter"]'{% if werte.wann == 'spaeter' %} checked{% endif %}>Später</label>
+        {#- Schritt 5 (5.1): Regel - Termine entstehen daraus als Vorschlaege. Bei einer
+            bestehenden Regel-Aufgabe ist "Regelmaessig" fest; "Nur dieser Termin" nutzt Tag. -#}
+        {% if not regel or werte.umfang == 'termin' %}
+        <label class="chip"><input type="radio" name="wann" value="regel" data-aendern="wannGewaehlt" data-args='["regel"]'{% if werte.wann == 'regel' %} checked{% endif %}{% if regel %} disabled{% endif %}>Regelmäßig</label>
+        {% else %}
+        <label class="chip"><input type="radio" name="wann" value="regel" data-aendern="wannGewaehlt" data-args='["regel"]' checked>Regelmäßig</label>
+        {% endif %}
       </div>
-      <div class="block-hinweis" id="wann-hinweis">{% if werte.wann == 'tag' %}Uhrzeit ist freiwillig.{% else %}Steht sofort bei Heute.{% endif %}</div>
+      <div class="block-hinweis" id="wann-hinweis">{% if werte.wann == 'tag' %}Uhrzeit ist freiwillig.{% elif werte.wann == 'spaeter' %}Wird geparkt, ohne Tag und ohne Frist.{% elif werte.wann == 'regel' %}Vorschläge entstehen für die laufende und die nächste Woche.{% else %}Steht sofort bei Heute.{% endif %}</div>
       <div class="tag-eingaben" id="tag-eingaben"{% if werte.wann != 'tag' %} hidden{% endif %}>
         <label><span>Tag</span><input type="date" id="tag" name="tag" value="{{ werte.tag }}" min="{{ tag_min }}" max="{{ tag_max }}"></label>
         <label><span>Uhrzeit (freiwillig)</span><input type="time" id="uhrzeit" name="uhrzeit" value="{{ werte.uhrzeit }}"></label>
+      </div>
+      <div class="regel-kasten" id="regel-kasten"{% if werte.wann != 'regel' %} hidden{% endif %}>
+        <div class="chips raster">
+          <label class="chip"><input type="radio" name="regel_typ" value="wochentage" data-aendern="regelArt" data-args='["wochentage"]'{% if werte.regel_typ != 'intervall' %} checked{% endif %}>An Wochentagen</label>
+          <label class="chip"><input type="radio" name="regel_typ" value="intervall" data-aendern="regelArt" data-args='["intervall"]'{% if werte.regel_typ == 'intervall' %} checked{% endif %}>Alle … Tage</label>
+        </div>
+        <div class="wochentage" id="regel-wochentage"{% if werte.regel_typ == 'intervall' %} hidden{% endif %}>
+          {% for kurz in wochentage_kurz %}
+          <label class="chip tagchip"><input type="checkbox" name="wochentage" value="{{ loop.index0 }}" data-aendern="regelVorschau"{% if loop.index0|string in werte.wochentage %} checked{% endif %}>{{ kurz }}</label>
+          {% endfor %}
+        </div>
+        <div class="intervall" id="regel-intervall"{% if werte.regel_typ != 'intervall' %} hidden{% endif %}>
+          <div class="stepper mittig">
+            <span>Alle</span>
+            <button type="button" data-klick="intervallSchritt" data-args='[-1]' aria-label="Weniger Tage" title="Weniger Tage">−</button>
+            <input type="text" inputmode="numeric" id="intervall" name="intervall" value="{{ werte.intervall }}" aria-label="Tage" data-eingabe="regelVorschau">
+            <button type="button" data-klick="intervallSchritt" data-args='[1]' aria-label="Mehr Tage" title="Mehr Tage">+</button>
+            <span>Tage</span>
+          </div>
+          <div class="block-hinweis mittig-text">Gezählt ab dem Tag, an dem sie zuletzt erledigt wurde.</div>
+        </div>
+        <div class="regel-vorschau" id="regel-vorschau"></div>
       </div>
     </div>
 
@@ -147,6 +192,10 @@
           </div>
         </div>
         <div class="zeile-2">
+          <label for="kachel"><span class="block-titel">Auch als Kachel</span><br><span class="block-hinweis">Zum spontanen Antippen bei „Sonst noch geholfen?“</span></label>
+          <input type="checkbox" id="kachel" name="kachel" value="1" class="kachel-haken"{% if werte.kachel %} checked{% endif %}>
+        </div>
+        <div class="zeile-2">
           <label class="block-titel" for="emoji">Symbol</label>
           <input class="emoji-eingabe" type="text" id="emoji" name="emoji" value="{{ werte.emoji }}" placeholder="Emoji" maxlength="8">
         </div>
@@ -154,8 +203,18 @@
       </div>
     </div>
 
+    {% if regel and termin_id %}
+    {#- 5.5: Vor dem Speichern "Nur dieser Termin" oder "Alle kuenftigen". -#}
+    <div class="umfang">
+      <label class="chip"><input type="radio" name="umfang" value="termin" data-aendern="umfangGewaehlt" data-args='["termin"]'{% if werte.umfang == 'termin' %} checked{% endif %}>Nur dieser Termin</label>
+      <label class="chip"><input type="radio" name="umfang" value="kuenftige" data-aendern="umfangGewaehlt" data-args='["kuenftige"]'{% if werte.umfang != 'termin' %} checked{% endif %}>Alle künftigen</label>
+    </div>
+    <input type="hidden" name="termin" value="{{ termin_id }}">
+    {% elif regel %}
+    <input type="hidden" name="umfang" value="kuenftige">
+    {% endif %}
     <div class="unten">
-      <button type="submit" class="speichern">Speichern</button>
+      <button type="submit" class="speichern" id="speichern-knopf">{% if werte.wann == 'spaeter' %}Parken{% else %}Speichern{% endif %}</button>
     </div>
   </form>
 
@@ -188,8 +247,12 @@ function werGewaehlt(text) {
 function wannGewaehlt(wert) {
   const felder = document.getElementById("tag-eingaben");
   felder.hidden = wert !== 'tag';
-  document.getElementById('wann-hinweis').textContent =
-    wert === 'tag' ? 'Uhrzeit ist freiwillig.' : 'Steht sofort bei Heute.';
+  document.getElementById('regel-kasten').hidden = wert !== 'regel';
+  const hinweise = { tag: 'Uhrzeit ist freiwillig.', spaeter: 'Wird geparkt, ohne Tag und ohne Frist.',
+                     regel: 'Vorschläge entstehen für die laufende und die nächste Woche.', heute: 'Steht sofort bei Heute.' };
+  document.getElementById('wann-hinweis').textContent = hinweise[wert] || hinweise.heute;
+  document.getElementById('speichern-knopf').textContent = wert === 'spaeter' ? 'Parken' : 'Speichern';
+  if (wert === 'regel') regelVorschau();
   if (wert === 'tag') {
     const tag = document.getElementById('tag');
     if (!tag.value) tag.value = tag.min ? {{ heute|tojson }} : '';
@@ -207,6 +270,40 @@ function punkteSchritt(delta) {
   feld.value = String(wert).replace('.', ',');
   zusammenfassung();
 }
+// Schritt 5: Regel-Kasten
+const TAGE_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+function regelArt(art) {
+  document.getElementById('regel-wochentage').hidden = art !== 'wochentage';
+  document.getElementById('regel-intervall').hidden = art !== 'intervall';
+  regelVorschau();
+}
+function intervallSchritt(delta) {
+  const feld = document.getElementById('intervall');
+  let n = parseInt(feld.value, 10) || 3;
+  n = Math.min(60, Math.max(2, n + delta));
+  feld.value = String(n);
+  regelVorschau();
+}
+function regelVorschau() {
+  const art = (document.querySelector('input[name=regel_typ]:checked') || {}).value || 'wochentage';
+  const ziel = document.getElementById('regel-vorschau');
+  if (!ziel) return;
+  if (art === 'wochentage') {
+    const tage = [...document.querySelectorAll('input[name=wochentage]:checked')].map(function (c) { return TAGE_KURZ[parseInt(c.value, 10)]; });
+    ziel.textContent = tage.length === 7 ? 'Jeden Tag' : (tage.length ? 'Jeden ' + tage.join(', ') : 'Bitte mindestens einen Tag wählen');
+  } else {
+    const n = parseInt(document.getElementById('intervall').value, 10) || 3;
+    ziel.textContent = 'Alle ' + n + ' Tage, gezählt ab der letzten Erledigung';
+  }
+}
+function umfangGewaehlt(wert) {
+  // "Nur dieser Termin": Tag/Person gelten fuer den einen Termin, die Regel bleibt zu.
+  const nurTermin = wert === 'termin';
+  document.getElementById('tag-eingaben').hidden = !nurTermin;
+  document.getElementById('regel-kasten').hidden = nurTermin;
+}
+regelVorschau();
+{% if regel and termin_id %}umfangGewaehlt({{ werte.umfang|tojson }});{% endif %}
 function mehrUmschalten(knopf) {
   const panel = document.getElementById('mehr-panel');
   panel.hidden = !panel.hidden;

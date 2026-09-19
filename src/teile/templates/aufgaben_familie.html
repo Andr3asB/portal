@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Familie{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 6 (#302, Spezifikation 6.4, Entwurf
+    Familie.dc.html): Fortschritt je Person, "Noch ohne Person", Einstiege
+    Spaeter und Alle Aufgaben; seit Schritt 5 (#301) der Vorschlagskasten
+    fuer die naechste Woche. -#}
+.abschnitt-titel { font-size:18px; font-weight:700; margin:18px 0 10px; }
+.kasten { padding:14px 16px; border-radius:16px; border:2px solid var(--farbe-kontrast); background:var(--surface); margin-bottom:6px; }
+.kasten-titel { margin:0 0 4px; font-size:17px; font-weight:700; }
+.kasten-text { font-size:14px; color:var(--text-2); margin-bottom:10px; }
+.kasten-aktionen { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.kasten-knopf { min-height:48px; padding:0 16px; border-radius:12px; border:none; background:var(--farbe-band); color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer; }
+.kasten-link { min-height:48px; display:inline-flex; align-items:center; padding:0 16px; border-radius:12px; border:2px solid var(--border); color:var(--text); text-decoration:none; font-size:15px; font-weight:700; }
+.person-zeile {
+  display:flex; align-items:center; gap:12px; min-height:72px; padding:10px 14px; margin-bottom:10px;
+  border-radius:16px; border:2px solid var(--border); background:var(--surface); color:var(--text); text-decoration:none;
+}
+.person-zeile .kuerzel {
+  flex-shrink:0; width:44px; height:44px; border-radius:22px; display:flex; align-items:center; justify-content:center;
+  font-size:18px; font-weight:800; background:var(--surface-2); border:2px solid var(--border);
+}
+.person-zeile .rest { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.person-zeile .kopf { display:flex; justify-content:space-between; gap:8px; font-size:16px; font-weight:700; }
+.person-zeile .stand { font-weight:600; color:var(--text-2); font-size:14px; }
+.leiste { height:8px; border-radius:4px; background:var(--surface-2); overflow:hidden; }
+.fuellung { height:8px; border-radius:4px; background:var(--farbe-band); }
+.person-zeile .zeile2 { font-size:13px; color:var(--text-2); }
+.person-zeile .zeile2.rot { color:var(--rot-text); font-weight:700; }
+.frei-zeile {
+  display:flex; align-items:center; gap:10px; min-height:64px; padding:8px 8px 8px 14px; margin-bottom:10px;
+  border-radius:16px; border:2px dashed var(--border); background:var(--surface);
+}
+.frei-zeile .text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.frei-zeile .name { font-size:16px; font-weight:700; }
+.frei-zeile .info { font-size:13px; color:var(--text-2); }
+.nehmen {
+  min-height:44px; padding:0 14px; border-radius:12px; border:none; background:var(--farbe-band); color:#fff;
+  font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.einstieg {
+  display:flex; align-items:center; justify-content:space-between; min-height:52px; padding:0 16px; margin-bottom:10px;
+  border-radius:16px; background:var(--surface-2); color:var(--text); text-decoration:none; font-size:16px; font-weight:700;
+}
+.neu-link {
+  display:flex; align-items:center; justify-content:center; min-height:52px; margin-top:6px;
+  border-radius:16px; border:2px dashed var(--border); color:var(--farbe-kontrast);
+  text-decoration:none; font-size:17px; font-weight:700;
+}
+.leer { color:var(--text-2); font-size:14px; padding:6px 0 10px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 Familie heute</h1>
+<div class="nav-sub">{{ datum }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+
+  {#- Schritt 5 (6.4): Vorschlaege der naechsten Woche, dazu der Hinweis auf die
+      automatische Freigabe am Tag selbst (Entscheidung 15.1). -#}
+  {% if vorschlaege_naechste or vorschlaege_diese %}
+  <section class="kasten">
+    <h2 class="kasten-titel">Nächste Woche: {{ vorschlaege_naechste }} {% if vorschlaege_naechste == 1 %}Vorschlag{% else %}Vorschläge{% endif %}</h2>
+    <div class="kasten-text">Aus euren Routinen, schon mit Person. Einzeln ändern geht in der Woche.{% if vorschlaege_diese %} {{ vorschlaege_diese }} weitere diese Woche, werden am jeweiligen Tag automatisch freigegeben.{% endif %}</div>
+    <div class="kasten-aktionen">
+      {% if vorschlaege_naechste %}
+      <form method="post" action="/a/aufgaben{{ tp }}woche/ok">
+        <input type="hidden" name="ab" value="{{ naechster_montag }}">
+        <input type="hidden" name="zurueck" value="/a/aufgaben{{ tp }}familie">
+        <button type="submit" class="kasten-knopf">Alle übernehmen</button>
+      </form>
+      {% endif %}
+      <a class="kasten-link knopf" href="/a/aufgaben{{ tp }}woche?ab={{ naechster_montag }}">Ansehen</a>
+    </div>
+  </section>
+  {% endif %}
+
+  <h2 class="abschnitt-titel">Wer ist wie weit?</h2>
+  {% for p in fortschritt %}
+  <a class="person-zeile knopf" href="/a/aufgaben{{ tp }}{% if p.id != user.id %}?fuer={{ p.id }}{% endif %}">
+    <span class="kuerzel" aria-hidden="true" style="border-color:{{ p.farbe }}">{{ p.kuerzel }}</span>
+    <span class="rest">
+      <span class="kopf"><span>{{ p.name }}</span><span class="stand">{{ p.stand }}</span></span>
+      <span class="leiste" aria-hidden="true"><span class="fuellung" style="display:block; width:{{ p.prozent }}%"></span></span>
+      <span class="zeile2{% if p.ueberfaellig %} rot{% endif %}">{{ p.zeile2 }}</span>
+    </span>
+  </a>
+  {% endfor %}
+
+  <h2 class="abschnitt-titel">Noch ohne Person</h2>
+  {% if not ohne_person %}<div class="leer">Alles hat eine Person.</div>{% endif %}
+  {% for t in ohne_person %}
+  <div class="frei-zeile" id="termin-{{ t.id }}">
+    <span class="text">
+      <span class="name" data-emoji-alt>{{ t.inhalt }}</span>
+      <span class="info">Von {{ t.von }} · {{ t.gruppe }}</span>
+    </span>
+    {% if t.darf %}
+    <form method="post" action="/a/aufgaben{{ tp }}termin/{{ t.id }}/nehmen">
+      <input type="hidden" name="zurueck" value="/a/aufgaben{{ tp }}familie">
+      <button type="submit" class="nehmen">Ich mach’s</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <h2 class="abschnitt-titel">Mehr</h2>
+  <a class="einstieg knopf" href="/a/aufgaben{{ tp }}spaeter"><span>Später · {{ geparkt }} geparkt</span><span aria-hidden="true">›</span></a>
+  <a class="einstieg knopf" href="/a/aufgaben{{ tp }}alle"><span>Alle Aufgaben · {{ alle }}</span><span aria-hidden="true">›</span></a>
+  <a class="neu-link knopf" href="/a/aufgaben{{ tp }}neu">+ Neue Aufgabe</a>
+
+</main>
+{% endblock %}

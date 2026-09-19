@@ -176,7 +176,11 @@
 <script{{ csp_nonce }}>
 /* Wunsch #171: Der Haken schaltet um, ohne dass die Seite neu laedt und an
    den Anfang der Zwei-Wochen-Liste springt. `this` ist das Formular. */
-function gekochtAktualisiert(antwort) {
+// Wunsch #306: der Verteiler ruft handler(form, antwort) - erst das
+// Formular, dann die Antwort (Konvention aus #200). Mit `antwort` als
+// erstem Parameter kam das Formular-Element an, `antwort.ok` war undefined
+// und der Knopf blieb bis zum Neuladen unveraendert.
+function gekochtAktualisiert(form, antwort) {
   if (!antwort || !antwort.ok) return;
   const knopf = this.querySelector('.gekocht-btn');
   knopf.classList.toggle('aktiv', antwort.gekocht);

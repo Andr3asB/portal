@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Alle Aufgaben{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 6 (#302, Spezifikation 6.6, Entwurf
+    Katalog.dc.html): Suche, Filter, je Zeile Rhythmus/Termin, Person,
+    Marken, Punkte; Tipp oeffnet das Formular; Pausierte gedimmt am Ende. -#}
+.zurueck { display:inline-block; margin-bottom:14px; color:var(--farbe-kontrast); font-weight:600; text-decoration:none; }
+.suche label { display:block; font-size:14px; font-weight:700; color:var(--text-2); margin-bottom:6px; }
+.suche input {
+  width:100%; height:52px; box-sizing:border-box; border-radius:12px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); padding:0 12px; font-family:inherit;
+}
+.filter { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 16px; }
+.filter button {
+  min-height:44px; padding:0 14px; border-radius:22px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.filter button[aria-pressed="true"] { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.kat-zeile {
+  display:flex; align-items:center; gap:10px; min-height:64px; padding:10px 14px; margin-bottom:8px;
+  border-radius:16px; border:2px solid var(--border); background:var(--surface); color:var(--text); text-decoration:none;
+}
+.kat-zeile.pausiert { opacity:.55; }
+.kat-zeile .text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.kat-zeile .name { font-size:16px; font-weight:700; word-break:break-word; }
+.kat-zeile .info { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:13px; color:var(--text-2); }
+.marke { font-weight:700; color:var(--text); background:var(--surface-2); padding:2px 8px; border-radius:10px; }
+.pkt { flex-shrink:0; font-size:13px; font-weight:700; color:var(--farbe-kontrast); border:1.5px solid var(--farbe-kontrast); padding:3px 9px; border-radius:12px; }
+.kat-block { display:flex; flex-direction:column; margin-bottom:8px; }
+.kat-block .kat-zeile { margin-bottom:0; border-radius:16px 16px 0 0; }
+.pause-form { display:flex; }
+.pause-knopf {
+  flex:1; min-height:44px; border:2px solid var(--border); border-top:none; border-radius:0 0 16px 16px;
+  background:var(--surface); color:var(--text-2); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.neu-link {
+  display:flex; align-items:center; justify-content:center; min-height:52px; margin-top:14px;
+  border-radius:16px; border:2px dashed var(--border); color:var(--farbe-kontrast);
+  text-decoration:none; font-size:17px; font-weight:700;
+}
+.leer { text-align:center; color:var(--text-2); padding:24px 12px; font-size:15px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 Alle Aufgaben</h1>
+<div class="nav-sub">Antippen zum Ändern</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <a class="zurueck" href="/a/aufgaben{{ tp }}familie">← Zurück zu Familie</a>
+
+  <div class="suche">
+    <label for="a-suche">Suchen</label>
+    <input id="a-suche" type="search" placeholder="z. B. Spülmaschine" autocomplete="off" data-eingabe="katalogSuche">
+  </div>
+  <div class="filter" id="kat-filter">
+    {% for wert, name in [('alle','Alle'), ('regel','Regelmäßig'), ('einmal','Einmalig'), ('geparkt','Geparkt')] %}
+    <button type="button" data-klick="katalogFilter" data-args='[{{ wert|tojson }}]' aria-pressed="{{ 'true' if wert == 'alle' else 'false' }}">{{ name }}</button>
+    {% endfor %}
+  </div>
+
+  {% if not zeilen %}<div class="leer">Noch keine Aufgaben.</div>{% endif %}
+  <div id="kat-liste">
+  {% for a in zeilen %}
+  <div class="kat-block" id="aufgabe-{{ a.id }}" data-art="{{ a.art }}" data-suche="{{ a.suche }}">
+    <a class="kat-zeile knopf{% if a.pausiert %} pausiert{% endif %}" href="/a/aufgaben{{ tp }}aufgabe/{{ a.id }}">
+      <span class="text">
+        <span class="name" data-emoji-alt>{% if a.emoji %}{{ a.emoji }} {% endif %}{{ a.inhalt }}</span>
+        <span class="info">
+          <span>{{ a.wann }} · {{ a.wer }}</span>
+          {% if a.pausiert %}<span class="marke">Pausiert</span>{% endif %}
+          {% if a.sicht_marke %}<span class="marke">🔒 {{ a.sicht_marke }}</span>{% endif %}
+          {% if a.kachel %}<span class="marke">Kachel</span>{% endif %}
+        </span>
+      </span>
+      {% if a.punkte > 0 %}<span class="pkt">+{{ a.punkte_text }}</span>{% endif %}
+    </a>
+    {% if a.regel %}
+    <form method="post" action="/a/aufgaben{{ tp }}aufgabe/{{ a.id }}/pausieren" class="pause-form">
+      <button type="submit" class="pause-knopf">{% if a.pausiert %}Fortsetzen{% else %}Pausieren{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  </div>
+  <div class="leer" id="kat-keine" hidden>Nichts passt zu Suche und Filter.</div>
+
+  <a class="neu-link knopf" href="/a/aufgaben{{ tp }}neu">+ Neue Aufgabe</a>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Suche und Filter rein im Browser - der Katalog ist klein.
+let katArt = 'alle';
+function katalogAnwenden() {
+  const suche = (document.getElementById('a-suche').value || '').trim().toLowerCase();
+  let sichtbar = 0;
+  document.querySelectorAll('#kat-liste .kat-block').forEach(function (b) {
+    const passt = (katArt === 'alle' || b.dataset.art === katArt)
+      && (!suche || (b.dataset.suche || '').indexOf(suche) !== -1);
+    b.hidden = !passt;
+    if (passt) sichtbar += 1;
+  });
+  document.getElementById('kat-keine').hidden = sichtbar > 0
+    || document.querySelectorAll('#kat-liste .kat-block').length === 0;
+}
+function katalogFilter(art) {
+  katArt = art;
+  document.querySelectorAll('#kat-filter button').forEach(function (k) {
+    k.setAttribute('aria-pressed', JSON.parse(k.dataset.args)[0] === art ? 'true' : 'false');
+  });
+  katalogAnwenden();
+}
+function katalogSuche() { katalogAnwenden(); }
+</script>
+{% endblock %}

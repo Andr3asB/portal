@@ -69,6 +69,29 @@ def test_fetch_umschalter_haben_ihre_funktion(datei, funktion):
 
 
 @pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)
+def test_fetch_handler_nehmen_erst_das_formular(datei):
+    """Wunsch #306: Der Verteiler ruft `handler(form, antwort)` - erst das
+    Formular, dann die Antwort (Konvention aus #200). `gekochtAktualisiert
+    (antwort)` und `stornoAktualisiert(antwort)` bekamen deshalb das
+    Formular-Element als `antwort`, `antwort.ok` war undefined, und der
+    Knopf blieb bis zum Neuladen unveraendert - der Server hatte laengst
+    gespeichert. Ein Handler mit nur EINEM Parameter, der ihn wie eine
+    Antwort benutzt (`.ok`), ist genau dieser Fehler."""
+    inhalt = datei.read_text(encoding="utf-8")
+    for name in set(re.findall(r'data-fetch="(\w+)"', inhalt)):
+        m = re.search(r"function\s+" + re.escape(name) + r"\s*\(([^)]*)\)", inhalt)
+        if not m:
+            continue
+        params = [p.strip() for p in m.group(1).split(",") if p.strip()]
+        if len(params) == 1 and re.search(re.escape(params[0]) + r"\.ok\b", inhalt):
+            pytest.fail(
+                f"{datei.name}: {name}({params[0]}) behandelt den ERSTEN Parameter als "
+                f"Antwort - der Verteiler uebergibt zuerst das Formular. Signatur "
+                f"(form, antwort) verwenden (Wunsch #306)."
+            )
+
+
+@pytest.mark.parametrize("datei", sorted(TPL.glob("*.html")), ids=lambda p: p.name)
 def test_jedes_data_fetch_hat_eine_funktion(datei):
     inhalt = datei.read_text(encoding="utf-8")
     # Erklaerkommentare herausschneiden: der Verteiler in base.html nennt

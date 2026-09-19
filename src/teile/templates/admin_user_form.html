@@ -66,7 +66,7 @@ input[type=text]:focus { border-color:var(--farbe); }
     <div class="form-group">
       <label>Rolle</label>
       <div style="display:flex; gap:12px; flex-wrap:wrap;">
-        {% for val, label in [('kind','Kind'), ('eltern','Eltern'), ('gast','Gast')] %}
+        {% for val, label in [('kind','Kind'), ('eltern','Eltern'), ('gast','Gast'), ('kiosk','Kiosk')] %}
         <label style="display:flex; gap:6px; align-items:center; cursor:pointer; font-size:15px; font-weight:500; color:var(--text);">
           <input type="radio" name="rolle" value="{{ val }}"
                  {% if (edit and edit.rolle == val) or (not edit and val == 'gast') %}checked{% endif %}

@@ -231,7 +231,8 @@
 /* Wunsch #171: Storno ohne Seitensprung. Der Kontostand aendert sich mit -
    er ist der eigentliche Grund fuer das Storno; bliebe er stehen, wirkte die
    Aktion folgenlos. */
-function stornoAktualisiert(antwort) {
+// Wunsch #306: handler(form, antwort) - siehe Verteiler in base.html (#200).
+function stornoAktualisiert(form, antwort) {
   if (!antwort || !antwort.ok || !antwort.storniert) return;
   const zeile = this.closest('.kb-eintrag');
   zeile.classList.add('kb-storniert');

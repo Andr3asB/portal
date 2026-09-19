@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Woche{% endblock %}
+
+{% block extra_styles %}
+{#- Aufgaben (neu), Schritt 5 (#301, Spezifikation 6.3, Entwurf Woche.dc.html):
+    Wochenwechsel, Personenfilter, gelber Vorschlagskasten mit Sammelknopf
+    ("Alle N ok" ohne Filter, "Diese N ok" mit Filter - bestaetigt wird immer
+    nur das Sichtbare), je Tag "<Tag> ok" und "+". Zeile: Vorschlaege
+    gestrichelt, Bestaetigtes durchgezogen; Haken bestaetigt, Namens-Chip
+    oeffnet die Personenwahl, Tipp auf den Text klappt Verlegen (Mo-So) und
+    "Faellt aus" auf. Kinder lesen nur. Kein Drag & Drop. -#}
+.wochenkopf { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.wochenkopf .mitte { flex:1; text-align:center; }
+.wochenkopf .titel { font-size:18px; font-weight:700; }
+.wochenkopf .bereich { font-size:13px; color:var(--text-2); }
+.pfeil {
+  width:48px; height:48px; border-radius:24px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:20px; font-weight:700;
+}
+.filter { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.filter a {
+  min-height:40px; display:inline-flex; align-items:center; padding:0 14px; border-radius:20px;
+  border:1.5px solid var(--border); background:var(--surface); color:var(--text); text-decoration:none; font-size:14px; font-weight:600;
+}
+.filter a[aria-current="true"] { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.kasten {
+  display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px; margin-bottom:14px;
+  background:var(--surface); border:2px solid var(--farbe-kontrast);
+}
+.kasten .text { flex:1; font-size:15px; }
+.kasten strong { font-size:16px; }
+.kasten-knopf {
+  flex-shrink:0; min-height:48px; padding:0 16px; border-radius:12px; border:none; background:var(--farbe-band);
+  color:#fff; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.fertig { padding:12px 14px; border-radius:14px; background:var(--surface-2); color:var(--text-2); font-size:15px; margin-bottom:14px; }
+.tag { margin-bottom:18px; }
+.tag-kopf { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.tag-kopf h2 { flex:1; margin:0; font-size:17px; font-weight:700; }
+.tag.heute h2 { color:var(--farbe-kontrast); }
+.tag-ok {
+  min-height:44px; padding:0 12px; border-radius:12px; border:2px solid var(--farbe-kontrast); background:var(--surface);
+  color:var(--farbe-kontrast); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.tag-plus {
+  width:44px; height:44px; border-radius:12px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:20px; font-weight:700;
+}
+.nichts { font-size:14px; color:var(--text-2); padding:4px 2px 0; }
+.eintrag {
+  display:flex; flex-direction:column; border-radius:16px; border:2px solid var(--border); background:var(--surface);
+  margin-bottom:8px; overflow:hidden;
+}
+.eintrag.vorschlag { border-style:dashed; background:var(--surface-2); }
+.eintrag.erledigt { opacity:.6; }
+.eintrag-oben { display:flex; align-items:stretch; }
+.eintrag-text {
+  flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; padding:10px 8px 10px 14px; min-height:60px;
+  text-align:left; border:none; background:transparent; color:var(--text); font-family:inherit; cursor:pointer; justify-content:center;
+}
+.eintrag-text .name { font-size:16px; font-weight:700; word-break:break-word; }
+.eintrag.erledigt .name { text-decoration:line-through; }
+.eintrag-text .info { font-size:13px; color:var(--text-2); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.marke { font-weight:700; color:var(--text); background:var(--surface); padding:2px 8px; border-radius:10px; border:1px solid var(--border); }
+.person-chip {
+  align-self:center; flex-shrink:0; min-height:40px; padding:0 12px; border-radius:20px; border:2px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; margin-right:6px;
+}
+.person-chip.farbtext { border-color:var(--ft-dunkel); }
+.person-chip[disabled] { cursor:default; }
+.ok-form { display:flex; }
+.ok-knopf {
+  width:52px; border:none; border-left:1px solid var(--border); background:transparent; color:var(--farbe-kontrast);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.auf { padding:10px 14px 12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:10px; }
+.auf .etikett { font-size:13px; font-weight:700; color:var(--text-2); }
+.ziele { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:5px; }
+.ziele form { display:flex; }
+.ziele button {
+  flex:1; min-height:44px; padding:0; border-radius:10px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.ziele button[aria-pressed="true"] { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.personen { display:flex; flex-wrap:wrap; gap:6px; }
+.personen form { display:flex; }
+.personen button {
+  min-height:40px; padding:0 12px; border-radius:20px; border:2px solid var(--border); background:var(--surface);
+  color:var(--text); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.personen button[aria-pressed="true"] { background:var(--farbe-band); border-color:var(--farbe-band); color:#fff; }
+.auf-aktionen { display:flex; gap:8px; flex-wrap:wrap; }
+.aus-knopf, .stift-link {
+  min-height:44px; padding:0 14px; border-radius:12px; border:2px solid var(--text); background:var(--surface);
+  color:var(--text); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; text-decoration:none;
+  display:inline-flex; align-items:center;
+}
+.aus-knopf { border-color:var(--rot-text); color:var(--rot-text); }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 {{ titel }}</h1>
+<div class="nav-sub">{{ bereich }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+
+  <div class="wochenkopf">
+    <a class="pfeil knopf" href="/a/aufgaben{{ tp }}woche?ab={{ vorher }}{% if wer %}&wer={{ wer }}{% endif %}" title="Vorherige Woche" aria-label="Vorherige Woche">‹</a>
+    <div class="mitte"><div class="titel">{{ titel }}</div><div class="bereich">{{ bereich }}</div></div>
+    <a class="pfeil knopf" href="/a/aufgaben{{ tp }}woche?ab={{ nachher }}{% if wer %}&wer={{ wer }}{% endif %}" title="Folgende Woche" aria-label="Folgende Woche">›</a>
+  </div>
+
+  {% if filter_optionen %}
+  <div class="filter" aria-label="Personenfilter">
+    {% for f in filter_optionen %}
+    <a class="knopf" href="/a/aufgaben{{ tp }}woche?ab={{ montag }}{% if f.wert %}&wer={{ f.wert }}{% endif %}"{% if f.wert == wer %} aria-current="true"{% endif %}>{{ f.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if ist_eltern %}
+  {% if offene %}
+  <div class="kasten" id="vorschlag-kasten">
+    <div class="text"><strong>{{ offene }} {% if offene == 1 %}Vorschlag{% else %}Vorschläge{% endif %}{% if wer_name %} für {{ wer_name }}{% endif %}.</strong> Gestrichelt heißt: noch nicht bestätigt.</div>
+    <form method="post" action="/a/aufgaben{{ tp }}woche/ok" data-fetch="wocheBestaetigt">
+      <input type="hidden" name="ab" value="{{ montag }}">
+      <input type="hidden" name="wer" value="{{ wer }}">
+      <button type="submit" class="kasten-knopf">{% if wer %}Diese {{ offene }} ok{% else %}Alle {{ offene }} ok{% endif %}</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="fertig" id="vorschlag-kasten">{% if wer_name %}Für {{ wer_name }} ist alles bestätigt.{% else %}Die Woche steht. Alles bestätigt.{% endif %}</div>
+  {% endif %}
+  {% endif %}
+
+  {% for d in tage %}
+  <section class="tag{% if d.heute %} heute{% endif %}" id="tag-{{ d.iso }}">
+    <div class="tag-kopf">
+      <h2>{{ d.titel }}</h2>
+      {% if ist_eltern and d.offene %}
+      <form method="post" action="/a/aufgaben{{ tp }}woche/ok" data-fetch="wocheBestaetigt">
+        <input type="hidden" name="ab" value="{{ montag }}"><input type="hidden" name="tag" value="{{ d.iso }}"><input type="hidden" name="wer" value="{{ wer }}">
+        <button type="submit" class="tag-ok">{{ d.kurz }} ok</button>
+      </form>
+      {% endif %}
+      {% if darf_anlegen and not d.vergangen %}
+      <a class="tag-plus knopf" href="/a/aufgaben{{ tp }}neu?tag={{ d.iso }}" title="Neue Aufgabe für {{ d.name }}" aria-label="Neue Aufgabe für {{ d.name }}">+</a>
+      {% endif %}
+    </div>
+    {% if not d.eintraege %}<div class="nichts">Nichts geplant</div>{% endif %}
+    {% for t in d.eintraege %}
+    <div class="eintrag{% if t.vorschlag %} vorschlag{% endif %}{% if t.erledigt %} erledigt{% endif %}" id="termin-{{ t.id }}" data-tag="{{ d.iso }}">
+      <div class="eintrag-oben">
+        {% if t.bearbeitbar %}
+        <button type="button" class="eintrag-text" data-klick="eintragAufklappen" data-args='[{{ t.id }}]' data-panel="auf-{{ t.id }}">
+          <span class="name" data-emoji-alt>{% if t.emoji %}{{ t.emoji }} {% endif %}{{ t.inhalt }}</span>
+          <span class="info"><span>{{ t.info }}</span>{% if t.sicht_marke %}<span class="marke">🔒 {{ t.sicht_marke }}</span>{% endif %}</span>
+        </button>
+        {% else %}
+        <span class="eintrag-text">
+          <span class="name" data-emoji-alt>{% if t.emoji %}{{ t.emoji }} {% endif %}{{ t.inhalt }}</span>
+          <span class="info"><span>{{ t.info }}</span>{% if t.sicht_marke %}<span class="marke">🔒 {{ t.sicht_marke }}</span>{% endif %}</span>
+        </span>
+        {% endif %}
+        <button type="button" class="person-chip{% if t.farbe %} farbtext{% endif %}"{% if t.farbe %} style="--ft-dunkel:{{ farbe_kontrast(t.farbe) }};--ft-hell:{{ farbe_kontrast_hell(t.farbe) }}"{% endif %}
+                {% if t.bearbeitbar %}data-klick="eintragAufklappen" data-args='[{{ t.id }}]' data-panel="auf-{{ t.id }}"{% else %}disabled{% endif %}
+                title="Person ändern, aktuell {{ t.person }}" aria-label="Person ändern, aktuell {{ t.person }}">{{ t.person }}</button>
+        {% if t.vorschlag and ist_eltern %}
+        <form method="post" action="/a/aufgaben{{ tp }}termin/{{ t.id }}/ok" class="ok-form" data-fetch="terminBestaetigt">
+          <button type="submit" class="ok-knopf" title="{{ t.inhalt }} am {{ d.name }} bestätigen" aria-label="{{ t.inhalt }} am {{ d.name }} bestätigen"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9"></path></svg></button>
+        </form>
+        {% endif %}
+      </div>
+      {% if t.bearbeitbar %}
+      <div class="auf" id="auf-{{ t.id }}" hidden>
+        <div class="etikett">An einen anderen Tag legen</div>
+        <div class="ziele">
+          {% for z in tage %}
+          <form method="post" action="/a/aufgaben{{ tp }}termin/{{ t.id }}/verlegen" data-fetch="terminVerlegt">
+            <input type="hidden" name="tag" value="{{ z.iso }}">
+            <button type="submit" aria-pressed="{{ 'true' if z.iso == d.iso else 'false' }}"{% if z.iso == d.iso %} disabled{% endif %}>{{ z.kurz }}</button>
+          </form>
+          {% endfor %}
+        </div>
+        <div class="etikett">Person</div>
+        <div class="personen">
+          {% for p in personen %}
+          <form method="post" action="/a/aufgaben{{ tp }}termin/{{ t.id }}/person" data-fetch="personGesetzt">
+            <input type="hidden" name="user_id" value="{{ p.id }}">
+            <button type="submit" aria-pressed="{{ 'true' if p.id == t.person_id else 'false' }}">{{ p.name }}</button>
+          </form>
+          {% endfor %}
+        </div>
+        <div class="auf-aktionen">
+          <form method="post" action="/a/aufgaben{{ tp }}termin/{{ t.id }}/aus" data-fetch="terminGestrichen">
+            <button type="submit" class="aus-knopf">Fällt aus</button>
+          </form>
+          {% if t.regel %}
+          <a class="stift-link knopf" href="/a/aufgaben{{ tp }}aufgabe/{{ t.aufgabe_id }}?termin={{ t.id }}">✏️ Bearbeiten</a>
+          {% else %}
+          <a class="stift-link knopf" href="/a/aufgaben{{ tp }}aufgabe/{{ t.aufgabe_id }}">✏️ Bearbeiten</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script{{ csp_nonce }}>
+// Verteiler-Konvention (Wunsch #200): erst data-args, dann das Element.
+function eintragAufklappen(id) {
+  const panel = document.getElementById('auf-' + id);
+  panel.hidden = !panel.hidden;
+}
+function terminBestaetigt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const eintrag = form.closest('.eintrag');
+  eintrag.classList.remove('vorschlag');
+  form.remove();
+  vorschlagszaehlerNachziehen();
+}
+function wocheBestaetigt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  location.reload();
+}
+function terminVerlegt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  location.reload();
+}
+function personGesetzt(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const eintrag = form.closest('.eintrag');
+  eintrag.querySelector('.person-chip').textContent = antwort.person;
+  eintrag.querySelectorAll('.personen button').forEach(function (k) {
+    k.setAttribute('aria-pressed', String(k.closest('form').querySelector('[name=user_id]').value) === String(antwort.user_id) ? 'true' : 'false');
+  });
+  document.getElementById('auf-' + eintrag.id.replace('termin-', '')).hidden = true;
+}
+// "Faellt aus": Zeile verschwindet, Rueckgaengig-Meldung (base.html) mit
+// dem Rueckweg; gibt es weitere Termine derselben Aufgabe in der Woche,
+// bietet die Meldung "Auch die anderen N streichen" (Spezifikation 6.3).
+function sendeZurueck(zurueck) {
+  const daten = new FormData();
+  Object.keys(zurueck.daten || {}).forEach(function (k) { daten.append(k, zurueck.daten[k]); });
+  return fetch(zurueck.url, { method: 'POST', body: daten, headers: { 'Accept': 'application/json' } })
+    .then(function () { location.reload(); });
+}
+function terminGestrichen(form, antwort) {
+  if (!antwort || !antwort.ok) return;
+  const eintrag = form.closest('.eintrag');
+  const url = form.action;
+  eintrag.remove();
+  vorschlagszaehlerNachziehen();
+  if (antwort.rest > 0) {
+    window.rueckgaengigMeldung(antwort.text + ' Rückgängig?', function () { sendeZurueck(antwort.zurueck); },
+      'Rückgängig');
+    const box = document.getElementById('rueckgaengig');
+    // zweiter Weg: auch die anderen streichen - als eigener Text-Link im Status
+    const extra = document.createElement('button');
+    extra.type = 'button';
+    extra.textContent = 'Auch die anderen ' + antwort.rest + ' streichen';
+    extra.addEventListener('click', function () {
+      const daten = new FormData(); daten.append('woche', '1');
+      fetch(url, { method: 'POST', body: daten, headers: { 'Accept': 'application/json' } })
+        .then(function () { location.reload(); });
+    });
+    box.appendChild(extra);
+    setTimeout(function () { extra.remove(); }, 6000);
+  } else {
+    window.rueckgaengigMeldung(antwort.text, function () { sendeZurueck(antwort.zurueck); });
+  }
+}
+function vorschlagszaehlerNachziehen() {
+  const offen = document.querySelectorAll('.eintrag.vorschlag').length;
+  const kasten = document.getElementById('vorschlag-kasten');
+  if (kasten && offen === 0) {
+    kasten.className = 'fertig';
+    kasten.textContent = 'Die Woche steht. Alles bestätigt.';
+  }
+}
+</script>
+{% endblock %}

@@ -184,7 +184,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt     # Windows
 .venv/bin/pip install -r requirements-dev.txt         # Linux/macOS
 
-# Alles (2735 Tests, Stand 19.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
+# Alles (2967 Tests, Stand 19.09.2026, gut zwei Minuten – der Guardrail-Test startet 60× bash)
 .venv/Scripts/python -m pytest tests/ -q
 
 # Eine Datei, ein einzelner Test, ein Muster über alle Dateien
@@ -438,6 +438,10 @@ der Test-Client tritt dafür in `conftest.py` als Browser auf.
   Nutzerdaten eingesetzt werden.
 - Jede Route prüft `grant()` zuerst; destruktive Aktionen zusätzlich
   `is_admin`/Owner-Check.
+- **Rollen:** `eltern`, `kind`, `gast` und seit #300 `kiosk` (das
+  Esszimmer-Konto der neuen Aufgaben-App, Spezifikation 5.7). Wer Rollen
+  aufzählt (Verwaltung, `_auto_grant_all()`, App-Rechte), behandelt `kiosk`
+  wie einen Gast, der nur „Aufgaben (neu)" bekommt – nie Auto-Grants.
 - Jedes echte (nicht reversible) Löschen fragt vorher per `confirm()` nach –
   seit Wunsch #142 (CSP) über das Attribut `data-bestaetigen="Frage?"` am
   Formular, das ein zentraler Verteiler in `base.html` auswertet. **Kein

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% set app_slug = "aufgaben" %}
+{% block title %}Wer bist du?{% endblock %}
+
+{% block extra_styles %}
+{#- Kiosk-Einstieg (#300, Spezifikation 5.7): vier grosse Flaechen, eine je
+    Person. Danach zeigt Heute nur "Heute dran", "Noch zu haben" und die
+    Kacheln der gewaehlten Person - ausschliesslich sicht='alle'. -#}
+.personen { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; margin-top:8px; }
+.person {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  min-height:140px; border-radius:20px; border:3px solid var(--border); background:var(--surface);
+  color:var(--text); text-decoration:none; font-size:22px; font-weight:700;
+}
+.person .kuerzel {
+  width:56px; height:56px; border-radius:28px; display:flex; align-items:center; justify-content:center;
+  font-size:24px; font-weight:800; color:var(--text); background:var(--surface-2);
+}
+.frage { font-size:20px; font-weight:700; margin:6px 0 4px; }
+.hinweis { font-size:14px; color:var(--text-2); margin-bottom:12px; }
+{% endblock %}
+
+{% block nav_title %}
+<h1 class="nav-title">📝 Aufgaben</h1>
+<div class="nav-sub">{{ datum }}</div>
+{% endblock %}
+
+{% block body %}
+<main class="main" id="main">
+  <h2 class="frage">Wer bist du?</h2>
+  <div class="hinweis">Tipp auf deinen Namen. Danach siehst du, was heute dran ist.</div>
+  <div class="personen">
+    {% for p in personen %}
+    <a class="person knopf" href="/a/aufgaben{{ tp }}?fuer={{ p.id }}" style="border-color:{{ p.farbe }}">
+      <span class="kuerzel" aria-hidden="true">{{ (p.name or '?')[:1]|upper }}</span>
+      <span>{{ p.name }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}
