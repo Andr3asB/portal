@@ -3218,6 +3218,12 @@ python -m venv .venv                                   # einmalig
   mit cap_add NET_BIND_SERVICE und /config; util_tmp als Volume statt tmpfs;
   Images per Version+Digest; Dockerfiles mit FROM-Digest, USER, compileall;
   .dockerignore mit `.env*`/`*.db`/`__pycache__`; util in Familienzeit.
+- `test_geholfen_matrix.py::test_eintrag_kurz_vor_mitternacht_zaehlt_zum_familientag`
+  – Wunsch #296. War vom 18.09.2026 an rot, weil `_matrix_fuer()` die
+  SQL-Grenze aus `datetime('now')` nahm, die Spalten aber aus `heute_lokal()`;
+  seit v263 kommt die Grenze aus derselben Kalenderquelle (Vortag des
+  aeltesten Tages, 00:00 UTC). Wer `heute_lokal` in einem Test festnagelt,
+  bekommt jetzt ein Fenster, das mitwandert.
 - `test_sitzung_haertung.py` – Wunsch #293 (Audit N-15). Neue Sitzung mit
   `ablauf` in 365 Tagen; Abgelaufenes wird geraeumt, Kiosk-Sitzung ohne
   Ablauf bleibt; hoechstens 20 je Nutzer, die am laengsten unbenutzte

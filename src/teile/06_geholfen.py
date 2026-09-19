@@ -173,11 +173,18 @@ def _matrix_fuer(db):
     # Einen Tag mehr holen als noetig: die Grenze liegt in UTC, der Tag in
     # Familienzeit - was um 23:30 lokal am aeltesten Tag passiert ist, steht
     # in UTC schon am Vortag.
+    #
+    # Wunsch #296: Die Grenze kommt aus DERSELBEN Kalenderquelle wie die
+    # Spalten (`heute_lokal()`), nicht aus `datetime('now')` der SQLite-Uhr.
+    # Vorher liefen hier zwei Kalender nebeneinander - unsichtbar im Betrieb
+    # (beide zeigen heute), aber ein Test, der `heute_lokal` auf einen festen
+    # Tag setzt, kippte elf Tage spaeter, weil die SQL-Grenze weiterwanderte.
+    grenze = (tage[0] - timedelta(days=1)).isoformat() + " 00:00:00"
     rows = db.execute("""
         SELECT zeitstempel, user_id, aufgabe_id FROM geholfen_eintraege
-        WHERE  zeitstempel >= datetime('now', ?)
+        WHERE  zeitstempel >= ?
         ORDER  BY zeitstempel
-    """, (f"-{MATRIX_TAGE + 1} days",)).fetchall()
+    """, (grenze,)).fetchall()
     ereignisse = [(utc_zu_lokal_datum(r["zeitstempel"]), r["user_id"], r["aufgabe_id"]) for r in rows]
     return matrix_daten(ereignisse, tage, aufgaben, personen)
 

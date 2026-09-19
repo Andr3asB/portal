@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-09-19 – portal-v263: #296 Matrix-Fenster aus einer Kalenderquelle; #281 Betroffenheit geprüft
+
+### #296 (`hoch`) – der Geholfen-Test kippte nach elf Tagen
+
+`_matrix_fuer()` in `06_geholfen.py` holte die Einträge mit
+`datetime('now', '-11 days')` aus der SQLite-Uhr, baute die Spalten aber aus
+`heute_lokal()`. Im Betrieb zeigen beide denselben Tag; der Test, der
+`heute_lokal` auf den 07.09. festnagelt, verlor am 18.09. den Eintrag vom
+06.09., weil die SQL-Grenze weiterwanderte. Jetzt kommt die Grenze aus
+derselben Quelle: Vortag des ältesten sichtbaren Tages, 00:00 UTC (deckt die
+Zeitzonenverschiebung ab). Kein Verhalten für die Familie geändert, ein Test
+weniger, der nach Kalender kippt. Die Übersicht (`uebersicht`) rechnet
+weiterhin in UTC – das steht in der Bestandsaufnahme
+(`docs/status_quo_aufgaben_geholfen_aufgabenplan.md`) und gehört zur
+geplanten Überarbeitung, nicht zu diesem Wunsch.
+
+### #281 – Andis Antwort: Historie umschreiben, vorher Betroffene prüfen
+
+Geprüft per HMAC im Container, ohne einen Token auszugeben: Von den fünf
+geleakten Tokens (einer in `server.md` @ c7eaff6 auf GitHub, fünf in der
+alten `settings.local.json`, die nur lokal und in den Deploy-Archiven bis
+v257 lag) sind vier **noch gültig**, alle von Andi (home, admin, werkstatt,
+geholfen); der Todo-Token war schon rotiert. Deshalb Rückfrage statt
+Handeln: Andi rotiert zuerst selbst per „Neuer Zugang + QR" (sein Gerät
+bleibt angemeldet, der neue Token erscheint nur bei ihm – in meinem
+Protokoll wäre er das nächste Leck), danach die Historie. Das Umschreiben
+braucht `filter-branch` und `push --force`, beides blockiert der Guardrail
+aus #290 mit Absicht; Andi entscheidet, ob er die Befehle selbst ausführt
+oder mir die Regeln für diesen einen Lauf freigibt.
+
+---
+
 ## 2026-09-19 – Bestandsaufnahme Aufgaben / Geholfen / Aufgabenplan (kein Portal-Code)
 
 Andi plant eine Überarbeitung der drei Apps und wollte vorher den vollständigen
